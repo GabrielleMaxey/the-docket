@@ -51,6 +51,25 @@ const sortIssues = ({ issues, isClosedLikeStatus, jiraRowPriorities, clampPriori
   });
 };
 
+const getIssueBrowseUrl = (issue) => {
+  const issueKey = String(issue?.key || "").trim();
+  if (!issueKey) {
+    return "";
+  }
+
+  const selfUrl = issue?.self;
+  if (typeof selfUrl === "string" && selfUrl.trim().length > 0) {
+    try {
+      const parsed = new URL(selfUrl);
+      return `${parsed.protocol}//${parsed.host}/browse/${encodeURIComponent(issueKey)}`;
+    } catch {
+      return "";
+    }
+  }
+
+  return "";
+};
+
 const JiraResultsTable = ({
   jqlRuns,
   selectedForPush,
@@ -229,6 +248,7 @@ const JiraResultsTable = ({
                 <tbody>
                   {pagedIssues.map((issue) => {
                     const issueKey = issue.key;
+                    const issueBrowseUrl = getIssueBrowseUrl(issue);
                     const status = issue.fields?.status?.name || "-";
                     const assignee = issue.fields?.assignee?.displayName || "Unassigned";
                     const updated = formatDate(issue.fields?.updated);
@@ -243,7 +263,15 @@ const JiraResultsTable = ({
                         key={issue.id}
                         className={isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}
                       >
-                        <td className="ww-cell-key">{issueKey}</td>
+                        <td className="ww-cell-key">
+                          {issueBrowseUrl ? (
+                            <a href={issueBrowseUrl} target="_blank" rel="noreferrer noopener">
+                              {issueKey}
+                            </a>
+                          ) : (
+                            issueKey
+                          )}
+                        </td>
                         <td>{issue.fields?.issuetype?.name || "-"}</td>
                         <td>{issue.fields?.summary || "No summary"}</td>
 
