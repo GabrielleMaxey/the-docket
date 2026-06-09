@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { IconContext } from 'react-icons/lib'
 import { animateScroll as scroll } from 'react-scroll';
-import { Nav, NavLink, Bars, NavMenu, MobileIcon, NavLogo, NavLogoIcon, NavBarContainer, NavItem, NavLinkRoute } from './navbarElements';
+import { Nav, Bars, NavMenu, MobileIcon, NavLogo, NavLogoIcon, NavBarContainer } from './navbarElements';
 
 //header video obtained from pexels.com*//
 
@@ -17,6 +17,7 @@ const NavBar = ({ toggle }) => {
     };
     useEffect(() => {
         window.addEventListener('scroll', changeNav);
+        return () => window.removeEventListener('scroll', changeNav);
     }, []);
 
     const toggleHome = () => {
@@ -25,30 +26,17 @@ const NavBar = ({ toggle }) => {
 
     return  (
 <>
-    <IconContext.Provider value={{ color: '#121213' }}>
+    <IconContext.Provider value={{ color: '#303032' }}>
         <Nav scrollNav={ scrollNav }>
             <NavBarContainer>
                 <NavLogo to='/' onClick={ toggleHome }>
-                    <NavLogoIcon aria-hidden='true'>🤹</NavLogoIcon>
+                    <NavLogoIcon src='/task-manager-favicon.svg' alt='' aria-hidden='true' />
                     Task Manager
                 </NavLogo>
                     <MobileIcon onClick={ toggle }>
                             <Bars />
                     </MobileIcon>
-                        <NavMenu>
-                            {/* <NavItem>
-                                <NavLink to="about" smooth="true" duration={500} spy='true' exact='true' offset={ -80 } > Pick Focus </NavLink>
-                            </NavItem> */}
-                            {/* <NavItem>
-                                <NavLink to="/" smooth="true" duration={500} spy='true' exact='true' offset={ -80 } > Work Time </NavLink>
-                            </NavItem>
-                            <NavItem>
-                                <NavLink to="/" smooth="true" duration={500} spy= 'true' exact='true' offset={ -80 }> Data </NavLink>
-                            </NavItem>
-                            <NavItem>
-                                <NavLinkRoute to="/" smooth={true}  duration={500} spy= 'true' exact='true' offset={ -80 }> Jira </NavLinkRoute>
-                            </NavItem> */}
-                        </NavMenu>
+                        <NavMenu />
                 </NavBarContainer>
             </Nav>
         </IconContext.Provider>

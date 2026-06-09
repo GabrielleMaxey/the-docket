@@ -21,7 +21,20 @@ const JOKE_TICKER_ITEMS = [
   "My favorite cardio is sprint planning.",
   "Task juggling level: circus-grade project management.",
   "Current KPI: fewer tabs, more done.",
+  "There are only two hard things in task management: estimation, prioritization, and remembering what the third one was.",
+  "I closed three tabs today and called it workflow optimization.",
 ];
+
+const shuffleItems = (items) => {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled;
+};
 
 const getCalendarCells = (date) => {
   const year = date.getFullYear();
@@ -90,7 +103,7 @@ const WorkWeekTimer = () => {
   } = useTaskManagerJira();
 
   const [jokeIndex, setJokeIndex] = React.useState(0);
-  const [dadJoke, setDadJoke] = React.useState("");
+  const [apiJokes, setApiJokes] = React.useState([]);
 
   const today = React.useMemo(() => new Date(), []);
   const todayDay = today.getDate();
@@ -103,47 +116,71 @@ const WorkWeekTimer = () => {
   });
   const calendarCells = React.useMemo(() => getCalendarCells(today), [today]);
   const tickerJokes = React.useMemo(() => {
-    if (!dadJoke) {
+    if (apiJokes.length === 0) {
       return JOKE_TICKER_ITEMS;
     }
 
-    return [dadJoke, ...JOKE_TICKER_ITEMS];
-  }, [dadJoke]);
+    return [...apiJokes, ...JOKE_TICKER_ITEMS];
+  }, [apiJokes]);
 
-  const fetchDadJoke = React.useCallback(async () => {
+  const fetchApiJokes = React.useCallback(async () => {
+    const nextApiJokes = [];
+
     try {
-      const response = await fetch("https://icanhazdadjoke.com/", {
+      const dadResponse = await fetch("https://icanhazdadjoke.com/", {
         headers: {
           Accept: "application/json",
         },
       });
 
-      if (!response.ok) {
-        return;
-      }
+      if (dadResponse.ok) {
+        const dadData = await dadResponse.json();
+        const dadJoke = String(dadData?.joke || "").trim();
 
-      const data = await response.json();
-      const nextJoke = String(data?.joke || "").trim();
-
-      if (nextJoke) {
-        setDadJoke(`Dad Joke: ${nextJoke}`);
+        if (dadJoke) {
+          nextApiJokes.push(dadJoke);
+        }
       }
     } catch {
       // Keep static jokes when API is unavailable.
     }
+
+    try {
+      const programmingResponse = await fetch(
+        "https://v2.jokeapi.dev/joke/Programming?safe-mode&type=single",
+        {
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (programmingResponse.ok) {
+        const programmingData = await programmingResponse.json();
+        const programmingJoke = String(programmingData?.joke || "").trim();
+
+        if (programmingJoke) {
+          nextApiJokes.push(programmingJoke);
+        }
+      }
+    } catch {
+      // Keep static jokes when API is unavailable.
+    }
+
+    setApiJokes(shuffleItems(nextApiJokes));
   }, []);
 
   React.useEffect(() => {
-    fetchDadJoke();
-  }, [fetchDadJoke]);
+    fetchApiJokes();
+  }, [fetchApiJokes]);
 
   React.useEffect(() => {
-    const jokeRefreshId = window.setInterval(fetchDadJoke, TEN_MINUTES_MS);
+    const jokeRefreshId = window.setInterval(fetchApiJokes, TEN_MINUTES_MS);
 
     return () => {
       window.clearInterval(jokeRefreshId);
     };
-  }, [fetchDadJoke]);
+  }, [fetchApiJokes]);
 
   React.useEffect(() => {
     const intervalId = window.setInterval(() => {

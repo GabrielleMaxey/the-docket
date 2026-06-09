@@ -33,7 +33,7 @@ On the Work Week page:
 - Enter each JQL in its input.
 - Click **Run JQL**.
 
-The UI will show grouped results for each query, including total matches and up to five issues per query.
+The UI will show grouped results for each query, including total matches, pagination controls, and a configurable Max results value.
 
 ## Team-friendly secret handling
 
