@@ -97,17 +97,17 @@ When sharing current local metadata with teammates, prefer creating explicit exp
   - npm run desktop:pack
 - Create release artifacts using current platform defaults:
   - npm run desktop:dist
-- Build a macOS DMG:
+- Build a macOS DMG: **TODO**
   - npm run desktop:dist:mac
 - Build a Windows NSIS installer:
   - npm run desktop:dist:win
 
-### Packaging Notes
+### Packaging Notes **TODO**
 - Artifacts are written to the release/ directory.
 - macOS notarization/signing requires a valid Apple Developer certificate.
 - Windows installer generation is scripted in this repo, but creating Windows installers is most reliable when run on Windows CI/host.
 
-## CI Packaging
+## CI Packaging **TODO**
 - Workflow file:
   - .github/workflows/desktop-packaging.yml
 - Triggers:
@@ -119,9 +119,9 @@ When sharing current local metadata with teammates, prefer creating explicit exp
 - Download location:
   - GitHub repository Actions tab, inside the specific workflow run artifacts section.
 
-## Core UI Behavior
+## Core UI Behavior 
 - Query management:
-  - Supports up to 3 saved JQL entries with editable labels.
+  - Supports up to 4 saved JQL entries with editable labels.
   - Query inputs and labels persist in local storage.
 - Results table:
   - Closed/resolved items are visually separated and treated as non-editable.

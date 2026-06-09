@@ -124,7 +124,7 @@ const isClosedLikeStatus = (status) => /^(closed|resolved|done)$/i.test(String(s
 
 const getPriorityClass = (value) => {
   const clamped = clampPriority(value);
-  if (clamped < 1 || clamped > 5) {
+  if (clamped < 1 || clamped > 10) {
     return "ww-priority-neutral";
   }
 
@@ -133,7 +133,7 @@ const getPriorityClass = (value) => {
 
 const getPriorityRowClass = (value) => {
   const clamped = clampPriority(value);
-  if (clamped < 1 || clamped > 5) {
+  if (clamped < 1 || clamped > 10) {
     return "ww-row-priority-neutral";
   }
 

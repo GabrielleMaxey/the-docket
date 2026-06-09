@@ -5,7 +5,7 @@ import { Link as LinkScroll } from 'react-scroll'
 import styled from 'styled-components';
 
 export const Nav = styled.nav `
-    background: ${({ scrollNav}) => (scrollNav ? '#2f3136' : 'transparent' )};
+    background: ${({ scrollNav}) => (scrollNav ? '#c7d3f1' : 'transparent' )};
     height: 80px;
     display: flex;
     align-items: center;
@@ -36,7 +36,7 @@ export const NavLogo = styled(RouterLink)
     margin-left: 20px;
     cursor: pointer;
     text-decoration: none;
-    font-size: 2rem;
+    font-size: 2.5rem;
     display: flex;
     align-items: center;
     font-weight: bold;
@@ -45,15 +45,15 @@ export const NavLogo = styled(RouterLink)
 
 export const NavLogoIcon = styled.img`
     display: inline-block;
-    width: 3.4rem;
-    height: 3.4rem;
+    width: 4.5rem;
+    height: 4.5rem;
     margin-right: 0.65rem;
     object-fit: contain;
     transform: translateY(-1px);
 
     @media screen and (max-width: 768px) {
-        width: 3rem;
-        height: 3rem;
+        width: 3.4rem;
+        height: 3.4rem;
     }
 `;
 

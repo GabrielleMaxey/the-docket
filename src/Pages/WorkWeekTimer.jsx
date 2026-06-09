@@ -209,95 +209,119 @@ const WorkWeekTimer = () => {
         />
 
         <Segment raised className="ww-segment">
-                <Card.Content>
-                  <Header as="h2">
-                    <Icon name="tasks" />
-                    <Header.Content>Task Manager</Header.Content>
-                  </Header>
-                  <p className="ww-copy">Run saved JQL queries and manage Jira tasks.</p>
-                </Card.Content>
-                <Card.Content extra>
-                  <p className="ww-copy">Update status, assignee, priority, and notes.</p>
-                </Card.Content>
-                <Card.Content extra>
-                  <Button
-                    primary
-                    onClick={handleJiraTest}
-                    loading={jiraState.loading}
-                    disabled={jiraState.loading}
-                  >
-                    Test Jira Connection
-                  </Button>
-                  <p
-                    className={`ww-jira-status ${
-                      jiraState.success === false ? "ww-jira-error" : ""
-                    }`}
-                  >
-                    {jiraState.message}
-                  </p>
-                  {jiraApiMeta ? <p className="ww-jira-meta">{jiraApiMeta}</p> : null}
-                </Card.Content>
-                <Card.Content extra>
-                  <div className="ww-jql-controls">
-                    <label htmlFor="jql-count">JQL count:</label>
-                    <select
-                      id="jql-count"
-                      value={jqlCount}
-                      onChange={(event) => setJqlCount(Number(event.target.value))}
-                    >
-                      <option value={1}>1</option>
-                      <option value={2}>2</option>
-                      <option value={3}>3</option>
-                    </select>
-                  </div>
+          <Card.Content>
+            <Header as="h2">
+              <Icon name="tasks" />
+              <Header.Content>Task Manager</Header.Content>
+            </Header>
+            <p className="ww-copy">
+              Run saved JQL queries and manage Jira tasks.
+            </p>
+          </Card.Content>
+          <Card.Content extra>
+            <p className="ww-copy">
+              Update status, assignee, priority, and notes.
+            </p>
+          </Card.Content>
+          <Card.Content extra>
+            <Button
+              primary
+              onClick={handleJiraTest}
+              loading={jiraState.loading}
+              disabled={jiraState.loading}
+            >
+              Test Jira Connection
+            </Button>
+            <p
+              className={`ww-jira-status ${
+                jiraState.success === false ? "ww-jira-error" : ""
+              }`}
+            >
+              {jiraState.message}
+            </p>
+            {jiraApiMeta ? <p className="ww-jira-meta">{jiraApiMeta}</p> : null}
+          </Card.Content>
+          <Card.Content extra>
+            <div className="ww-jql-controls">
+              <label htmlFor="jql-count">JQL count:</label>
+              <select
+                id="jql-count"
+                value={jqlCount}
+                onChange={(event) => setJqlCount(Number(event.target.value))}
+              >
+                <option value={1}>1</option>
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+                <option value={4}>4</option>
+              </select>
+            </div>
 
-                  {Array.from({ length: jqlCount }).map((_, index) => (
-                    <div key={`jql-input-${index}`} className="ww-jql-input-wrap">
-                      <div className="ww-jql-row-head">
-                        <label htmlFor={`jql-label-${index}`}>Label {index + 1}</label>
-                      </div>
-                      <div className="ww-jql-row-inline">
-                        <input
-                          id={`jql-label-${index}`}
-                          type="text"
-                          value={jqlLabels[index]}
-                          onChange={(event) => handleJqlLabelChange(index, event.target.value)}
-                          placeholder={`Label for JQL ${index + 1}`}
-                        />
-                      </div>
+            {Array.from({ length: jqlCount }).map((_, index) => (
+              <div key={`jql-input-${index}`} className="ww-jql-input-wrap">
+                <div className="ww-jql-row-head">
+                  <label htmlFor={`jql-label-${index}`}>
+                    Label {index + 1}
+                  </label>
+                </div>
+                <div className="ww-jql-row-inline">
+                  <input
+                    id={`jql-label-${index}`}
+                    type="text"
+                    value={jqlLabels[index]}
+                    onChange={(event) =>
+                      handleJqlLabelChange(index, event.target.value)
+                    }
+                    placeholder={`Label for JQL ${index + 1}`}
+                  />
+                </div>
 
-                      <input
-                        id={`jql-${index}`}
-                        type="text"
-                        value={jqlInputs[index]}
-                        onChange={(event) => handleJqlChange(index, event.target.value)}
-                        placeholder="project = ABC ORDER BY updated DESC"
-                      />
-                    </div>
-                  ))}
+                <input
+                  id={`jql-${index}`}
+                  type="text"
+                  value={jqlInputs[index]}
+                  onChange={(event) =>
+                    handleJqlChange(index, event.target.value)
+                  }
+                  placeholder="project = ABC ORDER BY updated DESC"
+                />
+              </div>
+            ))}
 
-                  <div className="ww-jql-maxresults">
-                    <label htmlFor="jql-max-results">Max results:</label>
-                    <input
-                      id="jql-max-results"
-                      type="number"
-                      min={1}
-                      max={1000}
-                      value={jqlMaxResults}
-                      onChange={(event) =>
-                        setJqlMaxResults(Math.max(1, Number(event.target.value) || 200))
-                      }
-                    />
-                  </div>
-                  <Button secondary onClick={handleRunJql} loading={jqlLoading} disabled={jqlLoading}>
-                    Run JQL
-                  </Button>
-                  <Button className="ww-reset-btn" onClick={handleResetSavedQueries} disabled={jqlLoading}>
-                    Reset Saved Queries
-                  </Button>
+            <div className="ww-jql-maxresults">
+              <label htmlFor="jql-max-results">Max results:</label>
+              <input
+                id="jql-max-results"
+                type="number"
+                min={1}
+                max={1000}
+                value={jqlMaxResults}
+                onChange={(event) =>
+                  setJqlMaxResults(
+                    Math.max(1, Number(event.target.value) || 200),
+                  )
+                }
+              />
+            </div>
+            <Button
+              secondary
+              onClick={handleRunJql}
+              loading={jqlLoading}
+              disabled={jqlLoading}
+            >
+              Run JQL
+            </Button>
+            <Button
+              className="ww-reset-btn"
+              onClick={handleResetSavedQueries}
+              disabled={jqlLoading}
+            >
+              Reset Saved Queries
+            </Button>
 
-                  {jqlError ? <p className="ww-jira-status ww-jira-error">{jqlError}</p> : null}
-                </Card.Content>
+            {jqlError ? (
+              <p className="ww-jira-status ww-jira-error">{jqlError}</p>
+            ) : null}
+          </Card.Content>
         </Segment>
 
         <JiraResultsTable
