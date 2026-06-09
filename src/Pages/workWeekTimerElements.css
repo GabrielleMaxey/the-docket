@@ -234,6 +234,21 @@
 .work-week-page .ww-results-table tbody .ww-row-priority-5 {
   background-color: #dceadf;
 }
+.work-week-page .ww-results-table tbody .ww-row-priority-6 {
+  background-color: #d0e2df;
+}
+.work-week-page .ww-results-table tbody .ww-row-priority-7 {
+  background-color: #dce8ea;
+}
+.work-week-page .ww-results-table tbody .ww-row-priority-8 {
+  background-color: #e2ddeb;
+}
+.work-week-page .ww-results-table tbody .ww-row-priority-9 {
+  background-color: #e8dcea;
+}
+.work-week-page .ww-results-table tbody .ww-row-priority-10 {
+  background-color: #e1d8e5;
+}
 
 .work-week-page .ww-results-table tbody .ww-row-priority-neutral {
   background-color: #f8fafc;
@@ -244,6 +259,11 @@
 .work-week-page .ww-results-table tbody .ww-row-priority-3 td,
 .work-week-page .ww-results-table tbody .ww-row-priority-4 td,
 .work-week-page .ww-results-table tbody .ww-row-priority-5 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-6 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-7 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-8 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-9 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-10 td,
 .work-week-page .ww-results-table tbody .ww-row-priority-neutral td {
   color: #1f2937;
   opacity: 1;
@@ -488,7 +508,26 @@
   background: #dceadf;
   border-color: #95b59d;
 }
-
+.work-week-page .ww-priority-6 {
+  background: #d0e2df;
+  border-color: #95b5b5;
+}
+.work-week-page .ww-priority-7 {
+  background: #dce8ea;
+  border-color: #95aeb5;
+}
+.work-week-page .ww-priority-8 {
+  background: #e2ddeb;
+  border-color: #948fb1;
+}
+.work-week-page .ww-priority-9 {
+  background: #e8dcea;
+  border-color: #ab95b5;
+}
+.work-week-page .ww-priority-10 {
+  background: #e1d8e5;
+  border-color: #b095b5;
+}
 .work-week-page .ww-priority-neutral {
   background: #f8fafc;
   border-color: #cbd5e1;
