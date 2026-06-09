@@ -19,9 +19,9 @@
     "build": "vite build",
     "desktop:build": "npm run build",
     "desktop:pack": "npm run desktop:generate-icons && npm run build && electron-builder --dir",
-    "desktop:dist": "npm run desktop:generate-icons && npm run build && electron-builder",
-    "desktop:dist:mac": "npm run desktop:generate-icons && npm run build && electron-builder --mac dmg",
-    "desktop:dist:win": "npm run desktop:generate-icons && npm run build && electron-builder --win nsis",
+    "desktop:dist": "npm run desktop:generate-icons && npm run build && electron-builder --publish never",
+    "desktop:dist:mac": "npm run desktop:generate-icons && npm run build && electron-builder --mac dmg --publish never",
+    "desktop:dist:win": "npm run desktop:generate-icons && npm run build && electron-builder --win nsis --publish never",
     "preview": "vite preview"
   },
   "build": {
