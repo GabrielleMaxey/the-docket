@@ -15,7 +15,7 @@
     "desktop:dev": "concurrently -k -n ui,electron \"npm:dev:ui\" \"npm:dev:electron\"",
     "desktop:rebuild-native": "electron-rebuild -f -w better-sqlite3",
     "desktop:doctor": "npm run desktop:rebuild-native && npm run desktop:dev",
-    "desktop:generate-icons": "mkdir -p build/icons && icon-gen -i public/task-manager-favicon.svg -o build/icons --ico --icns --ico-name icon --icns-name icon",
+    "desktop:generate-icons": "node -e \"require('fs').mkdirSync('build/icons', { recursive: true })\" && icon-gen -i public/task-manager-favicon.svg -o build/icons --ico --icns --ico-name icon --icns-name icon",
     "build": "vite build",
     "desktop:build": "npm run build",
     "desktop:pack": "npm run desktop:generate-icons && npm run build && electron-builder --dir",
