@@ -25,8 +25,8 @@
     "preview": "vite preview"
   },
   "build": {
-    "appId": "com.gmaxey.taskmanagerman",
-    "productName": "Task Manager Man",
+    "appId": "com.gmaxey.taskmanager",
+    "productName": "Task Manager",
     "asar": true,
     "directories": {
       "buildResources": "build",
