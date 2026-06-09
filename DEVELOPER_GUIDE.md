@@ -84,6 +84,41 @@ When sharing current local metadata with teammates, prefer creating explicit exp
 3. Start frontend and backend processes.
 4. Use the Test Jira Connection button in the UI to validate connectivity.
 
+## Desktop (Electron) Workflow
+- Start desktop dev quickly:
+  - npm run desktop:dev
+- Rebuild native modules then start desktop dev (recommended after dependency or Electron updates):
+  - npm run desktop:doctor
+- Rebuild native modules only:
+  - npm run desktop:rebuild-native
+
+## Desktop Packaging
+- Create unpacked desktop output (smoke test package):
+  - npm run desktop:pack
+- Create release artifacts using current platform defaults:
+  - npm run desktop:dist
+- Build a macOS DMG:
+  - npm run desktop:dist:mac
+- Build a Windows NSIS installer:
+  - npm run desktop:dist:win
+
+### Packaging Notes
+- Artifacts are written to the release/ directory.
+- macOS notarization/signing requires a valid Apple Developer certificate.
+- Windows installer generation is scripted in this repo, but creating Windows installers is most reliable when run on Windows CI/host.
+
+## CI Packaging
+- Workflow file:
+  - .github/workflows/desktop-packaging.yml
+- Triggers:
+  - Manual trigger from GitHub Actions (workflow_dispatch).
+  - Git tag push matching v*.
+- Outputs:
+  - macOS artifacts: desktop-macos (DMG/ZIP when present).
+  - Windows artifacts: desktop-windows (EXE/MSI/BLOCKMAP when present).
+- Download location:
+  - GitHub repository Actions tab, inside the specific workflow run artifacts section.
+
 ## Core UI Behavior
 - Query management:
   - Supports up to 3 saved JQL entries with editable labels.
@@ -98,7 +133,7 @@ When sharing current local metadata with teammates, prefer creating explicit exp
 
 ## New UI Additions
 - Top joke ticker:
-  - Includes static jokes and Dad Joke API integration.
+  - Includes static jokes plus live dad-joke and programming-joke API integration.
   - Refresh cadence is 10 minutes.
   - Falls back to static jokes if API fetch fails.
 - Date and mini calendar panel:
@@ -124,5 +159,5 @@ When sharing current local metadata with teammates, prefer creating explicit exp
   - Confirm local storage keys are available.
   - Confirm metadata endpoints are reachable and SQLite writes succeed.
   - Confirm the database file exists at data/workweek.sqlite.
-- Dad joke does not appear:
-  - Static jokes are expected fallback behavior when external API is unavailable.
+- Live joke does not appear:
+  - Static jokes are expected fallback behavior when external APIs are unavailable.

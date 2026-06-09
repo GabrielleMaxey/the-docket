@@ -2,37 +2,85 @@
   "name": "task-manager-man",
   "private": true,
   "version": "0.0.0",
+  "description": "Task Manager desktop app with Jira integration",
+  "author": "Task Manager Team",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "dev:ui": "vite",
     "dev:api": "node server/jiraProxy.mjs",
+    "dev:electron": "wait-on tcp:5173 && electron .",
     "dev:all": "concurrently -n ui,api \"npm:dev:ui\" \"npm:dev:api\"",
+    "desktop:dev": "concurrently -k -n ui,electron \"npm:dev:ui\" \"npm:dev:electron\"",
+    "desktop:rebuild-native": "electron-rebuild -f -w better-sqlite3",
+    "desktop:doctor": "npm run desktop:rebuild-native && npm run desktop:dev",
+    "desktop:generate-icons": "mkdir -p build/icons && icon-gen -i public/task-manager-favicon.svg -o build/icons --ico --icns --ico-name icon --icns-name icon",
     "build": "vite build",
+    "desktop:build": "npm run build",
+    "desktop:pack": "npm run desktop:generate-icons && npm run build && electron-builder --dir",
+    "desktop:dist": "npm run desktop:generate-icons && npm run build && electron-builder",
+    "desktop:dist:mac": "npm run desktop:generate-icons && npm run build && electron-builder --mac dmg",
+    "desktop:dist:win": "npm run desktop:generate-icons && npm run build && electron-builder --win nsis",
     "preview": "vite preview"
+  },
+  "build": {
+    "appId": "com.gmaxey.taskmanagerman",
+    "productName": "Task Manager Man",
+    "asar": true,
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "public/**/*",
+      "server/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "icon": "build/icons/icon.icns",
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "icon": "build/icons/icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "react": "^18.3.1",
-    "react-compound-timer": "^2.0.5",
     "react-dom": "^18.3.1",
     "react-icons": "^4.8.0",
     "react-router-dom": "^6.30.4",
     "react-scroll": "^1.9.3",
-    "react-scrollspy-navigation": "^1.0.3",
-    "sass": "^1.100.0",
     "semantic-ui-css": "^2.5.0",
     "semantic-ui-react": "^2.1.5",
     "styled-components": "^5.3.9"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.7.2",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^10.0.3",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
     "esbuild": "^0.28.0",
-    "vite": "^8.0.16"
+    "icon-gen": "^5.0.0",
+    "vite": "^8.0.16",
+    "wait-on": "^8.0.1"
   }
 }

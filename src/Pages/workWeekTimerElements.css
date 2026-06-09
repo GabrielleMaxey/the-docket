@@ -216,27 +216,37 @@
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-1 {
-  background-color: #d1fae5;
+  background-color: #f3dddd;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-2 {
-  background-color: #ecfccb;
+  background-color: #f4e5d9;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-3 {
-  background-color: #fef9c3;
+  background-color: #f3eedb;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-4 {
-  background-color: #ffedd5;
+  background-color: #e4ecd9;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-5 {
-  background-color: #fee2e2;
+  background-color: #dceadf;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-neutral {
   background-color: #f8fafc;
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-1 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-2 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-3 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-4 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-5 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-neutral td {
+  color: #1f2937;
+  opacity: 1;
 }
 
 /* ── full-width results section below the three-column grid ── */
@@ -280,9 +290,59 @@
 .work-week-page .ww-pagination-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.45rem;
   margin-bottom: 0.6rem;
+}
+
+.work-week-page .ww-sort-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.work-week-page .ww-sort-control {
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.work-week-page .ww-sort-controls select {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.78rem;
+  color: #334155;
+  background: #fff;
+}
+
+.work-week-page .ww-sort-controls select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.work-week-page .ww-sort-header-btn {
+  border: none;
+  background: transparent;
+  color: #1f2937;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+}
+
+.work-week-page .ww-sort-header-btn:not(.is-active)::after {
+  content: " <>";
+  opacity: 0.4;
+  font-weight: 600;
+}
+
+.work-week-page .ww-sort-header-btn.is-active {
+  color: #1d4ed8;
+}
+
+.work-week-page .ww-sort-header-btn:hover {
+  color: #1d4ed8;
 }
 
 .work-week-page .ww-page-btn {
@@ -400,31 +460,33 @@
   padding: 0.35rem 0.45rem;
   background: #fff;
   min-width: 72px;
+  color: #1f2937;
+  font-weight: 300;
 }
 
 .work-week-page .ww-priority-1 {
-  background: #d1fae5;
-  border-color: #10b981;
+  background: #f3dddd;
+  border-color: #c89595;
 }
 
 .work-week-page .ww-priority-2 {
-  background: #ecfccb;
-  border-color: #84cc16;
+  background: #f4e5d9;
+  border-color: #c9a88d;
 }
 
 .work-week-page .ww-priority-3 {
-  background: #fef9c3;
-  border-color: #eab308;
+  background: #f3eedb;
+  border-color: #c6b98a;
 }
 
 .work-week-page .ww-priority-4 {
-  background: #ffedd5;
-  border-color: #f97316;
+  background: #e4ecd9;
+  border-color: #a9bb94;
 }
 
 .work-week-page .ww-priority-5 {
-  background: #fee2e2;
-  border-color: #ef4444;
+  background: #dceadf;
+  border-color: #95b59d;
 }
 
 .work-week-page .ww-priority-neutral {
@@ -491,7 +553,7 @@
   border-bottom: 1px solid #e2e8f0;
   padding: 0.45rem 0.5rem;
   vertical-align: top;
-  font-size: 0.8rem;
+  font-size: 1 rem;
   color: #0f172a;
 }
 

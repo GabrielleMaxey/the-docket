@@ -6,6 +6,13 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      ignored: [
+        "**/release/**",
+        "**/dist/**",
+        "**/build/icons/**"
+      ]
+    },
     proxy: {
       "/api": {
         target: "http://localhost:8787",

@@ -43,25 +43,17 @@ export const NavLogo = styled(RouterLink)
     font-family: 'Allura', cursive;
 `;
 
-export const NavLogoIcon = styled.span`
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+export const NavLogoIcon = styled.img`
+    display: inline-block;
     width: 3.4rem;
     height: 3.4rem;
     margin-right: 0.65rem;
-    border-radius: 999px;
-    background: #ffe39a;
-    border: 2px solid #b45309;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28), 0 0 0 3px rgba(251, 191, 36, 0.35);
-    font-size: 2.1rem;
-    line-height: 1;
+    object-fit: contain;
     transform: translateY(-1px);
 
     @media screen and (max-width: 768px) {
         width: 3rem;
         height: 3rem;
-        font-size: 1.85rem;
     }
 `;
 
@@ -176,6 +168,6 @@ export const NavBtnLink = styled(RouterLink)
     transition: all 0.2s ease-in-out;
     border-bottom: 4px solid #fff;
     background: #fff;
-    color: #010606;
+    color: #d2e9f9;
 }
 `

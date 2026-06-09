@@ -1,6 +1,13 @@
 import React from "react";
 
 const PAGE_SIZE = 30;
+const SORT_FIELDS = [
+  { value: "default", label: "Default" },
+  { value: "assignee", label: "Assignee" },
+  { value: "status", label: "Status" },
+  { value: "priority", label: "Priority" },
+  { value: "key", label: "Key" },
+];
 
 const getKnownAssignees = (issues) => {
   return Array.from(
@@ -17,10 +24,36 @@ const getPrioritySortRank = (clampPriority, priorityValue) => {
   return priority === 0 ? 11 : priority;
 };
 
-const sortIssues = ({ issues, isClosedLikeStatus, jiraRowPriorities, clampPriority }) => {
+const compareIssueKeys = (a, b) => {
+  return String(a.key || "").localeCompare(String(b.key || ""), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+};
+
+const compareTextValues = (left, right) => {
+  return String(left || "").localeCompare(String(right || ""), undefined, {
+    sensitivity: "base",
+  });
+};
+
+const getIssueStatus = (issue) => String(issue.fields?.status?.name || "");
+
+const getIssueAssignee = (issue) => {
+  return String(issue.fields?.assignee?.displayName || "Unassigned");
+};
+
+const sortIssues = ({
+  issues,
+  isClosedLikeStatus,
+  jiraRowPriorities,
+  clampPriority,
+  sortField,
+  sortDirection,
+}) => {
   return [...issues].sort((a, b) => {
-    const aStatus = a.fields?.status?.name || "";
-    const bStatus = b.fields?.status?.name || "";
+    const aStatus = getIssueStatus(a);
+    const bStatus = getIssueStatus(b);
     const aClosed = isClosedLikeStatus(aStatus);
     const bClosed = isClosedLikeStatus(bStatus);
 
@@ -28,26 +61,48 @@ const sortIssues = ({ issues, isClosedLikeStatus, jiraRowPriorities, clampPriori
       return aClosed ? 1 : -1;
     }
 
-    if (aClosed && bClosed) {
-      return String(a.key || "").localeCompare(String(b.key || ""), undefined, {
-        numeric: true,
-        sensitivity: "base",
-      });
+    if (sortField === "default") {
+      if (aClosed && bClosed) {
+        return compareIssueKeys(a, b);
+      }
+
+      const aPriority = clampPriority(jiraRowPriorities[String(a.key || "").trim()] ?? 0);
+      const bPriority = clampPriority(jiraRowPriorities[String(b.key || "").trim()] ?? 0);
+      const aRank = getPrioritySortRank(clampPriority, aPriority);
+      const bRank = getPrioritySortRank(clampPriority, bPriority);
+
+      if (aRank !== bRank) {
+        return aRank - bRank;
+      }
+
+      return compareIssueKeys(a, b);
     }
 
-    const aPriority = clampPriority(jiraRowPriorities[String(a.key || "").trim()] ?? 0);
-    const bPriority = clampPriority(jiraRowPriorities[String(b.key || "").trim()] ?? 0);
-    const aRank = getPrioritySortRank(clampPriority, aPriority);
-    const bRank = getPrioritySortRank(clampPriority, bPriority);
+    let result = 0;
 
-    if (aRank !== bRank) {
-      return aRank - bRank;
+    if (sortField === "key") {
+      result = compareIssueKeys(a, b);
+    } else if (sortField === "status") {
+      result = compareTextValues(aStatus, bStatus);
+    } else if (sortField === "assignee") {
+      result = compareTextValues(getIssueAssignee(a), getIssueAssignee(b));
+    } else if (sortField === "priority") {
+      const aPriority = clampPriority(jiraRowPriorities[String(a.key || "").trim()] ?? 0);
+      const bPriority = clampPriority(jiraRowPriorities[String(b.key || "").trim()] ?? 0);
+      const aRank = getPrioritySortRank(clampPriority, aPriority);
+      const bRank = getPrioritySortRank(clampPriority, bPriority);
+      result = aRank - bRank;
     }
 
-    return String(a.key || "").localeCompare(String(b.key || ""), undefined, {
-      numeric: true,
-      sensitivity: "base",
-    });
+    if (result === 0) {
+      result = compareIssueKeys(a, b);
+    }
+
+    if (sortDirection === "desc") {
+      return result * -1;
+    }
+
+    return result;
   });
 };
 
@@ -100,6 +155,8 @@ const JiraResultsTable = ({
 }) => {
   const [activeTab, setActiveTab] = React.useState(0);
   const [pageByRunIndex, setPageByRunIndex] = React.useState({});
+  const [sortField, setSortField] = React.useState("default");
+  const [sortDirection, setSortDirection] = React.useState("asc");
 
   React.useEffect(() => {
     setActiveTab((prev) => Math.min(Math.max(prev, 0), Math.max(0, jqlRuns.length - 1)));
@@ -117,6 +174,8 @@ const JiraResultsTable = ({
     isClosedLikeStatus,
     jiraRowPriorities,
     clampPriority,
+    sortField,
+    sortDirection,
   });
 
   const runIndex = run.index ?? safeTab;
@@ -132,6 +191,44 @@ const JiraResultsTable = ({
   const handlePageChange = (nextPage) => {
     const clamped = Math.min(Math.max(1, nextPage), totalPages);
     setPageByRunIndex((prev) => ({ ...prev, [runIndex]: clamped }));
+  };
+
+  const handleSortFieldChange = (nextField) => {
+    setSortField(nextField);
+    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+  };
+
+  const handleSortDirectionChange = (nextDirection) => {
+    setSortDirection(nextDirection);
+    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+  };
+
+  const handleHeaderSort = (field) => {
+    if (sortField === field) {
+      const nextDirection = sortDirection === "asc" ? "desc" : "asc";
+      setSortDirection(nextDirection);
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+
+    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+  };
+
+  const getHeaderAriaSort = (field) => {
+    if (sortField !== field) {
+      return "none";
+    }
+
+    return sortDirection === "desc" ? "descending" : "ascending";
+  };
+
+  const getSortIndicator = (field) => {
+    if (sortField !== field) {
+      return "";
+    }
+
+    return sortDirection === "desc" ? " v" : " ^";
   };
 
   return (
@@ -169,6 +266,36 @@ const JiraResultsTable = ({
             </p>
 
             <div className="ww-pagination-row">
+              <div className="ww-sort-controls" aria-label="Table sorting controls">
+                <label className="ww-sort-control" htmlFor="ww-sort-field">
+                  Sort by
+                </label>
+                <select
+                  id="ww-sort-field"
+                  value={sortField}
+                  onChange={(event) => handleSortFieldChange(event.target.value)}
+                >
+                  {SORT_FIELDS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+
+                <label className="ww-sort-control" htmlFor="ww-sort-direction">
+                  Order
+                </label>
+                <select
+                  id="ww-sort-direction"
+                  value={sortDirection}
+                  onChange={(event) => handleSortDirectionChange(event.target.value)}
+                  disabled={sortField === "default"}
+                >
+                  <option value="asc">Ascending</option>
+                  <option value="desc">Descending</option>
+                </select>
+              </div>
+
               <button
                 type="button"
                 className="ww-page-btn"
@@ -211,13 +338,45 @@ const JiraResultsTable = ({
               <table className="ww-results-table">
                 <thead>
                   <tr>
-                    <th>Key</th>
+                    <th aria-sort={getHeaderAriaSort("key")}>
+                      <button
+                        type="button"
+                        className={"ww-sort-header-btn" + (sortField === "key" ? " is-active" : "")}
+                        onClick={() => handleHeaderSort("key")}
+                      >
+                        Key{getSortIndicator("key")}
+                      </button>
+                    </th>
                     <th>Jira Type</th>
                     <th>Summary</th>
-                    <th>Status</th>
-                    <th>Assignee</th>
+                    <th aria-sort={getHeaderAriaSort("status")}>
+                      <button
+                        type="button"
+                        className={"ww-sort-header-btn" + (sortField === "status" ? " is-active" : "")}
+                        onClick={() => handleHeaderSort("status")}
+                      >
+                        Status{getSortIndicator("status")}
+                      </button>
+                    </th>
+                    <th aria-sort={getHeaderAriaSort("assignee")}>
+                      <button
+                        type="button"
+                        className={"ww-sort-header-btn" + (sortField === "assignee" ? " is-active" : "")}
+                        onClick={() => handleHeaderSort("assignee")}
+                      >
+                        Assignee{getSortIndicator("assignee")}
+                      </button>
+                    </th>
                     <th>Updated</th>
-                    <th>Priority</th>
+                    <th aria-sort={getHeaderAriaSort("priority")}>
+                      <button
+                        type="button"
+                        className={"ww-sort-header-btn" + (sortField === "priority" ? " is-active" : "")}
+                        onClick={() => handleHeaderSort("priority")}
+                      >
+                        Priority{getSortIndicator("priority")}
+                      </button>
+                    </th>
                     <th>Notes</th>
                     <th>
                       <div className="ww-th-push">
