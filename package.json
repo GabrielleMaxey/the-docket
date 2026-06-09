@@ -1,5 +1,5 @@
 {
-  "name": "task-manager-man",
+  "name": "task-manager",
   "private": true,
   "version": "0.0.0",
   "description": "Task Manager desktop app with Jira integration",
