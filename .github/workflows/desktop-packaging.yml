@@ -24,7 +24,7 @@ jobs:
         run: npm ci
 
       - name: Build macOS package
-        run: npm run desktop:dist:mac
+        run: npm run desktop:dist:mac -- --publish never
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
