@@ -125,6 +125,11 @@ const getIssueBrowseUrl = (issue) => {
   return "";
 };
 
+const noteMatchesLastJiraPush = (noteDraft, lastPushed) =>
+  typeof lastPushed === "string" &&
+  lastPushed.trim().length > 0 &&
+  String(noteDraft || "").trim() === lastPushed.trim();
+
 const JiraResultsTable = ({
   jqlRuns,
   selectedForPush,
@@ -135,6 +140,7 @@ const JiraResultsTable = ({
   assigneeDrafts,
   jiraRowPriorities,
   jiraNotes,
+  lastPushedJiraNoteByKey,
   statusOptions,
   isClosedLikeStatus,
   clampPriority,
@@ -416,6 +422,9 @@ const JiraResultsTable = ({
                     const save = saveState[issueKey] || { loading: false, error: "", success: "" };
                     const rowUpdate = rowUpdateState[issueKey] || { loading: false, error: "", success: "" };
                     const isClosedOrResolved = isClosedLikeStatus(status);
+                    const noteDraft = jiraNotes[issueKey] || "";
+                    const pushedNoteSnapshot = lastPushedJiraNoteByKey[issueKey];
+                    const isNoteAlreadyPushed = noteMatchesLastJiraPush(noteDraft, pushedNoteSnapshot);
 
                     return (
                       <tr
@@ -519,11 +528,17 @@ const JiraResultsTable = ({
                             <span>-</span>
                           ) : (
                             <textarea
-                              value={jiraNotes[issueKey] || ""}
+                              className={isNoteAlreadyPushed ? "ww-note-textarea-pushed" : undefined}
+                              value={noteDraft}
                               onChange={(event) =>
                                 handleNoteChange(issueKey, event.target.value)
                               }
                               placeholder="Add notes here"
+                              title={
+                                isNoteAlreadyPushed
+                                  ? "This note was pushed to Jira. Change the text to add a new note before pushing again."
+                                  : undefined
+                              }
                             />
                           )}
                         </td>
@@ -546,7 +561,11 @@ const JiraResultsTable = ({
                                 type="button"
                                 className="ww-push-btn"
                                 onClick={() => handlePushNote(issueKey)}
-                                disabled={!selectedForPush[issueKey] || push.loading}
+                                disabled={
+                                  !selectedForPush[issueKey] ||
+                                  push.loading ||
+                                  isNoteAlreadyPushed
+                                }
                               >
                                 {push.loading ? "Pushing..." : "Push note"}
                               </button>

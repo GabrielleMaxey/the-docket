@@ -7,6 +7,7 @@ import {
   Icon,
   Button,
   Divider,
+  Message,
 } from "semantic-ui-react";
 import "semantic-ui-css/semantic.min.css";
 import "./workWeekTimerElements.css";
@@ -15,6 +16,20 @@ import TaskManagerHeaderPanel from "./components/TaskManagerHeaderPanel";
 import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira";
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
+
+const JOKE_FETCH_SOURCES = [
+  {
+    url: "https://icanhazdadjoke.com/",
+    headers: { Accept: "application/json" },
+    extract: (data) => String(data?.joke || "").trim(),
+  },
+  {
+    url: "https://v2.jokeapi.dev/joke/Programming?safe-mode&type=single",
+    headers: { Accept: "application/json" },
+    extract: (data) => String(data?.joke || "").trim(),
+  },
+];
+
 const JOKE_TICKER_ITEMS = [
   "Manager mode: turning coffee into completed tickets.",
   "I don't procrastinate, I run backlog grooming drills.",
@@ -58,6 +73,45 @@ const getCalendarCells = (date) => {
   return cells;
 };
 
+const REMINDERS_STORAGE_KEY = "workWeekTimerReminders";
+const REMINDER_SLOT_COUNT = 4;
+
+const defaultReminderRows = () =>
+  Array.from({ length: REMINDER_SLOT_COUNT }, () => ({ text: "", done: false }));
+
+const loadStoredReminders = () => {
+  if (typeof window === "undefined") {
+    return defaultReminderRows();
+  }
+
+  try {
+    const raw = window.localStorage.getItem(REMINDERS_STORAGE_KEY);
+    if (!raw) {
+      return defaultReminderRows();
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return defaultReminderRows();
+    }
+
+    const next = defaultReminderRows();
+    for (let index = 0; index < REMINDER_SLOT_COUNT; index += 1) {
+      const item = parsed[index];
+      if (item && typeof item === "object") {
+        next[index] = {
+          text: typeof item.text === "string" ? item.text : "",
+          done: Boolean(item.done),
+        };
+      }
+    }
+
+    return next;
+  } catch {
+    return defaultReminderRows();
+  }
+};
+
 const WorkWeekTimer = () => {
   const {
     jiraState,
@@ -67,11 +121,13 @@ const WorkWeekTimer = () => {
     jqlLabels,
     jqlLoading,
     jqlRuns,
+    showRestoredJqlBanner,
     jqlError,
     jqlMaxResults,
     jiraNotes,
     jiraRowPriorities,
     selectedForPush,
+    lastPushedJiraNoteByKey,
     pushState,
     saveState,
     statusDrafts,
@@ -102,8 +158,39 @@ const WorkWeekTimer = () => {
     handlePushNote,
   } = useTaskManagerJira();
 
+  const handleRunJqlRef = React.useRef(handleRunJql);
+  React.useEffect(() => {
+    handleRunJqlRef.current = handleRunJql;
+  }, [handleRunJql]);
+
+  React.useEffect(() => {
+    const onKeyDown = (event) => {
+      if ((!event.ctrlKey && !event.metaKey) || event.key !== "Enter") {
+        return;
+      }
+
+      const target = event.target;
+      const tagName =
+        target && typeof target.tagName === "string" ? target.tagName.toLowerCase() : "";
+      if (tagName === "textarea" || (target && target.isContentEditable)) {
+        return;
+      }
+
+      event.preventDefault();
+      if (!jqlLoading) {
+        void handleRunJqlRef.current();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [jqlLoading]);
+
   const [jokeIndex, setJokeIndex] = React.useState(0);
   const [apiJokes, setApiJokes] = React.useState([]);
+  const [reminders, setReminders] = React.useState(() => loadStoredReminders());
 
   const today = React.useMemo(() => new Date(), []);
   const todayDay = today.getDate();
@@ -126,45 +213,21 @@ const WorkWeekTimer = () => {
   const fetchApiJokes = React.useCallback(async () => {
     const nextApiJokes = [];
 
-    try {
-      const dadResponse = await fetch("https://icanhazdadjoke.com/", {
-        headers: {
-          Accept: "application/json",
-        },
-      });
-
-      if (dadResponse.ok) {
-        const dadData = await dadResponse.json();
-        const dadJoke = String(dadData?.joke || "").trim();
-
-        if (dadJoke) {
-          nextApiJokes.push(dadJoke);
+    for (const source of JOKE_FETCH_SOURCES) {
+      try {
+        const response = await fetch(source.url, { headers: source.headers });
+        if (!response.ok) {
+          continue;
         }
+
+        const data = await response.json();
+        const line = source.extract(data);
+        if (line) {
+          nextApiJokes.push(line);
+        }
+      } catch {
+        // Keep static jokes when API is unavailable.
       }
-    } catch {
-      // Keep static jokes when API is unavailable.
-    }
-
-    try {
-      const programmingResponse = await fetch(
-        "https://v2.jokeapi.dev/joke/Programming?safe-mode&type=single",
-        {
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
-
-      if (programmingResponse.ok) {
-        const programmingData = await programmingResponse.json();
-        const programmingJoke = String(programmingData?.joke || "").trim();
-
-        if (programmingJoke) {
-          nextApiJokes.push(programmingJoke);
-        }
-      }
-    } catch {
-      // Keep static jokes when API is unavailable.
     }
 
     setApiJokes(shuffleItems(nextApiJokes));
@@ -175,26 +238,54 @@ const WorkWeekTimer = () => {
   }, [fetchApiJokes]);
 
   React.useEffect(() => {
-    const jokeRefreshId = window.setInterval(fetchApiJokes, TEN_MINUTES_MS);
-
-    return () => {
-      window.clearInterval(jokeRefreshId);
-    };
-  }, [fetchApiJokes]);
-
-  React.useEffect(() => {
     const intervalId = window.setInterval(() => {
+      void fetchApiJokes();
       setJokeIndex((prev) => (prev + 1) % tickerJokes.length);
     }, TEN_MINUTES_MS);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [tickerJokes.length]);
+  }, [fetchApiJokes, tickerJokes.length]);
 
   React.useEffect(() => {
     setJokeIndex((prev) => (prev >= tickerJokes.length ? 0 : prev));
   }, [tickerJokes.length]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(REMINDERS_STORAGE_KEY, JSON.stringify(reminders));
+  }, [reminders]);
+
+  const handleReminderTextChange = React.useCallback((index, value) => {
+    setReminders((prev) => {
+      const prevRow = prev[index];
+      const prevTrim = String(prevRow.text).trim();
+      const nextTrim = String(value).trim();
+      const textMeaningChanged = nextTrim !== prevTrim;
+      const clearDone = textMeaningChanged || nextTrim.length === 0;
+
+      return prev.map((row, rowIndex) => {
+        if (rowIndex !== index) {
+          return row;
+        }
+
+        return {
+          text: value,
+          done: clearDone ? false : row.done,
+        };
+      });
+    });
+  }, []);
+
+  const handleReminderDoneChange = React.useCallback((index, checked) => {
+    setReminders((prev) =>
+      prev.map((row, rowIndex) => (rowIndex === index ? { ...row, done: checked } : row))
+    );
+  }, []);
 
   return (
     <>
@@ -206,6 +297,9 @@ const WorkWeekTimer = () => {
           monthLabel={monthLabel}
           calendarCells={calendarCells}
           todayDay={todayDay}
+          reminders={reminders}
+          onReminderTextChange={handleReminderTextChange}
+          onReminderDoneChange={handleReminderDoneChange}
         />
 
         <Segment raised className="ww-segment">
@@ -321,12 +415,38 @@ const WorkWeekTimer = () => {
             {jqlError ? (
               <p className="ww-jira-status ww-jira-error">{jqlError}</p>
             ) : null}
+            <p className="ww-jql-shortcut-hint">
+              Tip: Press{" "}
+              <kbd className="ww-kbd">Ctrl</kbd>+<kbd className="ww-kbd">Enter</kbd> or{" "}
+              <kbd className="ww-kbd">⌘</kbd>+<kbd className="ww-kbd">Enter</kbd> to run or refresh
+              JQL results.
+            </p>
           </Card.Content>
         </Segment>
+
+        {showRestoredJqlBanner && jqlRuns.length > 0 ? (
+          <Message info className="ww-restored-jql-banner">
+            <Message.Header>Showing saved results</Message.Header>
+            <p className="ww-restored-jql-banner-copy">
+              This table was restored from your last run (for example after a reload). Data may be
+              out of date until you refresh from Jira.
+            </p>
+            <Button
+              type="button"
+              primary
+              onClick={handleRunJql}
+              loading={jqlLoading}
+              disabled={jqlLoading}
+            >
+              Refresh results
+            </Button>
+          </Message>
+        ) : null}
 
         <JiraResultsTable
           jqlRuns={jqlRuns}
           selectedForPush={selectedForPush}
+          lastPushedJiraNoteByKey={lastPushedJiraNoteByKey}
           pushState={pushState}
           saveState={saveState}
           rowUpdateState={rowUpdateState}
