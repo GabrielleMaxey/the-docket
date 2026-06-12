@@ -1,168 +1,170 @@
-# Task Manager User Guide (No Coding Needed)
+# Task Manager — user guide
 
-## What This App Does
-Task Manager helps you view and manage your Jira tasks in one screen.
-You can:
-- Load tasks using saved Jira filters (JQL).
-- Update task status.
-- Change assignee names.
-- Add private notes before pushing them to Jira comments.
-- Set a simple priority value for your own sorting view.
+This guide is for **people who use the app**, not for programmers. You do not need to understand how the software is built.   
 
-## Why The App Uses a Database
-- The app uses a small local database so your notes and task priorities are not lost when you close or restart the app.
-- This database is on your machine (not a separate cloud database you need to set up).
-- It is used for app-specific metadata (notes and local priority), while Jira remains the source for Jira issue details.
+---
 
-## Database Setup (No Coding Required)
-1. Start the app normally.
-2. The database is created automatically in the background.
-3. You do not need to create tables or run SQL commands.
-4. If needed, ask your admin/dev to verify the file exists at data/workweek.sqlite.
+## Words you might see
 
-## Share Database Data
-If you need to share your current saved notes and priorities with someone else, use one of these files:
+| Term | In plain English |
+|------|------------------|
+| **Jira** | Your team’s work-tracking website (issues, statuses, assignees, comments). |
+| **JQL** | A saved filter or search language Jira understands. It decides *which* issues show up in your list. Jira can give you JQL text to paste in. |
+| **Issue / ticket / task** | The same thing in most teams: one row in Jira (for example `PROJ-123`). |
+| **Status** | Where the work sits in your workflow (for example “In Progress,” “Done”). |
+| **Assignee** | The person Jira thinks owns the issue. |
+| **Comment** | Text stored **in Jira** so everyone on the issue can see it. “Push note” sends your typed text there. |
+| **Browser** | Chrome, Edge, Firefox, Safari — the app may run inside a window like a normal website. |
+| **Desktop app** | A separate window (Electron) that feels more like a normal program; it still talks to Jira the same way once it is set up. |
+| **This computer only** | Some things are saved only on the machine you are using, not inside Jira. If you switch computers, those bits do not follow you unless you export or your team has another process. |
 
-- Full database snapshot:
-  - data/workweek-share.sqlite
-- Spreadsheet-friendly export:
-  - data/issue_metadata_export.csv
+---
 
-These files were generated from:
-- data/workweek.sqlite
+## What this app is for
 
-### For Admin/Dev (How They Generate It)
-1. Go to the app folder:
-  - cd /path/to/taskManager
-2. Create a share-safe SQLite backup:
-  - sqlite3 data/workweek.sqlite ".backup data/workweek-share.sqlite"
-3. Create a CSV export:
-  - sqlite3 -header -csv data/workweek.sqlite "SELECT issue_key, note, priority, updated_at FROM issue_metadata ORDER BY updated_at DESC;" > data/issue_metadata_export.csv
+You get **one screen** where you can:
 
-### Current Export Size
-- issue_metadata rows exported: 11
+- Pull in lists of Jira work using up to **four** saved searches (**JQL**).
+- See those issues in a **table**: status, assignee, title, and more.
+- For **open** issues: change **status** and **assignee** in Jira (using the buttons on each row).
+- Set a **private priority** (P0–P10) that helps **you** sort and color rows — it is **not** the same as Jira’s built-in “Priority” field unless your team wired them together (by default it is local to this app).
+- Write **notes** in the app. They can stay **only on your machine**, or you can **push** selected notes to Jira as **comments** so the team sees them.
+- Use **reminders** and a **calendar** at the top for your own planning — they are not sent to Jira.
 
-## Startup Details
+**Closed or resolved** issues still appear if your search returns them, but the app **locks** editing on those rows so you do not accidentally change finished work.
 
-### First-Time Setup
-1. Install Node.js 18+ (or newer).
-2. Open a terminal.
-3. Go to the app folder:
-  - cd /path/to/taskManager
-4. Install dependencies:
-  - npm install
-5. Confirm your Jira environment values are configured in .env (ask your admin/dev if needed).
+---
 
-### Option 1: Start The App (UI + API)
-1. In the same folder, run:
-  - npm run dev:all
-2. Wait until both services are running.
-3. Open the UI in your browser:
-  - http://localhost:5173
-4. API runs at:
-  - http://localhost:8787
+## Why there is a “database” on your computer
 
-### Option 2: Start Electron
-1. In the same folder, run:
-  - npm ci
-  - npm run desktop:rebuild-native
-  - npm run desktop:dev
-2 An Electron Chromium window will open.
+The app keeps a small **local file** (`data/workweek.sqlite`) so **your notes** and **your P0–P10 row priorities** are less likely to vanish when you close the window or restart. That file lives **on your machine** (or wherever the person who runs the app started it from). It is **not** a company-wide cloud database you log into separately.
 
-### Stop And Restart
-1. In the terminal running the app, press Ctrl + C.
-2. Start again with:
-  - npm run dev:all
+**Jira** remains the official place for real issue data. Think of the local file as a **personal workbook** layered on top of Jira for notes and your own sorting colors.
 
+---
 
-### Quick Health Check
-1. In the app, click Test Jira Connection.
-2. If needed, verify API health in browser:
-  - http://localhost:8787/api/health
+## How to open the app (pick one)
 
-## What You See at the Top
-- Joke ticker:
-  - Shows fun workplace jokes.
-  - Includes built-in jokes and live jokes from dad-joke and programming-joke APIs when available.
-  - Updates slowly (about every 10 minutes).
-- Date and mini calendar:
-  - Shows today’s full date.
-  - Highlights today in a small monthly calendar.
+You will either use it **in the browser** or as a **desktop program**.   
 
-## Quick Start
-1. Open Task Manager.
-2. Click Test Jira Connection.
-3. In JQL fields, keep existing filters or type your own Jira filter.
-4. Click Run JQL.
-5. Review and manage the tasks that appear in the table.
+### Option A — In the browser (typical for development)
 
-## Using the Task Table
-- Status:
-  - Choose a new status from the dropdown.
-  - Click Update Status.
-- Assignee:
-  - Select or type a person name.
-  - Click Update Assignee.
-- Priority:
-  - Choose P0 to P10.
-  - Lower number can represent higher urgency, based on your team preference.
-- Notes:
-  - Type your note in the Notes area.
-  - Check the row and click Push note (or use Push Selected for many tasks).
+Someone with technical access prepares the machine once:
 
-## How To Change Priority Row Colors
-- If you do not edit code yourself, share this section with your admin/dev.
-- The row colors are controlled in this file:
-  - src/Pages/workWeekTimerElements.css
-- Priority row color classes:
-  - .ww-row-priority-1
-  - .ww-row-priority-2
-  - .ww-row-priority-3
-  - .ww-row-priority-4
-  - .ww-row-priority-5
-  - .ww-row-priority-0 (default)
-- Dropdown color classes (the priority selector itself):
-  - .ww-priority-1
-  - .ww-priority-2
-  - .ww-priority-3
-  - .ww-priority-4
-  - .ww-priority-5
-  - .ww-priority-neutral
+1. Installs **Node.js** (version 18 or newer is fine).
+2. Opens a **terminal** (command window), goes to the app’s folder, and runs `npm install` once.
+3. Puts Jira connection details in a file named **`.env`** in that folder (you usually do **not** edit this yourself — ask the person who set up Jira).
 
-### Simple Update Process
-1. Open src/Pages/workWeekTimerElements.css.
-2. Find the class for the priority you want to change.
-3. Update background-color (and border-color if needed).
-4. Save and refresh the app.
+**Each time you want to use the app:**
 
-### Example
-- To change priority 1 row color, update .ww-row-priority-1 background-color.
-- To match dropdown color, also update .ww-priority-1.
+1. They (or you, if you were shown how) start the app with **`npm run dev:all`** from that folder.
+2. You open your browser to **`http://localhost:5173`** (like opening any website address).
+3. Leave the black terminal window **running** while you work; closing it stops the app.
 
-## Important Behavior
-- Closed/Resolved tasks are locked for editing.
-- Your query labels and filters are remembered.
-- Your notes and row priorities are saved so they are still there later.
-- Notes and priorities are saved in both browser memory and a local database for better durability.
+If the page will not load, the helper service may not be running, start **`npm run dev:all`** again or see **If something goes wrong** below.
 
-## Tips for Best Results
-- Use clear labels for each JQL query so you know what list you are viewing.
-- Start with a small result count if your list is too large.
-- Use Push Selected to save time when updating many tasks.
+### Option B — Desktop window (Electron)
 
-## If Something Looks Wrong
-- If connection fails:
-  - Click Test Jira Connection again.
-  - Ask your admin to check Jira setup credentials.
-- If a live joke is missing:
-  - This is okay. The app will keep showing built-in jokes.
-- If updates do not apply:
-  - Refresh and try once more.
-  - If it still fails, report the issue with the task key and action you tried.
-- If notes or priorities do not stay saved:
-  - Keep the app/API running and retry once.
-  - Ask your admin/dev to check local database access and API server logs.
-- If ports are in use when starting:
-  - find what PID is in use:
-      lsof -nP -iTCP:5173 -sTCP:LISTEN || true
+Your team may give you a **built installer** instead. If you are starting from source:
 
+1. Same one-time setup as above (Node, `npm install`, `.env`).
+2. They run **`npm run desktop:rebuild-native`** once if needed (technical step for SQLite).
+3. Then **`npm run desktop:dev`** opens a dedicated window.
+
+The desktop build also starts the small **helper service** in the background so Jira and the database work.
+
+**To stop the app:** close the window, and if a terminal was used to start it, press **Ctrl+C** in that terminal (Mac included).
+
+---
+
+## Quick confidence check
+
+Inside the app, click **Test Jira Connection**. If it succeeds, your Jira login settings on this machine are working.
+
+One screen to run **Jira JQL** (saved filters), then update **status**, **assignee**, local **priority** (P0–P10), and **notes** (save locally and optionally **push** to Jira as a comment). Closed/resolved issues are 
+read-only in the table.
+If someone asks you to “check the API,” they may mean opening **`http://localhost:8787/api/health`** in the browser — that is a simple “is the helper service alive?” page. You do not need to understand what “API” means day to day.
+
+---
+
+## Top of the screen (header)
+
+- **Joke ticker** — light rotating text; sometimes it calls the internet for a new joke, sometimes it uses built-in ones. It refreshes on a slow timer (about every ten minutes). If jokes stop updating, the rest of the app still works.
+- **Today** and the **small calendar** — shows the current date and highlights **today**. Useful when planning your week.
+- **Reminders** — up to **four** short lines under **Today** (on a wide screen the **calendar** sits to the right). These are **only for you** on this browser or this computer:
+  - Type a reminder, then you can tick the **checkbox** to mark it **done** (grey text with a line through it).
+  - Done stays until you **uncheck**, **clear the line**, or **edit the text** (editing clears “done” so you can reuse the line for something new).
+  - Reminders are **not** stored in Jira and **not** in the SQLite file — they live in **browser storage** (like sticky notes for this app only).
+
+---
+
+## Middle section — your Jira searches (“Task Manager” card)
+
+1. **Test Jira Connection** — use this first if lists are empty or errors mention connection.
+2. **JQL count** — choose **1 to 4** lists side by side. Each list has its own **label** (a name you recognize) and **JQL** box (the filter text from Jira).
+3. **Max results** — caps how many issues load per list so the table stays fast. If you expect more work than the cap, raise it or narrow your JQL.
+4. **Run JQL** — loads or refreshes the table. Keyboard shortcut: hold **Ctrl** (Windows/Linux) or **⌘** (Mac) and press **Enter** — same as clicking **Run JQL**.
+5. **Showing saved results** — if you closed the app earlier, you might see a banner saying the table was **restored from last time**. That is normal. Run **Run JQL** again when you want **fresh** data from Jira.
+6. **Reset Saved Queries** — clears your saved JQL text, labels, the **cached table**, and “I already pushed this note” memory for the session. It does **not** delete your **notes and priorities** inside the SQLite file on disk.
+
+If need help creating a JQL query, please see <a href="https://support.atlassian.com/jira-service-management-cloud/docs/use-advanced-search-with-jira-query-language-jql/">.  You can also copy a filter from Jira’s **Advanced issue search** in your instance of JIRA. Provided is a basic query task that you own: assignee = currentUser() ORDER BY updated DESC
+
+---
+
+## The results table (what each part does)
+
+Work **one row at a time** unless you use batch actions at the bottom.
+
+| What you want | What to do |
+|----------------|------------|
+| Change **status** in Jira | Choose from the dropdown, then click **Update Status** on that row. |
+| Change **assignee** in Jira | Pick or type the person, then **Update Assignee**. |
+| Set **your own** urgency for sorting / colors | Use **P0–P10**. **P1** means “most urgent for me” in this app; **P10** is least. **P0** is neutral (no strong color). |
+| Keep a **private note** | Type in the **Notes** area. The app saves it on your machine as you type (and you can click **Save to DB** if you want a clear “saved” confirmation on that row). |
+| Put the same text into **Jira as a comment** | Tick the row’s checkbox (or use batch select), then **Push note** (or **Push Selected**). After a successful push, the note box may look **greyed out** until you **change the text** — that prevents sending the exact same comment twice by mistake. |
+| Save without posting to Jira | Notes and priority already save in the background; **Save to DB** is an extra explicit save with a visible “saved” style message on the row. |
+
+**Colors:** rows and the priority dropdown use a heat style (warmer for more urgent **P** values, cooler for lower). The project’s stylesheet (`workWeekTimerElements.css`); see the short technical list in the older internal docs if needed.
+
+---
+
+## Where your information is stored (simple view)
+
+| Kind of information | Where it lives | Travels with you? |
+|----------------------|----------------|-------------------|
+| JQL text, labels, how many lists, last table snapshot, reminders | In the **browser’s storage** on this device | **No** — other browsers or PCs start clean unless you set things up again. |
+| Your **notes** and **P0–P10** values per issue key | File **`data/workweek.sqlite`** next to the app when the helper service runs | **Only this machine** (or copy of that file). |
+| Status, assignee, real Jira fields, **comments you pushed** | **Inside Jira** | **Yes** — anyone with permission sees them in Jira. |
+
+---
+
+## Sharing your notes and priorities with someone else
+
+| Data | Where |
+|------|--------|
+| JQL text, labels, count, last table snapshot, reminders | Browser **localStorage** on this device |
+| Per-issue note + priority (autosave on change; **Save to DB** for explicit confirmation) | Local file **`data/workweek.sqlite`** (created when the API runs) |
+
+- A **backup file** of the database (`workweek-share.sqlite`), and/or  
+- A **spreadsheet** export (`issue_metadata_export.csv`)
+
+They create these from the app folder using tools they already use; exact steps are in **`DEVELOPER_GUIDE.md`** for them.
+
+---
+
+## If something goes wrong
+
+| Symptom | What it usually means | What to try |
+|---------|------------------------|--------------|
+| “Cannot connect” / Test fails | Jira settings wrong, network, or helper not running | Click **Test Jira Connection** again; confirm Wi‑Fi or VPN; check your **`.env`** and **`JIRA_SETUP.md`**. |
+| Blank page in browser | UI server not started | Run **`npm run dev:all`** (or start the desktop app properly). |
+| Table empty after Run JQL | JQL returned no issues, or max results too low | Widen **Max results**; check JQL in Jira’s own search. |
+| Notes or priorities disappeared on **another** computer | Expected — they were never in Jira | Use one machine, or export/import files. |
+| Notes vanish on **same** computer | Helper or database problem | Restart the app and confirm **`data/workweek.sqlite`** exists and the API logs show no errors. |
+| “Port already in use” | Another program grabbed the same network slot free port **5173** or update the port.  |
+
+- **Jira / connection** — `.env`, **Test Jira Connection**, and `JIRA_SETUP.md`.
+- **Notes or priority don’t stick** — API must be running; check `data/workweek.sqlite` and API logs.
+- **Ports in use** — e.g. `lsof -nP -iTCP:5173 -sTCP:LISTEN`.
+
+For **installing Jira credentials** and technical setup, your team should use **`JIRA_SETUP.md`**. For architecture and code locations, contributors use **`DEVELOPER_GUIDE.md`**.

@@ -1,163 +1,75 @@
-# Task Manager Developer Guide
-
-## Purpose
+# Task Manager — developer guide
 Task Manager is a React + Vite app for running saved Jira JQL queries and managing issue workflows in one place. The UI supports status updates, assignee updates, note-taking, row priority ranking, and push-to-Jira actions.
+React + Vite UI, **Express** proxy (`server/jiraProxy.mjs`), **better-sqlite3** for local issue metadata. Jira Cloud REST calls go through the proxy only.
 
-## Tech Stack
-- Frontend: React, Vite, Semantic UI React, custom CSS
-- Backend proxy: Node.js + Express
-- Jira integration: Jira Cloud REST API through local proxy routes
-- Persistence: Local storage for UI preferences + SQLite-backed issue metadata via proxy endpoints
 
-## Database Purpose
-- Database type: SQLite (via better-sqlite3)
-- Database file: data/workweek.sqlite
-- Purpose:
-  - Persist Jira issue metadata keyed by issue key.
-  - Store per-issue note text.
-  - Store per-issue local priority value (P0-P10).
-  - Keep metadata durable across app restarts, unlike browser-only local storage.
+## Stack (current)
 
-## Database Setup
-1. Install dependencies (includes better-sqlite3).
-2. Start the API server.
-3. On startup, the API automatically:
-   - Creates data/ if it does not exist.
-   - Creates data/workweek.sqlite if it does not exist.
-   - Creates the issue_metadata table if missing.
-4. No separate migration command is required for current schema.
+- UI: React 18, React Router, Semantic UI React, styled-components
+- Build: Vite 8; desktop: Electron 31 + electron-builder
+- Data: `localStorage` (JQL prefs, labels, last JQL result snapshot, header reminders) + SQLite `data/workweek.sqlite` (per-issue note + priority via proxy)
 
-## Sharing Database Data
-When sharing current local metadata with teammates, prefer creating explicit export artifacts instead of copying live WAL files manually.
+## SQLite (`issue_metadata`)
 
-### Source Database
-- data/workweek.sqlite
+| Column      | Notes                          |
+|------------|---------------------------------|
+| `issue_key`| Primary key                    |
+| `note`     | Local draft / mirror of UI note|
+| `priority` | 0–10, clamped in API           |
+| `updated_at` | ISO text                     |
 
-### Recommended Share Artifacts
-- Full snapshot (for exact restore):
-  - data/workweek-share.sqlite
-- CSV (for review/spreadsheets):
-  - data/issue_metadata_export.csv
+Created automatically on first API start (`data/` + DB + table). WAL enabled.
 
-### Export Commands
-1. From project root:
-  - cd /path/to/taskManager
-2. Backup snapshot:
-  - sqlite3 data/workweek.sqlite ".backup data/workweek-share.sqlite"
-3. Export CSV:
-  - sqlite3 -header -csv data/workweek.sqlite "SELECT issue_key, note, priority, updated_at FROM issue_metadata ORDER BY updated_at DESC;" > data/issue_metadata_export.csv
-4. Optional row count check:
-  - sqlite3 data/workweek.sqlite "SELECT COUNT(*) FROM issue_metadata;"
+**Share / export** (run from repo root):
 
-### Privacy-Safe Export (No Notes)
-- sqlite3 -header -csv data/workweek.sqlite "SELECT issue_key, priority, updated_at FROM issue_metadata ORDER BY updated_at DESC;" > data/issue_metadata_redacted.csv
+```bash
+sqlite3 data/workweek.sqlite ".backup data/workweek-share.sqlite"
+sqlite3 -header -csv data/workweek.sqlite \
+  "SELECT issue_key, note, priority, updated_at FROM issue_metadata ORDER BY updated_at DESC;" \
+  > data/issue_metadata_export.csv
+```
 
-### Current Export Snapshot
-- issue_metadata row count at export time: 11
+Redacted CSV (no note column): omit `note` from the `SELECT`.
 
-## Database Schema (Current)
-- Table: issue_metadata
-- Columns:
-  - issue_key (TEXT, primary key)
-  - note (TEXT, default empty string)
-  - priority (INTEGER, default 0)
-  - updated_at (TEXT timestamp)
-- Priority values are clamped server-side to 0..10 before persistence.
+## Source layout (high signal)
 
-## Database + UI Data Model
-- Local storage keeps UI preferences such as saved JQL labels/inputs.
-- SQLite keeps durable issue metadata (note + priority).
-- During query runs, frontend fetches persisted metadata and merges it into current UI state.
+| Path | Role |
+|------|------|
+| `src/Pages/WorkWeekTimer.jsx` | Shell: header, Jira card, results |
+| `src/Pages/components/TaskManagerHeaderPanel.jsx` | Ticker, date/calendar, reminders |
+| `src/Pages/components/JiraResultsTable.jsx` | JQL results table |
+| `src/Pages/hooks/useTaskManagerJira.js` | Jira UI state, handlers, persistence hooks |
+| `src/Pages/hooks/jiraJqlRunWorkflow.js` | JQL run + metadata merge |
+| `src/services/jiraClient.js` | `fetch` → proxy |
+| `server/jiraProxy.mjs` | Jira + SQLite + static `dist` in production |
+| `electron/main.cjs` | Spawns proxy, loads Vite dev URL or `dist/` |
 
-## Project Structure
-- src/: React app source
-- src/Pages/WorkWeekTimer.jsx: Main Task Manager screen and interaction logic
-- src/Pages/workWeekTimerElements.css: Page and table styling
-- src/services/jiraClient.js: Frontend API wrapper for proxy endpoints
-- server/jiraProxy.mjs: Proxy server for Jira operations and metadata persistence
-- public/: Static assets such as favicon
-- JIRA_SETUP.md: Jira environment and setup notes
+## Scripts
 
-## Local Setup
-1. Install dependencies.
-2. Configure environment variables from .env.example into .env.
-3. Start frontend and backend processes.
-4. Use the Test Jira Connection button in the UI to validate connectivity.
+| Command | Use |
+|---------|-----|
+| `npm run dev:all` | Vite + proxy (web dev) |
+| `npm run desktop:dev` | Vite + Electron (proxy started from Electron) |
+| `npm run desktop:doctor` | Rebuild native modules, then `desktop:dev` |
+| `npm run desktop:rebuild-native` | `better-sqlite3` for current Electron |
+| `npm run build` | Production Vite bundle |
+| `npm run desktop:pack` / `desktop:dist` | electron-builder (output `release/`) |
+| `npm run desktop:dist:mac` / `desktop:dist:win` | Platform-specific installers |
 
-## Desktop (Electron) Workflow
-- Start desktop dev quickly:
-  - npm run desktop:dev
-- Rebuild native modules then start desktop dev (recommended after dependency or Electron updates):
-  - npm run desktop:doctor
-- Rebuild native modules only:
-  - npm run desktop:rebuild-native
+## GitHub Actions
 
-## Desktop Packaging
-- Create unpacked desktop output (smoke test package):
-  - npm run desktop:pack
-- Create release artifacts using current platform defaults:
-  - npm run desktop:dist
-- Build a macOS DMG: **TODO**
-  - npm run desktop:dist:mac
-- Build a Windows NSIS installer:
-  - npm run desktop:dist:win
+`.github/workflows/desktop-packaging.yml` — `workflow_dispatch` and tags `v*`. Artifacts: `desktop-macos`, `desktop-windows`.
 
-### Packaging Notes **TODO**
-- Artifacts are written to the release/ directory.
-- macOS notarization/signing requires a valid Apple Developer certificate.
-- Windows installer generation is scripted in this repo, but creating Windows installers is most reliable when run on Windows CI/host.
+## Product behavior (for code reviewers)
 
-## CI Packaging **TODO**
-- Workflow file:
-  - .github/workflows/desktop-packaging.yml
-- Triggers:
-  - Manual trigger from GitHub Actions (workflow_dispatch).
-  - Git tag push matching v*.
-- Outputs:
-  - macOS artifacts: desktop-macos (DMG/ZIP when present).
-  - Windows artifacts: desktop-windows (EXE/MSI/BLOCKMAP when present).
-- Download location:
-  - GitHub repository Actions tab, inside the specific workflow run artifacts section.
+- Up to **4** JQL slots; prefs + last successful **jqlRuns** cached in `localStorage` (restore banner until user runs JQL again).
+- **Reminders** (4 rows): `localStorage` only; checkbox “done” styling until text cleared/changed.
+- **Push note**: tracks last pushed text per issue; greys input + blocks duplicate push until note edits.
+- Priority **P1** = highest, **P10** lowest; row + select colors in `workWeekTimerElements.css` (interval legend in `END_USER_GUIDE.md`).
 
-## Core UI Behavior 
-- Query management:
-  - Supports up to 4 saved JQL entries with editable labels.
-  - Query inputs and labels persist in local storage.
-- Results table:
-  - Closed/resolved items are visually separated and treated as non-editable.
-  - Open items support status and assignee updates.
-  - Row priority supports values P0 through P10 and is persisted.
-  - Notes are editable and can be pushed to Jira comments.
-- Batch actions:
-  - Select-all and push-selected support multi-issue note pushes.
+## Checks after changes
 
-## New UI Additions
-- Top joke ticker:
-  - Includes static jokes plus live dad-joke and programming-joke API integration.
-  - Refresh cadence is 10 minutes.
-  - Falls back to static jokes if API fetch fails.
-- Date and mini calendar panel:
-  - Renders above the main Task Manager card.
-  - Highlights current day.
+1. `npm run build`
+2. Smoke: JQL run, metadata save, status/assignee update (against a real Jira test site if possible)
 
-## API/Integration Notes
-- All Jira interactions are routed through the local proxy, not directly from browser to Jira.
-- Frontend should handle proxy errors and show user-friendly state messages.
-- Metadata persistence endpoints are used to keep note and priority changes durable.
-- API server uses SQLite WAL mode for better local write/read concurrency.
-
-## Build and Validation
-1. Run a production build after UI or behavior changes.
-2. Verify table sorting and closed-item behavior after modifying row logic.
-3. Validate proxy-dependent actions against a configured Jira account.
-
-## Troubleshooting
-- Jira connection fails:
-  - Confirm .env credentials and base URL.
-  - Re-test with health and profile endpoints through the UI.
-- Notes or priorities appear reset:
-  - Confirm local storage keys are available.
-  - Confirm metadata endpoints are reachable and SQLite writes succeed.
-  - Confirm the database file exists at data/workweek.sqlite.
-- Live joke does not appear:
-  - Static jokes are expected fallback behavior when external APIs are unavailable.
+More setup detail: `JIRA_SETUP.md`. Non-technical usage: `END_USER_GUIDE.md`.

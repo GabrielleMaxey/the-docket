@@ -1,18 +1,18 @@
 import React from "react";
 import {
-  fetchIssueMetadataBulk,
   fetchJiraHealth,
   fetchJiraMyself,
-  fetchJiraSearch,
   pushJiraIssueNote,
   saveIssueMetadata,
   updateJiraIssueAssignee,
   updateJiraIssueStatus,
 } from "../../services/jiraClient";
+import { runJqlWorkflow } from "./jiraJqlRunWorkflow.js";
 
 const STORAGE_KEY = "workWeekTimerJiraPreferences";
 const NOTES_STORAGE_KEY = "workWeekTimerJiraNotes";
 const ROW_PRIORITY_STORAGE_KEY = "workWeekTimerJiraRowPriorities";
+const JQL_RUNS_STORAGE_KEY = "workWeekTimerJiraLastJqlRuns";
 const DEFAULT_JQL_COUNT = 1;
 const DEFAULT_JQLS = ["assignee = currentUser() ORDER BY updated DESC", "", ""];
 const DEFAULT_LABELS = ["My Work", "In Progress", "Blocked"];
@@ -67,47 +67,52 @@ const loadStoredPreferences = () => {
   }
 };
 
-const loadStoredNotes = () => {
+const readJsonObject = (storageKey) => {
   if (typeof window === "undefined") {
     return {};
   }
 
   try {
-    const raw = window.localStorage.getItem(NOTES_STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) {
       return {};
     }
 
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return {};
-    }
-
-    return parsed;
+    return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
   }
 };
 
-const loadStoredRowPriorities = () => {
+const isValidJqlRun = (run) =>
+  Boolean(
+    run &&
+      typeof run === "object" &&
+      Number.isFinite(Number(run.index)) &&
+      Array.isArray(run.issues)
+  );
+
+const loadStoredJqlRuns = () => {
   if (typeof window === "undefined") {
-    return {};
+    return [];
   }
 
   try {
-    const raw = window.localStorage.getItem(ROW_PRIORITY_STORAGE_KEY);
+    const raw = window.localStorage.getItem(JQL_RUNS_STORAGE_KEY);
     if (!raw) {
-      return {};
+      return [];
     }
 
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return {};
+    if (!Array.isArray(parsed)) {
+      return [];
     }
 
-    return parsed;
+    const runs = parsed.filter(isValidJqlRun);
+    return runs.length === 0 ? [] : [...runs].sort((a, b) => a.index - b.index);
   } catch {
-    return {};
+    return [];
   }
 };
 
@@ -122,23 +127,18 @@ const clampPriority = (value) => {
 
 const isClosedLikeStatus = (status) => /^(closed|resolved|done)$/i.test(String(status || ""));
 
-const getPriorityClass = (value) => {
+const priorityTierClass = (prefix, value) => {
   const clamped = clampPriority(value);
   if (clamped < 1 || clamped > 10) {
-    return "ww-priority-neutral";
+    return `${prefix}-neutral`;
   }
 
-  return `ww-priority-${clamped}`;
+  return `${prefix}-${clamped}`;
 };
 
-const getPriorityRowClass = (value) => {
-  const clamped = clampPriority(value);
-  if (clamped < 1 || clamped > 10) {
-    return "ww-row-priority-neutral";
-  }
+const getPriorityClass = (value) => priorityTierClass("ww-priority", value);
 
-  return `ww-row-priority-${clamped}`;
-};
+const getPriorityRowClass = (value) => priorityTierClass("ww-row-priority", value);
 
 const formatDate = (value) => {
   if (!value) {
@@ -152,10 +152,24 @@ const formatDate = (value) => {
   }
 };
 
+const patchIndexedArray = (previous, index, nextValue) => {
+  const next = [...previous];
+  next[index] = nextValue;
+  return next;
+};
+
+const patchIssueKeyed = (previous, issueKey, nextValue) => ({
+  ...previous,
+  [issueKey]: nextValue,
+});
+
+const errorMessage = (error, fallback) =>
+  error instanceof Error ? error.message : fallback;
+
 export const useTaskManagerJira = () => {
   const stored = loadStoredPreferences();
-  const storedNotes = loadStoredNotes();
-  const storedRowPriorities = loadStoredRowPriorities();
+  const storedNotes = readJsonObject(NOTES_STORAGE_KEY);
+  const storedRowPriorities = readJsonObject(ROW_PRIORITY_STORAGE_KEY);
 
   const [jiraState, setJiraState] = React.useState({
     loading: false,
@@ -167,12 +181,16 @@ export const useTaskManagerJira = () => {
   const [jqlInputs, setJqlInputs] = React.useState(stored.jqlInputs);
   const [jqlLabels, setJqlLabels] = React.useState(stored.jqlLabels);
   const [jqlLoading, setJqlLoading] = React.useState(false);
-  const [jqlRuns, setJqlRuns] = React.useState([]);
+  const [jqlRuns, setJqlRuns] = React.useState(loadStoredJqlRuns);
+  const [showRestoredJqlBanner, setShowRestoredJqlBanner] = React.useState(
+    () => loadStoredJqlRuns().length > 0
+  );
   const [jqlError, setJqlError] = React.useState("");
   const [jqlMaxResults, setJqlMaxResults] = React.useState(200);
   const [jiraNotes, setJiraNotes] = React.useState(storedNotes);
   const [jiraRowPriorities, setJiraRowPriorities] = React.useState(storedRowPriorities);
   const [selectedForPush, setSelectedForPush] = React.useState({});
+  const [lastPushedJiraNoteByKey, setLastPushedJiraNoteByKey] = React.useState({});
   const [pushState, setPushState] = React.useState({});
   const [saveState, setSaveState] = React.useState({});
   const [statusDrafts, setStatusDrafts] = React.useState({});
@@ -192,23 +210,26 @@ export const useTaskManagerJira = () => {
         jqlLabels,
       })
     );
-  }, [jqlCount, jqlInputs, jqlLabels]);
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
     window.localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(jiraNotes));
-  }, [jiraNotes]);
+    window.localStorage.setItem(ROW_PRIORITY_STORAGE_KEY, JSON.stringify(jiraRowPriorities));
+  }, [jqlCount, jqlInputs, jqlLabels, jiraNotes, jiraRowPriorities]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    window.localStorage.setItem(ROW_PRIORITY_STORAGE_KEY, JSON.stringify(jiraRowPriorities));
-  }, [jiraRowPriorities]);
+    if (jqlRuns.length === 0) {
+      window.localStorage.removeItem(JQL_RUNS_STORAGE_KEY);
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(JQL_RUNS_STORAGE_KEY, JSON.stringify(jqlRuns));
+    } catch (error) {
+      console.warn("Could not persist JQL results to localStorage (size or quota).", error);
+    }
+  }, [jqlRuns]);
 
   const handleJiraTest = async () => {
     setJiraState({ loading: true, success: null, message: "Checking Jira connection..." });
@@ -230,25 +251,17 @@ export const useTaskManagerJira = () => {
       setJiraState({
         loading: false,
         success: false,
-        message: error instanceof Error ? error.message : "Failed to connect to Jira",
+        message: errorMessage(error, "Failed to connect to Jira"),
       });
     }
   };
 
   const handleJqlChange = (index, value) => {
-    setJqlInputs((prev) => {
-      const next = [...prev];
-      next[index] = value;
-      return next;
-    });
+    setJqlInputs((prev) => patchIndexedArray(prev, index, value));
   };
 
   const handleJqlLabelChange = (index, value) => {
-    setJqlLabels((prev) => {
-      const next = [...prev];
-      next[index] = value;
-      return next;
-    });
+    setJqlLabels((prev) => patchIndexedArray(prev, index, value));
   };
 
   const handleResetSavedQueries = () => {
@@ -256,10 +269,13 @@ export const useTaskManagerJira = () => {
     setJqlInputs(DEFAULT_JQLS);
     setJqlLabels(DEFAULT_LABELS);
     setJqlRuns([]);
+    setShowRestoredJqlBanner(false);
     setJqlError("");
+    setLastPushedJiraNoteByKey({});
 
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(JQL_RUNS_STORAGE_KEY);
     }
   };
 
@@ -291,6 +307,19 @@ export const useTaskManagerJira = () => {
       return;
     }
 
+    const lastPushedSnapshot = lastPushedJiraNoteByKey[issueKey];
+    if (typeof lastPushedSnapshot === "string" && lastPushedSnapshot.trim() && note === lastPushedSnapshot.trim()) {
+      setPushState((prev) => ({
+        ...prev,
+        [issueKey]: {
+          loading: false,
+          error: "",
+          success: "Already pushed — edit the note to push again.",
+        },
+      }));
+      return;
+    }
+
     setPushState((prev) => ({
       ...prev,
       [issueKey]: { loading: true, error: "", success: "" },
@@ -298,6 +327,8 @@ export const useTaskManagerJira = () => {
 
     try {
       await pushJiraIssueNote({ issueKey, note });
+      setJiraNotes((prev) => patchIssueKeyed(prev, issueKey, note));
+      setLastPushedJiraNoteByKey((prev) => patchIssueKeyed(prev, issueKey, note));
       setPushState((prev) => ({
         ...prev,
         [issueKey]: { loading: false, error: "", success: "Pushed to Jira." },
@@ -307,7 +338,7 @@ export const useTaskManagerJira = () => {
         ...prev,
         [issueKey]: {
           loading: false,
-          error: error instanceof Error ? error.message : "Failed to push note",
+          error: errorMessage(error, "Failed to push note"),
           success: "",
         },
       }));
@@ -342,7 +373,7 @@ export const useTaskManagerJira = () => {
         ...prev,
         [issueKey]: {
           loading: false,
-          error: error instanceof Error ? error.message : "Failed to save to DB",
+          error: errorMessage(error, "Failed to save to DB"),
           success: "",
         },
       }));
@@ -350,10 +381,7 @@ export const useTaskManagerJira = () => {
   };
 
   const handleNoteChange = (issueKey, note) => {
-    setJiraNotes((prev) => ({
-      ...prev,
-      [issueKey]: note,
-    }));
+    setJiraNotes((prev) => patchIssueKeyed(prev, issueKey, note));
 
     saveIssueMetadata({ issueKey, note }).catch((error) => {
       console.error("Failed to persist note", issueKey, error);
@@ -363,10 +391,7 @@ export const useTaskManagerJira = () => {
   const handleRowPriorityChange = (issueKey, value) => {
     const priority = clampPriority(value);
 
-    setJiraRowPriorities((prev) => ({
-      ...prev,
-      [issueKey]: priority,
-    }));
+    setJiraRowPriorities((prev) => patchIssueKeyed(prev, issueKey, priority));
 
     saveIssueMetadata({ issueKey, priority }).catch((error) => {
       console.error("Failed to persist priority", issueKey, error);
@@ -374,17 +399,11 @@ export const useTaskManagerJira = () => {
   };
 
   const handleStatusDraftChange = (issueKey, value) => {
-    setStatusDrafts((prev) => ({
-      ...prev,
-      [issueKey]: value,
-    }));
+    setStatusDrafts((prev) => patchIssueKeyed(prev, issueKey, value));
   };
 
   const handleAssigneeDraftChange = (issueKey, value) => {
-    setAssigneeDrafts((prev) => ({
-      ...prev,
-      [issueKey]: value,
-    }));
+    setAssigneeDrafts((prev) => patchIssueKeyed(prev, issueKey, value));
   };
 
   const setRowUpdateMessage = (issueKey, next) => {
@@ -440,7 +459,7 @@ export const useTaskManagerJira = () => {
     } catch (error) {
       setRowUpdateMessage(issueKey, {
         loading: false,
-        error: error instanceof Error ? error.message : "Failed to update status",
+        error: errorMessage(error, "Failed to update status"),
       });
     }
   };
@@ -471,120 +490,25 @@ export const useTaskManagerJira = () => {
     } catch (error) {
       setRowUpdateMessage(issueKey, {
         loading: false,
-        error: error instanceof Error ? error.message : "Failed to update assignee",
+        error: errorMessage(error, "Failed to update assignee"),
       });
     }
   };
 
-  const handleRunJql = async () => {
-    const selected = jqlInputs.slice(0, jqlCount).map((item) => item.trim());
-    const nonEmpty = selected.filter(Boolean);
-
-    if (nonEmpty.length === 0) {
-      setJqlError("Please enter at least one JQL.");
-      setJqlRuns([]);
-      return;
-    }
-
-    setJqlError("");
-    setJqlLoading(true);
-
-    const runResults = await Promise.all(
-      selected.map(async (jql, idx) => {
-        const label = (jqlLabels[idx] || "").trim() || `JQL ${idx + 1}`;
-
-        if (!jql) {
-          return {
-            index: idx,
-            label,
-            jql,
-            issues: [],
-            total: 0,
-            error: "No JQL entered for this slot.",
-          };
-        }
-
-        try {
-          const data = await fetchJiraSearch({ jql, maxResults: jqlMaxResults });
-          return {
-            index: idx,
-            label,
-            jql,
-            issues: data?.issues || [],
-            total: Number(data?.total || 0),
-            error: null,
-          };
-        } catch (error) {
-          return {
-            index: idx,
-            label,
-            jql,
-            issues: [],
-            total: 0,
-            error: error instanceof Error ? error.message : "Failed to run query",
-          };
-        }
-      })
-    );
-
-    const allIssueKeys = Array.from(
-      new Set(
-        runResults.flatMap((run) =>
-          (run.issues || []).map((issue) => String(issue.key || "").trim())
-        )
-      )
-    ).filter((key) => key.length > 0);
-
-    if (allIssueKeys.length > 0) {
-      try {
-        const persisted = await fetchIssueMetadataBulk(allIssueKeys);
-        const nextNotes = {};
-        const nextPriorities = {};
-
-        allIssueKeys.forEach((issueKey) => {
-          const item = persisted?.[issueKey];
-          if (!item) {
-            return;
-          }
-
-          if (typeof item.note === "string") {
-            nextNotes[issueKey] = item.note;
-          }
-          if (item.priority !== undefined) {
-            nextPriorities[issueKey] = clampPriority(item.priority);
-          }
-        });
-
-        if (Object.keys(nextNotes).length > 0) {
-          setJiraNotes((prev) => {
-            const merged = { ...prev };
-            Object.entries(nextNotes).forEach(([issueKey, note]) => {
-              if (merged[issueKey] === undefined) {
-                merged[issueKey] = note;
-              }
-            });
-            return merged;
-          });
-        }
-        if (Object.keys(nextPriorities).length > 0) {
-          setJiraRowPriorities((prev) => {
-            const merged = { ...prev };
-            Object.entries(nextPriorities).forEach(([issueKey, priority]) => {
-              if (merged[issueKey] === undefined) {
-                merged[issueKey] = priority;
-              }
-            });
-            return merged;
-          });
-        }
-      } catch (error) {
-        console.error("Failed to fetch persisted issue metadata", error);
-      }
-    }
-
-    setJqlRuns([...runResults].sort((a, b) => a.index - b.index));
-    setJqlLoading(false);
-  };
+  const handleRunJql = () =>
+    runJqlWorkflow({
+      jqlInputs,
+      jqlCount,
+      jqlLabels,
+      jqlMaxResults,
+      clampPriority,
+      setJqlError,
+      setJqlRuns,
+      setShowRestoredJqlBanner,
+      setJqlLoading,
+      setJiraNotes,
+      setJiraRowPriorities,
+    });
 
   return {
     jiraState,
@@ -594,11 +518,13 @@ export const useTaskManagerJira = () => {
     jqlLabels,
     jqlLoading,
     jqlRuns,
+    showRestoredJqlBanner,
     jqlError,
     jqlMaxResults,
     jiraNotes,
     jiraRowPriorities,
     selectedForPush,
+    lastPushedJiraNoteByKey,
     pushState,
     saveState,
     statusDrafts,

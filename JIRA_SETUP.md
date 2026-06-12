@@ -1,47 +1,41 @@
-# Jira API Setup
+# Jira setup
 
-This project uses a local proxy so Jira credentials are never sent to the browser.
+Credentials stay on the machine: the **Node proxy** (`server/jiraProxy.mjs`) talks to Jira; the browser only calls the proxy.
 
-## 1) Create local env file
+## 1. Environment
 
-Copy `.env.example` to `.env` in the project root and fill values:
+Copy `.env.example` → `.env` and set:
 
-- `JIRA_BASE_URL` (example: `https://your-domain.atlassian.net`)
-- `JIRA_EMAIL`
-- `JIRA_API_TOKEN`
-- `API_PORT` (default `8787`)
+| Variable        | Example |
+|----------------|---------|
+| `JIRA_BASE_URL` | `https://your-site.atlassian.net` |
+| `JIRA_EMAIL`    | Atlassian account email |
+| `JIRA_API_TOKEN`| From Atlassian API tokens |
+| `API_PORT`      | Optional; default `8787` |
 
-## 2) Run app + Jira proxy together
+Do not commit `.env`.
+
+## 2. Run UI + proxy
 
 ```bash
-cd /path/to/taskManager
-npm run dev:all
+npm install
+npm ci
+npm run desktop:dev
 ```
 
-- UI: `http://localhost:5173`
-- Proxy: `http://localhost:8787`
+- UI: `http://localhost:5173` (Task Manager is the home route.)
+- API: `http://localhost:<API_PORT>` (default `8787`)
 
-## 3) Test from UI
+`npm run dev:ui` alone does **not** start the proxy—use `dev:all` for Jira, or run `npm run dev:api` in another terminal.
 
-Open the Work Week page and click **Test Jira Connection**.
+## 3. Verify
 
-## 4) Run one to three JQL queries
+In the app, click **Test Jira Connection**. Optionally open `http://localhost:8787/api/health`.
 
-On the Work Week page:
+## 4. JQL
 
-- Choose **JQL count** = 1, 2, or 3.
-- Enter each JQL in its input.
-- Click **Run JQL**.
+Choose **JQL count** (1–4), enter JQL and optional labels, set **Max results**, then **Run JQL**. Use **Ctrl+Enter** or **⌘+Enter** as a shortcut for Run JQL.
 
-The UI will show grouped results for each query, including total matches, pagination controls, and a configurable Max results value.
+---
 
-## Team-friendly secret handling
-
-For shared environments, do not commit `.env`.
-
-Options:
-- Local dev: each teammate keeps their own `.env`.
-- CI/hosted: inject env vars from provider secrets store.
-- Corporate vault: export secrets at runtime into process env and start `npm run dev:api`.
-
-As long as `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` are present in process env, proxy calls work.
+For sharing secrets in teams: inject the same variables in CI or a vault-backed process; no keys in the repo.

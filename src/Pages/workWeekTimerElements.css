@@ -36,9 +36,27 @@
   border: 1px solid rgba(15, 23, 42, 0.1);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 1rem;
+  grid-template-columns: minmax(200px, 1fr) max-content;
+  grid-template-rows: auto auto;
+  column-gap: 1rem;
+  row-gap: 0.85rem;
   align-items: start;
+}
+
+.work-week-page .ww-date-calendar-segment > .ww-date-block {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.work-week-page .ww-date-calendar-segment > .ww-calendar-block {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  align-self: flex-end;
+}
+
+.work-week-page .ww-date-calendar-segment > .ww-reminders-block {
+  grid-column: 1;
+  grid-row: 2;
 }
 
 .work-week-page .ww-date-label {
@@ -58,6 +76,8 @@
 
 .work-week-page .ww-calendar-block {
   min-width: 212px;
+  width: fit-content;
+  max-width: 100%;
   padding: 0.65rem;
   border-radius: 10px;
   background: #f8fafc;
@@ -103,18 +123,91 @@
   font-weight: 700;
 }
 
-@media (max-width: 760px) {
-  .work-week-page .ww-joke-ticker {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+.work-week-page .ww-reminders-block {
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
 
+.work-week-page .ww-reminders-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.work-week-page .ww-reminders-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.work-week-page .ww-reminder-row {
+  margin: 0;
+}
+
+.work-week-page .ww-reminder-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  cursor: text;
+}
+
+.work-week-page .ww-reminder-check {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.work-week-page .ww-reminder-input {
+  flex: 1;
+  min-width: 14rem;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  color: #0f172a;
+  background: #fff;
+}
+
+.work-week-page .ww-reminder-row-done .ww-reminder-input {
+  background: #e2e8f0;
+  color: #64748b;
+  border-color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.work-week-page .ww-reminder-row-done .ww-reminder-check {
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
   .work-week-page .ww-date-calendar-segment {
     grid-template-columns: 1fr;
   }
 
-  .work-week-page .ww-calendar-block {
-    min-width: 100%;
+  .work-week-page .ww-date-calendar-segment > .ww-date-block,
+  .work-week-page .ww-date-calendar-segment > .ww-calendar-block,
+  .work-week-page .ww-date-calendar-segment > .ww-reminders-block {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .work-week-page .ww-joke-ticker {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -211,43 +304,50 @@
   color: #1e40af;
 }
 
+/* ── priority row tint (20-interval × 5pt scale; we use bands 96–100 … 51–55) ──
+   App P1 = highest = interval 96–100 (red). App P10 = lowest = 51–55 (green-cyan). */
 .work-week-page .ww-results-table tbody .ww-row-priority-0 {
-  background-color: #FFFFFF;
+  background-color: #ffffff;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-1 {
-  background-color: #f3dddd;
+  background-color: #fee2e2;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-2 {
-  background-color: #f4e5d9;
+  background-color: #ffedd5;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-3 {
-  background-color: #f3eedb;
+  background-color: #fff7ed;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-4 {
-  background-color: #e4ecd9;
+  background-color: #fef3c7;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-5 {
-  background-color: #dceadf;
+  background-color: #fef9c3;
 }
+
 .work-week-page .ww-results-table tbody .ww-row-priority-6 {
-  background-color: #d0e2df;
+  background-color: #ecfccb;
 }
+
 .work-week-page .ww-results-table tbody .ww-row-priority-7 {
-  background-color: #dce8ea;
+  background-color: #dcfce7;
 }
+
 .work-week-page .ww-results-table tbody .ww-row-priority-8 {
-  background-color: #e2ddeb;
+  background-color: #d1fae5;
 }
+
 .work-week-page .ww-results-table tbody .ww-row-priority-9 {
-  background-color: #e8dcea;
+  background-color: #ccfbf1;
 }
+
 .work-week-page .ww-results-table tbody .ww-row-priority-10 {
-  background-color: #e1d8e5;
+  background-color: #cffafe;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-priority-neutral {
@@ -391,6 +491,36 @@
   margin-left: 0.5rem;
 }
 
+.work-week-page .ww-jql-shortcut-hint {
+  margin: 0.85rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.work-week-page .ww-kbd {
+  display: inline-block;
+  padding: 0.08rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  font-size: 0.72rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  color: #334155;
+}
+
+.work-week-page .ww-restored-jql-banner {
+  margin: 1rem auto 0;
+  max-width: 1200px;
+}
+
+.work-week-page .ww-restored-jql-banner-copy {
+  margin: 0.5rem 0 0.85rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
 .work-week-page .ww-jql-controls {
   display: flex;
   align-items: center;
@@ -484,49 +614,55 @@
   font-weight: 300;
 }
 
+/* Priority select / P-badge: same interval map as row tints (P1 = 96–100 … P10 = 51–55). */
 .work-week-page .ww-priority-1 {
-  background: #f3dddd;
-  border-color: #c89595;
+  background: #fecaca;
+  border-color: #b91c1c;
 }
 
 .work-week-page .ww-priority-2 {
-  background: #f4e5d9;
-  border-color: #c9a88d;
+  background: #fed7aa;
+  border-color: #c2410c;
 }
 
 .work-week-page .ww-priority-3 {
-  background: #f3eedb;
-  border-color: #c6b98a;
+  background: #fdba74;
+  border-color: #ea580c;
 }
 
 .work-week-page .ww-priority-4 {
-  background: #e4ecd9;
-  border-color: #a9bb94;
+  background: #fde68a;
+  border-color: #d97706;
 }
 
 .work-week-page .ww-priority-5 {
-  background: #dceadf;
-  border-color: #95b59d;
+  background: #fef08a;
+  border-color: #ca8a04;
 }
+
 .work-week-page .ww-priority-6 {
-  background: #d0e2df;
-  border-color: #95b5b5;
+  background: #d9f99d;
+  border-color: #65a30d;
 }
+
 .work-week-page .ww-priority-7 {
-  background: #dce8ea;
-  border-color: #95aeb5;
+  background: #bbf7d0;
+  border-color: #15803d;
 }
+
 .work-week-page .ww-priority-8 {
-  background: #e2ddeb;
-  border-color: #948fb1;
+  background: #6ee7b7;
+  border-color: #047857;
 }
+
 .work-week-page .ww-priority-9 {
-  background: #e8dcea;
-  border-color: #ab95b5;
+  background: #5eead4;
+  border-color: #0f766e;
 }
+
 .work-week-page .ww-priority-10 {
-  background: #e1d8e5;
-  border-color: #b095b5;
+  background: #67e8f9;
+  border-color: #0e7490;
 }
 .work-week-page .ww-priority-neutral {
   background: #f8fafc;
@@ -665,6 +801,17 @@
   border-radius: 8px;
   padding: 0.45rem 0.55rem;
   font-size: 0.8rem;
+}
+
+.work-week-page .ww-results-table textarea.ww-note-textarea-pushed {
+  background: #e2e8f0;
+  color: #64748b;
+  border-color: #94a3b8;
+  cursor: text;
+}
+
+.work-week-page .ww-results-table textarea.ww-note-textarea-pushed::placeholder {
+  color: #94a3b8;
 }
 
 /* ── push to jira per-row controls ── */
