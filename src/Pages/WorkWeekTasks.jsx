@@ -10,10 +10,13 @@ import {
   Message,
 } from "semantic-ui-react";
 import "semantic-ui-css/semantic.min.css";
-import "./workWeekTimerElements.css";
+import "./workWeekTaskElements.css";
 import JiraResultsTable from "./components/JiraResultsTable";
 import TaskManagerHeaderPanel from "./components/TaskManagerHeaderPanel";
-import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira";
+import {
+  STATUS_OPTIONS,
+  useTaskManagerJira,
+} from "./hooks/useTaskManagerJira.js";
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
@@ -73,8 +76,26 @@ const getCalendarCells = (date) => {
   return cells;
 };
 
-const REMINDERS_STORAGE_KEY = "workWeekTimerReminders";
+const REMINDERS_STORAGE_KEY = "workWeekTasksReminders";
+const TASK_MANAGER_SEGMENT_OPEN_KEY = "workWeekTasksTaskManagerSegmentOpen";
 const REMINDER_SLOT_COUNT = 4;
+
+const loadTaskManagerSegmentOpen = () => {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(TASK_MANAGER_SEGMENT_OPEN_KEY);
+    if (raw === null) {
+      return true;
+    }
+
+    return raw === "true";
+  } catch {
+    return true;
+  }
+};
 
 const defaultReminderRows = () =>
   Array.from({ length: REMINDER_SLOT_COUNT }, () => ({ text: "", done: false }));
@@ -112,7 +133,7 @@ const loadStoredReminders = () => {
   }
 };
 
-const WorkWeekTimer = () => {
+const workWeekTasks = () => {
   const {
     jiraState,
     jiraApiMeta,
@@ -158,6 +179,20 @@ const WorkWeekTimer = () => {
     handlePushNote,
   } = useTaskManagerJira();
 
+  const handleResetSavedQueriesWithConfirm = React.useCallback(() => {
+    const message =
+      "Reset saved queries?\n\n" +
+      "This will remove: saved JQL text and labels, the cached results table, and “last pushed note” markers for this session.\n\n" +
+      "This will NOT remove: notes or priorities in your local database (SQLite), or header reminders.\n\n" +
+      "Click OK to reset, or Cancel to keep your settings.";
+
+    if (!window.confirm(message)) {
+      return;
+    }
+
+    handleResetSavedQueries();
+  }, [handleResetSavedQueries]);
+
   const handleRunJqlRef = React.useRef(handleRunJql);
   React.useEffect(() => {
     handleRunJqlRef.current = handleRunJql;
@@ -191,6 +226,9 @@ const WorkWeekTimer = () => {
   const [jokeIndex, setJokeIndex] = React.useState(0);
   const [apiJokes, setApiJokes] = React.useState([]);
   const [reminders, setReminders] = React.useState(() => loadStoredReminders());
+  const [taskManagerSegmentOpen, setTaskManagerSegmentOpen] = React.useState(
+    () => loadTaskManagerSegmentOpen()
+  );
 
   const today = React.useMemo(() => new Date(), []);
   const todayDay = today.getDate();
@@ -260,6 +298,21 @@ const WorkWeekTimer = () => {
     window.localStorage.setItem(REMINDERS_STORAGE_KEY, JSON.stringify(reminders));
   }, [reminders]);
 
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        TASK_MANAGER_SEGMENT_OPEN_KEY,
+        String(taskManagerSegmentOpen)
+      );
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [taskManagerSegmentOpen]);
+
   const handleReminderTextChange = React.useCallback((index, value) => {
     setReminders((prev) => {
       const prevRow = prev[index];
@@ -302,134 +355,154 @@ const WorkWeekTimer = () => {
           onReminderDoneChange={handleReminderDoneChange}
         />
 
-        <Segment raised className="ww-segment">
+        <Segment
+          raised
+          className={
+            "ww-segment" + (taskManagerSegmentOpen ? "" : " ww-segment--collapsed")
+          }
+        >
           <Card.Content>
-            <Header as="h2">
-              <Icon name="tasks" />
-              <Header.Content>Task Manager</Header.Content>
-            </Header>
-            <p className="ww-copy">
-              Run saved JQL queries and manage Jira tasks.
-            </p>
-          </Card.Content>
-          <Card.Content extra>
-            <p className="ww-copy">
-              Update status, assignee, priority, and notes.
-            </p>
-          </Card.Content>
-          <Card.Content extra>
-            <Button
-              primary
-              onClick={handleJiraTest}
-              loading={jiraState.loading}
-              disabled={jiraState.loading}
-            >
-              Test Jira Connection
-            </Button>
-            <p
-              className={`ww-jira-status ${
-                jiraState.success === false ? "ww-jira-error" : ""
-              }`}
-            >
-              {jiraState.message}
-            </p>
-            {jiraApiMeta ? <p className="ww-jira-meta">{jiraApiMeta}</p> : null}
-          </Card.Content>
-          <Card.Content extra>
-            <div className="ww-jql-controls">
-              <label htmlFor="jql-count">JQL count:</label>
-              <select
-                id="jql-count"
-                value={jqlCount}
-                onChange={(event) => setJqlCount(Number(event.target.value))}
+            <div className="ww-task-manager-segment-head">
+              <Header as="h2" className="ww-task-manager-segment-title">
+                <Icon name="tasks" />
+                <Header.Content>Task Manager</Header.Content>
+              </Header>
+              <Button
+                type="button"
+                basic
+                size="small"
+                className="ww-task-manager-segment-toggle"
+                onClick={() => setTaskManagerSegmentOpen((open) => !open)}
+                aria-expanded={taskManagerSegmentOpen}
+                aria-controls="ww-task-manager-segment-body"
+                id="ww-task-manager-segment-toggle"
               >
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={3}>3</option>
-                <option value={4}>4</option>
-              </select>
+                <Icon name={taskManagerSegmentOpen ? "chevron up" : "chevron down"} />
+                {taskManagerSegmentOpen ? "Hide" : "Show"}
+              </Button>
             </div>
+          </Card.Content>
 
-            {Array.from({ length: jqlCount }).map((_, index) => (
-              <div key={`jql-input-${index}`} className="ww-jql-input-wrap">
-                <div className="ww-jql-row-head">
-                  <label htmlFor={`jql-label-${index}`}>
-                    Label {index + 1}
-                  </label>
+          {taskManagerSegmentOpen ? (
+            <div id="ww-task-manager-segment-body">
+              <Card.Content>
+                <p className="ww-copy">Run saved JQL queries and manage Jira tasks.</p>
+              </Card.Content>
+              <Card.Content extra>
+                <p className="ww-copy">Update status, assignee, priority, and notes.</p>
+              </Card.Content>
+              <Card.Content extra>
+                <Button
+                  primary
+                  onClick={handleJiraTest}
+                  loading={jiraState.loading}
+                  disabled={jiraState.loading}
+                >
+                  Test Jira Connection
+                </Button>
+                <p
+                  className={`ww-jira-status ${
+                    jiraState.success === false ? "ww-jira-error" : ""
+                  }`}
+                >
+                  {jiraState.message}
+                </p>
+                {jiraApiMeta ? <p className="ww-jira-meta">{jiraApiMeta}</p> : null}
+              </Card.Content>
+              <Card.Content extra>
+                <div className="ww-jql-controls">
+                  <label htmlFor="jql-count">JQL count:</label>
+                  <select
+                    id="jql-count"
+                    value={jqlCount}
+                    onChange={(event) => setJqlCount(Number(event.target.value))}
+                  >
+                    <option value={1}>1</option>
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                    <option value={4}>4</option>
+                  </select>
                 </div>
-                <div className="ww-jql-row-inline">
+
+                {Array.from({ length: jqlCount }).map((_, index) => (
+                  <div key={`jql-input-${index}`} className="ww-jql-input-wrap">
+                    <div className="ww-jql-row-head">
+                      <label htmlFor={`jql-label-${index}`}>Label {index + 1}</label>
+                    </div>
+                    <div className="ww-jql-row-inline">
+                      <input
+                        id={`jql-label-${index}`}
+                        type="text"
+                        value={jqlLabels[index]}
+                        onChange={(event) =>
+                          handleJqlLabelChange(index, event.target.value)
+                        }
+                        placeholder={`Label for JQL ${index + 1}`}
+                      />
+                    </div>
+
+                    <input
+                      id={`jql-${index}`}
+                      type="text"
+                      value={jqlInputs[index]}
+                      onChange={(event) => handleJqlChange(index, event.target.value)}
+                      placeholder="project = ABC ORDER BY updated DESC"
+                    />
+                  </div>
+                ))}
+
+                <div className="ww-jql-maxresults">
+                  <label htmlFor="jql-max-results">Max results:</label>
                   <input
-                    id={`jql-label-${index}`}
-                    type="text"
-                    value={jqlLabels[index]}
+                    id="jql-max-results"
+                    type="number"
+                    min={1}
+                    max={1000}
+                    value={jqlMaxResults}
                     onChange={(event) =>
-                      handleJqlLabelChange(index, event.target.value)
+                      setJqlMaxResults(Math.max(1, Number(event.target.value) || 200))
                     }
-                    placeholder={`Label for JQL ${index + 1}`}
                   />
                 </div>
+                <Button
+                  secondary
+                  onClick={handleRunJql}
+                  loading={jqlLoading}
+                  disabled={jqlLoading}
+                >
+                  Run JQL
+                </Button>
+                <div className="ww-reset-saved-group">
+                  <Button
+                    className="ww-reset-btn"
+                    onClick={handleResetSavedQueriesWithConfirm}
+                    disabled={jqlLoading}
+                  >
+                    <Icon name="warning sign" />
+                    Reset Saved Queries
+                  </Button>
+                </div>
 
-                <input
-                  id={`jql-${index}`}
-                  type="text"
-                  value={jqlInputs[index]}
-                  onChange={(event) =>
-                    handleJqlChange(index, event.target.value)
-                  }
-                  placeholder="project = ABC ORDER BY updated DESC"
-                />
-              </div>
-            ))}
-
-            <div className="ww-jql-maxresults">
-              <label htmlFor="jql-max-results">Max results:</label>
-              <input
-                id="jql-max-results"
-                type="number"
-                min={1}
-                max={1000}
-                value={jqlMaxResults}
-                onChange={(event) =>
-                  setJqlMaxResults(
-                    Math.max(1, Number(event.target.value) || 200),
-                  )
-                }
-              />
+                {jqlError ? (
+                  <p className="ww-jira-status ww-jira-error">{jqlError}</p>
+                ) : null}
+                <p className="ww-jql-shortcut-hint">
+                  Tip: Press <kbd className="ww-kbd">Ctrl</kbd>+
+                  <kbd className="ww-kbd">Enter</kbd> or{" "}
+                  <kbd className="ww-kbd">⌘</kbd>+
+                  <kbd className="ww-kbd">Enter</kbd> to run or refresh JQL results.
+                </p>
+              </Card.Content>
             </div>
-            <Button
-              secondary
-              onClick={handleRunJql}
-              loading={jqlLoading}
-              disabled={jqlLoading}
-            >
-              Run JQL
-            </Button>
-            <Button
-              className="ww-reset-btn"
-              onClick={handleResetSavedQueries}
-              disabled={jqlLoading}
-            >
-              Reset Saved Queries
-            </Button>
-
-            {jqlError ? (
-              <p className="ww-jira-status ww-jira-error">{jqlError}</p>
-            ) : null}
-            <p className="ww-jql-shortcut-hint">
-              Tip: Press{" "}
-              <kbd className="ww-kbd">Ctrl</kbd>+<kbd className="ww-kbd">Enter</kbd> or{" "}
-              <kbd className="ww-kbd">⌘</kbd>+<kbd className="ww-kbd">Enter</kbd> to run or refresh
-              JQL results.
-            </p>
-          </Card.Content>
+          ) : null}
         </Segment>
 
         {showRestoredJqlBanner && jqlRuns.length > 0 ? (
           <Message info className="ww-restored-jql-banner">
             <Message.Header>Showing saved results</Message.Header>
             <p className="ww-restored-jql-banner-copy">
-              This table was restored from your last run (for example after a reload). Data may be
-              out of date until you refresh from Jira.
+              This table was restored from your last run (for example after a
+              reload). Data may be out of date until you refresh from Jira.
             </p>
             <Button
               type="button"
@@ -478,4 +551,4 @@ const WorkWeekTimer = () => {
   );
 };
 
-export default WorkWeekTimer;
+export default workWeekTasks;

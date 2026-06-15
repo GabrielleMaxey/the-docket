@@ -105,9 +105,9 @@ If someone asks you to “check the API,” they may mean opening **`http://loca
 3. **Max results** — caps how many issues load per list so the table stays fast. If you expect more work than the cap, raise it or narrow your JQL.
 4. **Run JQL** — loads or refreshes the table. Keyboard shortcut: hold **Ctrl** (Windows/Linux) or **⌘** (Mac) and press **Enter** — same as clicking **Run JQL**.
 5. **Showing saved results** — if you closed the app earlier, you might see a banner saying the table was **restored from last time**. That is normal. Run **Run JQL** again when you want **fresh** data from Jira.
-6. **Reset Saved Queries** — clears your saved JQL text, labels, the **cached table**, and “I already pushed this note” memory for the session. It does **not** delete your **notes and priorities** inside the SQLite file on disk.
+6. **Reset Saved Queries** — clears your saved JQL text, labels, the **cached table**, and “I already pushed this note” memory for the session. It does **not** delete your **notes and priorities** in SQLite, and it does **not** clear **header reminders** (they use a separate saved setting).
 
-If need help creating a JQL query, please see <a href="https://support.atlassian.com/jira-service-management-cloud/docs/use-advanced-search-with-jira-query-language-jql/">.  You can also copy a filter from Jira’s **Advanced issue search** in your instance of JIRA. Provided is a basic query task that you own: assignee = currentUser() ORDER BY updated DESC
+If you need help writing JQL, see [Atlassian’s JQL documentation](https://support.atlassian.com/jira-service-management-cloud/docs/use-advanced-search-with-jira-query-language-jql/). You can also copy a filter from Jira’s **Advanced issue search**. Example query for issues assigned to you: `assignee = currentUser() ORDER BY updated DESC`.
 
 ---
 
@@ -123,8 +123,9 @@ Work **one row at a time** unless you use batch actions at the bottom.
 | Keep a **private note** | Type in the **Notes** area. The app saves it on your machine as you type (and you can click **Save to DB** if you want a clear “saved” confirmation on that row). |
 | Put the same text into **Jira as a comment** | Tick the row’s checkbox (or use batch select), then **Push note** (or **Push Selected**). After a successful push, the note box may look **greyed out** until you **change the text** — that prevents sending the exact same comment twice by mistake. |
 | Save without posting to Jira | Notes and priority already save in the background; **Save to DB** is an extra explicit save with a visible “saved” style message on the row. |
+| Find rows by **issue key** | Use **Filter by key** above the table (matches any part of the key, case-insensitive, e.g. `PROJ-42` or `proj`). Clear the box to show all loaded rows again. **Select all** / **Push Selected** apply only to rows that match the filter. |
 
-**Colors:** rows and the priority dropdown use a heat style (warmer for more urgent **P** values, cooler for lower). The project’s stylesheet (`workWeekTimerElements.css`); see the short technical list in the older internal docs if needed.
+**Colors:** rows and the priority dropdown use a heat style (warmer for more urgent **P** values, cooler for lower). The project’s stylesheet (`workWeekTasksElements.css`); see the short technical list in the older internal docs if needed.
 
 ---
 
@@ -132,7 +133,8 @@ Work **one row at a time** unless you use batch actions at the bottom.
 
 | Kind of information | Where it lives | Travels with you? |
 |----------------------|----------------|-------------------|
-| JQL text, labels, how many lists, last table snapshot, reminders | In the **browser’s storage** on this device | **No** — other browsers or PCs start clean unless you set things up again. |
+| JQL text, labels, how many lists, last table snapshot | In the **browser’s storage** on this device | **No** — other browsers or PCs start clean unless you set things up again. |
+| Header **reminders** | Separate **browser storage** (`workWeekTasksReminders`) | **No** — not cleared by **Reset Saved Queries**. |
 | Your **notes** and **P0–P10** values per issue key | File **`data/workweek.sqlite`** next to the app when the helper service runs | **Only this machine** (or copy of that file). |
 | Status, assignee, real Jira fields, **comments you pushed** | **Inside Jira** | **Yes** — anyone with permission sees them in Jira. |
 
@@ -142,7 +144,8 @@ Work **one row at a time** unless you use batch actions at the bottom.
 
 | Data | Where |
 |------|--------|
-| JQL text, labels, count, last table snapshot, reminders | Browser **localStorage** on this device |
+| JQL text, labels, count, last table snapshot | Browser **localStorage** (`workWeekTasksJira*`) |
+| Header reminders | Browser **localStorage** (`workWeekTasksReminders`) |
 | Per-issue note + priority (autosave on change; **Save to DB** for explicit confirmation) | Local file **`data/workweek.sqlite`** (created when the API runs) |
 
 - A **backup file** of the database (`workweek-share.sqlite`), and/or  
