@@ -31,7 +31,7 @@ const NavBar = ({ toggle }) => {
             <NavBarContainer>
                 <NavLogo to='/' onClick={ toggleHome }>
                     <NavLogoIcon src='/task-manager-favicon.svg' alt='' aria-hidden='true' />
-                    Task Manager
+                    TASK MANAGER
                 </NavLogo>
                     <MobileIcon onClick={ toggle }>
                             <Bars />

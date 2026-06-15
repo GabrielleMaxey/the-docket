@@ -218,6 +218,26 @@
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
 }
 
+.work-week-page .ww-segment.ww-segment--collapsed {
+  min-height: 0;
+}
+
+.work-week-page .ww-task-manager-segment-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+
+.work-week-page .ww-task-manager-segment-title {
+  margin: 0 !important;
+}
+
+.work-week-page .ww-task-manager-segment-toggle.ui.button {
+  flex-shrink: 0;
+}
+
 .work-week-page .extra.content {
   text-align: center;
 }
@@ -407,13 +427,70 @@
   background: #eff6ff;
 }
 
+.work-week-page .ww-key-filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.90rem;
+}
+
+.work-week-page .ww-key-filter-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.work-week-page .ww-key-filter-input {
+  min-width: 10rem;
+  max-width: 12rem;
+  flex: 1 1 12rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.8rem;
+  color: #334155;
+  background: #fff;
+}
+
+.work-week-page .ww-key-filter-input::placeholder {
+  color: #94a3b8;
+}
+
 .work-week-page .ww-pagination-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.45rem;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.70rem;
+}
+
+.work-week-page .ww-pagination-row--sort-only {
+  justify-content: flex-end;
+}
+
+.work-week-page .ww-pager-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem 0.55rem;
+  margin-bottom: 0.65rem;
+  padding: 0.4rem 0.35rem;
+
+}
+
+.work-week-page .ww-pager-bar.is-bottom {
+  margin-top: 0.75rem;
+  margin-bottom: 0;
+}
+
+.work-week-page .ww-page-row-range {
+  font-size: 0.78rem;
+  color: #64748b;
+  white-space: nowrap;
 }
 
 .work-week-page .ww-sort-controls {
@@ -485,6 +562,26 @@
   color: #475569;
   min-width: 92px;
   text-align: center;
+}
+
+.work-week-page .ww-reset-saved-group {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  margin-left: 0.5rem;
+  max-width: min(20rem, 100%);
+  vertical-align: top;
+}
+
+.work-week-page .ww-reset-warning-label {
+  white-space: normal;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.work-week-page .ww-reset-saved-group .ww-reset-btn {
+  margin-left: 0;
 }
 
 .work-week-page .ww-reset-btn {

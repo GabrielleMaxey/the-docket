@@ -3,7 +3,7 @@ import { createBrowserRouter, Outlet } from "react-router-dom";
 import NavBar from "./Components/NavBar/navBarIndex";
 import Errors from "./Pages/Errors.jsx";
 import Home from "./Pages/Home.jsx";
-import WorkWeekTimer from "./Pages/WorkWeekTimer.jsx";
+import WorkWeekTasks from "./Pages/WorkWeekTasks.jsx";
 
 const AppLayout = () => (
   <>
@@ -19,11 +19,11 @@ const router = createBrowserRouter([
     children: [
       {
         path: "/",
-        element: <WorkWeekTimer />,
+        element: <WorkWeekTasks />,
       },
       {
         path: "/work-week",
-        element: <WorkWeekTimer />,
+        element: <WorkWeekTasks />,
       },
       {
         path: "/home",
