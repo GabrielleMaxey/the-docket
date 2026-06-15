@@ -43,6 +43,17 @@ const getIssueAssignee = (issue) => {
   return String(issue.fields?.assignee?.displayName || "Unassigned");
 };
 
+const filterIssuesByKeySubstring = (issues, rawQuery) => {
+  const term = String(rawQuery || "").trim().toLowerCase();
+  if (term.length === 0) {
+    return issues;
+  }
+
+  return issues.filter((issue) =>
+    String(issue.key || "").toLowerCase().includes(term)
+  );
+};
+
 const sortIssues = ({
   issues,
   isClosedLikeStatus,
@@ -130,6 +141,75 @@ const noteMatchesLastJiraPush = (noteDraft, lastPushed) =>
   lastPushed.trim().length > 0 &&
   String(noteDraft || "").trim() === lastPushed.trim();
 
+const ResultsPagerBar = ({
+  placement,
+  currentPage,
+  totalPages,
+  totalRows,
+  rowStartDisplay,
+  rowEndDisplay,
+  onFirst,
+  onPrev,
+  onNext,
+  onLast,
+}) => {
+  const rowRangeLabel =
+    totalRows === 0
+      ? "No rows on this page"
+      : `Rows ${rowStartDisplay}–${rowEndDisplay} of ${totalRows}`;
+
+  const suffix = placement === "bottom" ? "bottom of table" : "top of table";
+
+  return (
+    <div
+      className={"ww-pager-bar" + (placement === "bottom" ? " is-bottom" : "")}
+      role="navigation"
+      aria-label={`Results pagination (${suffix})`}
+    >
+      <button
+        type="button"
+        className="ww-page-btn"
+        onClick={onFirst}
+        disabled={currentPage <= 1 || totalPages <= 1}
+        aria-label="First page"
+      >
+        First
+      </button>
+      <button
+        type="button"
+        className="ww-page-btn"
+        onClick={onPrev}
+        disabled={currentPage <= 1}
+        aria-label="Previous page"
+      >
+        Prev
+      </button>
+      <span className="ww-page-meta">
+        Page {currentPage} of {totalPages}
+      </span>
+      <span className="ww-page-row-range">{rowRangeLabel}</span>
+      <button
+        type="button"
+        className="ww-page-btn"
+        onClick={onNext}
+        disabled={currentPage >= totalPages}
+        aria-label="Next page"
+      >
+        Next
+      </button>
+      <button
+        type="button"
+        className="ww-page-btn"
+        onClick={onLast}
+        disabled={currentPage >= totalPages || totalPages <= 1}
+        aria-label="Last page"
+      >
+        Last
+      </button>
+    </div>
+  );
+};
+
 const JiraResultsTable = ({
   jqlRuns,
   selectedForPush,
@@ -161,6 +241,7 @@ const JiraResultsTable = ({
 }) => {
   const [activeTab, setActiveTab] = React.useState(0);
   const [pageByRunIndex, setPageByRunIndex] = React.useState({});
+  const [keyFilterByRunIndex, setKeyFilterByRunIndex] = React.useState({});
   const [sortField, setSortField] = React.useState("default");
   const [sortDirection, setSortDirection] = React.useState("asc");
 
@@ -174,21 +255,26 @@ const JiraResultsTable = ({
 
   const safeTab = Math.min(activeTab, jqlRuns.length - 1);
   const run = jqlRuns[safeTab];
-  const knownAssignees = getKnownAssignees(run.issues || []);
+  const runIndex = run.index ?? safeTab;
+  const allLoadedIssues = run.issues || [];
+  const keyFilterDraft = keyFilterByRunIndex[runIndex] ?? "";
+  const issuesMatchingKey = filterIssuesByKeySubstring(allLoadedIssues, keyFilterDraft);
+  const knownAssignees = getKnownAssignees(issuesMatchingKey);
   const sortedIssues = sortIssues({
-    issues: run.issues || [],
+    issues: issuesMatchingKey,
     isClosedLikeStatus,
     jiraRowPriorities,
     clampPriority,
     sortField,
     sortDirection,
   });
-
-  const runIndex = run.index ?? safeTab;
-  const totalPages = Math.max(1, Math.ceil(sortedIssues.length / PAGE_SIZE));
+  const totalRows = sortedIssues.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
   const currentPage = Math.min(pageByRunIndex[runIndex] || 1, totalPages);
   const start = (currentPage - 1) * PAGE_SIZE;
   const pagedIssues = sortedIssues.slice(start, start + PAGE_SIZE);
+  const rowStartDisplay = totalRows === 0 ? 0 : start + 1;
+  const rowEndDisplay = totalRows === 0 ? 0 : Math.min(start + PAGE_SIZE, totalRows);
 
   const handleTabChange = (idx) => {
     setActiveTab(idx);
@@ -206,6 +292,12 @@ const JiraResultsTable = ({
 
   const handleSortDirectionChange = (nextDirection) => {
     setSortDirection(nextDirection);
+    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+  };
+
+  const handleKeyFilterChange = (event) => {
+    const value = event.target.value;
+    setKeyFilterByRunIndex((prev) => ({ ...prev, [runIndex]: value }));
     setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
   };
 
@@ -268,10 +360,36 @@ const JiraResultsTable = ({
         ) : (
           <div>
             <p className="ww-jira-status">
-              Showing {run.issues.length} of {run.total} matched
+              {keyFilterDraft.trim().length > 0 ? (
+                <>
+                  Showing {issuesMatchingKey.length} of {allLoadedIssues.length} loaded (key
+                  filter) · {run.total} matched by JQL
+                </>
+              ) : (
+                <>
+                  Showing {allLoadedIssues.length} of {run.total} matched
+                </>
+              )}
             </p>
 
-            <div className="ww-pagination-row">
+            <div className="ww-key-filter-row">
+              <label className="ww-key-filter-label" htmlFor={`ww-key-filter-${runIndex}`}>
+                Filter by key
+              </label>
+              <input
+                id={`ww-key-filter-${runIndex}`}
+                className="ww-key-filter-input"
+                type="search"
+                placeholder="e.g. ODI-123456 or 123456"
+                value={keyFilterDraft}
+                onChange={handleKeyFilterChange}
+                aria-label="Filter table rows by issue key"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+
+            <div className="ww-pagination-row ww-pagination-row--sort-only">
               <div className="ww-sort-controls" aria-label="Table sorting controls">
                 <label className="ww-sort-control" htmlFor="ww-sort-field">
                   Sort by
@@ -301,36 +419,29 @@ const JiraResultsTable = ({
                   <option value="desc">Descending</option>
                 </select>
               </div>
-
-              <button
-                type="button"
-                className="ww-page-btn"
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage <= 1}
-              >
-                Prev
-              </button>
-              <span className="ww-page-meta">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                type="button"
-                className="ww-page-btn"
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage >= totalPages}
-              >
-                Next
-              </button>
             </div>
+
+            <ResultsPagerBar
+              placement="top"
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalRows={totalRows}
+              rowStartDisplay={rowStartDisplay}
+              rowEndDisplay={rowEndDisplay}
+              onFirst={() => handlePageChange(1)}
+              onPrev={() => handlePageChange(currentPage - 1)}
+              onNext={() => handlePageChange(currentPage + 1)}
+              onLast={() => handlePageChange(totalPages)}
+            />
 
             <div className="ww-results-table-wrap">
               <div className="ww-push-selected-row">
                 <button
                   type="button"
                   className="ww-push-selected-btn"
-                  onClick={() => handlePushSelected(run.issues)}
+                  onClick={() => handlePushSelected(issuesMatchingKey)}
                   disabled={
-                    !run.issues.some(
+                    !issuesMatchingKey.some(
                       (issue) =>
                         selectedForPush[issue.key] &&
                         !isClosedLikeStatus(issue.fields?.status?.name)
@@ -391,17 +502,17 @@ const JiraResultsTable = ({
                           <input
                             type="checkbox"
                             checked={
-                              run.issues.filter(
+                              issuesMatchingKey.filter(
                                 (issue) => !isClosedLikeStatus(issue.fields?.status?.name)
                               ).length > 0 &&
-                              run.issues
+                              issuesMatchingKey
                                 .filter(
                                   (issue) => !isClosedLikeStatus(issue.fields?.status?.name)
                                 )
                                 .every((issue) => selectedForPush[issue.key])
                             }
                             onChange={(event) =>
-                              handleSelectAll(run.issues, event.target.checked)
+                              handleSelectAll(issuesMatchingKey, event.target.checked)
                             }
                           />
                           All
@@ -592,6 +703,19 @@ const JiraResultsTable = ({
                 </tbody>
               </table>
             </div>
+
+            <ResultsPagerBar
+              placement="bottom"
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalRows={totalRows}
+              rowStartDisplay={rowStartDisplay}
+              rowEndDisplay={rowEndDisplay}
+              onFirst={() => handlePageChange(1)}
+              onPrev={() => handlePageChange(currentPage - 1)}
+              onNext={() => handlePageChange(currentPage + 1)}
+              onLast={() => handlePageChange(totalPages)}
+            />
           </div>
         )}
       </div>
