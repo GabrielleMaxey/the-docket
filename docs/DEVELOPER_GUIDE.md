@@ -7,7 +7,7 @@ React + Vite UI, **Express** proxy (`server/jiraProxy.mjs`), **better-sqlite3** 
 
 - UI: React 18, React Router, Semantic UI React, styled-components
 - Build: Vite 8; desktop: Electron 31 + electron-builder
-- Data: `localStorage` (JQL prefs, labels, last JQL result snapshot, header reminders) + SQLite `data/workweek.sqlite` (per-issue note + priority via proxy)
+- Data: `localStorage` — JQL prefs/labels/last JQL snapshot (`workWeekTasksJira*`), header reminders (`workWeekTasksReminders`, not cleared by reset) — plus SQLite `data/workweek.sqlite` (per-issue note + priority via proxy)
 
 ## SQLite (`issue_metadata`)
 
@@ -35,7 +35,7 @@ Redacted CSV (no note column): omit `note` from the `SELECT`.
 
 | Path | Role |
 |------|------|
-| `src/Pages/WorkWeekTimer.jsx` | Shell: header, Jira card, results |
+| `src/Pages/workWeekTasks.jsx` | Shell: header, Jira card, results |
 | `src/Pages/components/TaskManagerHeaderPanel.jsx` | Ticker, date/calendar, reminders |
 | `src/Pages/components/JiraResultsTable.jsx` | JQL results table |
 | `src/Pages/hooks/useTaskManagerJira.js` | Jira UI state, handlers, persistence hooks |
@@ -65,7 +65,7 @@ Redacted CSV (no note column): omit `note` from the `SELECT`.
 - Up to **4** JQL slots; prefs + last successful **jqlRuns** cached in `localStorage` (restore banner until user runs JQL again).
 - **Reminders** (4 rows): `localStorage` only; checkbox “done” styling until text cleared/changed.
 - **Push note**: tracks last pushed text per issue; greys input + blocks duplicate push until note edits.
-- Priority **P1** = highest, **P10** lowest; row + select colors in `workWeekTimerElements.css` (interval legend in `END_USER_GUIDE.md`).
+- Priority **P1** = highest, **P10** lowest; row + select colors in `workWeekTasksElements.css` (interval legend in `END_USER_GUIDE.md`).
 
 ## Checks after changes
 

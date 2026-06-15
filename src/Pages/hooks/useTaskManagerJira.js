@@ -9,10 +9,10 @@ import {
 } from "../../services/jiraClient";
 import { runJqlWorkflow } from "./jiraJqlRunWorkflow.js";
 
-const STORAGE_KEY = "workWeekTimerJiraPreferences";
-const NOTES_STORAGE_KEY = "workWeekTimerJiraNotes";
-const ROW_PRIORITY_STORAGE_KEY = "workWeekTimerJiraRowPriorities";
-const JQL_RUNS_STORAGE_KEY = "workWeekTimerJiraLastJqlRuns";
+const STORAGE_KEY = "workWeekTasksJiraPreferences";
+const NOTES_STORAGE_KEY = "workWeekTasksJiraNotes";
+const ROW_PRIORITY_STORAGE_KEY = "workWeekTasksJiraRowPriorities";
+const JQL_RUNS_STORAGE_KEY = "workWeekTasksJiraLastJqlRuns";
 const DEFAULT_JQL_COUNT = 1;
 const DEFAULT_JQLS = ["assignee = currentUser() ORDER BY updated DESC", "", ""];
 const DEFAULT_LABELS = ["My Work", "In Progress", "Blocked"];
@@ -276,6 +276,8 @@ export const useTaskManagerJira = () => {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(STORAGE_KEY);
       window.localStorage.removeItem(JQL_RUNS_STORAGE_KEY);
+      // Do not remove header reminders (`workWeekTasksReminders` in WorkWeekTasks.jsx) or
+      // `NOTES_STORAGE_KEY` / `ROW_PRIORITY_STORAGE_KEY` — reset is JQL prefs + cached runs only.
     }
   };
 
