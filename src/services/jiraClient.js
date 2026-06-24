@@ -1,3 +1,5 @@
+import { buildApiUrl } from "./apiBase.js";
+
 const extractJiraErrorMessage = (data, status) => {
   if (Array.isArray(data?.errorMessages) && data.errorMessages.length > 0) {
     return data.errorMessages.join(" ");
@@ -6,8 +8,8 @@ const extractJiraErrorMessage = (data, status) => {
   return data?.error || data?.message || `Jira request failed with status ${status}`;
 };
 
-const requestJson = async (url, options = {}) => {
-  const response = await fetch(url, {
+const requestJson = async (path, options = {}) => {
+  const response = await fetch(buildApiUrl(path), {
     headers: {
       Accept: "application/json",
       ...(options.headers || {}),
@@ -15,7 +17,16 @@ const requestJson = async (url, options = {}) => {
     ...options,
   });
 
-  const data = await response.json();
+  const text = await response.text();
+  let data = {};
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { message: text };
+    }
+  }
 
   if (!response.ok) {
     throw new Error(extractJiraErrorMessage(data, response.status));
@@ -24,16 +35,13 @@ const requestJson = async (url, options = {}) => {
   return data;
 };
 
-export const fetchJiraMyself = async () => {
-  return requestJson("/api/jira/myself");
-};
+export const fetchJiraMyself = async () => requestJson("/api/jira/myself");
 
-export const fetchJiraHealth = async () => {
-  return requestJson("/api/health");
-};
+export const fetchJiraHealth = async () => requestJson("/api/health");
 
-// Send JQL as POST JSON body — avoids URL-encoding issues with complex JQL
-// and matches Aware's request pattern (POST body to /rest/api/3/search/jql).
+export const testJiraConnection = async () => fetchJiraMyself();
+
+// Send JQL as POST JSON body to avoid URL-encoding edge cases.
 export const fetchJiraSearch = async ({ jql, maxResults = 5 }) => {
   return requestJson("/api/jira/search", {
     method: "POST",
@@ -101,5 +109,211 @@ export const saveIssueMetadata = async ({ issueKey, note, priority }) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+  });
+};
+
+export const fetchEpicPresets = async () => {
+  const data = await requestJson("/api/epic-presets");
+  return data?.items || [];
+};
+
+export const createEpicPreset = async (payload) => {
+  return requestJson("/api/epic-presets", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload || {}),
+  });
+};
+
+export const updateEpicPreset = async (id, payload) => {
+  return requestJson(`/api/epic-presets/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload || {}),
+  });
+};
+
+export const deleteEpicPreset = async (id) => {
+  return requestJson(`/api/epic-presets/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+};
+
+export const fetchFavouriteJiraFilters = async () => {
+  const data = await requestJson("/api/jira/filters/favourite");
+  return data?.items || [];
+};
+
+export const runEpicFilters = async ({ epicPresetIds, includePastDue, maxResults = 200 }) => {
+  const data = await requestJson("/api/epic-filters/run", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ epicPresetIds, includePastDue, maxResults }),
+  });
+
+  return data?.runs || [];
+};
+
+export const fetchFieldMappings = async () => {
+  const data = await requestJson("/api/jira/field-mappings");
+  return data?.items || [];
+};
+
+export const saveFieldMappings = async (mappings) => {
+  const data = await requestJson("/api/jira/field-mappings", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ mappings }),
+  });
+
+  return data?.items || [];
+};
+
+export const syncFieldMappingsFromJira = async () => {
+  const data = await requestJson("/api/jira/field-mappings/sync", {
+    method: "POST",
+  });
+
+  return data?.items || [];
+};
+
+export const fetchJiraFields = async () => {
+  const data = await requestJson("/api/jira/fields");
+  return data?.items || [];
+};
+
+export const fetchAppSettings = async () => {
+  const data = await requestJson("/api/settings");
+  return data?.settings || {};
+};
+
+export const saveAppSettings = async (settings) => {
+  const data = await requestJson("/api/settings", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ settings: settings || {} }),
+  });
+
+  return data?.settings || {};
+};
+
+export const fetchWatchedAssignees = async () => {
+  const data = await requestJson("/api/watched-assignees");
+  return data?.items || [];
+};
+
+export const createWatchedAssignee = async (payload) => {
+  return requestJson("/api/watched-assignees", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload || {}),
+  });
+};
+
+export const deleteWatchedAssignee = async (id) => {
+  return requestJson(`/api/watched-assignees/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+};
+
+export const fetchDashboardMetrics = async () => {
+  const data = await requestJson("/api/dashboard/metrics");
+  return data?.snapshot || null;
+};
+
+export const fetchJiraFilters = async () => {
+  const data = await requestJson("/api/jira/filters");
+  return Array.isArray(data) ? data : [];
+};
+
+export const refreshDashboardMetrics = async (payload) => {
+  const data = await requestJson("/api/dashboard/refresh", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload || {}),
+  });
+
+  return data?.snapshot || null;
+};
+
+export const generateReport = async ({ audience, epicPresetIds, additionalContext }) => {
+  return requestJson("/api/report/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ audience, epicPresetIds, additionalContext }),
+  });
+};
+
+export const fetchChatStatus = async () => requestJson("/api/chat/status");
+
+export const startChatOAuth = async () => {
+  const data = await requestJson("/api/chat/auth/start?format=json");
+  return String(data?.authorizeUrl || "").trim();
+};
+
+export const signOutChat = async () => {
+  return requestJson("/api/chat/auth/signout", {
+    method: "POST",
+  });
+};
+
+export const sendChatMessage = async ({ message, epicContext }) => {
+  return requestJson("/api/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ message, epicContext }),
+  });
+};
+
+export const fetchJiraProjects = async () => {
+  const data = await requestJson("/api/jira/projects");
+  return data?.items || [];
+};
+
+export const fetchJiraCreateMeta = async (projectKey) => {
+  return requestJson(`/api/jira/projects/${encodeURIComponent(projectKey)}/createmeta`);
+};
+
+export const createJiraIssue = async (payload) => {
+  return requestJson("/api/jira/issues", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload || {}),
+  });
+};
+
+export const generateProjectReport = async ({ label, summary }) => {
+  return requestJson("/api/report/project", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label, summary }),
+  });
+};
+
+export const generateWeekPlan = async ({ projects, focusStyle, capacityHours, additionalContext }) => {
+  return requestJson("/api/plan/week", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ projects, focusStyle, capacityHours, additionalContext }),
   });
 };

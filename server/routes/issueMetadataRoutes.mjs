@@ -1,0 +1,287 @@
+// Issue mutation + local-metadata endpoints (comment, status transition,
+// assignee, and the SQLite-backed note/priority store). Split out of
+// jiraProxy.mjs for the same reason as jiraCoreRoutes.mjs.
+//
+// The assignee route used to have its own inline copy of "search Jira for a
+// user and pick the best match" duplicating lib/jiraSearchHelpers.mjs's
+// resolveJiraUser almost exactly. It now calls the shared helper instead —
+// same fix already applied in jiraIssueRoutes.mjs's create-issue flow.
+
+export const registerIssueMetadataRoutes = (
+  app,
+  { db, jiraRequest, ensureEnvOrRespond, resolveJiraUser }
+) => {
+  const selectIssueMetadataStmt = db.prepare(
+    "SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key = ?"
+  );
+  const upsertIssueMetadataStmt = db.prepare(`
+    INSERT INTO issue_metadata (issue_key, note, priority, updated_at)
+    VALUES (@issueKey, @note, @priority, CURRENT_TIMESTAMP)
+    ON CONFLICT(issue_key) DO UPDATE SET
+      note = excluded.note,
+      priority = excluded.priority,
+      updated_at = CURRENT_TIMESTAMP
+  `);
+
+  const clampDbPriority = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.min(10, Math.round(numeric)));
+  };
+
+  app.post("/api/jira/issues/:issueKey/comment", async (req, res) => {
+    if (!ensureEnvOrRespond(res)) {
+      return;
+    }
+
+    const issueKey = String(req.params.issueKey || "").trim();
+    const note = String(req.body?.note || "").trim();
+
+    if (!issueKey) {
+      return res.status(400).json({ error: "Missing issue key" });
+    }
+
+    if (!note) {
+      return res.status(400).json({ error: "Missing note" });
+    }
+
+    const body = {
+      body: {
+        type: "doc",
+        version: 1,
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: note,
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    try {
+      const result = await jiraRequest({
+        method: "POST",
+        pathWithQuery: `/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`,
+        body,
+      });
+
+      if (!result.ok) {
+        return res.status(result.status).json(result.data);
+      }
+
+      return res.json(result.data);
+    } catch (error) {
+      return res.status(500).json({
+        error: "Failed to push comment to Jira",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.post("/api/jira/issues/:issueKey/status", async (req, res) => {
+    if (!ensureEnvOrRespond(res)) {
+      return;
+    }
+
+    const issueKey = String(req.params.issueKey || "").trim();
+    const targetStatus = String(req.body?.targetStatus || "").trim();
+
+    if (!issueKey) {
+      return res.status(400).json({ error: "Missing issue key" });
+    }
+
+    if (!targetStatus) {
+      return res.status(400).json({ error: "Missing target status" });
+    }
+
+    try {
+      const transitionsResult = await jiraRequest({
+        pathWithQuery: `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`,
+      });
+
+      if (!transitionsResult.ok) {
+        return res.status(transitionsResult.status).json(transitionsResult.data);
+      }
+
+      const transitions = Array.isArray(transitionsResult.data?.transitions)
+        ? transitionsResult.data.transitions
+        : [];
+
+      const desired = targetStatus.toLowerCase();
+      const matchingTransition = transitions.find(
+        (item) => String(item?.to?.name || "").toLowerCase() === desired
+      );
+
+      if (!matchingTransition?.id) {
+        const available = transitions
+          .map((item) => item?.to?.name)
+          .filter((name) => typeof name === "string" && name.trim().length > 0);
+
+        return res.status(400).json({
+          error: `Status '${targetStatus}' is not an available transition for ${issueKey}`,
+          availableTransitions: available,
+        });
+      }
+
+      const transitionResult = await jiraRequest({
+        method: "POST",
+        pathWithQuery: `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`,
+        body: {
+          transition: {
+            id: matchingTransition.id,
+          },
+        },
+      });
+
+      if (!transitionResult.ok) {
+        return res.status(transitionResult.status).json(transitionResult.data);
+      }
+
+      return res.json({
+        ok: true,
+        issueKey,
+        previousStatus: null,
+        newStatus: targetStatus,
+        transitionId: matchingTransition.id,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        error: "Failed to update Jira status",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.post("/api/jira/issues/:issueKey/assignee", async (req, res) => {
+    if (!ensureEnvOrRespond(res)) {
+      return;
+    }
+
+    const issueKey = String(req.params.issueKey || "").trim();
+    const assigneeRaw = String(req.body?.assignee || "").trim();
+
+    if (!issueKey) {
+      return res.status(400).json({ error: "Missing issue key" });
+    }
+
+    if (!assigneeRaw) {
+      return res.status(400).json({ error: "Missing assignee value" });
+    }
+
+    try {
+      let accountId = "";
+      let resolvedAssignee = assigneeRaw;
+
+      // Already looks like an Atlassian accountId (e.g. picked from a
+      // dropdown that already resolved it) — skip the user-search round trip.
+      const looksLikeAccountId = assigneeRaw.includes(":") || assigneeRaw.length > 20;
+      if (looksLikeAccountId) {
+        accountId = assigneeRaw;
+      } else {
+        const resolved = await resolveJiraUser({ query: assigneeRaw, jiraRequest });
+        accountId = resolved?.accountId || "";
+        resolvedAssignee = resolved?.displayName || assigneeRaw;
+      }
+
+      if (!accountId) {
+        return res.status(404).json({
+          error: `No Jira user found for '${assigneeRaw}'`,
+        });
+      }
+
+      const updateResult = await jiraRequest({
+        method: "PUT",
+        pathWithQuery: `/rest/api/3/issue/${encodeURIComponent(issueKey)}/assignee`,
+        body: {
+          accountId,
+        },
+      });
+
+      if (!updateResult.ok) {
+        return res.status(updateResult.status).json(updateResult.data);
+      }
+
+      return res.json({
+        ok: true,
+        issueKey,
+        accountId,
+        resolvedAssignee,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        error: "Failed to update Jira assignee",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.post("/api/jira/issue-metadata/bulk", (req, res) => {
+    const issueKeys = Array.isArray(req.body?.issueKeys)
+      ? req.body.issueKeys
+          .map((key) => String(key || "").trim())
+          .filter((key) => key.length > 0)
+      : [];
+
+    if (issueKeys.length === 0) {
+      return res.json({ items: {} });
+    }
+
+    const placeholders = issueKeys.map(() => "?").join(",");
+    const rows = db
+      .prepare(
+        `SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key IN (${placeholders})`
+      )
+      .all(...issueKeys);
+
+    const items = rows.reduce((acc, row) => {
+      acc[row.issue_key] = {
+        note: String(row.note || ""),
+        priority: clampDbPriority(row.priority),
+      };
+      return acc;
+    }, {});
+
+    return res.json({ items });
+  });
+
+  app.put("/api/jira/issue-metadata/:issueKey", (req, res) => {
+    const issueKey = String(req.params.issueKey || "").trim();
+    if (!issueKey) {
+      return res.status(400).json({ error: "Missing issue key" });
+    }
+
+    const current = selectIssueMetadataStmt.get(issueKey) || {};
+    const hasNote = typeof req.body?.note === "string";
+    const hasPriority = req.body?.priority !== undefined;
+
+    if (!hasNote && !hasPriority) {
+      return res.status(400).json({ error: "Provide note or priority" });
+    }
+
+    const nextNote = hasNote ? String(req.body.note) : String(current.note || "");
+    const nextPriority = hasPriority
+      ? clampDbPriority(req.body.priority)
+      : clampDbPriority(current.priority);
+
+    upsertIssueMetadataStmt.run({
+      issueKey,
+      note: nextNote,
+      priority: nextPriority,
+    });
+
+    return res.json({
+      ok: true,
+      issueKey,
+      note: nextNote,
+      priority: nextPriority,
+    });
+  });
+};

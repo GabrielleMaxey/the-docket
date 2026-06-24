@@ -6,7 +6,5 @@ import "./index.css";
 import router from "./AppRouter.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <RouterProvider router={router} />
-  </React.StrictMode>
+  <RouterProvider router={router} future={{ v7_startTransition: true }} />
 );
