@@ -17,11 +17,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify jiraClient exports
+        run: npm run check:jira-client-exports
 
       - name: Build macOS package
         env:
@@ -47,11 +50,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify jiraClient exports
+        run: npm run check:jira-client-exports
 
       - name: Build Windows package
         run: npm run desktop:dist:win
