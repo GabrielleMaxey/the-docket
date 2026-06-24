@@ -1,0 +1,114 @@
+.ww-epic-filter-panel .ww-epic-filter-dropdown-wrap {
+  width: 100%;
+}
+
+.ww-epic-filter-panel .ww-epic-filter-dropdown-wrap label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.ww-epic-filter-panel .ww-epic-dropdown {
+  position: relative;
+}
+
+.ww-epic-filter-panel .ww-epic-dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.92rem;
+}
+
+.ww-epic-filter-panel .ww-epic-dropdown-trigger:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.ww-epic-filter-panel .ww-epic-dropdown-caret {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.ww-epic-filter-panel .ww-epic-dropdown-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  max-height: 240px;
+  overflow: auto;
+  padding: 0.35rem;
+}
+
+.ww-epic-filter-panel .ww-epic-dropdown-option {
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 0.4rem 0.45rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: #1e293b;
+}
+
+.ww-epic-filter-panel .ww-epic-dropdown-option:hover {
+  background: #f8fafc;
+}
+
+.ww-epic-filter-panel .ww-epic-dropdown-option.is-selected {
+  background: #eef6ff;
+}
+
+.ww-epic-filter-panel .ww-epic-dropdown-option input {
+  margin: 0;
+}
+
+.ww-epic-filter-panel .ww-epic-selected-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.ww-epic-filter-panel .ww-epic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  background: #e8f5fd;
+  color: #0c93d9;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.82rem;
+}
+
+.ww-epic-filter-panel .ww-epic-chip-remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  font-size: 1rem;
+}
+
+@media (max-width: 700px) {
+  .ww-epic-filter-panel .ww-epic-dropdown-menu {
+    max-height: 200px;
+  }
+}

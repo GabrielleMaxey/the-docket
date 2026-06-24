@@ -1,5 +1,13 @@
 import React from "react";
 import { Grid, Segment } from "semantic-ui-react";
+import { Button } from "semantic-ui-react";
+
+const FOCUS_OPTIONS = [
+  { value: "balance", label: "Balance across projects" },
+  { value: "overdue", label: "Clear overdue first" },
+  { value: "single", label: "Focus on one project" },
+  { value: "meetings", label: "Light week (lots of meetings)" },
+];
 
 const TaskManagerHeaderPanel = ({
   tickerJokes,
@@ -11,6 +19,7 @@ const TaskManagerHeaderPanel = ({
   reminders,
   onReminderTextChange,
   onReminderDoneChange,
+  weeklyPlanPanel,
 }) => {
   return (
     <>
@@ -84,6 +93,10 @@ const TaskManagerHeaderPanel = ({
                     </li>
                   ))}
                 </ul>
+
+                {weeklyPlanPanel ? (
+                  <div className="ww-weekly-plan-block">{weeklyPlanPanel}</div>
+                ) : null}
               </div>
             </Segment>
           </Grid.Column>
