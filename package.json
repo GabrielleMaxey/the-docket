@@ -7,6 +7,18 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
+    "check:node": "node scripts/check-node-version.cjs",
+    "preinstall": "node scripts/check-node-version.cjs",
+    "check:jira-client-exports": "node scripts/check-jira-client-exports.cjs",
+    "prebuild": "npm run check:node && npm run check:jira-client-exports",
+    "predev": "npm run check:node",
+    "predev:ui": "npm run check:node",
+    "predev:api": "npm run check:node && npm rebuild better-sqlite3",
+    "predev:electron": "npm run check:node && npm run desktop:rebuild-native",
+    "predev:all": "npm run check:node",
+    "predesktop:dev": "npm run check:node",
+    "predesktop:doctor": "npm run check:node",
+    "prepreview": "npm run check:node",
     "dev": "vite",
     "dev:ui": "vite",
     "dev:api": "node server/jiraProxy.mjs",
@@ -58,7 +70,7 @@
     }
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0",
+    "better-sqlite3": "^12.11.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "react": "^18.3.1",
@@ -69,6 +81,9 @@
     "semantic-ui-css": "^2.5.0",
     "semantic-ui-react": "^2.1.5",
     "styled-components": "^5.3.9"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.2",

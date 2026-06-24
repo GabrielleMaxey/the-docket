@@ -16,7 +16,44 @@ const getKnownAssignees = (issues) => {
         .map((issue) => issue.fields?.assignee?.displayName)
         .filter((name) => typeof name === "string" && name.trim().length > 0)
     )
-  );
+  ).sort();
+};
+
+const getKnownStatuses = (issues) => {
+  return Array.from(
+    new Set(
+      issues
+        .map((issue) => issue.fields?.status?.name)
+        .filter((s) => typeof s === "string" && s.trim().length > 0)
+    )
+  ).sort();
+};
+
+const filterIssues = (issues, { keyQuery, statusFilter, assigneeFilter }) => {
+  let result = issues;
+
+  const keyTerm = String(keyQuery || "").trim().toLowerCase();
+  if (keyTerm) {
+    result = result.filter((issue) =>
+      String(issue.key || "").toLowerCase().includes(keyTerm)
+    );
+  }
+
+  if (statusFilter) {
+    result = result.filter(
+      (issue) => String(issue.fields?.status?.name || "") === statusFilter
+    );
+  }
+
+  if (assigneeFilter) {
+    const target = assigneeFilter === "__unassigned__" ? "" : assigneeFilter;
+    result = result.filter((issue) => {
+      const name = String(issue.fields?.assignee?.displayName || "");
+      return target === "" ? !name : name === target;
+    });
+  }
+
+  return result;
 };
 
 const getPrioritySortRank = (clampPriority, priorityValue) => {
@@ -238,10 +275,13 @@ const JiraResultsTable = ({
   handleNoteChange,
   handleSelectForPush,
   handlePushNote,
+  onActiveTabChange,
 }) => {
   const [activeTab, setActiveTab] = React.useState(0);
   const [pageByRunIndex, setPageByRunIndex] = React.useState({});
   const [keyFilterByRunIndex, setKeyFilterByRunIndex] = React.useState({});
+  const [statusFilterByRunIndex, setStatusFilterByRunIndex] = React.useState({});
+  const [assigneeFilterByRunIndex, setAssigneeFilterByRunIndex] = React.useState({});
   const [sortField, setSortField] = React.useState("default");
   const [sortDirection, setSortDirection] = React.useState("asc");
 
@@ -258,8 +298,11 @@ const JiraResultsTable = ({
   const runIndex = run.index ?? safeTab;
   const allLoadedIssues = run.issues || [];
   const keyFilterDraft = keyFilterByRunIndex[runIndex] ?? "";
-  const issuesMatchingKey = filterIssuesByKeySubstring(allLoadedIssues, keyFilterDraft);
-  const knownAssignees = getKnownAssignees(issuesMatchingKey);
+  const statusFilter = statusFilterByRunIndex[runIndex] ?? "";
+  const assigneeFilter = assigneeFilterByRunIndex[runIndex] ?? "";
+  const issuesMatchingKey = filterIssues(allLoadedIssues, { keyQuery: keyFilterDraft, statusFilter, assigneeFilter });
+  const knownAssignees = getKnownAssignees(allLoadedIssues);
+  const knownStatuses = getKnownStatuses(allLoadedIssues);
   const sortedIssues = sortIssues({
     issues: issuesMatchingKey,
     isClosedLikeStatus,
@@ -278,6 +321,7 @@ const JiraResultsTable = ({
 
   const handleTabChange = (idx) => {
     setActiveTab(idx);
+    if (onActiveTabChange) onActiveTabChange(idx);
   };
 
   const handlePageChange = (nextPage) => {
@@ -298,6 +342,25 @@ const JiraResultsTable = ({
   const handleKeyFilterChange = (event) => {
     const value = event.target.value;
     setKeyFilterByRunIndex((prev) => ({ ...prev, [runIndex]: value }));
+    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+  };
+
+  const handleStatusFilterChange = (event) => {
+    const value = event.target.value;
+    setStatusFilterByRunIndex((prev) => ({ ...prev, [runIndex]: value }));
+    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+  };
+
+  const handleAssigneeFilterChange = (event) => {
+    const value = event.target.value;
+    setAssigneeFilterByRunIndex((prev) => ({ ...prev, [runIndex]: value }));
+    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+  };
+
+  const handleClearFilters = () => {
+    setKeyFilterByRunIndex((prev) => ({ ...prev, [runIndex]: "" }));
+    setStatusFilterByRunIndex((prev) => ({ ...prev, [runIndex]: "" }));
+    setAssigneeFilterByRunIndex((prev) => ({ ...prev, [runIndex]: "" }));
     setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
   };
 
@@ -387,6 +450,52 @@ const JiraResultsTable = ({
                 autoComplete="off"
                 spellCheck={false}
               />
+
+              <label className="ww-key-filter-label" htmlFor={`ww-status-filter-${runIndex}`}>
+                Status
+              </label>
+              <select
+                id={`ww-status-filter-${runIndex}`}
+                className="ww-key-filter-input"
+                value={statusFilter}
+                onChange={handleStatusFilterChange}
+                aria-label="Filter by status"
+                style={{ minWidth: "9rem" }}
+              >
+                <option value="">All statuses</option>
+                {knownStatuses.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <label className="ww-key-filter-label" htmlFor={`ww-assignee-filter-${runIndex}`}>
+                Assignee
+              </label>
+              <select
+                id={`ww-assignee-filter-${runIndex}`}
+                className="ww-key-filter-input"
+                value={assigneeFilter}
+                onChange={handleAssigneeFilterChange}
+                aria-label="Filter by assignee"
+                style={{ minWidth: "9rem" }}
+              >
+                <option value="">All assignees</option>
+                <option value="__unassigned__">Unassigned</option>
+                {knownAssignees.map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+
+              {(keyFilterDraft || statusFilter || assigneeFilter) ? (
+                <button
+                  type="button"
+                  className="ww-page-btn"
+                  onClick={handleClearFilters}
+                  aria-label="Clear all filters"
+                >
+                  Clear filters
+                </button>
+              ) : null}
             </div>
 
             <div className="ww-pagination-row ww-pagination-row--sort-only">
@@ -485,6 +594,8 @@ const JiraResultsTable = ({
                       </button>
                     </th>
                     <th>Updated</th>
+                    <th>Due Date</th>
+                    <th>Parent</th>
                     <th aria-sort={getHeaderAriaSort("priority")}>
                       <button
                         type="button"
@@ -613,6 +724,27 @@ const JiraResultsTable = ({
                         </td>
 
                         <td>{updated}</td>
+
+                        <td>
+                          {issue.fields?.duedate
+                            ? formatDate(issue.fields.duedate)
+                            : <span style={{ color: "#94a3b8" }}>—</span>}
+                        </td>
+
+                        <td>
+                          {issue.fields?.parent?.key
+                            ? (() => {
+                                const parentUrl = getIssueBrowseUrl({ key: issue.fields.parent.key, self: issue.self });
+                                return parentUrl ? (
+                                  <a href={parentUrl} target="_blank" rel="noreferrer noopener" style={{ fontSize: "0.82rem", whiteSpace: "nowrap" }}>
+                                    {issue.fields.parent.key}
+                                  </a>
+                                ) : (
+                                  <span style={{ fontSize: "0.82rem" }}>{issue.fields.parent.key}</span>
+                                );
+                              })()
+                            : <span style={{ color: "#94a3b8" }}>—</span>}
+                        </td>
 
                         <td>
                           {isClosedOrResolved ? (
