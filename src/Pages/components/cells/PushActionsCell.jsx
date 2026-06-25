@@ -19,7 +19,7 @@ const PushActionsCell = ({
     {isClosedOrResolved ? (
       <span>-</span>
     ) : (
-      <div>
+      <div className="ww-push-actions">
         <label className="ww-row-select-label">
           <input
             type="checkbox"

@@ -1,0 +1,91 @@
+.app-collapsible {
+  margin-top: 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  width: 100%;
+}
+
+.app-collapsible--spaced {
+  margin-top: 1.75rem;
+}
+
+.app-collapsible--input {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.app-collapsible--input .ui.segment {
+  border-radius: 0;
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 0;
+  box-shadow: none;
+}
+
+.app-collapsible-header {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.app-collapsible-header:hover {
+  background: #f1f5f9;
+}
+
+.app-collapsible-title-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.app-collapsible-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.app-collapsible-subtitle {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.app-collapsible-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  background: #e2e8f0;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.app-collapsible-chevron {
+  font-size: 1.25rem;
+  color: #94a3b8;
+  transform: rotate(90deg);
+  transition: transform 0.18s;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.app-collapsible-chevron.open {
+  transform: rotate(-90deg);
+}
+
+.app-collapsible-body {
+  padding: 1.25rem;
+  border-top: 1px solid #e2e8f0;
+}

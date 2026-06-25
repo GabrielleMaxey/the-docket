@@ -1,14 +1,6 @@
-// Framework-agnostic Jira issue/metrics helpers shared by both the Express
-// server (server/routes/dashboardRoutes.mjs) and the React frontend
-// (src/Pages/Dashboard.jsx). This file must stay free of Node-only or
-// browser-only APIs so it can be imported from either side unmodified.
-//
-// This used to be duplicated: the server had its own copy in
-// server/lib/dashboardMetrics.mjs, and the frontend reimplemented
-// isClosedLikeStatus / getTerminalIssueCount locally in Dashboard.jsx with a
-// slightly different (out of sync) status regex than the one used by
-// src/Pages/hooks/useTaskManagerJira.js. Both now import from here so there
-// is exactly one definition of "what counts as a closed/terminal issue".
+// Shared Jira metrics helpers — importable from server and browser (no Node/DOM APIs).
+
+import { resolveMappedFieldId } from "./odiFieldIds.mjs";
 
 export const getIssueStatusName = (issue) => {
   const status = issue?.fields?.status;
@@ -17,6 +9,23 @@ export const getIssueStatusName = (issue) => {
   }
 
   return String(status?.name || "").trim();
+};
+
+export const getIssueTypeName = (issue) => {
+  const fromFields = issue?.fields?.issuetype;
+  if (typeof fromFields === "string") {
+    return String(fromFields).trim();
+  }
+
+  return String(fromFields?.name || issue?.issueType || "").trim();
+};
+
+export const isEpicIssueType = (issueOrTypeName) => {
+  if (typeof issueOrTypeName === "string") {
+    return String(issueOrTypeName).trim().toLowerCase() === "epic";
+  }
+
+  return getIssueTypeName(issueOrTypeName).toLowerCase() === "epic";
 };
 
 export const getIssueStatusCategoryKey = (issue) =>
@@ -58,6 +67,178 @@ export const startOfToday = () => {
   return today;
 };
 
+export const PAST_DUE_LOOKBACK_YEAR_OPTIONS = [1, 2, 3];
+
+export const normalizePastDueLookbackYears = (value) => {
+  const years = Number(value);
+  if (years === 2 || years === 3) {
+    return years;
+  }
+  return 1;
+};
+
+export const computePastDueFloorDate = (lookbackYears = 1) => {
+  const years = normalizePastDueLookbackYears(lookbackYears);
+  const floor = startOfToday();
+  floor.setMonth(floor.getMonth() - years * 12);
+  return floor;
+};
+
+export const isDueDateInDueByWindow = (dueDate, targetDate, pastDueFloor) => {
+  if (!dueDate || !targetDate) {
+    return false;
+  }
+
+  const cutoff = parseJiraDate(targetDate);
+  if (!cutoff) {
+    return false;
+  }
+
+  cutoff.setHours(23, 59, 59, 999);
+  if (dueDate > cutoff) {
+    return false;
+  }
+
+  const today = startOfToday();
+  if (dueDate >= today) {
+    return true;
+  }
+
+  if (!pastDueFloor) {
+    return true;
+  }
+
+  const floor =
+    pastDueFloor instanceof Date ? pastDueFloor : parseJiraDate(pastDueFloor);
+  if (!floor) {
+    return true;
+  }
+
+  return dueDate >= floor;
+};
+
+export const getIssueDueByDate = (issue, compareFieldId, fallbackFieldId, epicIssue = null) => {
+  const fallbackId = String(fallbackFieldId || "duedate").trim();
+  const compareId = String(compareFieldId || fallbackId).trim();
+
+  const fallbackValue = getFieldValue(issue, fallbackId);
+  const fallbackDate = parseJiraDate(fallbackValue);
+  if (fallbackDate) {
+    return { dueDate: fallbackDate, dueValue: fallbackValue };
+  }
+
+  if (compareId !== fallbackId) {
+    const epicKey = String(epicIssue?.key || "").trim();
+    const issueKey = String(issue?.key || "").trim();
+    if (epicIssue && epicKey && epicKey !== issueKey) {
+      const epicValue = getFieldValue(epicIssue, compareId);
+      const epicDate = parseJiraDate(epicValue);
+      if (epicDate) {
+        return { dueDate: epicDate, dueValue: epicValue };
+      }
+    } else if (!epicIssue || epicKey === issueKey) {
+      const compareValue = getFieldValue(issue, compareId);
+      const compareDate = parseJiraDate(compareValue);
+      if (compareDate) {
+        return { dueDate: compareDate, dueValue: compareValue };
+      }
+    }
+  }
+
+  return { dueDate: null, dueValue: null };
+};
+
+export const isIssueInDueByWindow = (
+  issue,
+  compareFieldId,
+  fallbackFieldId,
+  targetDate,
+  pastDueFloor,
+  epicIssue = null
+) => {
+  if (!isIssueOpen(issue)) {
+    return false;
+  }
+
+  const { dueDate } = getIssueDueByDate(
+    issue,
+    compareFieldId,
+    fallbackFieldId,
+    epicIssue
+  );
+  if (!dueDate) {
+    return false;
+  }
+
+  return isDueDateInDueByWindow(dueDate, targetDate, pastDueFloor);
+};
+
+export const isIssueUpcomingDueBy = (
+  issue,
+  compareFieldId,
+  fallbackFieldId,
+  targetDate,
+  epicIssue = null
+) => {
+  if (!isIssueOpen(issue)) {
+    return false;
+  }
+
+  const { dueDate } = getIssueDueByDate(
+    issue,
+    compareFieldId,
+    fallbackFieldId,
+    epicIssue
+  );
+  if (!dueDate || !targetDate) {
+    return false;
+  }
+
+  const cutoff = parseJiraDate(targetDate);
+  if (!cutoff) {
+    return false;
+  }
+
+  cutoff.setHours(23, 59, 59, 999);
+  const today = startOfToday();
+  return dueDate >= today && dueDate <= cutoff;
+};
+
+export const isIssuePastDueInLookback = (
+  issue,
+  compareFieldId,
+  fallbackFieldId,
+  pastDueFloor,
+  epicIssue = null
+) => {
+  if (!isIssueOpen(issue) || !pastDueFloor) {
+    return false;
+  }
+
+  const { dueDate } = getIssueDueByDate(
+    issue,
+    compareFieldId,
+    fallbackFieldId,
+    epicIssue
+  );
+  if (!dueDate) {
+    return false;
+  }
+
+  const today = startOfToday();
+  if (dueDate >= today) {
+    return false;
+  }
+
+  const floor =
+    pastDueFloor instanceof Date ? pastDueFloor : parseJiraDate(pastDueFloor);
+  if (!floor) {
+    return false;
+  }
+
+  return dueDate >= floor;
+};
+
 export const getFieldValue = (issue, fieldId) => {
   const id = String(fieldId || "").trim();
   if (!id || !issue?.fields) {
@@ -76,18 +257,41 @@ export const formatDateOnly = (value) => {
   return parsed.toISOString().slice(0, 10);
 };
 
-export const isTaskOverdue = (issue, dueFieldId) => {
+export const isTaskOverdue = (issue, dueFieldId, extraFieldIds = []) => {
   if (!isIssueOpen(issue)) {
     return false;
   }
 
-  const dueValue = getFieldValue(issue, dueFieldId || "duedate");
-  const dueDate = parseJiraDate(dueValue);
-  if (!dueDate) {
+  const fieldIds = [dueFieldId || "duedate", ...extraFieldIds].filter(Boolean);
+  const today = startOfToday();
+
+  for (const fieldId of fieldIds) {
+    const dueDate = parseJiraDate(getFieldValue(issue, fieldId));
+    if (dueDate && dueDate < today) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+// Open issue with a due date on or after today (not yet missed).
+export const isTaskDueInFuture = (issue, dueFieldId = "duedate", extraOverdueFieldIds = []) => {
+  if (!isIssueOpen(issue) || isTaskOverdue(issue, dueFieldId, extraOverdueFieldIds)) {
     return false;
   }
 
-  return dueDate < startOfToday();
+  const fieldIds = [dueFieldId || "duedate", ...extraOverdueFieldIds].filter(Boolean);
+  const today = startOfToday();
+
+  for (const fieldId of fieldIds) {
+    const dueDate = parseJiraDate(getFieldValue(issue, fieldId));
+    if (dueDate && dueDate >= today) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
 // Counts open issues due strictly between today and a future cutoff date.
@@ -139,28 +343,53 @@ export const isTaskDueOrOverdue = (issue, dueFieldId, targetDate) => {
   return dueDate <= cutoff;
 };
 
-export const computeEpicPastDue = ({ epicIssue, mappingsByRole, epicPastDueMode }) => {
-  if (!epicIssue || !isIssueOpen(epicIssue)) {
+export const computeEpicPastDue = ({
+  epicIssue,
+  mappingsByRole,
+  epicPastDueMode,
+  pastDueFloor = null,
+  trackPastDue = true,
+}) => {
+  if (!epicIssue || !isIssueOpen(epicIssue) || !trackPastDue) {
     return { isPastDue: false, pastDueReason: null };
   }
 
-  const mrdFieldId =
-    mappingsByRole.get("most_recent_done_date")?.fieldId ||
-    mappingsByRole.get("most_recent_done_date")?.fieldName;
+  const iddFieldId = resolveMappedFieldId(mappingsByRole, "initial_done_date");
+  const mrdFieldId = resolveMappedFieldId(mappingsByRole, "most_recent_done_date");
   const pedFieldId =
     mappingsByRole.get("project_end_date")?.fieldId ||
     mappingsByRole.get("project_end_date")?.fieldName;
 
+  const iddValue = getFieldValue(epicIssue, iddFieldId);
   const mrdValue = getFieldValue(epicIssue, mrdFieldId);
   const pedValue = getFieldValue(epicIssue, pedFieldId);
+  const iddDate = parseJiraDate(iddValue);
   const mrdDate = parseJiraDate(mrdValue);
   const pedDate = parseJiraDate(pedValue);
   const today = startOfToday();
+  const floor =
+    pastDueFloor instanceof Date ? pastDueFloor : parseJiraDate(pastDueFloor);
 
-  const mrdPastDue = Boolean(mrdDate && mrdDate < today);
-  const endPastDue = Boolean(pedDate && pedDate < today);
+  const isDatePastDue = (date) => {
+    if (!date || date >= today) {
+      return false;
+    }
+    if (!floor) {
+      return false;
+    }
+    return date >= floor;
+  };
+
+  const iddPastDue = isDatePastDue(iddDate);
+  const mrdPastDue = isDatePastDue(mrdDate);
+  const endPastDue = isDatePastDue(pedDate);
 
   switch (epicPastDueMode) {
+    case "initial_done_date":
+      return {
+        isPastDue: iddPastDue,
+        pastDueReason: iddPastDue ? "idd" : null,
+      };
     case "most_recent_done_date":
       return {
         isPastDue: mrdPastDue,
@@ -173,10 +402,10 @@ export const computeEpicPastDue = ({ epicIssue, mappingsByRole, epicPastDueMode 
       };
     case "either":
     default: {
-      const isPastDue = mrdPastDue || endPastDue;
+      const isPastDue = mrdPastDue || iddPastDue || endPastDue;
       let pastDueReason = null;
       if (isPastDue) {
-        pastDueReason = mrdPastDue ? "mrd" : "project_end";
+        pastDueReason = mrdPastDue ? "mrd" : iddPastDue ? "idd" : "project_end";
       }
       return { isPastDue, pastDueReason };
     }
@@ -232,7 +461,19 @@ export const getTerminalIssueCount = ({
   return Math.max(fromResolved, fromTotals, fromStatusDiff);
 };
 
-export const computeChildIssueMetrics = (issues, epicKey, dueFieldId, dueByDate) => {
+export const computeChildIssueMetrics = (
+  issues,
+  epicKey,
+  dueFieldId,
+  dueByDate,
+  extraOverdueFieldIds = [],
+  dueByOptions = null
+) => {
+  const compareFieldId = dueByOptions?.dueByCompareFieldId || dueFieldId;
+  const fallbackFieldId = dueByOptions?.dueByFallbackFieldId || dueFieldId;
+  const pastDueFloor = dueByOptions?.pastDueFloor ?? null;
+  const includePastDueInList = Boolean(dueByOptions?.includePastDueInList);
+  const epicIssue = dueByOptions?.epicIssue ?? null;
   const childIssues = issues.filter((issue) => String(issue.key || "") !== String(epicKey || ""));
 
   let completedIssues = 0;
@@ -254,26 +495,57 @@ export const computeChildIssueMetrics = (issues, epicKey, dueFieldId, dueByDate)
     } else {
       openIssues += 1;
       openStatusCounts[statusName] = (openStatusCounts[statusName] || 0) + 1;
-      if (isTaskOverdue(issue, dueFieldId)) {
+      if (isTaskOverdue(issue, dueFieldId, extraOverdueFieldIds)) {
         overdueOpenIssues += 1;
       }
       if (dueByDate) {
-        if (isTaskDueBy(issue, dueFieldId, dueByDate)) {
-          dueByOpenIssues += 1;
-        }
-        if (isTaskDueOrOverdue(issue, dueFieldId, dueByDate)) {
-          const dueValue = getFieldValue(issue, dueFieldId || "duedate");
+        const dueMeta = getIssueDueByDate(
+          issue,
+          compareFieldId,
+          fallbackFieldId,
+          epicIssue
+        );
+        const today = startOfToday();
+        const pushDueByIssue = (isOverdue) => {
+          if (!dueMeta.dueValue) {
+            return;
+          }
+
           dueByIssues.push({
             key: String(issue.key || ""),
             summary: String(issue.fields?.summary || ""),
             status: statusName,
             assignee: String(issue.fields?.assignee?.displayName || "Unassigned"),
-            dueDate: formatDateOnly(dueValue),
+            dueDate: formatDateOnly(dueMeta.dueValue),
             issueType: String(issue.fields?.issuetype?.name || ""),
             epicKey: String(epicKey || ""),
             self: String(issue.self || ""),
-            isOverdue: isTaskOverdue(issue, dueFieldId),
+            isOverdue: isOverdue,
           });
+        };
+
+        if (
+          isIssueUpcomingDueBy(
+            issue,
+            compareFieldId,
+            fallbackFieldId,
+            dueByDate,
+            epicIssue
+          )
+        ) {
+          dueByOpenIssues += 1;
+          pushDueByIssue(false);
+        } else if (
+          includePastDueInList &&
+          isIssuePastDueInLookback(
+            issue,
+            compareFieldId,
+            fallbackFieldId,
+            pastDueFloor,
+            epicIssue
+          )
+        ) {
+          pushDueByIssue(Boolean(dueMeta.dueDate && dueMeta.dueDate < today));
         }
       }
     }
@@ -302,7 +574,7 @@ export const computeChildIssueMetrics = (issues, epicKey, dueFieldId, dueByDate)
   };
 };
 
-export const computeContributorMetricsFromIssues = (issues, dueFieldId) => {
+export const computeContributorMetricsFromIssues = (issues, dueFieldId, extraOverdueFieldIds = []) => {
   const byContributor = new Map();
 
   for (const issue of issues || []) {
@@ -336,12 +608,13 @@ export const computeContributorMetricsFromIssues = (issues, dueFieldId) => {
     const statusName = getIssueStatusName(issue).trim() || "Unknown";
     bucket.openStatusCounts[statusName] = (bucket.openStatusCounts[statusName] || 0) + 1;
 
-    if (isTaskOverdue(issue, dueFieldId)) {
+    if (isTaskOverdue(issue, dueFieldId, extraOverdueFieldIds)) {
       bucket.overdueOpenIssues += 1;
       bucket.overdueIssues.push({
         key: String(issue?.key || "").trim(),
         summary: String(issue?.fields?.summary || "").trim(),
         dueDate: formatDateOnly(getFieldValue(issue, dueFieldId || "duedate")),
+        issueType: getIssueTypeName(issue),
       });
     }
 

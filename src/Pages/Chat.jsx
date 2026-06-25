@@ -9,20 +9,10 @@ import {
 } from "semantic-ui-react";
 import EpicFilterPanel from "./components/EpicFilterPanel";
 import { useEpicFilters } from "./hooks/useEpicFilters";
-import {
-  fetchChatStatus,
-  sendChatMessage,
-  signOutChat,
-  startChatOAuth,
-} from "../services/jiraClient";
+import { fetchChatStatus, fetchDashboardMetrics, sendChatMessage, signOutChat, startChatOAuth } from "../services/jiraClient";
 import { buildApiUrl } from "../services/apiBase";
+import { buildChatSessionContext } from "../utils/chatSessionContext";
 import "./chat.css";
-
-// Rovo MCP access isn't available for this Jira instance right now (see
-// docs/JIRA_SETUP.md), so the Atlassian sign-in flow is parked rather than
-// removed — the OAuth routes/handlers below still work and can come back by
-// flipping this to true once Rovo is usable again.
-const ROVO_OAUTH_ENABLED = false;
 
 const Chat = () => {
   const {
@@ -42,6 +32,16 @@ const Chat = () => {
   const [sending, setSending] = React.useState(false);
   const [chatError, setChatError] = React.useState("");
   const [chatStatus, setChatStatus] = React.useState(null);
+  const [dashboardSnapshot, setDashboardSnapshot] = React.useState(null);
+
+  const loadDashboardSnapshot = React.useCallback(async () => {
+    try {
+      const data = await fetchDashboardMetrics();
+      setDashboardSnapshot(data);
+    } catch {
+      setDashboardSnapshot(null);
+    }
+  }, []);
 
   const loadStatus = React.useCallback(async () => {
     try {
@@ -54,7 +54,8 @@ const Chat = () => {
 
   React.useEffect(() => {
     void loadStatus();
-  }, [loadStatus]);
+    void loadDashboardSnapshot();
+  }, [loadStatus, loadDashboardSnapshot]);
 
   const selectedEpics = React.useMemo(
     () =>
@@ -64,9 +65,6 @@ const Chat = () => {
           epicKey: preset.epicKey,
           epicName: preset.epicName,
           label: preset.label,
-          // JQL-type presets (e.g. "My Team") carry their real definition
-          // here so the assistant can search with the actual JQL instead of
-          // guessing who's on a team it only knows by name.
           presetType: preset.presetType,
           jql: preset.presetType === "jql" ? preset.jql : "",
         })),
@@ -106,11 +104,22 @@ const Chat = () => {
     setInput("");
 
     try {
+      let snapshot = dashboardSnapshot;
+      try {
+        snapshot = await fetchDashboardMetrics();
+        setDashboardSnapshot(snapshot);
+      } catch {
+        // Use cached snapshot if refresh fails.
+      }
+
+      const sessionContext = buildChatSessionContext({ dashboardSnapshot: snapshot });
+
       const result = await sendChatMessage({
         message: text,
         epicContext: {
           selectedEpics,
           includePastDue,
+          sessionContext,
         },
       });
 
@@ -136,37 +145,37 @@ const Chat = () => {
     <Container className="chat-page">
       <Header as="h1">Chat</Header>
       <p className="ww-copy">
-        Ask questions about selected epics. Context from the filter panel below is sent with each
-        message.
+        Ask questions about selected epics, your Work Week JQL results, dashboard metrics, and any
+        reports or week plans you generated in this browser.
       </p>
 
       <Segment>
         <div className="chat-status-row">
           <span>
-            Provider: <strong>{chatStatus?.provider || "unknown"}</strong>
-            {ROVO_OAUTH_ENABLED && chatStatus?.oauthConnected ? " · Signed in with Atlassian" : ""}
+            Provider: <strong>{chatStatus?.provider || "not configured"}</strong>
+            {chatStatus?.provider === "rovo" && chatStatus?.oauthConnected
+              ? " · Signed in with Atlassian"
+              : ""}
           </span>
-          {ROVO_OAUTH_ENABLED ? (
+          {chatStatus?.provider === "rovo" && chatStatus?.oauthConfigured ? (
             <div className="chat-status-actions">
-              {chatStatus?.oauthConfigured ? (
-                chatStatus.oauthConnected ? (
-                  <Button size="small" basic onClick={handleSignOut}>
-                    Sign out
-                  </Button>
-                ) : (
-                  <Button size="small" primary onClick={handleSignIn}>
-                    Sign in with Atlassian
-                  </Button>
-                )
-              ) : null}
+              {chatStatus.oauthConnected ? (
+                <Button size="small" basic onClick={handleSignOut}>
+                  Sign out
+                </Button>
+              ) : (
+                <Button size="small" primary onClick={handleSignIn}>
+                  Sign in with Atlassian
+                </Button>
+              )}
             </div>
           ) : null}
         </div>
         {!chatReady ? (
           <Message warning size="small">
-            Chat is not ready. A developer must set <code>CHAT_PROVIDER</code> in{" "}
-            <code>.env</code> on the proxy host (openai, anthropic, ollama, or rovo) and configure
-            API keys or OAuth. Status:{" "}
+            Chat is not ready. Set <code>CHAT_PROVIDER</code> and the matching API key in <code>.env</code> on
+            the proxy host (for example <code>anthropic</code> + <code>ANTHROPIC_API_KEY</code>, or{" "}
+            <code>rovo</code> with Atlassian OAuth). Status:{" "}
             <a href={buildApiUrl("/api/chat/status")} target="_blank" rel="noreferrer">
               /api/chat/status
             </a>

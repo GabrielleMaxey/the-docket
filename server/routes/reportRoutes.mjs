@@ -1,11 +1,6 @@
-// AI-powered project status report generator. Loads the most recent dashboard
-// snapshot from the DB (rather than re-fetching from Jira), formats the
-// metrics as a structured context block, then calls the configured LLM to
-// produce a professional report tailored to the requested audience.
-//
-// Deliberately self-contained: calls the LLM API directly rather than going
-// through chatProviders.mjs so it can use a custom system prompt and a higher
-// token limit without touching the chat feature.
+// Dashboard AI reports from the latest stored snapshot + configured LLM.
+
+import { completeLlmText, resolveFirstReadyReportProvider } from "../lib/llmClient.mjs";
 
 const REPORT_MAX_TOKENS = 2048;
 
@@ -125,77 +120,15 @@ const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics }) => {
 };
 
 const callLLMForReport = async ({ systemPrompt, context }) => {
-  const provider = String(process.env.CHAT_PROVIDER || "anthropic").trim().toLowerCase();
-
-  if (provider === "anthropic" || provider === "rovo") {
-    const apiKey = String(process.env.ANTHROPIC_API_KEY || "").trim();
-    if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY is not configured.");
-    }
-
-    const model = String(process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6").trim();
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: REPORT_MAX_TOKENS,
-        system: systemPrompt,
-        messages: [{ role: "user", content: context }],
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.error?.message || `Anthropic error ${response.status}`);
-    }
-
-    const textBlock = (data.content || []).find((b) => b.type === "text");
-    return String(textBlock?.text || "").trim();
-  }
-
-  if (provider === "openai") {
-    const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
-    if (!apiKey) {
-      throw new Error("OPENAI_API_KEY is not configured.");
-    }
-
-    const model = String(process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: REPORT_MAX_TOKENS,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: context },
-        ],
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.error?.message || `OpenAI error ${response.status}`);
-    }
-
-    return String(data.choices?.[0]?.message?.content || "").trim();
-  }
-
-  if (provider === "ollama") {
-    throw new Error(
-      "Report generation is not supported with the Ollama provider. Set CHAT_PROVIDER to anthropic or openai in .env."
-    );
-  }
-
-  throw new Error(`Unknown CHAT_PROVIDER '${provider}'. Set it to anthropic or openai.`);
+  const provider = resolveFirstReadyReportProvider();
+  return completeLlmText({
+    systemPrompt,
+    userMessage: context,
+    maxTokens: REPORT_MAX_TOKENS,
+    provider,
+    allowOllama: false,
+    forReports: true,
+  });
 };
 
 export const registerReportRoutes = (app, { db }) => {

@@ -1,8 +1,10 @@
 import crypto from "crypto";
+import { sendChatMessage } from "../lib/chatProviders.mjs";
 import {
   getConfiguredChatProvider,
-  sendChatMessage,
-} from "../lib/chatProviders.mjs";
+  isChatProviderReady,
+  ROVO_PROVIDER,
+} from "../lib/llmClient.mjs";
 
 const DEFAULT_SESSION_ID = "default";
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
@@ -64,37 +66,13 @@ export const registerChatRoutes = (app, { db, jiraRequest }) => {
     const oauth = getOAuthConfig();
     const session = readSession();
     const oauthConnected = Boolean(session?.oauthTokens?.access_token || session?.oauthTokens?.accessToken);
-
-    const fallbackAvailable =
-      Boolean(process.env.OPENAI_API_KEY) ||
-      Boolean(process.env.ANTHROPIC_API_KEY) ||
-      Boolean(process.env.OLLAMA_BASE_URL);
-
-    let ready = false;
-    switch (provider) {
-      case "openai":
-        ready = Boolean(process.env.OPENAI_API_KEY);
-        break;
-      case "anthropic":
-        ready = Boolean(process.env.ANTHROPIC_API_KEY);
-        break;
-      case "ollama":
-        ready = Boolean(process.env.OLLAMA_BASE_URL);
-        break;
-      case "rovo":
-        ready = oauthConnected || fallbackAvailable;
-        break;
-      default:
-        ready = false;
-        break;
-    }
+    const ready = isChatProviderReady(provider, { oauthConnected });
 
     return res.json({
       provider,
-      oauthConfigured: oauth.configured,
-      oauthConnected,
-      fallbackAvailable,
       ready,
+      oauthConfigured: provider === ROVO_PROVIDER ? oauth.configured : false,
+      oauthConnected: provider === ROVO_PROVIDER ? oauthConnected : false,
     });
   });
 
@@ -172,7 +150,7 @@ export const registerChatRoutes = (app, { db, jiraRequest }) => {
 
       upsertSessionStmt.run({
         id: DEFAULT_SESSION_ID,
-        provider: "rovo",
+        provider: ROVO_PROVIDER,
         oauthTokens: JSON.stringify(tokens),
       });
 
@@ -203,7 +181,7 @@ export const registerChatRoutes = (app, { db, jiraRequest }) => {
     if (provider === "disabled") {
       return res.status(503).json({
         error: "Chat is disabled",
-        hint: "Set CHAT_PROVIDER in .env on the proxy host (openai, anthropic, ollama, or rovo).",
+        hint: "Set CHAT_PROVIDER to anthropic, openai, ollama, or rovo with matching credentials in .env.",
       });
     }
 

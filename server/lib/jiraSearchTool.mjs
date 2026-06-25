@@ -1,12 +1,4 @@
-// Shared "search_jira_issues" tool definition + executor.
-// Used by both the OpenAI and Anthropic branches in chatProviders.mjs so the
-// chat assistant can answer open-ended questions (not just the epics
-// selected in the UI) by running live JQL searches against Jira.
-//
-// Reuses the same `jiraRequest` helper already used by jiraIssueRoutes.mjs /
-// epicFilterJql.mjs, so it inherits whatever auth (API token or OAuth) is
-// already configured for the rest of the app — no new Atlassian scopes
-// needed.
+// search_jira_issues tool for LLM chat (live JQL via jiraRequest).
 
 const DEFAULT_SEARCH_FIELDS = [
   "summary",
