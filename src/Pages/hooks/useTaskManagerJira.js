@@ -2,12 +2,14 @@ import React from "react";
 import {
   fetchJiraHealth,
   fetchJiraMyself,
+  fetchFieldMappings,
   pushJiraIssueNote,
   saveIssueMetadata,
   updateJiraIssueAssignee,
   updateJiraIssueStatus,
 } from "../../services/jiraClient";
 import { runJqlWorkflow } from "./jiraJqlRunWorkflow.js";
+import { enrichRunWithParentDoneDates, runsNeedParentMrddEnrich } from "../../utils/jiraIssueDoneDates.js";
 
 const STORAGE_KEY = "workWeekTasksJiraPreferences";
 const NOTES_STORAGE_KEY = "workWeekTasksJiraNotes";
@@ -196,6 +198,37 @@ export const useTaskManagerJira = () => {
   const [statusDrafts, setStatusDrafts] = React.useState({});
   const [assigneeDrafts, setAssigneeDrafts] = React.useState({});
   const [rowUpdateState, setRowUpdateState] = React.useState({});
+  const [fieldMappingRows, setFieldMappingRows] = React.useState([]);
+  const [fieldMappingsLoading, setFieldMappingsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    setFieldMappingsLoading(true);
+    fetchFieldMappings()
+      .then((rows) => setFieldMappingRows(Array.isArray(rows) ? rows : []))
+      .catch((error) => {
+        console.warn("Failed to load Jira field mappings", error);
+      })
+      .finally(() => setFieldMappingsLoading(false));
+  }, []);
+
+  React.useEffect(() => {
+    if (fieldMappingsLoading || jqlRuns.length === 0 || !runsNeedParentMrddEnrich(jqlRuns)) {
+      return;
+    }
+
+    let cancelled = false;
+    Promise.all(jqlRuns.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows))).then(
+      (enriched) => {
+        if (!cancelled) {
+          setJqlRuns([...enriched].sort((a, b) => a.index - b.index));
+        }
+      }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fieldMappingRows, fieldMappingsLoading, jqlRuns]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
@@ -510,6 +543,7 @@ export const useTaskManagerJira = () => {
       setJqlLoading,
       setJiraNotes,
       setJiraRowPriorities,
+      fieldMappingRows,
     });
 
   return {
@@ -537,6 +571,7 @@ export const useTaskManagerJira = () => {
     getPriorityClass,
     getPriorityRowClass,
     formatDate,
+    filtersLoading: fieldMappingsLoading,
     setJqlCount,
     setJqlMaxResults,
     handleJiraTest,

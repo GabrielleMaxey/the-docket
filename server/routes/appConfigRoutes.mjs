@@ -4,6 +4,7 @@ import {
   buildPastDueJql,
   resolvePresetJql,
 } from "../lib/epicFilterJql.mjs";
+import { computePastDueFloorDate } from "../../shared/dashboardMetrics.mjs";
 
 const EPIC_PAST_DUE_MODES = new Set(["most_recent_done_date", "project_end_date", "either"]);
 const WATCH_TYPES = new Set(["person", "jql"]);
@@ -361,6 +362,7 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
         mappingsByRole,
         epicPastDueMode,
         epicKeys,
+        pastDueFloorDate: computePastDueFloorDate(1),
       });
 
       try {

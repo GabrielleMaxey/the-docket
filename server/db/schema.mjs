@@ -1,6 +1,8 @@
+import { normalizePastDueLookbackYears } from "../../shared/dashboardMetrics.mjs";
+
 const DEFAULT_FIELD_MAPPINGS = [
-  { role: "initial_done_date", fieldName: "Initial Done Date", fieldId: "" },
-  { role: "most_recent_done_date", fieldName: "Most Recent Done Date", fieldId: "" },
+  { role: "initial_done_date", fieldName: "Initial Done Date", fieldId: "customfield_10008" },
+  { role: "most_recent_done_date", fieldName: "Most Recent Done Date", fieldId: "customfield_10009" },
   { role: "due_date", fieldName: "Due date", fieldId: "duedate" },
   { role: "project_end_date", fieldName: "Project End Date", fieldId: "" },
 ];
@@ -142,8 +144,20 @@ const migrateDatabase = (db) => {
   ensureColumn(db, "dashboard_snapshots", "due_by_date", "TEXT");
   ensureColumn(db, "dashboard_snapshots", "due_by_field", "TEXT NOT NULL DEFAULT 'most_recent_done_date'");
   ensureColumn(db, "dashboard_snapshots", "due_by_issues_json", "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn(db, "dashboard_snapshots", "extended_past_due_history", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "dashboard_snapshots", "past_due_lookback_years", "INTEGER NOT NULL DEFAULT 1");
+  db.prepare(
+    "UPDATE dashboard_snapshots SET past_due_lookback_years = 3 WHERE extended_past_due_history = 1 AND past_due_lookback_years = 1"
+  ).run();
   ensureColumn(db, "dashboard_epic_metrics", "due_by_open_issues", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "app_settings", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
+
+  db.prepare(
+    "UPDATE jira_field_mappings SET field_id = 'customfield_10008' WHERE role = 'initial_done_date' AND TRIM(field_id) = ''"
+  ).run();
+  db.prepare(
+    "UPDATE jira_field_mappings SET field_id = 'customfield_10009' WHERE role = 'most_recent_done_date' AND TRIM(field_id) = ''"
+  ).run();
 };
 
 const seedFieldMappings = (db) => {
@@ -236,6 +250,10 @@ export const mapDashboardSnapshotRow = (row, { epics = [], assignees = [] } = {}
     refreshedAt: row.refreshed_at,
     epicPresetIds: parseJsonArray(row.epic_preset_ids_json).map((value) => Number(value)),
     includePastDue: Boolean(row.include_past_due),
+    pastDueLookbackYears: normalizePastDueLookbackYears(
+      row.past_due_lookback_years ??
+        (row.extended_past_due_history ? 3 : 1)
+    ),
     dueByDate: row.due_by_date || null,
     dueByField: String(row.due_by_field || "most_recent_done_date").trim(),
     dueByIssues: parseJsonArray(row.due_by_issues_json),

@@ -26,7 +26,7 @@ Everything in the app talks to **your own Jira project (ODI)** through a local p
 Run up to four saved JQL queries side-by-side and manage every issue in one table.
 
 - **Run JQL** — pulls live results from Jira into the table
-- **Task table** — update status, assignee, and priority; write notes; push notes to Jira as comments
+- **Task table** — update status, assignee, and priority; **MRD** column (Most Recent Done Date, with parent-chain inheritance); write notes; push notes to Jira as comments (shared projects: use `PRIORITY P#` prefix — see [END_USER_GUIDE.md](./END_USER_GUIDE.md))
 - **My Metrics** — per-query progress summary with issue counts and a per-project AI report (written for you, the assignee, in second person)
 - **Help me plan my week** — answers 4 quick questions, then generates a day-by-day Monday–Friday plan based on your actual open issues
 - **Create Issue** — creates a new Jira issue from a modal with epic/query selection
@@ -34,14 +34,15 @@ Run up to four saved JQL queries side-by-side and manage every issue in one tabl
 ### Dashboard *(project-level view)*
 Select one or more saved Epic or JQL presets and get a metrics snapshot across all of them.
 
-- **Overall Status** — aggregate % resolved, % complete, % overdue across all selected projects
+- **Overall Status** — aggregate % resolved, % in progress, % complete, and % overdue across selected projects
 - **Project Metrics** — per-epic cards showing issue %, epic %, overdue %, status breakdown (pie or bar chart), and deadline dates
-- **Due by Date** — hierarchical task list (epic → assignee → issue) for anything due before a chosen date
+- **Upcoming Due Dates** — optional card: open tasks due from today through a chosen window (7d–90d or custom), grouped by project → assignee; issue type shown per row
+- **Past Due in lookback** — optional card: missed deadlines within a 1–3 year lookback when Past Due Projects is enabled
 - **Individual Contributor Metrics** — per-person workload cards (open, in progress, overdue, backlog)
 - **Generate Report** — AI-written report in Executive Summary, Product Owner, or Developer format; copyable and downloadable as Markdown
 
 ### Chat *(Jira Q&A)*
-Ask natural-language questions about selected epics. The assistant searches Jira directly and never invents names or facts. Works with Anthropic, OpenAI, or Ollama — configured in `.env`.
+Ask natural-language questions about selected epics, your Work Week JQL results, Dashboard metrics, and reports or week plans you already generated. The assistant searches Jira when needed and cites session context for prior queries and AI outputs. Works with Anthropic, OpenAI, Ollama, or opt-in Rovo — configured in `.env`.
 
 ### Settings *(one-time configuration)*
 - **Epic & JQL presets** — the named queries used on Dashboard, Work Week, and Chat
@@ -59,7 +60,7 @@ Ask natural-language questions about selected epics. The assistant searches Jira
 |------|----------------|-------------|
 | Work Week | Daily JQL run + issue management | Per-project report, week planner |
 | Dashboard | Multi-project metrics snapshot | Executive / PO / Developer reports |
-| Chat | Natural-language Jira Q&A | Full conversation with Jira tool access |
+| Chat | Natural-language Jira Q&A + session context | Conversation with Jira tool access; references cached JQL, dashboard snapshot, and generated reports |
 | Settings | Configuration | Custom chat instructions |
 
 ---
@@ -80,6 +81,9 @@ The app is designed around the ODI Jira project at `lumen.atlassian.net` and wil
 
 ## Quick start
 
+Works on **macOS and Windows** (and Linux for browser dev).
+
+**macOS / Linux (Terminal):**
 ```bash
 # 1. Use the pinned Node version (once per new shell)
 nvm install
@@ -97,6 +101,25 @@ npm run dev:all        # browser at http://localhost:5173
 npm run desktop:dev    # Electron desktop window
 ```
 
+**Windows (PowerShell):**
+```powershell
+# 1. Node 22 required — install from nodejs.org or nvm-windows, then verify:
+node -v
+
+# 2. Install dependencies
+npm install
+
+# 3. Copy credentials template
+Copy-Item .env.example .env
+# → edit .env with Notepad or your editor
+
+# 4. Start (pick one)
+npm run dev:all
+npm run desktop:dev
+```
+
+**Packaged desktop (no Node required):** install the `.dmg` (Mac) or NSIS installer (Windows), edit `.env` in the user data folder on first launch — see [JIRA_SETUP.md](./JIRA_SETUP.md) § Desktop app.
+
 Full setup details → **[JIRA_SETUP.md](./JIRA_SETUP.md)**
 Code architecture → **[DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)**
 Day-to-day usage → **[END_USER_GUIDE.md](./END_USER_GUIDE.md)**
@@ -108,11 +131,14 @@ Day-to-day usage → **[END_USER_GUIDE.md](./END_USER_GUIDE.md)**
 | What | Where stored | Leaves your machine? |
 |------|-------------|----------------------|
 | JQL text, labels, last table snapshot | Browser `localStorage` | No |
+| Chat session artifacts (reports/plans for context) | Browser `localStorage` | No |
 | Header reminders | Browser `localStorage` | No |
 | Per-issue notes + P1–P10 priority | `data/workweek.sqlite` (local file) | No |
 | Status/assignee changes, pushed comments | Jira (lumen.atlassian.net) | Yes — visible in Jira to anyone with access |
-| Dashboard metrics snapshot | `data/workweek.sqlite` | No |
+| Dashboard metrics snapshot | `data/workweek.sqlite` (dev) or user data folder (packaged desktop) | No |
+| Desktop `.env` + local DB (packaged app) | OS user data folder — see [JIRA_SETUP.md](./JIRA_SETUP.md) | No |
 | Jira credentials | `.env` file on this machine | No — only the local proxy reads them |
+| Chat message content | Your configured LLM provider (Anthropic/OpenAI/etc.) when you send a message | Yes — to that provider's API |
 
 ---
 

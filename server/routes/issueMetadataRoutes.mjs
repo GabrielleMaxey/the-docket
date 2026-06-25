@@ -1,11 +1,4 @@
-// Issue mutation + local-metadata endpoints (comment, status transition,
-// assignee, and the SQLite-backed note/priority store). Split out of
-// jiraProxy.mjs for the same reason as jiraCoreRoutes.mjs.
-//
-// The assignee route used to have its own inline copy of "search Jira for a
-// user and pick the best match" duplicating lib/jiraSearchHelpers.mjs's
-// resolveJiraUser almost exactly. It now calls the shared helper instead —
-// same fix already applied in jiraIssueRoutes.mjs's create-issue flow.
+// Issue mutations (comment, status, assignee) and SQLite note/priority metadata.
 
 export const registerIssueMetadataRoutes = (
   app,

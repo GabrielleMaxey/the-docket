@@ -9,13 +9,23 @@ const extractJiraErrorMessage = (data, status) => {
 };
 
 const requestJson = async (path, options = {}) => {
-  const response = await fetch(buildApiUrl(path), {
-    headers: {
-      Accept: "application/json",
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
+  let response;
+  try {
+    response = await fetch(buildApiUrl(path), {
+      headers: {
+        Accept: "application/json",
+        ...(options.headers || {}),
+      },
+      ...options,
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        "Cannot reach the local API. Start it with npm run dev:api or npm run dev:all (proxy on port 8787)."
+      );
+    }
+    throw error;
+  }
 
   const text = await response.text();
   let data = {};
