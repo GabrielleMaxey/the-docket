@@ -44,12 +44,22 @@ Open `.env` in any text editor and fill in:
 | `CHAT_PROVIDER` | `anthropic` | **Required** to enable chat. Use `openai`, `ollama`, `rovo`, or `disabled`. Unset = chat off |
 | `ANTHROPIC_API_KEY` | `sk-ant-...` | Required when `CHAT_PROVIDER=anthropic` |
 | `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Optional model override |
-| `OPENAI_API_KEY` | `sk-...` | Only if `CHAT_PROVIDER=openai` |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Optional; use for Databricks OpenAI-compatible endpoints |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Optional; custom Anthropic-compatible API host |
+| `OPENAI_API_KEY` | `sk-...` | When `CHAT_PROVIDER=openai` or `REPORT_PROVIDER=openai` |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible endpoints (Databricks, Azure, LiteLLM, vLLM) |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Optional OpenAI / compatible model name |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Only if `CHAT_PROVIDER=ollama` |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | When `CHAT_PROVIDER=ollama` or `REPORT_PROVIDER=ollama` |
+| `OLLAMA_MODEL` | `llama3.2` | Local model for chat (and reports if `OLLAMA_REPORT_MODEL` unset) |
+| `OLLAMA_REPORT_MODEL` | `llama3.3:70b` | Optional larger local model for reports only |
+| `REPORT_PROVIDER` | `openai` | Optional; reports use this provider instead of `CHAT_PROVIDER` |
+| `REPORT_OPENAI_API_KEY` | | Optional report-only OpenAI key (falls back to `OPENAI_API_KEY`) |
+| `REPORT_OPENAI_BASE_URL` | | Optional report-only OpenAI-compatible URL |
+| `REPORT_OPENAI_MODEL` | | Optional report-only model name |
+| `REPORT_ANTHROPIC_API_KEY` | | Optional report-only Anthropic key (falls back to `ANTHROPIC_API_KEY`) |
+| `REPORT_ANTHROPIC_BASE_URL` | | Optional report-only Anthropic-compatible URL |
+| `REPORT_ANTHROPIC_MODEL` | | Optional report-only Anthropic model |
 
-Reports always use Anthropic or OpenAI (not Ollama). Chat uses whichever provider you configure.
+Chat and reports use the same provider (`CHAT_PROVIDER`) unless you set `REPORT_PROVIDER`. All three built-in providers (`anthropic`, `openai`, `ollama`) can generate reports and week plans.
 
 > **Never commit `.env`** — it is in `.gitignore`.
 
@@ -152,13 +162,15 @@ Open **tasks/stories** in overdue metrics also count when standard **Due date**,
 
 ## 8. Chat, reports, and optional providers
 
-**Setup:** set `CHAT_PROVIDER` and the matching API key in `.env`. Chat is disabled until you do. Dashboard reports use Anthropic or OpenAI (not Ollama).
+**Setup:** set `CHAT_PROVIDER` and the matching credentials in `.env`. Chat is disabled until you do. Reports and week plans use the same provider unless you set `REPORT_PROVIDER`.
 
 | Goal | `.env` setup |
 |------|----------------|
-| Anthropic | `CHAT_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` |
-| OpenAI | `CHAT_PROVIDER=openai` + `OPENAI_API_KEY` |
-| Local Ollama (chat only) | `CHAT_PROVIDER=ollama` + `OLLAMA_BASE_URL` |
+| Anthropic (chat + reports) | `CHAT_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` |
+| OpenAI (chat + reports) | `CHAT_PROVIDER=openai` + `OPENAI_API_KEY` |
+| OpenAI-compatible (Databricks, Azure, LiteLLM, vLLM) | `CHAT_PROVIDER=openai` + `OPENAI_API_KEY` + `OPENAI_BASE_URL` + `OPENAI_MODEL` |
+| Local Ollama (chat + reports) | `CHAT_PROVIDER=ollama` + `OLLAMA_BASE_URL` (+ optional `OLLAMA_REPORT_MODEL` for a larger report model) |
+| Ollama chat + cloud reports | `CHAT_PROVIDER=ollama` + `REPORT_PROVIDER=openai` (+ report OpenAI vars; use `REPORT_OPENAI_*` if different from chat) |
 | Turn chat off | `CHAT_PROVIDER=disabled` or leave unset |
 | **Rovo (opt-in)** | `CHAT_PROVIDER=rovo` + OAuth vars below |
 
@@ -201,6 +213,28 @@ Artifacts are saved automatically when the user generates a Work Week project re
 
 Session context stays in the browser and SQLite (dashboard snapshot); only the formatted prompt text is sent to your LLM provider (or Rovo) with each chat message.
 
+### OpenAI-compatible providers (Databricks, Azure, LiteLLM, vLLM, etc.)
+
+Most enterprise and self-hosted gateways expose an **OpenAI-compatible** `/chat/completions` API. Point the app at that URL — no code changes:
+
+```env
+CHAT_PROVIDER=openai
+OPENAI_API_KEY=<your-token>
+OPENAI_BASE_URL=https://<host>/.../v1
+OPENAI_MODEL=<model-name>
+```
+
+Use the same pattern for **reports only** on a different endpoint:
+
+```env
+CHAT_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+REPORT_PROVIDER=openai
+REPORT_OPENAI_API_KEY=<databricks-token>
+REPORT_OPENAI_BASE_URL=https://<workspace-host>/serving-endpoints/<endpoint>/invocations/v1
+REPORT_OPENAI_MODEL=claude-sonnet-...
+```
+
 ### Databricks Model Serving
 
 Databricks endpoints are often **OpenAI-compatible**. No code change is required if your endpoint supports the chat completions API:
@@ -218,9 +252,9 @@ OPENAI_MODEL=<model-name-on-endpoint>
 2. Create a PAT or service principal with permission to query that endpoint.
 3. Ensure the machine running the Express proxy can reach the Databricks workspace URL (VPN, firewall, or private link as required).
 4. Set the variables above in `.env` on the proxy host and restart the API.
-5. Test Chat and a dashboard report — reports use the same OpenAI-compatible path when `CHAT_PROVIDER=openai`.
+5. Test Chat and a dashboard report — reports use the same provider and URL unless `REPORT_PROVIDER` or `REPORT_OPENAI_*` overrides are set.
 
-If your endpoint uses a different request format (non-OpenAI), we would need a dedicated `databricks` provider in `server/lib/llmClient.mjs`.
+If your endpoint uses a different request format (not OpenAI chat completions or Anthropic messages), you would need a dedicated provider in `server/lib/llmClient.mjs`.
 
 ---
 

@@ -243,6 +243,7 @@ The assistant uses session context first when you ask about reports or queries y
 | **Anthropic** | `CHAT_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` in `.env` on the proxy host |
 | **OpenAI / Databricks** | `CHAT_PROVIDER=openai` + `OPENAI_API_KEY` (+ optional `OPENAI_BASE_URL`) |
 | **Ollama (local)** | `CHAT_PROVIDER=ollama` + `OLLAMA_BASE_URL` |
+| **Any OpenAI-compatible API** | `CHAT_PROVIDER=openai` + `OPENAI_API_KEY` + `OPENAI_BASE_URL` |
 | **Rovo (opt-in)** | `CHAT_PROVIDER=rovo` + OAuth vars — see [JIRA_SETUP.md](./JIRA_SETUP.md) §8 |
 | **Disabled / not configured** | `CHAT_PROVIDER=disabled` or leave unset |
 
