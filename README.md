@@ -118,7 +118,7 @@ npm run dev:all
 npm run desktop:dev
 ```
 
-**Packaged desktop (no Node required):** install the `.dmg` (Mac) or NSIS installer (Windows), edit `.env` in the user data folder on first launch — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) § Desktop app.
+**Packaged desktop (no Node required):** install the `.dmg` (Mac) or NSIS installer (Windows), edit `.env`  — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) § Desktop app.
 
 Full setup details → **[JIRA_SETUP.md](./docs/JIRA_SETUP.md)**
 Code architecture → **[DEVELOPER_GUIDE.md](./docs/DEVELOPER_GUIDE.md)**
