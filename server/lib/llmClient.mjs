@@ -7,12 +7,20 @@ import {
 
 const MAX_TOOL_ROUNDS = 3;
 const SUPPORTED_PROVIDERS = new Set(["openai", "anthropic", "ollama"]);
-const REPORT_PROVIDERS = ["anthropic", "openai"];
+const LLM_PROVIDER_ORDER = ["anthropic", "openai", "ollama"];
 
 export const ROVO_PROVIDER = "rovo";
 
 export const getConfiguredLlmProvider = () => {
   const provider = String(process.env.CHAT_PROVIDER || "").trim().toLowerCase();
+  if (SUPPORTED_PROVIDERS.has(provider)) {
+    return provider;
+  }
+  return null;
+};
+
+export const getConfiguredReportProvider = () => {
+  const provider = String(process.env.REPORT_PROVIDER || "").trim().toLowerCase();
   if (SUPPORTED_PROVIDERS.has(provider)) {
     return provider;
   }
@@ -52,7 +60,7 @@ export const resolveFirstReadyLlmProvider = () => {
     return configured;
   }
 
-  for (const provider of ["anthropic", "openai", "ollama"]) {
+  for (const provider of LLM_PROVIDER_ORDER) {
     if (isLlmCredentialReady(provider)) {
       return provider;
     }
@@ -62,13 +70,18 @@ export const resolveFirstReadyLlmProvider = () => {
 };
 
 export const resolveFirstReadyReportProvider = () => {
-  const configured = getConfiguredLlmProvider();
-  if (configured && configured !== "ollama" && isLlmCredentialReady(configured)) {
-    return configured;
+  const reportProvider = getConfiguredReportProvider();
+  if (reportProvider && isReportProviderReady(reportProvider)) {
+    return reportProvider;
   }
 
-  for (const provider of REPORT_PROVIDERS) {
-    if (isLlmCredentialReady(provider)) {
+  const chatProvider = getConfiguredLlmProvider();
+  if (chatProvider && isReportProviderReady(chatProvider)) {
+    return chatProvider;
+  }
+
+  for (const provider of LLM_PROVIDER_ORDER) {
+    if (isReportProviderReady(provider)) {
       return provider;
     }
   }
@@ -82,6 +95,19 @@ const isLlmCredentialReady = (provider) => {
       return Boolean(process.env.OPENAI_API_KEY);
     case "anthropic":
       return Boolean(process.env.ANTHROPIC_API_KEY);
+    case "ollama":
+      return Boolean(process.env.OLLAMA_BASE_URL);
+    default:
+      return false;
+  }
+};
+
+const isReportProviderReady = (provider) => {
+  switch (provider) {
+    case "openai":
+      return Boolean(process.env.REPORT_OPENAI_API_KEY || process.env.OPENAI_API_KEY);
+    case "anthropic":
+      return Boolean(process.env.REPORT_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY);
     case "ollama":
       return Boolean(process.env.OLLAMA_BASE_URL);
     default:
@@ -133,37 +159,51 @@ export const extractAssistantText = (data) => {
   return "";
 };
 
-const getOpenAiCredentials = () => {
-  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+const getOpenAiCredentials = ({ forReports = false } = {}) => {
+  const defaultApiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  const reportApiKey = String(process.env.REPORT_OPENAI_API_KEY || "").trim();
+  const apiKey = forReports && reportApiKey ? reportApiKey : defaultApiKey;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured on the proxy host");
   }
 
-  const baseUrl = String(process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+  const defaultBaseUrl = String(process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+  const reportBaseUrl = String(process.env.REPORT_OPENAI_BASE_URL || "").trim().replace(/\/$/, "");
+  const baseUrl = forReports && reportBaseUrl ? reportBaseUrl : defaultBaseUrl;
 
-  return {
-    apiKey,
-    baseUrl,
-    model: String(process.env.OPENAI_MODEL || "gpt-4o-mini").trim(),
-  };
+  const chatModel = String(process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
+  const reportModel = String(process.env.REPORT_OPENAI_MODEL || "").trim();
+  const model = forReports && reportModel ? reportModel : chatModel;
+
+  return { apiKey, baseUrl, model };
 };
 
-const getAnthropicCredentials = () => {
-  const apiKey = String(process.env.ANTHROPIC_API_KEY || "").trim();
+const getAnthropicCredentials = ({ forReports = false } = {}) => {
+  const defaultApiKey = String(process.env.ANTHROPIC_API_KEY || "").trim();
+  const reportApiKey = String(process.env.REPORT_ANTHROPIC_API_KEY || "").trim();
+  const apiKey = forReports && reportApiKey ? reportApiKey : defaultApiKey;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured on the proxy host");
   }
 
-  return {
-    apiKey,
-    model: String(process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6").trim(),
-  };
+  const defaultBaseUrl = String(process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com").replace(/\/$/, "");
+  const reportBaseUrl = String(process.env.REPORT_ANTHROPIC_BASE_URL || "").trim().replace(/\/$/, "");
+  const baseUrl = forReports && reportBaseUrl ? reportBaseUrl : defaultBaseUrl;
+
+  const chatModel = String(process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6").trim();
+  const reportModel = String(process.env.REPORT_ANTHROPIC_MODEL || "").trim();
+  const model = forReports && reportModel ? reportModel : chatModel;
+
+  return { apiKey, baseUrl, model };
 };
 
-const getOllamaConfig = () => ({
-  baseUrl: String(process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, ""),
-  model: String(process.env.OLLAMA_MODEL || "llama3.2").trim(),
-});
+const getOllamaConfig = ({ forReports = false } = {}) => {
+  const baseUrl = String(process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
+  const chatModel = String(process.env.OLLAMA_MODEL || "llama3.2").trim();
+  const reportModel = String(process.env.OLLAMA_REPORT_MODEL || "").trim();
+  const model = forReports && reportModel ? reportModel : chatModel;
+  return { baseUrl, model };
+};
 
 const buildOpenAiJiraTool = () => ({
   type: "function",
@@ -206,8 +246,8 @@ const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens,
   return data;
 };
 
-const callAnthropicMessages = async ({ apiKey, model, systemPrompt, messages, maxTokens, tools }) => {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+const callAnthropicMessages = async ({ apiKey, baseUrl, model, systemPrompt, messages, maxTokens, tools }) => {
+  const response = await fetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "x-api-key": apiKey,
@@ -231,8 +271,8 @@ const callAnthropicMessages = async ({ apiKey, model, systemPrompt, messages, ma
   return data;
 };
 
-const callOllamaChat = async ({ systemPrompt, userMessage, maxTokens }) => {
-  const { baseUrl, model } = getOllamaConfig();
+const callOllamaChat = async ({ systemPrompt, userMessage, maxTokens, forReports = false }) => {
+  const { baseUrl, model } = getOllamaConfig({ forReports });
   const response = await fetch(`${baseUrl}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -260,8 +300,8 @@ const callOllamaChat = async ({ systemPrompt, userMessage, maxTokens }) => {
   return text;
 };
 
-const completeOpenAiText = async ({ systemPrompt, userMessage, maxTokens }) => {
-  const { apiKey, baseUrl, model } = getOpenAiCredentials();
+const completeOpenAiText = async ({ systemPrompt, userMessage, maxTokens, forReports = false }) => {
+  const { apiKey, baseUrl, model } = getOpenAiCredentials({ forReports });
   const data = await callOpenAiMessages({
     apiKey,
     baseUrl,
@@ -281,10 +321,11 @@ const completeOpenAiText = async ({ systemPrompt, userMessage, maxTokens }) => {
   return text;
 };
 
-const completeAnthropicText = async ({ systemPrompt, userMessage, maxTokens }) => {
-  const { apiKey, model } = getAnthropicCredentials();
+const completeAnthropicText = async ({ systemPrompt, userMessage, maxTokens, forReports = false }) => {
+  const { apiKey, baseUrl, model } = getAnthropicCredentials({ forReports });
   const data = await callAnthropicMessages({
     apiKey,
+    baseUrl,
     model,
     systemPrompt,
     maxTokens,
@@ -347,13 +388,14 @@ const completeOpenAiWithJiraTools = async ({ systemPrompt, userMessage, maxToken
 };
 
 const completeAnthropicWithJiraTools = async ({ systemPrompt, userMessage, maxTokens, jiraRequest }) => {
-  const { apiKey, model } = getAnthropicCredentials();
+  const { apiKey, baseUrl, model } = getAnthropicCredentials();
   const messages = [{ role: "user", content: userMessage }];
   const tools = jiraRequest ? [buildAnthropicJiraTool()] : undefined;
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
     const data = await callAnthropicMessages({
       apiKey,
+      baseUrl,
       model,
       systemPrompt,
       maxTokens,
@@ -395,17 +437,9 @@ const completeAnthropicWithJiraTools = async ({ systemPrompt, userMessage, maxTo
   throw new Error("Anthropic did not return a final response after tool calls");
 };
 
-const buildProviderError = (provider, { allowOllama, forReports }) => {
-  if (forReports && provider === "ollama") {
-    return "Report generation is not supported with the Ollama provider. Set CHAT_PROVIDER to anthropic or openai in .env.";
-  }
-
-  if (!allowOllama && provider === "ollama") {
-    return "Report generation is not supported with the Ollama provider. Set CHAT_PROVIDER to anthropic or openai in .env.";
-  }
-
+const buildProviderError = (provider, { forReports = false } = {}) => {
   if (forReports) {
-    return `No report LLM configured. Set CHAT_PROVIDER to anthropic or openai with the matching API key in .env.`;
+    return `No report LLM configured. Set REPORT_PROVIDER or CHAT_PROVIDER to anthropic, openai, or ollama with matching credentials in .env. OpenAI-compatible endpoints (Databricks, Azure, LiteLLM, vLLM) use CHAT_PROVIDER=openai or REPORT_PROVIDER=openai with OPENAI_BASE_URL or REPORT_OPENAI_BASE_URL.`;
   }
 
   return "Chat is disabled. Set CHAT_PROVIDER to anthropic, openai, ollama, or rovo in .env (or leave unset and configure provider credentials).";
@@ -417,7 +451,6 @@ export const completeLlmText = async ({
   maxTokens = 1024,
   provider: providerOverride,
   defaultProvider = "disabled",
-  allowOllama = true,
   forReports = false,
 }) => {
   const provider = providerOverride || resolveLlmProvider(defaultProvider);
@@ -428,16 +461,18 @@ export const completeLlmText = async ({
 
   switch (provider) {
     case "anthropic":
-      return completeAnthropicText({ systemPrompt, userMessage: userContent, maxTokens });
+      return completeAnthropicText({ systemPrompt, userMessage: userContent, maxTokens, forReports });
     case "openai":
-      return completeOpenAiText({ systemPrompt, userMessage: userContent, maxTokens });
+      return completeOpenAiText({ systemPrompt, userMessage: userContent, maxTokens, forReports });
     case "ollama":
-      if (!allowOllama) {
-        throw new Error(buildProviderError(provider, { allowOllama, forReports }));
-      }
-      return callOllamaChat({ systemPrompt, userMessage: userContent, maxTokens });
+      return callOllamaChat({
+        systemPrompt,
+        userMessage: userContent,
+        maxTokens,
+        forReports,
+      });
     default:
-      throw new Error(buildProviderError(provider, { allowOllama, forReports }));
+      throw new Error(buildProviderError(provider, { forReports }));
   }
 };
 
@@ -472,6 +507,6 @@ export const completeLlmWithJiraTools = async ({
     case "ollama":
       return callOllamaChat({ systemPrompt, userMessage: userContent, maxTokens });
     default:
-      throw new Error(buildProviderError(provider, { allowOllama: true, forReports: false }));
+      throw new Error(buildProviderError(provider));
   }
 };
