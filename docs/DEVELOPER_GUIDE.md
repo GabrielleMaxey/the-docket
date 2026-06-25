@@ -12,7 +12,7 @@ Internal reference for code structure, data flow, scripts, and extension points.
 | Desktop shell | Electron 31 + electron-builder |
 | Proxy / API | Express 5 (`server/`) |
 | Database | better-sqlite3 → `data/workweek.sqlite` |
-| AI providers | Anthropic / OpenAI / Ollama (runtime-selectable via `CHAT_PROVIDER` in `.env`) |
+| AI providers | Anthropic, OpenAI, Ollama, or Rovo via `llmClient.mjs` — explicit `CHAT_PROVIDER` in `.env` |
 | CSS | Global design system in `workWeekTaskElements.css` + `dashboard.css`; `ww-` namespace prefix |
 
 ---
@@ -20,14 +20,16 @@ Internal reference for code structure, data flow, scripts, and extension points.
 ## Node version policy
 
 - This repo is pinned to Node `22` via `.nvmrc`.
-- Before installing dependencies, run:
+- **macOS / Linux:** before installing dependencies:
 
 ```bash
 nvm install
 nvm use
 ```
 
+- **Windows:** install Node 22 from [nodejs.org](https://nodejs.org/), or use [nvm-windows](https://github.com/coreybutler/nvm-windows) / [fnm](https://github.com/Schniz/fnm) and select the version from `.nvmrc`.
 - `npm install` runs a preinstall guard (`scripts/check-node-version.cjs`) and will fail fast if your Node major version does not match `.nvmrc`.
+- `postinstall` runs `electron-builder install-app-deps` so native modules align with Electron.
 - This prevents native module ABI mismatches (for example with `better-sqlite3`).
 
 ---
@@ -43,8 +45,11 @@ taskManager/
 │   ├── db/
 │   │   └── schema.mjs        # SQLite schema + prepared statements
 │   ├── lib/
-│   │   ├── chatProviders.mjs # Anthropic / OpenAI / Ollama abstraction
-│   │   ├── epicFilterJql.mjs # Builds JQL from epic preset selections
+│   │   ├── llmClient.mjs     # Shared Anthropic / OpenAI / Ollama client
+│   │   ├── chatProviders.mjs # Chat prompts + routing (LLM or Rovo)
+│   │   ├── rovoChat.mjs      # Opt-in Rovo MCP path + LLM fallback
+│   │   ├── dashboardRefresh/ # Dashboard refresh pipeline (parse → metrics → persist)
+│   │   ├── epicFilterJql.mjs # JQL builders (metrics scope, past due, presets)
 │   │   └── jiraSearch*.mjs   # Jira REST helpers
 │   └── routes/
 │       ├── appConfigRoutes.mjs    # Settings, field mappings, presets
@@ -55,11 +60,21 @@ taskManager/
 │       ├── jiraIssueRoutes.mjs    # Status/assignee updates, create issue
 │       └── reportRoutes.mjs       # /api/report/* + /api/plan/week
 ├── shared/
-│   └── dashboardMetrics.mjs  # Pure functions shared by server + UI
+│   ├── dashboardMetrics.mjs   # Pure metrics helpers (server + UI)
+│   └── chatSessionPrompt.mjs  # Formats Chat session context for LLM prompts
+├── tests/
+│   ├── dashboardMetrics.test.mjs
+│   ├── epicFilterJql.test.mjs
+│   └── chatSessionPrompt.test.mjs
 ├── src/
 │   ├── Pages/
 │   │   ├── WorkWeekTasks.jsx       # Work Week page shell
-│   │   ├── Dashboard.jsx           # Dashboard page
+│   │   ├── Dashboard/            # Dashboard feature (index.jsx, hooks, components)
+│   │   │   ├── index.jsx
+│   │   │   ├── hooks/            # useDashboardRefresh, useReportGeneration
+│   │   │   ├── components/       # filters, due-date lists, epic cards, reports
+│   │   │   └── utils/            # dashboardMetricsUtils (presets, splitDueByIssues)
+│   │   ├── Dashboard.jsx         # Re-exports Dashboard/index
 │   │   ├── Chat.jsx                # Chat page
 │   │   ├── Settings.jsx            # Settings page
 │   │   ├── workWeekTaskElements.css
@@ -78,11 +93,16 @@ taskManager/
 │   │       ├── useJokeTicker.js
 │   │       └── useCalendarData.js
 │   ├── components/
-│   │   └── StatusPieChart.jsx     # Pie / bar chart (no external library)
+│   │   ├── CollapsibleSection.jsx  # Shared collapsible (Work Week + Dashboard)
+│   │   ├── collapsible.css
+│   │   ├── ReportOutput.jsx
+│   │   └── StatusPieChart.jsx      # Pie / bar chart (no external library)
 │   ├── services/
 │   │   ├── jiraClient.js          # fetch → proxy wrappers (all API calls)
 │   │   └── apiBase.js             # Runtime proxy URL resolution
 │   └── utils/
+│       ├── chatSessionContext.js  # Chat session artifacts + JQL/dashboard summaries
+│       ├── jiraIssueDoneDates.js  # Work Week MRD display + parent-chain inheritance
 │       └── format.js              # formatPercent, formatTimestamp
 ├── docs/                     # ← you are here
 ├── data/                     # workweek.sqlite (auto-created, git-ignored)
@@ -103,6 +123,8 @@ taskManager/
 | `priority` | INTEGER | 0–10; 0 = unranked, 1 = highest |
 | `updated_at` | TEXT | ISO 8601 |
 
+**Multi-user / shared projects:** `issue_metadata` is **per machine** (whoever runs the local proxy). There is no server-side sync between users. For team-visible ranking on shared issues, the documented workflow is to push Jira comments prefixed with `PRIORITY P#` (P1–P10); other users read Jira and update their local priority manually. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority. The app does **not** parse Jira comments back into SQLite today. A future option is Jira custom fields for shared priority instead of comment conventions.
+
 **`epic_presets`** — saved JQL/epic presets
 
 | Column | Notes |
@@ -115,7 +137,17 @@ taskManager/
 | `jql` | JQL string |
 | `sort_order` | Display order |
 
-**`dashboard_snapshot`** — cached metrics from the last Dashboard refresh
+**`dashboard_snapshots`** — cached metrics from the last Dashboard refresh (plus related `dashboard_epic_metrics` / `dashboard_assignee_metrics` rows)
+
+Notable snapshot fields used by the UI and Chat context:
+
+| Field / column | Notes |
+|----------------|-------|
+| `due_by_date` | Upcoming cutoff date (null = no upcoming due-date views) |
+| `due_by_field` | `most_recent_done_date` or `initial_done_date` |
+| `include_past_due` | Whether past-due epics/rows were included |
+| `past_due_lookback_years` | `1`, `2`, or `3` — lookback floor for past-due list rows |
+| `due_by_issues_json` | Flat list of due-date rows; each item has `isOverdue` for past vs upcoming split |
 
 **`field_mappings`** — maps app date-field roles to Jira custom field IDs/names
 
@@ -123,9 +155,13 @@ taskManager/
 
 **`watched_assignees`** — saved people/JQL watches for Dashboard Individual Contributor section
 
+**`chat_sessions`** — Rovo OAuth tokens when `CHAT_PROVIDER=rovo`
+
 Created automatically in `server/db/schema.mjs` on first API start. WAL mode enabled.
 
 ### Export / backup
+
+For **single-user backup** or handoff — not live collaboration. Shared-project teams should use the `PRIORITY P#` Jira comment convention (see END_USER_GUIDE).
 
 ```bash
 # Full backup
@@ -146,7 +182,60 @@ sqlite3 -header -csv data/workweek.sqlite \
 | Initial Done Date | `customfield_10008` |
 | Most Recent Done Date | `customfield_10009` |
 
-These are mapped in Settings → Jira field mapping and synced via `/api/fields/sync`.
+These are mapped in Settings → Jira field mapping and synced via `POST /api/jira/field-mappings/sync`. Fallback IDs live in `shared/odiFieldIds.mjs`.
+
+---
+
+## Dashboard refresh pipeline
+
+`POST /api/dashboard/refresh` → `server/lib/dashboardRefresh/runDashboardRefresh.mjs`:
+
+1. **`parseRefreshInput.mjs`** — validates preset IDs, `dueByDate`, `dueByField`, `includePastDue`, `pastDueLookbackYears` (1/2/3 only)
+2. **`buildRefreshContext.mjs`** — resolves field IDs, `dueByCompareFieldId`, `pastDueFloor`, and `dueByOptions` (including `epicIssue` when computing per-epic child metrics)
+3. **`buildEpicMetrics.mjs`** — Jira search per preset; `computeChildIssueMetrics` + `buildEpicLevelDueByIssues` for due-date lists
+4. **`collectDueByIssues.mjs`** — merges epic-level due-by rows into snapshot flat list (capped at 200)
+5. **`persistSnapshot.mjs`** — writes `dashboard_snapshots` and related metric rows
+
+### Due-date resolution (`shared/dashboardMetrics.mjs`)
+
+`getIssueDueByDate(issue, compareFieldId, fallbackFieldId, epicIssue)` resolves the effective date for due-by filtering:
+
+1. **Task `duedate`** (mapped due-date field) when set — wins over epic automated-date fields on subtasks (avoids stale MRD on child issues)
+2. **Parent epic’s compare field** (MRD or IDD) when the task has no due date and `epicIssue` is provided
+3. **Compare field on the issue itself** when it is the epic row (or no parent epic context)
+
+Upcoming vs past-due list membership:
+
+- **Upcoming** — `dueDate >= today` and `<= dueByDate` cutoff (`isIssueUpcomingDueBy`)
+- **Past due in list** — only when `includePastDueInList`; `dueDate < today` within `pastDueFloor` lookback (`isIssuePastDueInLookback`)
+
+Epic-level inheritance for children without task due dates: `server/lib/dashboardRefresh/dueByHelpers.mjs` → `buildEpicLevelDueByIssues`.
+
+### Work Week MRD column (`src/utils/jiraIssueDoneDates.js`)
+
+After each **Run JQL**, `enrichRunWithParentDoneDates` (in `jiraJqlRunWorkflow.js`) attaches `mrdFieldId` and `parentMostRecentDoneDateByKey` to each run. Restored runs from `localStorage` are re-enriched when field mappings finish loading (`useTaskManagerJira.js`).
+
+Display logic in `getMostRecentDoneDateForIssue`:
+
+1. **Issue’s own MRD** (`most_recent_done_date` mapping) when set
+2. **`parentMostRecentDoneDateByKey[parentKey]`** when the task has no MRD
+
+`buildParentMostRecentDoneDateMap` fetches missing parents from Jira and walks up to **five** ancestor levels (Story → Epic, etc.) until an MRD is found. `JiraResultsTable` renders the column header as **MRD** with `title="Most Recent Done Date"`.
+
+### Dashboard UI section toggles
+
+Persisted in `localStorage` key `dashboard-visible-sections` via `normalizeVisibleSections()` in `dashboardMetricsUtils.js`:
+
+| Key | Section |
+|-----|---------|
+| `overall` | Overall Status |
+| `epicMetrics` | Project Metrics |
+| `dueByUpcoming` | Upcoming Due Dates card |
+| `dueByPastDue` | Past Due in lookback card |
+| `overdue` | Individual Contributor Metrics |
+| `report` | Generate Report |
+
+Legacy `dueBy` key migrates to both `dueByUpcoming` and `dueByPastDue`.
 
 ---
 
@@ -159,22 +248,34 @@ All routes mounted by `server/jiraProxy.mjs`.
 | GET | `/api/health` | Jira connection check + base URL |
 | GET | `/api/jira/myself` | Current user info |
 | GET | `/api/jira/fields` | All Jira fields |
-| POST | `/api/jira/search` | Raw JQL search |
-| GET/POST | `/api/metadata/:key` | Issue note + priority (SQLite) |
-| POST | `/api/jira/issue/:key/status` | Transition status |
-| POST | `/api/jira/issue/:key/assignee` | Update assignee |
-| POST | `/api/jira/issue` | Create issue |
-| GET/POST | `/api/presets` | Epic/JQL presets CRUD |
-| GET/POST | `/api/watched-assignees` | Watched people CRUD |
-| GET/POST | `/api/field-mappings` | Date field role mappings |
-| GET/POST | `/api/settings` | App settings key-value |
+| GET/POST | `/api/jira/search` | JQL search (POST body or GET query) |
+| POST | `/api/jira/issues/:issueKey/comment` | Add Jira comment |
+| POST | `/api/jira/issues/:issueKey/status` | Transition status |
+| POST | `/api/jira/issues/:issueKey/assignee` | Update assignee |
+| POST | `/api/jira/issues` | Create issue |
+| GET | `/api/jira/projects` | List projects |
+| GET | `/api/jira/projects/:key/createmeta` | Create-issue field metadata |
+| POST | `/api/jira/issue-metadata/bulk` | Bulk read notes + priority (SQLite) |
+| PUT | `/api/jira/issue-metadata/:issueKey` | Update note + priority (SQLite) |
+| GET/POST/PUT/DELETE | `/api/epic-presets` | Epic/JQL presets CRUD |
+| POST | `/api/epic-filters/run` | Run preset JQL (Work Week) |
+| GET | `/api/jira/filters` | Jira filters list |
+| GET | `/api/jira/filters/favourite` | Favourite filters |
+| GET | `/api/jira/filters/:id` | Single filter by ID |
+| GET/PUT | `/api/jira/field-mappings` | Date field role mappings |
+| POST | `/api/jira/field-mappings/sync` | Sync mappings from Jira |
+| GET/PUT | `/api/settings` | App settings key-value |
+| GET/POST/PUT/DELETE | `/api/watched-assignees` | Watched people/JQL for Dashboard |
 | POST | `/api/dashboard/refresh` | Pull + store metrics snapshot |
 | GET | `/api/dashboard/metrics` | Read stored snapshot |
-| POST | `/api/report/dashboard` | AI report (Executive/PO/Developer) |
-| POST | `/api/report/project` | AI per-project report (Work Week) |
-| POST | `/api/plan/week` | AI week planner |
-| POST | `/api/chat/message` | Chat message → AI provider |
-| GET | `/api/chat/status` | Chat provider readiness |
+| POST | `/api/report/generate` | Dashboard AI report (Executive/PO/Developer) |
+| POST | `/api/report/project` | Work Week per-query AI report |
+| POST | `/api/plan/week` | Work Week AI week planner |
+| GET | `/api/chat/status` | Chat provider readiness + OAuth state |
+| GET | `/api/chat/auth/start` | Start Atlassian OAuth (Rovo); `?format=json` returns URL |
+| GET | `/api/chat/auth/callback` | OAuth callback (browser redirect target) |
+| POST | `/api/chat/auth/signout` | Clear stored OAuth session |
+| POST | `/api/chat` | Chat message → AI provider (see Chat session context below) |
 
 ---
 
@@ -183,7 +284,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 ### `/api/report/project` (Work Week — My Metrics)
 Written **from the assignee's perspective**, second person ("you have", "your open items"). Tone: supportive colleague, not manager status update. Covers: overall tracking %, key open items, overdue concerns, recommended next steps. Flowing prose, no bullet lists.
 
-### `/api/report/dashboard` (Dashboard — Generate Report)
+### `/api/report/generate` (Dashboard — Generate Report)
 Three audience variants stored in `reportRoutes.mjs`:
 - **Executive** — highlights, risks, action items for leadership
 - **Product Owner** — feature delivery, backlog health, blockers, upcoming priorities
@@ -194,39 +295,97 @@ Day-by-day Monday–Friday plan using actual issue keys from the loaded JQL runs
 
 ---
 
+## Chat session context
+
+Each `POST /api/chat` request includes an `epicContext` object from the browser:
+
+| Field | Source | Purpose |
+|-------|--------|---------|
+| `selectedEpics` | Chat epic filter panel | Preset labels, keys, and JQL for scoped searches |
+| `includePastDue` | Chat epic filter panel | Whether past-due filter is active |
+| `sessionContext` | `buildChatSessionContext()` in `src/utils/chatSessionContext.js` | Work Week queries, dashboard snapshot, generated artifacts |
+
+`sessionContext` is built client-side on each send:
+
+1. **JQL queries** — summarized from `localStorage` key `workWeekTasksJiraLastJqlRuns` (label, JQL, counts, top open issues).
+2. **Dashboard snapshot** — refreshed via `GET /api/dashboard/metrics` on Chat load and again on each send. Summary includes separate `dueByPastDueCount` and `dueByUpcomingCount` when `dueByDate` is set.
+3. **Artifacts** — last 8 generated reports/plans from `localStorage` key `taskManagerChatSessionArtifacts`.
+
+Artifacts are saved when the user generates:
+
+| Artifact `type` | Saved from |
+|-----------------|------------|
+| `work_week_project_report` | Work Week → My Metrics → Project Report |
+| `week_plan` | Work Week → Help me plan my week |
+| `dashboard_report` | Dashboard → Generate Report |
+
+`server/lib/chatProviders.mjs` calls `formatChatSessionContext()` from `shared/chatSessionPrompt.mjs` to append this material to the system prompt. The model is instructed to use session context (especially artifacts) before running new Jira searches when the user asks about reports or queries they already ran.
+
+`POST /api/chat` body shape:
+
+```json
+{
+  "message": "What did my week plan say about Monday?",
+  "epicContext": {
+    "selectedEpics": [{ "label": "...", "epicKey": "...", "jql": "..." }],
+    "includePastDue": false,
+    "sessionContext": {
+      "jqlQueries": [],
+      "artifacts": [],
+      "dashboardSnapshot": null
+    }
+  }
+}
+```
+
+---
+
 ## State persistence
 
 | Data | Mechanism | Key(s) |
 |------|-----------|--------|
-| JQL inputs, labels, count | `localStorage` via `usePersistedState` | `workWeekTasksJira*` |
-| Last JQL results snapshot | `localStorage` | `workWeekTasksJqlRuns` |
+| JQL inputs, labels, count | `localStorage` | `workWeekTasksJiraPreferences` |
+| Last JQL results snapshot | `localStorage` | `workWeekTasksJiraLastJqlRuns` |
+| Jira notes + row priorities (UI cache) | `localStorage` | `workWeekTasksJiraNotes`, `workWeekTasksJiraRowPriorities` |
+| Chat session artifacts (reports/plans) | `localStorage` | `taskManagerChatSessionArtifacts` |
 | Header reminders | `localStorage` | `workWeekTasksReminders` |
-| Collapsible open/closed | `localStorage` via `usePersistedState` | various `ww-*` / `dashboard-collapse-*` |
-| Issue notes + P1–P10 | SQLite via proxy | `issue_metadata` |
-| Dashboard snapshot | SQLite via proxy | `dashboard_snapshot` |
+| Collapsible open/closed | `localStorage` via `usePersistedState` | various `ww-*` / `dashboard-*` keys |
+| Dashboard visible sections | `localStorage` | `dashboard-visible-sections` (`dueByUpcoming`, `dueByPastDue`, …) |
+| Issue notes + P1–P10 (persisted) | SQLite via proxy | `issue_metadata` |
+| Dashboard snapshot | SQLite via proxy | `dashboard_snapshots` (+ related metric tables) |
+| Packaged desktop `.env` + SQLite | OS user data folder | `TASK_MANAGER_USER_DATA` (see Packaged desktop below) |
 | Epic preset selections (Dashboard/Chat) | `localStorage` | `epicFilterSelectedIds` |
+| Rovo OAuth tokens | SQLite via proxy | `chat_sessions` |
+
+### Packaged desktop (Electron installer)
+
+When `TASK_MANAGER_USER_DATA` is set by Electron main (packaged app only):
+
+| Path | Contents |
+|------|----------|
+| `{userData}/.env` | Jira + LLM credentials (created from template on first launch) |
+| `{userData}/data/workweek.sqlite` | Notes, dashboard snapshots, settings |
+
+**macOS:** `~/Library/Application Support/Task Manager/`  
+**Windows:** `%APPDATA%\Task Manager\`
+
+Dev desktop (`npm run desktop:dev`) and browser dev use the repo `data/` folder and project-root `.env` instead.
+
+Packaged builds load the UI from `http://127.0.0.1:{API_PORT}` (proxy serves `dist/`). `better-sqlite3` is unpacked from ASAR via `asarUnpack` in `package.json`.
 
 ---
 
 ## Collapsible component pattern
 
-Both Work Week and Dashboard use a shared collapsible pattern:
+Work Week and Dashboard share `src/Components/CollapsibleSection.jsx` (CSS: `src/Components/collapsible.css`):
 
-**Work Week** — `WWCollapsible` in `WorkWeekTasks.jsx`:
-```jsx
-<WWCollapsible title="📊 My Metrics" badge="12 open" storageKey="ww-my-metrics" defaultOpen>
-  {/* content */}
-</WWCollapsible>
-```
-
-**Dashboard** — `CollapsibleSection` in `Dashboard.jsx`:
 ```jsx
 <CollapsibleSection title="Project Metrics" storageKey="epicMetrics" badge="3 projects">
   {/* content */}
 </CollapsibleSection>
 ```
 
-Both use the same `›` chevron that rotates on open/close, same border/radius/background design tokens, and persist open state in `localStorage`.
+Open state persists in `localStorage` via each panel's `storageKey`.
 
 ---
 
@@ -257,6 +416,8 @@ Key values used throughout `workWeekTaskElements.css`:
 | `npm run desktop:doctor` | Rebuilds `better-sqlite3` native module, then starts desktop dev |
 | `npm run desktop:rebuild-native` | Rebuilds native modules for current Electron version |
 | `npm run check:jira-client-exports` | Verifies every imported `jiraClient` symbol is exported (prevents runtime blank-screen import failures) |
+| `npm test` | Unit tests: `dashboardMetrics.mjs`, `epicFilterJql.mjs`, `chatSessionPrompt.mjs` |
+| `npm run seed:presets` | Seed shared Epic/JQL presets into local SQLite — see [pilot-presets.md](./pilot-presets.md) |
 | `npm run build` | Runs export guard (`prebuild`), then creates production Vite bundle → `dist/` |
 | `npm run desktop:dist` | Full build + electron-builder → `release/` |
 | `npm run desktop:dist:mac` | macOS `.dmg` |
@@ -267,18 +428,23 @@ Key values used throughout `workWeekTaskElements.css`:
 ## Checks after making changes
 
 ```bash
-# 1. Type-check server routes (no native binary needed)
+# 1. Unit tests (metrics, JQL builders, chat session prompt)
+npm test
+
+# 2. Type-check server routes (no native binary needed)
 node --check server/routes/reportRoutes.mjs
 node --check server/routes/dashboardRoutes.mjs
 
-# 2. Build the UI
+# 3. Build the UI
 npm run build
 
-# 3. Smoke test (with a real Jira test site):
+# 4. Smoke test (with a real Jira test site):
 #    - Run JQL on Work Week, confirm table loads
 #    - Generate a project report
 #    - Generate a week plan
-#    - Dashboard refresh + Generate Report
+#    - Dashboard refresh (Refresh status) + optional due-date views + Generate Report
+#    - Chat: ask about a generated week plan or report (session context)
+#    - Packaged desktop: edit userData `.env`, confirm Test Jira Connection
 #    - Create Issue modal
 ```
 
@@ -296,7 +462,8 @@ Produces artifacts: `desktop-macos` (`.dmg`) and `desktop-windows` (NSIS install
 1. Add a new route in `server/routes/reportRoutes.mjs` following the `app.post("/api/report/project", ...)` pattern — call `callLLMForReport({ systemPrompt, context })` and return `res.json({ report, label })`.
 2. Add a client function in `src/services/jiraClient.js`.
 3. Create a panel component (or extend an existing one) following the `ProjectReportPanel` pattern: `loading`, `report`, `error`, `copied` state; `Generate` → `Copy` → `Download` buttons.
-4. Wrap in `<WWCollapsible>` on Work Week or `<CollapsibleSection>` on Dashboard.
+4. Wrap in `<CollapsibleSection>` on Work Week or Dashboard.
+5. If the output should be available in Chat, call `saveChatSessionArtifact()` from `src/utils/chatSessionContext.js` after a successful generation (see existing report/plan panels).
 
 ---
 

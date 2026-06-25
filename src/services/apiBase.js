@@ -1,15 +1,26 @@
 export const PROXY_URL_STORAGE_KEY = "taskManagerProxyUrl";
 
+const normalizeBase = (value) => String(value || "").trim().replace(/\/$/, "");
+
 export const getApiBase = () => {
   const fromEnv = import.meta.env.VITE_API_BASE;
   if (fromEnv && String(fromEnv).trim()) {
-    return String(fromEnv).trim().replace(/\/$/, "");
+    return normalizeBase(fromEnv);
   }
 
   if (typeof window !== "undefined") {
+    const desktopBase = window.desktop?.apiBaseUrl;
+    if (desktopBase && String(desktopBase).trim()) {
+      return normalizeBase(desktopBase);
+    }
+
     const stored = window.localStorage.getItem(PROXY_URL_STORAGE_KEY);
     if (stored && stored.trim()) {
-      return stored.trim().replace(/\/$/, "");
+      return normalizeBase(stored);
+    }
+
+    if (window.location?.origin && /^https?:\/\//i.test(window.location.origin)) {
+      return normalizeBase(window.location.origin);
     }
   }
 

@@ -26,6 +26,9 @@ jobs:
       - name: Verify jiraClient exports
         run: npm run check:jira-client-exports
 
+      - name: Unit tests
+        run: npm test
+
       - name: Build macOS package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -58,6 +61,9 @@ jobs:
 
       - name: Verify jiraClient exports
         run: npm run check:jira-client-exports
+
+      - name: Unit tests
+        run: npm test
 
       - name: Build Windows package
         run: npm run desktop:dist:win

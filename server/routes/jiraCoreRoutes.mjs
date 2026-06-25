@@ -1,13 +1,10 @@
-// Core "talk to Jira" endpoints: connection test (/myself) and ad-hoc JQL
-// search. Split out of jiraProxy.mjs, which used to define these inline
-// alongside bootstrap/env/DB setup — same pattern as the other
-// server/routes/*.mjs files, which receive their dependencies (jiraRequest,
-// ensureEnvOrRespond, runJiraSearchRequest) via DI from jiraProxy.mjs rather
-// than constructing them themselves.
+// Core Jira endpoints: connection test and JQL search.
+
+import { getJiraSearchFields } from "../lib/jiraSearchFields.mjs";
 
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
 
-export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, runJiraSearchRequest }) => {
+export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, runJiraSearchRequest, db }) => {
   // GET /api/jira/myself
   app.get("/api/jira/myself", async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
@@ -68,7 +65,11 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
     }
 
     try {
-      const result = await runJiraSearchRequest(jql, maxResults);
+      const result = await runJiraSearchRequest({
+        jql,
+        maxResults,
+        fields: getJiraSearchFields(db),
+      });
       if (!result.ok) {
         return res.status(result.status).json({
           ...(result.data || {}),

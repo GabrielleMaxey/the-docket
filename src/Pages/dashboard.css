@@ -600,81 +600,7 @@
   color: #0f172a;
 }
 
-/* ── Collapsible sections ── */
-
-.dashboard-page .dashboard-collapsible {
-  margin-top: 1.75rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #fff;
-}
-
-.dashboard-page .dashboard-collapsible-header {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  background: #f8fafc;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s;
-}
-
-.dashboard-page .dashboard-collapsible-header:hover {
-  background: #f1f5f9;
-}
-
-.dashboard-page .dashboard-collapsible-title {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.dashboard-page .dashboard-collapsible-title-wrap {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.dashboard-page .dashboard-collapsible-subtitle {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: #64748b;
-  line-height: 1.35;
-}
-
-.dashboard-page .dashboard-collapsible-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #475569;
-  background: #e2e8f0;
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.dashboard-page .dashboard-collapsible-chevron {
-  font-size: 1.25rem;
-  color: #94a3b8;
-  transform: rotate(90deg);
-  transition: transform 0.18s;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.dashboard-page .dashboard-collapsible-chevron.open {
-  transform: rotate(-90deg);
-}
-
-.dashboard-page .dashboard-collapsible-body {
-  padding: 1.25rem 1.25rem;
-  border-top: 1px solid #e2e8f0;
-}
+/* ── Section visibility toggles ── */
 
 .dashboard-page .dashboard-subsection-label {
   font-size: 0.78rem;
@@ -684,8 +610,6 @@
   color: #991b1b;
   margin: 0 0 0.5rem;
 }
-
-/* ── Section visibility toggles ── */
 
 .dashboard-page .dashboard-section-toggle-row {
   display: flex;
@@ -709,13 +633,7 @@
   user-select: none;
 }
 
-/* ── Report panel ── */
-
-.dashboard-page .dashboard-report-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
+/* ── Report panel (dashboard-specific controls) ── */
 
 .dashboard-page .dashboard-report-controls {
   display: flex;
@@ -807,89 +725,6 @@
   box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.25);
 }
 
-.dashboard-page .dashboard-report-output {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.dashboard-page .dashboard-report-output-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.6rem 1rem;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.dashboard-page .dashboard-report-output-actions {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.dashboard-page .dashboard-report-chart-wrap {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #e2e8f0;
-  background: #fafafa;
-}
-
-.dashboard-page .dashboard-report-chart-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #64748b;
-  margin: 0 0 0.5rem;
-}
-
-.dashboard-page .dashboard-report-output-title {
-  font-size: 0.88rem;
-  color: #0f172a;
-}
-
-.dashboard-page .dashboard-report-markdown {
-  padding: 1rem 1.1rem;
-  line-height: 1.65;
-  color: #1e293b;
-  font-size: 0.88rem;
-}
-
-.dashboard-page .dashboard-report-markdown .report-h1 {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 1rem 0 0.4rem;
-  padding-bottom: 0.3rem;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.dashboard-page .dashboard-report-markdown .report-h2 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0.85rem 0 0.3rem;
-}
-
-.dashboard-page .dashboard-report-markdown .report-h3 {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #334155;
-  margin: 0.6rem 0 0.2rem;
-}
-
-.dashboard-page .dashboard-report-markdown .report-p {
-  margin: 0.35rem 0;
-}
-
-.dashboard-page .dashboard-report-markdown .report-list {
-  margin: 0.35rem 0 0.35rem 1.25rem;
-  padding: 0;
-}
-
-.dashboard-page .dashboard-report-markdown .report-list li {
-  margin-bottom: 0.2rem;
-}
-
 /* ── Bar chart ── */
 
 .dashboard-bar-chart {
@@ -933,6 +768,17 @@
   background: #fff;
 }
 
+.dashboard-page .dashboard-due-by-input--inline {
+  margin-left: 0.35rem;
+}
+
+.dashboard-page .dashboard-due-by-field-option--custom {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .dashboard-page .dashboard-due-by-clear {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
@@ -946,6 +792,45 @@
 
 .dashboard-page .dashboard-due-by-clear:hover {
   background: #e2e8f0;
+}
+
+.dashboard-page .dashboard-selector-clear {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.72rem;
+  cursor: pointer;
+  line-height: 1.3;
+}
+
+.dashboard-page .dashboard-selector-clear:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.dashboard-page .dashboard-optional-filters-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.65rem;
+}
+
+.dashboard-page .dashboard-due-by-field-row--inline .dashboard-due-by-inline-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+}
+
+.dashboard-page .dashboard-due-by-inline-separator {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-left: 0.15rem;
 }
 
 .dashboard-page .dashboard-due-by-hint {
@@ -1013,13 +898,37 @@
   padding: 0.1rem 0 0.25rem;
 }
 
+.dashboard-page .app-collapsible--due-upcoming {
+  border-left: 3px solid #22c55e;
+}
+
+.dashboard-page .app-collapsible--due-past-due {
+  border-left: 3px solid #ef4444;
+}
+
 /* ── Period summary chips ── */
 
 .dashboard-page .dashboard-period-summary {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.65rem;
   margin: 0.75rem 0 1rem;
+}
+
+.dashboard-page .dashboard-period-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dashboard-page .dashboard-period-group-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-right: 0.15rem;
 }
 
 .dashboard-page .dashboard-period-chip {
@@ -1034,10 +943,17 @@
   font-size: 0.82rem;
 }
 
+.dashboard-page .dashboard-period-chip--past-due,
 .dashboard-page .dashboard-period-chip--overdue {
   background: #fff1f2;
   border-color: #fecdd3;
   color: #9f1239;
+}
+
+.dashboard-page .dashboard-period-chip--upcoming {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
 }
 
 /* ── Hierarchical due-by list ── */
@@ -1122,7 +1038,7 @@
 
 .dashboard-page .dashboard-due-by-task-row {
   display: grid;
-  grid-template-columns: 7rem 1fr auto;
+  grid-template-columns: 7rem 4.75rem 1fr auto;
   gap: 0 0.75rem;
   align-items: baseline;
   padding: 0.4rem 0.9rem 0.4rem 1.75rem;
@@ -1134,8 +1050,13 @@
   border-bottom: none;
 }
 
+.dashboard-page .dashboard-due-by-task-row--past-due,
 .dashboard-page .dashboard-due-by-task-row--overdue {
   background: #fff7f7;
+}
+
+.dashboard-page .dashboard-due-by-task-row--upcoming {
+  background: #f8fafc;
 }
 
 .dashboard-page .dashboard-due-by-task-key {
@@ -1152,6 +1073,29 @@
 
 .dashboard-page .dashboard-due-by-task-key a:hover {
   text-decoration: underline;
+}
+
+.dashboard-page .dashboard-due-by-type-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  white-space: nowrap;
+  text-align: center;
+  font-family: inherit;
+}
+
+.dashboard-page .dashboard-due-by-type-badge--epic {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.dashboard-page .dashboard-epic-contributor-type-badge {
+  margin-right: 0.35rem;
+  vertical-align: middle;
 }
 
 .dashboard-page .dashboard-due-by-task-summary {
@@ -1224,6 +1168,27 @@
   text-decoration: underline;
 }
 
+.dashboard-page .dashboard-due-by-timing-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  vertical-align: middle;
+  font-family: inherit;
+}
+
+.dashboard-page .dashboard-due-by-timing-badge--past-due {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.dashboard-page .dashboard-due-by-timing-badge--upcoming {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .dashboard-page .dashboard-due-by-overdue-badge {
   display: inline-block;
   margin-left: 0.4rem;
@@ -1246,59 +1211,6 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   color: #0f172a;
-}
-
-/* ── Input collapsible ── */
-
-.dashboard-page .dashboard-input-collapsible {
-  margin-bottom: 1rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.dashboard-page .dashboard-input-collapsible-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background: #f8fafc;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s;
-}
-
-.dashboard-page .dashboard-input-collapsible-header:hover { background: #f1f5f9; }
-
-.dashboard-page .dashboard-input-collapsible-title {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.dashboard-page .dashboard-input-collapsible-title-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.15rem;
-  min-width: 0;
-}
-
-.dashboard-page .dashboard-input-collapsible-subtitle {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: #64748b;
-  line-height: 1.35;
-}
-
-.dashboard-page .dashboard-input-collapsible .ui.segment {
-  border-radius: 0;
-  border: none;
-  border-top: 1px solid #e2e8f0;
-  margin: 0;
-  box-shadow: none;
 }
 
 /* ── Project tabs ── */

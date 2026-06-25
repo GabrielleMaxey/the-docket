@@ -819,12 +819,17 @@ const Settings = () => {
 
         <div style={{ borderTop: "1px solid #e2e8f0", margin: "1.25rem 0 1rem" }} />
         <Header as="h4" style={{ margin: "0 0 0.5rem" }}>Connection status</Header>
-        <p style={{ fontSize: "0.85rem", color: "#475569", marginBottom: "0.75rem" }}>Chat provider is configured in <code>.env</code> on the proxy host (<code>CHAT_PROVIDER</code>).</p>
+        <p style={{ fontSize: "0.85rem", color: "#475569", marginBottom: "0.75rem" }}>
+          Set <code>CHAT_PROVIDER</code> and the matching API key in <code>.env</code> on the proxy host
+          (see JIRA_SETUP.md). Use <code>CHAT_PROVIDER=rovo</code> only if your org has Rovo MCP access.
+        </p>
         {chatStatus ? (
           <Message info size="small">
             Provider: <strong>{chatStatus.provider}</strong>
-            {chatStatus.oauthConnected ? " · Signed in with Atlassian" : ""}
-            {chatStatus.ready ? " · Ready" : " · Not ready — check API keys or OAuth in .env"}
+            {chatStatus.provider === "rovo" && chatStatus.oauthConnected
+              ? " · Signed in with Atlassian"
+              : ""}
+            {chatStatus.ready ? " · Ready" : " · Not ready — check API keys in .env"}
           </Message>
         ) : (
           <Message warning size="small">Could not load chat status.</Message>

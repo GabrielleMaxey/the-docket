@@ -8,6 +8,8 @@ const BASE_SEARCH_FIELDS = [
   "duedate",
 ];
 
+const ODI_FALLBACK_FIELD_IDS = ["customfield_10008", "customfield_10009"];
+
 export const getJiraSearchFields = (db) => {
   const fields = [...BASE_SEARCH_FIELDS];
   const seen = new Set(fields);
@@ -24,6 +26,13 @@ export const getJiraSearchFields = (db) => {
 
     seen.add(fieldId);
     fields.push(fieldId);
+  }
+
+  for (const fieldId of ODI_FALLBACK_FIELD_IDS) {
+    if (!seen.has(fieldId)) {
+      seen.add(fieldId);
+      fields.push(fieldId);
+    }
   }
 
   return fields;

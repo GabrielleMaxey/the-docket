@@ -7,7 +7,7 @@ const NotesCell = ({ issueKey, isClosedOrResolved, noteDraft, isNoteAlreadyPushe
       <span>-</span>
     ) : (
       <textarea
-        className={isNoteAlreadyPushed ? "ww-note-textarea-pushed" : undefined}
+        className={`ww-note-textarea${isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""}`}
         value={noteDraft}
         onChange={(event) => onChange(issueKey, event.target.value)}
         placeholder="Add notes here"

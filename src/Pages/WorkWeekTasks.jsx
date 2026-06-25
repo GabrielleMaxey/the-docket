@@ -2,6 +2,8 @@ import React from "react";
 import { Container, Divider, Icon, Message } from "semantic-ui-react";
 import "semantic-ui-css/semantic.min.css";
 import "./workWeekTaskElements.css";
+import CollapsibleSection from "../components/CollapsibleSection";
+import ReportOutput from "../components/ReportOutput";
 import JiraResultsTable from "./components/JiraResultsTable";
 import TaskManagerHeaderPanel from "./components/TaskManagerHeaderPanel";
 import JiraFilterImportModal from "./components/JiraFilterImportModal";
@@ -9,10 +11,12 @@ import CreateIssueModal from "./components/CreateIssueModal";
 import { useEpicFilters } from "./hooks/useEpicFilters";
 import { usePersistedState } from "./hooks/usePersistedState";
 import { useFlash } from "./hooks/useFlash";
+import { useReportClipboard } from "../hooks/useReportClipboard";
 import { useJokeTicker } from "./hooks/useJokeTicker";
 import { useCalendarData } from "./hooks/useCalendarData";
 import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.js";
 import { generateProjectReport, generateWeekPlan } from "../services/jiraClient";
+import { saveChatSessionArtifact } from "../utils/chatSessionContext";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -86,70 +90,18 @@ const isIssueOpen = (issue) => {
   return !/(closed|resolved|done)/.test(status);
 };
 
-// ─── Shared collapsible (matches Dashboard + Settings style) ──────────────────
-
-const WWCollapsible = ({ title, badge, storageKey, defaultOpen = false, children }) => {
-  const persistedState = usePersistedState(storageKey || "__ww_unused__", defaultOpen);
-  const localState = React.useState(defaultOpen);
-  const [isOpen, setIsOpen] = storageKey ? persistedState : localState;
-  return (
-    <div className="ww-collapsible">
-      <button
-        type="button"
-        className="ww-collapsible-header"
-        onClick={() => setIsOpen((o) => !o)}
-        aria-expanded={isOpen}
-      >
-        <span className="ww-collapsible-title">{title}</span>
-        {badge != null ? <span className="ww-collapsible-badge">{badge}</span> : null}
-        <span className={`ww-collapsible-chevron${isOpen ? " open" : ""}`}>›</span>
-      </button>
-      {isOpen ? <div className="ww-collapsible-body">{children}</div> : null}
-    </div>
-  );
-};
-
-// ─── SimpleMarkdown renderer ──────────────────────────────────────────────────
-
-const renderInline = (text, key) =>
-  text.split(/\*\*(.+?)\*\*/g).map((part, i) =>
-    i % 2 === 1 ? <strong key={`${key}-b-${i}`}>{part}</strong> : part
-  );
-
-const SimpleMarkdownWW = ({ text }) => {
-  if (!text) return null;
-  const elements = [];
-  let listItems = [];
-  let listKey = 0;
-  const flushList = () => {
-    if (listItems.length > 0) {
-      elements.push(<ul key={`ul-${listKey}`} className="report-list">{listItems}</ul>);
-      listItems = [];
-      listKey++;
-    }
-  };
-  text.split("\n").forEach((line, i) => {
-    if (line.startsWith("### ")) { flushList(); elements.push(<h4 key={i} className="report-h3">{renderInline(line.slice(4), `h4-${i}`)}</h4>); }
-    else if (line.startsWith("## ")) { flushList(); elements.push(<h3 key={i} className="report-h2">{renderInline(line.slice(3), `h3-${i}`)}</h3>); }
-    else if (line.startsWith("# ")) { flushList(); elements.push(<h2 key={i} className="report-h1">{renderInline(line.slice(2), `h2-${i}`)}</h2>); }
-    else if (line.match(/^[-*] /)) { listItems.push(<li key={i}>{renderInline(line.slice(2), `li-${i}`)}</li>); }
-    else if (line.trim() === "") { flushList(); }
-    else { flushList(); elements.push(<p key={i} className="report-p">{renderInline(line, `p-${i}`)}</p>); }
-  });
-  flushList();
-  return <div className="dashboard-report-markdown">{elements}</div>;
-};
-
 // ─── Project Report Panel ─────────────────────────────────────────────────────
 
 const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
   const [loading, setLoading] = React.useState(false);
   const [report, setReport] = React.useState(null);
   const [error, setError] = React.useState("");
-  const [copied, setCopied] = React.useState(false);
+  const { copied, handleCopy, handleDownload } = useReportClipboard(report);
 
   const handleGenerate = async () => {
-    setLoading(true); setError(""); setReport(null);
+    setLoading(true);
+    setError("");
+    setReport(null);
     try {
       const issues = run.issues || [];
       const open = issues.filter(isIssueOpen);
@@ -170,8 +122,17 @@ const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
             isOverdue: Boolean(iss.isOverdue),
           })),
       };
-      const result = await generateProjectReport({ label: run.label || `Run ${(run.index || 0) + 1}`, summary });
+      const result = await generateProjectReport({
+        label: run.label || `Run ${(run.index || 0) + 1}`,
+        summary,
+      });
       setReport(result);
+      saveChatSessionArtifact({
+        type: "work_week_project_report",
+        label: result.label || run.label || `Run ${(run.index || 0) + 1}`,
+        content: result.report,
+        meta: { jql: run.jql || "" },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Report generation failed");
     } finally {
@@ -179,38 +140,27 @@ const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
     }
   };
 
-  const handleCopy = async () => {
-    if (!report?.report) return;
-    await navigator.clipboard.writeText(report.report);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleDownload = () => {
-    if (!report?.report) return;
-    const blob = new Blob([report.report], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `${(report.label || "report").replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.md`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-  };
-
   return (
-    <WWCollapsible title="📄 Project Report">
-      <div className="ww-project-report-controls">
-        <Button size="small" primary onClick={handleGenerate} loading={loading} disabled={loading || !run.issues?.length}>
+    <CollapsibleSection title="📄 Project Report">
+      <div className="app-report-controls">
+        <Button
+          size="small"
+          primary
+          onClick={handleGenerate}
+          loading={loading}
+          disabled={loading || !run.issues?.length}
+        >
           Generate Report
         </Button>
-        {report ? (
-          <>
-            <Button size="small" basic onClick={handleCopy}>{copied ? "✓ Copied" : "Copy"}</Button>
-            <Button size="small" basic onClick={handleDownload}>⤓ Download</Button>
-          </>
-        ) : null}
       </div>
       {error ? <p className="ww-jira-status ww-jira-error">{error}</p> : null}
-      {report ? <SimpleMarkdownWW text={report.report} /> : null}
-    </WWCollapsible>
+      <ReportOutput
+        report={report}
+        copied={copied}
+        onCopy={handleCopy}
+        onDownload={handleDownload}
+      />
+    </CollapsibleSection>
   );
 };
 
@@ -275,13 +225,13 @@ const MyMetricsSection = ({ run, jiraRowPriorities }) => {
   }
 
   return (
-    <WWCollapsible title="📊 My Metrics" badge={`${totalOpen} open`} storageKey={MY_METRICS_KEY} defaultOpen>
+    <CollapsibleSection title="📊 My Metrics" badge={`${totalOpen} open`} storageKey={MY_METRICS_KEY} defaultOpen>
       <div key={`run-summary-${run.index}`} className="ww-run-summary">
         <div className="ww-run-summary-label">{run.label || `Run ${(run.index || 0) + 1}`}</div>
         <JqlRunMetrics run={run} jiraRowPriorities={jiraRowPriorities} />
         <ProjectReportPanel run={run} jiraRowPriorities={jiraRowPriorities} />
       </div>
-    </WWCollapsible>
+    </CollapsibleSection>
   );
 };
 
@@ -291,7 +241,8 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
   const [plan, setPlan] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
-  const [copied, setCopied] = React.useState(false);
+  const planReport = plan ? { report: plan, label: "Week plan" } : null;
+  const { copied, handleCopy, handleDownload } = useReportClipboard(planReport);
   const [step, setStep] = React.useState("questions");
   const [focusStyle, setFocusStyle] = React.useState("balance");
   const [capacityHours, setCapacityHours] = React.useState("40");
@@ -325,19 +276,18 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
       const combined = [fixedCommitments.trim(), additionalContext.trim()].filter(Boolean).join(" | ");
       const result = await generateWeekPlan({ projects, focusStyle, capacityHours: Number(capacityHours) || 40, additionalContext: combined });
       setPlan(result.plan);
+      saveChatSessionArtifact({
+        type: "week_plan",
+        label: "Week plan",
+        content: result.plan,
+        meta: { focusStyle, capacityHours: Number(capacityHours) || 40 },
+      });
       setStep("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Plan generation failed");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCopy = async () => {
-    if (!plan) return;
-    await navigator.clipboard.writeText(plan);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleReset = () => {
@@ -347,7 +297,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
   };
 
   return (
-    <WWCollapsible title="🗓️ Help me plan my week" storageKey={WEEKLY_PLAN_KEY}>
+    <CollapsibleSection title="🗓️ Help me plan my week" storageKey={WEEKLY_PLAN_KEY}>
       <div className="ww-weekly-plan-body">
         {!hasRuns ? (
           <p className="ww-plan-intro">Run JQL queries first to load your tasks, then generate a week plan.</p>
@@ -401,23 +351,34 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
               <button type="button" className="ww-plan-edit-btn" onClick={handleReset}>✎ Edit</button>
             </div>
             <div className="ww-weekly-plan-controls">
-              <Button primary size="small" onClick={handleGenerate} loading={loading} disabled={loading}>Generate week plan</Button>
-              {plan ? <Button basic size="small" onClick={handleCopy}>{copied ? "✓ Copied" : "Copy"}</Button> : null}
+              <Button primary size="small" onClick={handleGenerate} loading={loading} disabled={loading}>
+                Generate week plan
+              </Button>
               {plan ? <Button basic size="small" onClick={handleReset}>Start over</Button> : null}
             </div>
             {error ? <p className="ww-jira-status ww-jira-error">{error}</p> : null}
-            {plan ? <SimpleMarkdownWW text={plan} /> : null}
+            <ReportOutput
+              report={planReport}
+              copied={copied}
+              onCopy={handleCopy}
+              onDownload={handleDownload}
+            />
           </>
         )}
       </div>
-    </WWCollapsible>
+    </CollapsibleSection>
   );
 };
 
 // ─── Main page component ──────────────────────────────────────────────────────
 
 const WorkWeekTasks = () => {
-  const { presets: epicPresets } = useEpicFilters();
+  const {
+    presets: epicPresets,
+    loading: epicPresetsLoading,
+    error: epicPresetsError,
+    reloadPresets,
+  } = useEpicFilters();
   const { tickerJokes, jokeIndex } = useJokeTicker();
   const { todayDay, monthLabel, fullDateLabel, calendarCells } = useCalendarData();
 
@@ -514,8 +475,25 @@ const WorkWeekTasks = () => {
           }
         />
 
-        <WWCollapsible title="🗂️ Task Manager" storageKey={TASK_MANAGER_KEY} defaultOpen>
+        <CollapsibleSection title="🗂️ Task Manager" storageKey={TASK_MANAGER_KEY} defaultOpen>
           <div className="ww-task-manager-body">
+            {epicPresetsError ? (
+              <Message warning size="small">
+                Could not load Epic/JQL presets for Quick pick ({epicPresetsError}). Is the API
+                running at <code>http://localhost:8787</code>? Try{" "}
+                <code>npm run dev:api</code> or <code>npm run dev:all</code>, then{" "}
+                <button type="button" className="ww-page-btn" onClick={() => void reloadPresets()}>
+                  retry
+                </button>
+                .
+              </Message>
+            ) : null}
+            {!epicPresetsLoading && !epicPresetsError && epicPresets.length === 0 ? (
+              <Message info size="small">
+                No presets in the database yet. Add them in Settings → Epic & JQL presets, or run{" "}
+                <code>npm run seed:presets -- --all</code>.
+              </Message>
+            ) : null}
             <div className="ww-create-issue-row">
               <Button primary onClick={() => setCreateIssueOpen(true)}>Create Issue</Button>
             </div>
@@ -594,7 +572,7 @@ const WorkWeekTasks = () => {
               <kbd className="ww-kbd">⌘</kbd>+<kbd className="ww-kbd">Enter</kbd> to run or refresh JQL results.
             </p>
           </div>
-        </WWCollapsible>
+        </CollapsibleSection>
 
         {jqlRuns.some((r) => r.issues?.length > 0) ? null : null}
 
