@@ -94,24 +94,60 @@ export const resolvePresetJql = async ({ preset, jiraRequest }) => {
   return fallbackPresetJql(preset?.epicKey);
 };
 
-export const buildPastDueJql = ({ mappingsByRole, epicPastDueMode, epicKeys = [] }) => {
+export const buildPastDueJql = ({
+  mappingsByRole,
+  epicPastDueMode,
+  epicKeys = [],
+  pastDueFloorDate = null,
+}) => {
   const dueMapping = mappingsByRole.get("due_date");
+  const iddMapping = mappingsByRole.get("initial_done_date");
   const mrdMapping = mappingsByRole.get("most_recent_done_date");
   const pedMapping = mappingsByRole.get("project_end_date");
 
   const dueRef = jqlFieldRef(dueMapping) || "duedate";
+  const iddRef = jqlFieldRef(iddMapping);
   const mrdRef = jqlFieldRef(mrdMapping);
   const pedRef = jqlFieldRef(pedMapping);
 
-  const taskClause = `statusCategory != Done AND ${dueRef} is not EMPTY AND ${dueRef} < startOfDay()`;
+  const floorLiteral =
+    pastDueFloorDate instanceof Date
+      ? pastDueFloorDate.toISOString().slice(0, 10)
+      : String(pastDueFloorDate || "").trim();
 
-  const mrdClause =
-    mrdRef != null ? `${mrdRef} is not EMPTY AND ${mrdRef} < startOfDay()` : null;
-  const pedClause =
-    pedRef != null ? `${pedRef} is not EMPTY AND ${pedRef} < startOfDay()` : null;
+  const withFloor = (clause, ref) => {
+    if (!clause) {
+      return null;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(floorLiteral)) {
+      return clause;
+    }
+    return `${clause} AND ${ref} >= "${floorLiteral}"`;
+  };
+
+  const taskClause = withFloor(
+    `statusCategory != Done AND ${dueRef} is not EMPTY AND ${dueRef} < startOfDay()`,
+    dueRef
+  );
+
+  const iddClause = withFloor(
+    iddRef != null ? `${iddRef} is not EMPTY AND ${iddRef} < startOfDay()` : null,
+    iddRef
+  );
+  const mrdClause = withFloor(
+    mrdRef != null ? `${mrdRef} is not EMPTY AND ${mrdRef} < startOfDay()` : null,
+    mrdRef
+  );
+  const pedClause = withFloor(
+    pedRef != null ? `${pedRef} is not EMPTY AND ${pedRef} < startOfDay()` : null,
+    pedRef
+  );
 
   let epicInnerClause = null;
   switch (epicPastDueMode) {
+    case "initial_done_date":
+      epicInnerClause = iddClause;
+      break;
     case "most_recent_done_date":
       epicInnerClause = mrdClause;
       break;
@@ -120,7 +156,7 @@ export const buildPastDueJql = ({ mappingsByRole, epicPastDueMode, epicKeys = []
       break;
     case "either":
     default: {
-      const parts = [mrdClause, pedClause].filter(Boolean);
+      const parts = [mrdClause, iddClause, pedClause].filter(Boolean);
       epicInnerClause = parts.length > 0 ? parts.map((part) => `(${part})`).join(" OR ") : null;
       break;
     }

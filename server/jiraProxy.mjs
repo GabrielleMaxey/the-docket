@@ -13,12 +13,39 @@ import { registerJiraCoreRoutes } from "./routes/jiraCoreRoutes.mjs";
 import { registerJiraIssueRoutes } from "./routes/jiraIssueRoutes.mjs";
 import { registerIssueMetadataRoutes } from "./routes/issueMetadataRoutes.mjs";
 import { resolveJiraUser } from "./lib/jiraSearchHelpers.mjs";
+import { getJiraSearchFields } from "./lib/jiraSearchFields.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+const projectRoot = path.resolve(__dirname, "..");
+
+const loadEnvFiles = () => {
+  const userDataRoot = String(process.env.TASK_MANAGER_USER_DATA || "").trim();
+  dotenv.config({ path: path.join(projectRoot, ".env") });
+
+  if (userDataRoot) {
+    dotenv.config({ path: path.join(userDataRoot, ".env"), override: true });
+  }
+};
+
+loadEnvFiles();
 
 const app = express();
 const port = Number(process.env.API_PORT || 8787);
+
+// Electron dev loads the UI from localhost:5173 while the API runs on :8787 — allow that cross-origin traffic.
+app.use((req, res, next) => {
+  const origin = String(req.headers.origin || "").trim();
+  if (origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
+    res.setHeader("Vary", "Origin");
+  }
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 app.use(express.json());
 
@@ -28,12 +55,30 @@ const requiredEnv = ["JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_API_TOKEN"];
 
 // ─── Database ─────────────────────────────────────────────────────────────────
 
-const dbDir = path.resolve(__dirname, "../data");
+const userDataRoot = String(process.env.TASK_MANAGER_USER_DATA || "").trim();
+const dbDir = userDataRoot
+  ? path.join(userDataRoot, "data")
+  : path.resolve(projectRoot, "data");
 fs.mkdirSync(dbDir, { recursive: true });
 const dbPath = path.resolve(dbDir, "workweek.sqlite");
-const db = new Database(dbPath);
-db.pragma("journal_mode = WAL");
-initDatabase(db);
+
+let db;
+try {
+  db = new Database(dbPath);
+  db.pragma("journal_mode = WAL");
+  initDatabase(db);
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error("[task-manager] Failed to open SQLite database at", dbPath);
+  console.error(message);
+  if (message.includes("NODE_MODULE_VERSION")) {
+    console.error(
+      "better-sqlite3 must match your Node version. Run: npm rebuild better-sqlite3"
+    );
+    console.error("Or start the API via: npm run dev:api (rebuilds automatically)");
+  }
+  process.exit(1);
+}
 
 // ─── Shared helpers (passed into route modules) ───────────────────────────────
 
@@ -103,7 +148,7 @@ const runJiraSearchRequest = async (input, legacyOptions = {}) => {
   const requestBody = {
     jql,
     maxResults,
-    fields: fields || ["summary", "issuetype", "status", "assignee", "updated"],
+    fields: fields || getJiraSearchFields(db),
     ...(nextPageToken ? { nextPageToken } : {}),
   };
 
@@ -182,22 +227,6 @@ app.put("/api/jira/issue-metadata/:issueKey", (req, res) => {
   return res.json({ ok: true, issueKey, note, priority });
 });
 
-app.post("/api/jira/search", async (req, res) => {
-  const jql = String(req.body?.jql || "").trim();
-  const maxResults = Number(req.body?.maxResults || 200);
-  if (!jql) return res.status(400).json({ error: "Missing jql" });
-  const data = await runJiraSearchRequest({ jql, maxResults, res });
-  if (data) res.json(data);
-});
-
-app.get("/api/jira/search", async (req, res) => {
-  const jql = String(req.query.jql || "").trim();
-  const maxResults = Number(req.query.maxResults || 10);
-  if (!jql) return res.status(400).json({ error: "Missing jql" });
-  const data = await runJiraSearchRequest({ jql, maxResults, res });
-  if (data) res.json(data);
-});
-
 // ─── Mount all route modules ──────────────────────────────────────────────────
 
 const routeCtx = {
@@ -218,7 +247,7 @@ registerChatRoutes(app, routeCtx);
 
 // ─── Static (production packaged build) ──────────────────────────────────────
 
-const distDir = path.resolve(__dirname, "../dist");
+const distDir = path.resolve(projectRoot, "dist");
 if (fs.existsSync(distDir)) {
   app.use(express.static(distDir));
   app.use((_req, res) => {

@@ -1,4 +1,5 @@
 import { fetchIssueMetadataBulk, fetchJiraSearch } from "../../services/jiraClient";
+import { enrichRunWithParentDoneDates } from "../../utils/jiraIssueDoneDates.js";
 
 const errorMessage = (error, fallback) =>
   error instanceof Error ? error.message : fallback;
@@ -29,6 +30,7 @@ export async function runJqlWorkflow({
   setJqlLoading,
   setJiraNotes,
   setJiraRowPriorities,
+  fieldMappingRows,
 }) {
   const selected = jqlInputs.slice(0, jqlCount).map((item) => String(item || "").trim());
   const nonEmpty = selected.filter(Boolean);
@@ -122,7 +124,11 @@ export async function runJqlWorkflow({
       }
     }
 
-    setJqlRuns([...runResults].sort((a, b) => a.index - b.index));
+    const enrichedRuns = await Promise.all(
+      runResults.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows))
+    );
+
+    setJqlRuns([...enrichedRuns].sort((a, b) => a.index - b.index));
   } finally {
     setJqlLoading(false);
   }

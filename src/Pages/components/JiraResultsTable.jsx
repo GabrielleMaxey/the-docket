@@ -1,4 +1,5 @@
 import React from "react";
+import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js";
 
 const PAGE_SIZE = 30;
 const SORT_FIELDS = [
@@ -594,7 +595,7 @@ const JiraResultsTable = ({
                       </button>
                     </th>
                     <th>Updated</th>
-                    <th>Due Date</th>
+                    <th title="Most Recent Done Date">MRD</th>
                     <th>Parent</th>
                     <th aria-sort={getHeaderAriaSort("priority")}>
                       <button
@@ -726,9 +727,11 @@ const JiraResultsTable = ({
                         <td>{updated}</td>
 
                         <td>
-                          {issue.fields?.duedate
-                            ? formatDate(issue.fields.duedate)
-                            : <span style={{ color: "#94a3b8" }}>—</span>}
+                          {getMostRecentDoneDateForIssue(
+                            issue,
+                            run.mrdFieldId,
+                            run.parentMostRecentDoneDateByKey
+                          ) || <span style={{ color: "#94a3b8" }}>—</span>}
                         </td>
 
                         <td>
@@ -771,7 +774,9 @@ const JiraResultsTable = ({
                             <span>-</span>
                           ) : (
                             <textarea
-                              className={isNoteAlreadyPushed ? "ww-note-textarea-pushed" : undefined}
+                              className={`ww-note-textarea${
+                                isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
+                              }`}
                               value={noteDraft}
                               onChange={(event) =>
                                 handleNoteChange(issueKey, event.target.value)
@@ -790,7 +795,7 @@ const JiraResultsTable = ({
                           {isClosedOrResolved ? (
                             <span>-</span>
                           ) : (
-                            <div>
+                            <div className="ww-push-actions">
                               <label className="ww-row-select-label">
                                 <input
                                   type="checkbox"
