@@ -7,12 +7,25 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies & build output
 node_modules
 dist
 dist-ssr
+release
+
+# Vite
 *.local
-MiscFiles/
+
+# Local app data (SQLite, exports) — never commit personal DBs or snapshots
 data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+
+# Local misc notes (folder name varies by machine)
+MiscFiles/
+MiscFIles/
 
 # Editor directories and files
 .vscode/*
@@ -29,5 +42,3 @@ data/
 .env
 .env.*
 !.env.example
-
-release

@@ -126,7 +126,6 @@ const callLLMForReport = async ({ systemPrompt, context }) => {
     userMessage: context,
     maxTokens: REPORT_MAX_TOKENS,
     provider,
-    allowOllama: false,
     forReports: true,
   });
 };
