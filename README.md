@@ -26,7 +26,7 @@ Everything in the app talks to **your own Jira project (ODI)** through a local p
 Run up to five saved JQL queries side-by-side and manage every issue in one table.
 
 - **Run JQL** — pulls live results from Jira into the table
-- **Task table** — update status, assignee, and priority; **MRD** column (Most Recent Done Date, with parent-chain inheritance); write notes; push notes to Jira as comments (shared projects: use `PRIORITY P#` prefix — see [END_USER_GUIDE.md](./END_USER_GUIDE.md))
+- **Task table** — update status, assignee, and priority; **MRD** column (Most Recent Done Date, with parent-chain inheritance); write notes; push notes to Jira as comments (shared projects: use `PRIORITY P#` prefix — see [END_USER_GUIDE.md](./docs/END_USER_GUIDE.md))
 - **My Metrics** — per-query progress summary with issue counts and a per-project AI report (written for you, the assignee, in second person)
 - **Help me plan my week** — answers 4 quick questions, then generates a day-by-day Monday–Friday plan based on your actual open issues
 - **Create Issue** — creates a new Jira issue from a modal with epic/query selection
@@ -118,11 +118,11 @@ npm run dev:all
 npm run desktop:dev
 ```
 
-**Packaged desktop (no Node required):** install the `.dmg` (Mac) or NSIS installer (Windows), edit `.env` in the user data folder on first launch — see [JIRA_SETUP.md](./JIRA_SETUP.md) § Desktop app.
+**Packaged desktop (no Node required):** install the `.dmg` (Mac) or NSIS installer (Windows), edit `.env` in the user data folder on first launch — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) § Desktop app.
 
-Full setup details → **[JIRA_SETUP.md](./JIRA_SETUP.md)**
-Code architecture → **[DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)**
-Day-to-day usage → **[END_USER_GUIDE.md](./END_USER_GUIDE.md)**
+Full setup details → **[JIRA_SETUP.md](./docs/JIRA_SETUP.md)**
+Code architecture → **[DEVELOPER_GUIDE.md](./docs/DEVELOPER_GUIDE.md)**
+Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 
 ---
 
@@ -136,7 +136,7 @@ Day-to-day usage → **[END_USER_GUIDE.md](./END_USER_GUIDE.md)**
 | Per-issue notes + P1–P10 priority | `data/workweek.sqlite` (local file) | No |
 | Status/assignee changes, pushed comments | Jira (lumen.atlassian.net) | Yes — visible in Jira to anyone with access |
 | Dashboard metrics snapshot | `data/workweek.sqlite` (dev) or user data folder (packaged desktop) | No |
-| Desktop `.env` + local DB (packaged app) | OS user data folder — see [JIRA_SETUP.md](./JIRA_SETUP.md) | No |
+| Desktop `.env` + local DB (packaged app) | OS user data folder — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) | No |
 | Jira credentials | `.env` file on this machine | No — only the local proxy reads them |
 | Chat message content | Your configured LLM provider (Anthropic/OpenAI/etc.) when you send a message | Yes — to that provider's API |
 
