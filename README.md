@@ -23,7 +23,7 @@ Everything in the app talks to **your own Jira project (ODI)** through a local p
 ```
 
 ### Work Week *(daily driver)*
-Run up to four saved JQL queries side-by-side and manage every issue in one table.
+Run up to five saved JQL queries side-by-side and manage every issue in one table.
 
 - **Run JQL** — pulls live results from Jira into the table
 - **Task table** — update status, assignee, and priority; **MRD** column (Most Recent Done Date, with parent-chain inheritance); write notes; push notes to Jira as comments (shared projects: use `PRIORITY P#` prefix — see [END_USER_GUIDE.md](./END_USER_GUIDE.md))
@@ -59,7 +59,7 @@ Ask natural-language questions about selected epics, your Work Week JQL results,
 | Page | Primary purpose | AI features |
 |------|----------------|-------------|
 | Work Week | Daily JQL run + issue management | Per-project report, week planner |
-| Dashboard | Multi-project metrics snapshot | Executive / PO / Developer reports |
+| Dashboard | Multi-project metrics snapshot | Executive / PM / Developer reports |
 | Chat | Natural-language Jira Q&A + session context | Conversation with Jira tool access; references cached JQL, dashboard snapshot, and generated reports |
 | Settings | Configuration | Custom chat instructions |
 
