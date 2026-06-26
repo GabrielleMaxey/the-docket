@@ -5,12 +5,14 @@ import Home from "./Pages/Home.jsx";
 import WorkWeekTasks from "./Pages/WorkWeekTasks.jsx";
 import Dashboard from "./Pages/Dashboard.jsx";
 import Chat from "./Pages/Chat.jsx";
+import ReportArchive from "./Pages/ReportArchive.jsx";
 import Settings from "./Pages/Settings.jsx";
 import "./appNav.css";
 
 const NAV_LINKS = [
   { to: "/work-week", label: "Work Week" },
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/reports", label: "Past Reports" },
   { to: "/chat", label: "Chat" },
   { to: "/settings", label: "Settings", icon: "⚙️" },
 ];
@@ -49,6 +51,7 @@ const router = createHashRouter([
       { path: "/", element: <WorkWeekTasks /> },
       { path: "/work-week", element: <WorkWeekTasks /> },
       { path: "/dashboard", element: <Dashboard /> },
+      { path: "/reports", element: <ReportArchive /> },
       { path: "/chat", element: <Chat /> },
       { path: "/settings", element: <Settings /> },
       { path: "/home", element: <Home /> },

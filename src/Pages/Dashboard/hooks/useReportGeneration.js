@@ -1,6 +1,10 @@
 import React from "react";
 import { generateReport } from "../../../services/jiraClient";
 import { saveChatSessionArtifact } from "../../../utils/chatSessionContext";
+import {
+  loadDashboardReportState,
+  saveDashboardReportState,
+} from "../../../utils/pageReportPersistence";
 import { useReportClipboard } from "../../../hooks/useReportClipboard";
 
 export const AUDIENCE_OPTIONS = [
@@ -22,14 +26,24 @@ export const AUDIENCE_OPTIONS = [
   },
 ];
 
-export const useReportGeneration = ({ epics = [] }) => {
-  const [audience, setAudience] = React.useState("executive");
+export const useReportGeneration = ({ epics = [], overallStatusCounts, chartVariant = "pie" }) => {
+  const persisted = loadDashboardReportState();
+
+  const [audience, setAudience] = React.useState(persisted?.audience || "executive");
   const [loading, setLoading] = React.useState(false);
-  const [report, setReport] = React.useState(null);
+  const [report, setReport] = React.useState(persisted?.report ?? null);
+  const [reportStatusCounts, setReportStatusCounts] = React.useState(persisted?.statusCounts ?? null);
+  const [reportChartVariant, setReportChartVariant] = React.useState(
+    persisted?.chartVariant || chartVariant || "pie"
+  );
   const [error, setError] = React.useState("");
   const { copied, handleCopy, handleDownload } = useReportClipboard(report);
-  const [selectedEpicIds, setSelectedEpicIds] = React.useState([]);
-  const [additionalContext, setAdditionalContext] = React.useState("");
+  const [selectedEpicIds, setSelectedEpicIds] = React.useState(
+    Array.isArray(persisted?.selectedEpicIds) ? persisted.selectedEpicIds : []
+  );
+  const [additionalContext, setAdditionalContext] = React.useState(
+    String(persisted?.additionalContext || "")
+  );
 
   const epicIds =
     selectedEpicIds.length > 0
@@ -42,25 +56,55 @@ export const useReportGeneration = ({ epics = [] }) => {
     setLoading(true);
     setError("");
     setReport(null);
+    setReportStatusCounts(null);
     try {
+      const hasChartData =
+        overallStatusCounts &&
+        Object.values(overallStatusCounts).some((value) => Number(value) > 0);
       const result = await generateReport({
         audience,
         epicPresetIds: epicIds,
         additionalContext: additionalContext.trim(),
+        ...(hasChartData
+          ? { statusCounts: overallStatusCounts, chartVariant }
+          : {}),
       });
       setReport(result);
+      const nextStatusCounts = result?.statusCounts || (hasChartData ? overallStatusCounts : null);
+      const nextChartVariant = result?.chartVariant || chartVariant || "pie";
+      setReportStatusCounts(nextStatusCounts);
+      setReportChartVariant(nextChartVariant);
+      saveDashboardReportState({
+        report: result,
+        audience,
+        selectedEpicIds,
+        additionalContext: additionalContext.trim(),
+        statusCounts: nextStatusCounts,
+        chartVariant: nextChartVariant,
+      });
       saveChatSessionArtifact({
         type: "dashboard_report",
         label: result.label || selectedOption?.label || audience,
         content: result.report,
-        meta: { audience },
+        meta: {
+          audience,
+          ...(nextStatusCounts ? { statusCounts: nextStatusCounts, chartVariant: nextChartVariant } : {}),
+        },
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Report generation failed");
     } finally {
       setLoading(false);
     }
-  }, [audience, epicIds, additionalContext]);
+  }, [
+    audience,
+    epicIds,
+    additionalContext,
+    selectedEpicIds,
+    selectedOption?.label,
+    overallStatusCounts,
+    chartVariant,
+  ]);
 
   const toggleEpicSelection = React.useCallback(
     (epicPresetId) => {
@@ -83,6 +127,8 @@ export const useReportGeneration = ({ epics = [] }) => {
     setAudience,
     loading,
     report,
+    reportStatusCounts,
+    reportChartVariant,
     error,
     copied,
     selectedEpicIds,

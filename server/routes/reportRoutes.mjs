@@ -1,6 +1,12 @@
 // Dashboard AI reports from the latest stored snapshot + configured LLM.
 
 import { completeLlmText, resolveFirstReadyReportProvider } from "../lib/llmClient.mjs";
+import {
+  insertGeneratedReport,
+  getGeneratedReportById,
+  listGeneratedReports,
+  REPORT_SOURCES,
+} from "../lib/reportArchive.mjs";
 
 const REPORT_MAX_TOKENS = 2048;
 
@@ -53,6 +59,25 @@ Structure your report with these exact sections:
 Tone: practical, task-focused, peer-level.`,
   },
 };
+
+const sanitizeStatusCounts = (value) => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const counts = {};
+  for (const [label, count] of Object.entries(value)) {
+    const key = String(label || "").trim();
+    const numeric = Number(count);
+    if (key && numeric > 0) {
+      counts[key] = numeric;
+    }
+  }
+
+  return Object.keys(counts).length > 0 ? counts : null;
+};
+
+const sanitizeChartVariant = (value) => (String(value || "").trim() === "bar" ? "bar" : "pie");
 
 const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics }) => {
   const lines = [
@@ -151,6 +176,8 @@ export const registerReportRoutes = (app, { db }) => {
       ? req.body.epicPresetIds.map(Number).filter((n) => n > 0)
       : [];
     const additionalContext = String(req.body?.additionalContext || "").trim();
+    const statusCounts = sanitizeStatusCounts(req.body?.statusCounts);
+    const chartVariant = sanitizeChartVariant(req.body?.chartVariant);
 
     const snapshotRow = getLatestSnapshotStmt.get();
     if (!snapshotRow) {
@@ -218,7 +245,26 @@ export const registerReportRoutes = (app, { db }) => {
 
     try {
       const report = await callLLMForReport({ systemPrompt, context });
-      return res.json({ report, audience: audienceKey, label: config.label });
+      const archiveId = insertGeneratedReport(db, {
+        source: REPORT_SOURCES.DASHBOARD,
+        reportType: "dashboard_report",
+        label: config.label,
+        content: report,
+        meta: {
+          audience: audienceKey,
+          epicPresetIds: requestedEpicIds,
+          additionalContext,
+          snapshotRefreshedAt: snapshot.refreshedAt,
+          ...(statusCounts ? { statusCounts, chartVariant } : {}),
+        },
+      });
+      return res.json({
+        report,
+        audience: audienceKey,
+        label: config.label,
+        archiveId,
+        ...(statusCounts ? { statusCounts, chartVariant } : {}),
+      });
     } catch (error) {
       console.error("[report] generation failed:", error);
       return res.status(500).json({
@@ -273,7 +319,14 @@ Tone: supportive and honest — like a thoughtful colleague reviewing your work 
     if (customInstructions) systemParts.push(`\nAdditional instructions:\n${customInstructions}`);
     try {
       const report = await callLLMForReport({ systemPrompt: systemParts.join("\n\n"), context: contextLines.join("\n") });
-      return res.json({ report, label });
+      const archiveId = insertGeneratedReport(db, {
+        source: REPORT_SOURCES.WORK_WEEK,
+        reportType: "work_week_project_report",
+        label,
+        content: report,
+        meta: { summary },
+      });
+      return res.json({ report, label, archiveId });
     } catch (error) {
       console.error("[report/project] generation failed:", error);
       return res.status(500).json({ error: "Project report generation failed", message: error instanceof Error ? error.message : "Unknown error" });
@@ -336,10 +389,54 @@ Rules:
 
     try {
       const plan = await callLLMForReport({ systemPrompt, context: contextLines.join("\n") });
-      return res.json({ plan });
+      const archiveId = insertGeneratedReport(db, {
+        source: REPORT_SOURCES.WORK_WEEK,
+        reportType: "week_plan",
+        label: "Week plan",
+        content: plan,
+        meta: { focusStyle, capacityHours, additionalContext, projectLabels: projects.map((p) => p.label) },
+      });
+      return res.json({ plan, archiveId });
     } catch (error) {
       console.error("[plan/week] generation failed:", error);
       return res.status(500).json({ error: "Week plan generation failed", message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.get("/api/reports/archive", (req, res) => {
+    const source = String(req.query?.source || "").trim();
+    const limit = Math.min(200, Math.max(1, Number(req.query?.limit) || 100));
+
+    try {
+      const items = listGeneratedReports(db, { source, limit });
+      return res.json({ items });
+    } catch (error) {
+      console.error("[reports/archive] list failed:", error);
+      return res.status(500).json({
+        error: "Failed to load archived reports",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.get("/api/reports/archive/:id", (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: "Invalid report id" });
+    }
+
+    try {
+      const item = getGeneratedReportById(db, id);
+      if (!item) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      return res.json({ item });
+    } catch (error) {
+      console.error("[reports/archive] get failed:", error);
+      return res.status(500).json({
+        error: "Failed to load archived report",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   });
 };
