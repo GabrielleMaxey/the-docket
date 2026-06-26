@@ -114,6 +114,19 @@ export const initDatabase = (db) => {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS generated_reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL,
+      report_type TEXT NOT NULL,
+      label TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL DEFAULT '',
+      meta_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_generated_reports_source_created
+      ON generated_reports (source, created_at);
   `);
 
   // Run schema migrations before seed inserts so legacy DBs gain required
