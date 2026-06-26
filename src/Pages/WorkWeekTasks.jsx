@@ -17,6 +17,14 @@ import { useCalendarData } from "./hooks/useCalendarData";
 import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.js";
 import { generateProjectReport, generateWeekPlan } from "../services/jiraClient";
 import { saveChatSessionArtifact } from "../utils/chatSessionContext";
+import {
+  clearWeekPlanState,
+  getWorkWeekRunKey,
+  loadWeekPlanState,
+  loadWorkWeekProjectReport,
+  saveWeekPlanState,
+  saveWorkWeekProjectReport,
+} from "../utils/pageReportPersistence";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -93,10 +101,19 @@ const isIssueOpen = (issue) => {
 // ─── Project Report Panel ─────────────────────────────────────────────────────
 
 const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
+  const runKey = getWorkWeekRunKey(run);
+  const persisted = loadWorkWeekProjectReport(runKey);
+
   const [loading, setLoading] = React.useState(false);
-  const [report, setReport] = React.useState(null);
+  const [report, setReport] = React.useState(persisted?.report ?? null);
   const [error, setError] = React.useState("");
   const { copied, handleCopy, handleDownload } = useReportClipboard(report);
+
+  React.useEffect(() => {
+    const saved = loadWorkWeekProjectReport(runKey);
+    setReport(saved?.report ?? null);
+    setError("");
+  }, [runKey]);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -127,6 +144,11 @@ const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
         summary,
       });
       setReport(result);
+      saveWorkWeekProjectReport(runKey, {
+        report: result,
+        runLabel: run.label || `Run ${(run.index || 0) + 1}`,
+        jql: run.jql || "",
+      });
       saveChatSessionArtifact({
         type: "work_week_project_report",
         label: result.label || run.label || `Run ${(run.index || 0) + 1}`,
@@ -238,16 +260,24 @@ const MyMetricsSection = ({ run, jiraRowPriorities }) => {
 // ─── Weekly Plan Panel ────────────────────────────────────────────────────────
 
 const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
-  const [plan, setPlan] = React.useState(null);
+  const persistedPlan = loadWeekPlanState();
+
+  const [plan, setPlan] = React.useState(persistedPlan?.plan ?? null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const planReport = plan ? { report: plan, label: "Week plan" } : null;
   const { copied, handleCopy, handleDownload } = useReportClipboard(planReport);
-  const [step, setStep] = React.useState("questions");
-  const [focusStyle, setFocusStyle] = React.useState("balance");
-  const [capacityHours, setCapacityHours] = React.useState("40");
-  const [fixedCommitments, setFixedCommitments] = React.useState("");
-  const [additionalContext, setAdditionalContext] = React.useState("");
+  const [step, setStep] = React.useState(persistedPlan?.step || "questions");
+  const [focusStyle, setFocusStyle] = React.useState(persistedPlan?.focusStyle || "balance");
+  const [capacityHours, setCapacityHours] = React.useState(
+    String(persistedPlan?.capacityHours ?? "40")
+  );
+  const [fixedCommitments, setFixedCommitments] = React.useState(
+    String(persistedPlan?.fixedCommitments || "")
+  );
+  const [additionalContext, setAdditionalContext] = React.useState(
+    String(persistedPlan?.additionalContext || "")
+  );
 
   const hasRuns = jqlRuns.some((r) => r.issues?.length > 0);
 
@@ -276,6 +306,14 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
       const combined = [fixedCommitments.trim(), additionalContext.trim()].filter(Boolean).join(" | ");
       const result = await generateWeekPlan({ projects, focusStyle, capacityHours: Number(capacityHours) || 40, additionalContext: combined });
       setPlan(result.plan);
+      saveWeekPlanState({
+        plan: result.plan,
+        step: "done",
+        focusStyle,
+        capacityHours,
+        fixedCommitments,
+        additionalContext,
+      });
       saveChatSessionArtifact({
         type: "week_plan",
         label: "Week plan",
@@ -291,9 +329,14 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
   };
 
   const handleReset = () => {
-    setStep("questions"); setPlan(null); setError("");
-    setFocusStyle("balance"); setCapacityHours("40");
-    setFixedCommitments(""); setAdditionalContext("");
+    setStep("questions");
+    setPlan(null);
+    setError("");
+    setFocusStyle("balance");
+    setCapacityHours("40");
+    setFixedCommitments("");
+    setAdditionalContext("");
+    clearWeekPlanState();
   };
 
   return (
@@ -620,6 +663,7 @@ const WorkWeekTasks = () => {
         <JiraFilterImportModal
           open={importSlotIndex !== null}
           onClose={() => setImportSlotIndex(null)}
+          slotLabel={`JQL slot ${importSlotIndex + 1}`}
           onImport={(jql, label) => handleImportFilter(importSlotIndex, jql, label)}
         />
       ) : null}

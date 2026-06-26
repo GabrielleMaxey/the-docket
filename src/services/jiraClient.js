@@ -1,11 +1,38 @@
 import { buildApiUrl } from "./apiBase.js";
 
+const formatErrorDetail = (value) => {
+  if (value == null || value === "") {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
 const extractJiraErrorMessage = (data, status) => {
   if (Array.isArray(data?.errorMessages) && data.errorMessages.length > 0) {
-    return data.errorMessages.join(" ");
+    return data.errorMessages.map((item) => formatErrorDetail(item)).filter(Boolean).join(" ");
   }
 
-  return data?.error || data?.message || `Jira request failed with status ${status}`;
+  const errorDetail = formatErrorDetail(data?.error);
+  if (errorDetail) {
+    return errorDetail;
+  }
+
+  const messageDetail = formatErrorDetail(data?.message);
+  if (messageDetail) {
+    return messageDetail;
+  }
+
+  return `Jira request failed with status ${status}`;
 };
 
 const requestJson = async (path, options = {}) => {
@@ -260,13 +287,25 @@ export const refreshDashboardMetrics = async (payload) => {
   return data?.snapshot || null;
 };
 
-export const generateReport = async ({ audience, epicPresetIds, additionalContext }) => {
+export const generateReport = async ({
+  audience,
+  epicPresetIds,
+  additionalContext,
+  statusCounts,
+  chartVariant,
+}) => {
   return requestJson("/api/report/generate", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ audience, epicPresetIds, additionalContext }),
+    body: JSON.stringify({
+      audience,
+      epicPresetIds,
+      additionalContext,
+      statusCounts,
+      chartVariant,
+    }),
   });
 };
 
@@ -326,4 +365,23 @@ export const generateWeekPlan = async ({ projects, focusStyle, capacityHours, ad
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ projects, focusStyle, capacityHours, additionalContext }),
   });
+};
+
+export const fetchArchivedReports = async ({ source, limit } = {}) => {
+  const params = new URLSearchParams();
+  if (source) {
+    params.set("source", source);
+  }
+  if (limit) {
+    params.set("limit", String(limit));
+  }
+  const query = params.toString();
+  const path = query ? `/api/reports/archive?${query}` : "/api/reports/archive";
+  const data = await requestJson(path);
+  return data?.items || [];
+};
+
+export const fetchArchivedReportById = async (id) => {
+  const data = await requestJson(`/api/reports/archive/${encodeURIComponent(id)}`);
+  return data?.item || null;
 };
