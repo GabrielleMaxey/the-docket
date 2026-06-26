@@ -1,5 +1,7 @@
 // Issue mutations (comment, status, assignee) and SQLite note/priority metadata.
 
+import { fetchLatestCommentTextBulk } from "../lib/jiraCommentText.mjs";
+
 export const registerIssueMetadataRoutes = (
   app,
   { db, jiraRequest, ensureEnvOrRespond, resolveJiraUser }
@@ -211,6 +213,32 @@ export const registerIssueMetadataRoutes = (
     } catch (error) {
       return res.status(500).json({
         error: "Failed to update Jira assignee",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.post("/api/jira/issues/comments/latest/bulk", async (req, res) => {
+    if (!ensureEnvOrRespond(res)) {
+      return;
+    }
+
+    const issueKeys = Array.isArray(req.body?.issueKeys)
+      ? req.body.issueKeys
+          .map((key) => String(key || "").trim())
+          .filter((key) => key.length > 0)
+      : [];
+
+    if (issueKeys.length === 0) {
+      return res.json({ items: {} });
+    }
+
+    try {
+      const { items } = await fetchLatestCommentTextBulk({ issueKeys, jiraRequest });
+      return res.json({ items });
+    } catch (error) {
+      return res.status(500).json({
+        error: "Failed to fetch latest Jira comments",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
