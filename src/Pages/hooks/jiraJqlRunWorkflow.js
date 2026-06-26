@@ -1,4 +1,4 @@
-import { fetchIssueMetadataBulk, fetchJiraSearch } from "../../services/jiraClient";
+import { fetchIssueMetadataBulk, fetchJiraSearch, fetchLatestJiraCommentsBulk } from "../../services/jiraClient";
 import { enrichRunWithParentDoneDates } from "../../utils/jiraIssueDoneDates.js";
 
 const errorMessage = (error, fallback) =>
@@ -23,6 +23,7 @@ export async function runJqlWorkflow({
   jqlCount,
   jqlLabels,
   jqlMaxResults,
+  pullLatestComment,
   clampPriority,
   setJqlError,
   setJqlRuns,
@@ -94,6 +95,26 @@ export async function runJqlWorkflow({
     ).filter((key) => key.length > 0);
 
     if (allIssueKeys.length > 0) {
+      if (pullLatestComment) {
+        try {
+          const latestComments = await fetchLatestJiraCommentsBulk(allIssueKeys);
+          const nextNotes = {};
+
+          allIssueKeys.forEach((issueKey) => {
+            const comment = latestComments?.[issueKey];
+            if (typeof comment === "string" && comment.trim()) {
+              nextNotes[issueKey] = comment.trim();
+            }
+          });
+
+          if (Object.keys(nextNotes).length > 0) {
+            setJiraNotes((prev) => ({ ...prev, ...nextNotes }));
+          }
+        } catch (error) {
+          console.error("Failed to fetch latest Jira comments", error);
+        }
+      }
+
       try {
         const persisted = await fetchIssueMetadataBulk(allIssueKeys);
         const nextNotes = {};
@@ -105,7 +126,7 @@ export async function runJqlWorkflow({
             return;
           }
 
-          if (typeof item.note === "string") {
+          if (!pullLatestComment && typeof item.note === "string") {
             nextNotes[issueKey] = item.note;
           }
           if (item.priority !== undefined) {
@@ -113,7 +134,7 @@ export async function runJqlWorkflow({
           }
         });
 
-        if (Object.keys(nextNotes).length > 0) {
+        if (!pullLatestComment && Object.keys(nextNotes).length > 0) {
           setJiraNotes((prev) => mergeIssueMapsPreferExisting(prev, nextNotes));
         }
         if (Object.keys(nextPriorities).length > 0) {

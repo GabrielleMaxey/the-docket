@@ -37,6 +37,7 @@ const loadStoredPreferences = () => {
       jqlCount: DEFAULT_JQL_COUNT,
       jqlInputs: DEFAULT_JQLS,
       jqlLabels: DEFAULT_LABELS,
+      pullLatestComment: false,
     };
   }
 
@@ -47,6 +48,7 @@ const loadStoredPreferences = () => {
         jqlCount: DEFAULT_JQL_COUNT,
         jqlInputs: DEFAULT_JQLS,
         jqlLabels: DEFAULT_LABELS,
+        pullLatestComment: false,
       };
     }
 
@@ -59,12 +61,14 @@ const loadStoredPreferences = () => {
       jqlLabels: Array.isArray(parsed?.jqlLabels)
         ? [parsed.jqlLabels[0] || "", parsed.jqlLabels[1] || "", parsed.jqlLabels[2] || ""]
         : DEFAULT_LABELS,
+      pullLatestComment: parsed?.pullLatestComment === true,
     };
   } catch {
     return {
       jqlCount: DEFAULT_JQL_COUNT,
       jqlInputs: DEFAULT_JQLS,
       jqlLabels: DEFAULT_LABELS,
+      pullLatestComment: false,
     };
   }
 };
@@ -189,6 +193,7 @@ export const useTaskManagerJira = () => {
   );
   const [jqlError, setJqlError] = React.useState("");
   const [jqlMaxResults, setJqlMaxResults] = React.useState(200);
+  const [pullLatestComment, setPullLatestComment] = React.useState(stored.pullLatestComment);
   const [jiraNotes, setJiraNotes] = React.useState(storedNotes);
   const [jiraRowPriorities, setJiraRowPriorities] = React.useState(storedRowPriorities);
   const [selectedForPush, setSelectedForPush] = React.useState({});
@@ -241,11 +246,12 @@ export const useTaskManagerJira = () => {
         jqlCount,
         jqlInputs,
         jqlLabels,
+        pullLatestComment,
       })
     );
     window.localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(jiraNotes));
     window.localStorage.setItem(ROW_PRIORITY_STORAGE_KEY, JSON.stringify(jiraRowPriorities));
-  }, [jqlCount, jqlInputs, jqlLabels, jiraNotes, jiraRowPriorities]);
+  }, [jqlCount, jqlInputs, jqlLabels, pullLatestComment, jiraNotes, jiraRowPriorities]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
@@ -536,6 +542,7 @@ export const useTaskManagerJira = () => {
       jqlCount,
       jqlLabels,
       jqlMaxResults,
+      pullLatestComment,
       clampPriority,
       setJqlError,
       setJqlRuns,
@@ -557,6 +564,7 @@ export const useTaskManagerJira = () => {
     showRestoredJqlBanner,
     jqlError,
     jqlMaxResults,
+    pullLatestComment,
     jiraNotes,
     jiraRowPriorities,
     selectedForPush,
@@ -574,6 +582,7 @@ export const useTaskManagerJira = () => {
     filtersLoading: fieldMappingsLoading,
     setJqlCount,
     setJqlMaxResults,
+    setPullLatestComment,
     handleJiraTest,
     handleJqlChange,
     handleJqlLabelChange,
