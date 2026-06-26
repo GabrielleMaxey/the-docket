@@ -42,10 +42,7 @@ const JiraFilterImportModal = ({ open, onClose, onImport, slotLabel }) => {
   }, [open]);
 
   const handlePick = (filter) => {
-    onImport({
-      label: filter.name || slotLabel,
-      jql: filter.jql || "",
-    });
+    onImport(filter.jql || "", filter.name || slotLabel || "");
     onClose();
   };
 

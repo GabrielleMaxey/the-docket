@@ -9,6 +9,7 @@ const ReportOutput = ({
   onDownload,
   chartSlot,
   title,
+  hideTitle = false,
   className = "",
 }) => {
   const reportText = typeof report === "string" ? report : report?.report;
@@ -16,10 +17,11 @@ const ReportOutput = ({
     return null;
   }
 
-  const displayTitle =
-    title ||
-    (typeof report === "string" ? null : report?.label) ||
-    "Report";
+  const displayTitle = hideTitle
+    ? null
+    : title ||
+      (typeof report === "string" ? null : report?.label) ||
+      "Report";
 
   return (
     <div className={`app-report-output ${className}`.trim()}>

@@ -9,6 +9,8 @@ const ReportPanel = ({ hasSnapshot, overallStatusCounts, chartVariant, epics = [
     setAudience,
     loading,
     report,
+    reportStatusCounts,
+    reportChartVariant,
     error,
     copied,
     selectedEpicIds,
@@ -20,10 +22,12 @@ const ReportPanel = ({ hasSnapshot, overallStatusCounts, chartVariant, epics = [
     handleDownload,
     toggleEpicSelection,
     selectAllEpics,
-  } = useReportGeneration({ epics });
+  } = useReportGeneration({ epics, overallStatusCounts, chartVariant });
 
+  const chartCounts = reportStatusCounts || overallStatusCounts;
+  const chartStyle = report ? reportChartVariant : chartVariant;
   const hasChartData =
-    overallStatusCounts && Object.values(overallStatusCounts).some((v) => Number(v) > 0);
+    chartCounts && Object.values(chartCounts).some((value) => Number(value) > 0);
 
   return (
     <div className="app-report-panel dashboard-report-panel">
@@ -145,9 +149,9 @@ const ReportPanel = ({ hasSnapshot, overallStatusCounts, chartVariant, epics = [
             <>
               <p className="app-report-chart-label">Overall status</p>
               <StatusPieChart
-                statusCounts={overallStatusCounts}
+                statusCounts={chartCounts}
                 size={160}
-                variant={chartVariant}
+                variant={chartStyle}
               />
             </>
           ) : null
