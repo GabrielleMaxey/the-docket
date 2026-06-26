@@ -131,6 +131,18 @@ export const fetchIssueMetadataBulk = async (issueKeys) => {
   return data?.items || {};
 };
 
+export const fetchLatestJiraCommentsBulk = async (issueKeys) => {
+  const data = await requestJson("/api/jira/issues/comments/latest/bulk", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ issueKeys }),
+  });
+
+  return data?.items || {};
+};
+
 export const saveIssueMetadata = async ({ issueKey, note, priority }) => {
   const body = {};
   if (typeof note === "string") {

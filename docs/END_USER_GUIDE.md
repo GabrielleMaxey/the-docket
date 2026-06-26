@@ -302,7 +302,7 @@ PRIORITY P2 — Blocked on vendor response. Target fix by Friday.
 1. Read the latest comment on the issue in Jira (or open the issue in Jira's UI).
 2. In Task Manager, set your local **Priority** dropdown to match the `P#` in the comment.
 3. Optionally copy the rest of the comment into your local **Notes** box for quick reference while you work.
-4. Run **Run JQL** when you need fresh issue data — comments are not imported into the app automatically.
+4. Run **Run JQL** when you need fresh issue data. Optionally choose **Pull most recent Jira comment** under JQL controls to load the latest comment into each row's Notes box (useful for shared `PRIORITY P#` comments).
 
 **Personal work:** On issues only you track, use local notes and priority without pushing, or push comments without the `PRIORITY` prefix if the note is informational only.
 

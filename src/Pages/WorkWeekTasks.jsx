@@ -431,13 +431,13 @@ const WorkWeekTasks = () => {
 
   const {
     jqlCount, jqlInputs, jqlLabels, jqlLoading, jqlRuns,
-    showRestoredJqlBanner, jqlError, jqlMaxResults,
+    showRestoredJqlBanner, jqlError, jqlMaxResults, pullLatestComment,
     jiraNotes, jiraRowPriorities, selectedForPush,
     lastPushedJiraNoteByKey, pushState, saveState,
     statusDrafts, assigneeDrafts, rowUpdateState,
     isClosedLikeStatus, clampPriority, getPriorityClass,
     getPriorityRowClass, formatDate, filtersLoading,
-    setJqlCount, setJqlMaxResults,
+    setJqlCount, setJqlMaxResults, setPullLatestComment,
     handleJqlChange, handleJqlLabelChange,
     handleResetSavedQueries, handleRunJql, handlePushSelected,
     handleSaveMetadata, handleSelectAll, handleStatusDraftChange,
@@ -597,6 +597,40 @@ const WorkWeekTasks = () => {
               <label htmlFor="jql-max-results">Max results:</label>
               <input id="jql-max-results" type="number" min={1} max={1000} value={jqlMaxResults}
                 onChange={(e) => setJqlMaxResults(Math.max(1, Number(e.target.value) || 200))} />
+            </div>
+
+            <div className="ww-jql-pull-comments">
+              <span className="ww-jql-pull-comments-label">Notes on run</span>
+              <label className="ww-jql-pull-comments-option">
+                <input
+                  type="radio"
+                  name="jqlPullComments"
+                  value="off"
+                  checked={!pullLatestComment}
+                  onChange={() => setPullLatestComment(false)}
+                />
+                Keep local notes
+              </label>
+              <label className="ww-jql-pull-comments-option">
+                <input
+                  type="radio"
+                  name="jqlPullComments"
+                  value="latest"
+                  checked={pullLatestComment}
+                  onChange={() => setPullLatestComment(true)}
+                />
+                Pull most recent Jira comment
+              </label>
+              <button
+                type="button"
+                className="ww-selector-clear"
+                onClick={() => setPullLatestComment(false)}
+              >
+                Clear
+              </button>
+              <span className="ww-jql-pull-comments-hint">
+                When enabled, Run JQL and Refresh overwrite note text with each issue&apos;s latest Jira comment.
+              </span>
             </div>
 
             <div className="ww-jql-action-row">
