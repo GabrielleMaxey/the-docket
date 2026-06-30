@@ -50,6 +50,8 @@ taskManager/
 │   │   ├── rovoChat.mjs      # Opt-in Rovo MCP path + LLM fallback
 │   │   ├── dashboardRefresh/ # Dashboard refresh pipeline (parse → metrics → persist)
 │   │   ├── epicFilterJql.mjs # JQL builders (metrics scope, past due, presets)
+│   │   ├── jiraSearchHelpers.mjs # Paginated Jira search (search/all)
+│   │   ├── weeklyDigest.mjs  # Snapshot → markdown weekly digest
 │   │   └── jiraSearch*.mjs   # Jira REST helpers
 │   └── routes/
 │       ├── appConfigRoutes.mjs    # Settings, field mappings, presets
@@ -61,18 +63,20 @@ taskManager/
 │       └── reportRoutes.mjs       # /api/report/* + /api/plan/week
 ├── shared/
 │   ├── dashboardMetrics.mjs   # Pure metrics helpers (server + UI)
+│   ├── priorityFromComment.mjs # Parse PRIORITY P1–P10 from Jira comment text
 │   └── chatSessionPrompt.mjs  # Formats Chat session context for LLM prompts
 ├── tests/
 │   ├── dashboardMetrics.test.mjs
 │   ├── epicFilterJql.test.mjs
-│   └── chatSessionPrompt.test.mjs
+│   ├── chatSessionPrompt.test.mjs
+│   └── priorityFromComment.test.mjs
 ├── src/
 │   ├── Pages/
 │   │   ├── WorkWeekTasks.jsx       # Work Week page shell
 │   │   ├── Dashboard/            # Dashboard feature (index.jsx, hooks, components)
 │   │   │   ├── index.jsx
 │   │   │   ├── hooks/            # useDashboardRefresh, useReportGeneration
-│   │   │   ├── components/       # filters, due-date lists, epic cards, reports
+│   │   │   ├── components/       # filters, due-date lists, epic cards, WeeklyDigestPanel
 │   │   │   └── utils/            # dashboardMetricsUtils (presets, splitDueByIssues)
 │   │   ├── Dashboard.jsx         # Re-exports Dashboard/index
 │   │   ├── Chat.jsx                # Chat page
@@ -87,12 +91,16 @@ taskManager/
 │   │   │   └── JiraFilterImportModal.jsx
 │   │   └── hooks/
 │   │       ├── useTaskManagerJira.js   # All Work Week Jira state + handlers
+│   │       ├── jiraJqlRunWorkflow.js # Run JQL, load remaining, priority-from-comment sync
 │   │       ├── useEpicFilters.js       # Preset selection state (shared)
 │   │       ├── usePersistedState.js    # localStorage wrapper
 │   │       ├── useFlash.js             # Transient success messages
 │   │       ├── useJokeTicker.js
+│   │       ├── useUpcomingDueBanner.js
+│   │       ├── useWorkWeekHeaderPreferences.js
 │   │       └── useCalendarData.js
 │   ├── components/
+│   │   ├── BackgroundJobIndicator.jsx # Nav pill for in-flight background jobs
 │   │   ├── CollapsibleSection.jsx  # Shared collapsible (Work Week + Dashboard)
 │   │   ├── collapsible.css
 │   │   ├── ReportOutput.jsx
@@ -100,9 +108,14 @@ taskManager/
 │   ├── services/
 │   │   ├── jiraClient.js          # fetch → proxy wrappers (all API calls)
 │   │   └── apiBase.js             # Runtime proxy URL resolution
+│   ├── hooks/
+│   │   └── useBackgroundJobs.js # Subscribe / attach to backgroundJobStore
 │   └── utils/
+│       ├── backgroundJobStore.js  # Module-level jobs that survive route changes
 │       ├── chatSessionContext.js  # Chat session artifacts + JQL/dashboard summaries
 │       ├── jiraIssueDoneDates.js  # Work Week MRD display + parent-chain inheritance
+│       ├── jqlRunPersistence.js   # Persist JQL runs when workflow completes off-page
+│       ├── workWeekNavigation.js  # buildWorkWeekHref({ key, assignee }) for drill-down
 │       └── format.js              # formatPercent, formatTimestamp
 ├── docs/                     # ← you are here
 ├── data/                     # workweek.sqlite (auto-created, git-ignored)
@@ -123,7 +136,7 @@ taskManager/
 | `priority` | INTEGER | 0–10; 0 = unranked, 1 = highest |
 | `updated_at` | TEXT | ISO 8601 |
 
-**Multi-user / shared projects:** `issue_metadata` is **per machine** (whoever runs the local proxy). There is no server-side sync between users. For team-visible ranking on shared issues, the documented workflow is to push Jira comments prefixed with `PRIORITY P#` (P1–P10); other users read Jira and update their local priority manually. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority. The app does **not** parse Jira comments back into SQLite today. A future option is Jira custom fields for shared priority instead of comment conventions.
+**Multi-user / shared projects:** `issue_metadata` is **per machine** (whoever runs the local proxy). There is no server-side sync between users. For team-visible ranking on shared issues, PMs push Jira comments prefixed with `PRIORITY P#` (P1–P10). On **Run JQL**, `shared/priorityFromComment.mjs` parses the latest comment per issue; matching priorities are written to SQLite and shown with a **Jira** badge in the UI (`prioritySourceByKey`). Manual priority changes clear the badge. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
 
 **`epic_presets`** — saved JQL/epic presets
 
@@ -222,6 +235,45 @@ Display logic in `getMostRecentDoneDateForIssue`:
 
 `buildParentMostRecentDoneDateMap` fetches missing parents from Jira and walks up to **five** ancestor levels (Story → Epic, etc.) until an MRD is found. `JiraResultsTable` renders the column header as **MRD** with `title="Most Recent Done Date"`.
 
+### Work Week JQL — full result loading
+
+`POST /api/jira/search/all` (`server/lib/jiraSearchHelpers.mjs` → `searchAllIssues`) paginates with Jira `nextPageToken` until all matches are loaded or `maxTotal` is reached (cap **5000**). Work Week **Run JQL** calls `fetchJiraSearchAll` per slot (`jiraJqlRunWorkflow.js`). Each run stores `total`, `loaded`, and `loadComplete`; the UI shows **Load remaining** when incomplete. `persistJqlRunsToStorage()` writes results when a run finishes so navigation mid-JQL does not lose the table.
+
+### Priority from Jira comments
+
+On each **Run JQL** (and **Load remaining**), `fetchLatestJiraCommentsBulk` returns `{ text, author }` per key. `parsePriorityFromComment()` in `shared/priorityFromComment.mjs` matches `PRIORITY P1` … `P10` at the start of the comment. Parsed values update `jiraRowPriorities`, `prioritySourceByKey`, and `saveIssueMetadata` (SQLite). `PriorityCell` shows a **Jira** badge when `prioritySourceByKey[issueKey].source === "jira-comment"`. Manual `handleRowPriorityChange` clears the source entry.
+
+### Dashboard → Work Week drill-down
+
+`src/utils/workWeekNavigation.js` → `buildWorkWeekHref({ key, assignee })` returns `/work-week?key=…&assignee=…` (hash router). Dashboard components link via React Router `Link`:
+
+- `DueByHierarchicalList.jsx` — issue keys, assignees, epic **Work Week** links
+- `EpicMetricCard.jsx` — epic key, contributor names, overdue task keys
+- `AssigneeMetricCard.jsx` — person name, overdue issue keys
+
+`WorkWeekTasks.jsx` reads `useSearchParams()` and passes `drillDownFilters` to `JiraResultsTable`, which applies key/assignee filters on mount.
+
+Drill-down behavior:
+
+1. **`findRunIndexForDrillDown`** (`workWeekNavigation.js`) — switches to the JQL tab that already contains the issue (or the assignee-heavy tab).
+2. **Re-apply when JQL loads** — filter state updates when `jqlRuns` populates (fixes early apply-before-data bug).
+3. **`loadDrillDownIssueByKey`** (`jiraJqlRunWorkflow.js`) — fetches `key = "ISSUE-KEY"` from Jira and prepends a temporary **Drill-down** tab (`isDrillDown: true`). A fetch sequence guard drops stale responses when keys change quickly or **Clear drill-down** is used.
+
+**Drill-down run isolation** (`jqlRunPersistence.js`): `partitionJqlRuns` / `mergeJqlRuns` / `savableJqlRuns` keep `isDrillDown` tabs out of `localStorage` and preserve them when background JQL completes, MRDD enrichment runs, or **Load remaining** updates regular tabs. **Clear drill-down** (`/work-week` without query) removes `isDrillDown` runs via `clearDrillDownRuns()` and invalidates in-flight fetches.
+
+### Epic preset team pack
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/epic-presets/export` | JSON pack (`version`, `exportedAt`, `presets[]`) |
+| POST | `/api/epic-presets/import` | Body: `{ presets, mode: "merge" \| "replace" }` — fingerprint dedupes on merge |
+
+Settings UI: **Export team pack** / **Import team pack**. Align with `npm run seed:presets` for admin seeding — see [pilot-presets.md](./pilot-presets.md).
+
+### Weekly digest
+
+`GET /api/reports/weekly-digest` (`server/lib/weeklyDigest.mjs`) builds markdown from the latest `dashboard_snapshots` row (overdue/upcoming, contributors, rollup). No LLM. UI: `WeeklyDigestPanel.jsx` under Dashboard → Generate Report.
+
 ### Dashboard UI section toggles
 
 Persisted in `localStorage` key `dashboard-visible-sections` via `normalizeVisibleSections()` in `dashboardMetricsUtils.js`:
@@ -249,6 +301,8 @@ All routes mounted by `server/jiraProxy.mjs`.
 | GET | `/api/jira/myself` | Current user info |
 | GET | `/api/jira/fields` | All Jira fields |
 | GET/POST | `/api/jira/search` | JQL search (POST body or GET query) |
+| POST | `/api/jira/search/all` | Paginated JQL until `maxTotal` (cap 5000) |
+| POST | `/api/jira/issues/comments/latest/bulk` | Latest comment `{ text, author }` per issue key |
 | POST | `/api/jira/issues/:issueKey/comment` | Add Jira comment |
 | POST | `/api/jira/issues/:issueKey/status` | Transition status |
 | POST | `/api/jira/issues/:issueKey/assignee` | Update assignee |
@@ -258,6 +312,8 @@ All routes mounted by `server/jiraProxy.mjs`.
 | POST | `/api/jira/issue-metadata/bulk` | Bulk read notes + priority (SQLite) |
 | PUT | `/api/jira/issue-metadata/:issueKey` | Update note + priority (SQLite) |
 | GET/POST/PUT/DELETE | `/api/epic-presets` | Epic/JQL presets CRUD |
+| GET | `/api/epic-presets/export` | Team preset pack (JSON) |
+| POST | `/api/epic-presets/import` | Import team pack (`merge` or `replace`) |
 | POST | `/api/epic-filters/run` | Run preset JQL (Work Week) |
 | GET | `/api/jira/filters` | Jira filters list |
 | GET | `/api/jira/filters/favourite` | Favourite filters |
@@ -269,6 +325,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 | POST | `/api/dashboard/refresh` | Pull + store metrics snapshot |
 | GET | `/api/dashboard/metrics` | Read stored snapshot |
 | POST | `/api/report/generate` | Dashboard AI report (Executive/PO/Developer) |
+| GET | `/api/reports/weekly-digest` | Snapshot-based weekly digest (markdown, no LLM) |
 | POST | `/api/report/project` | Work Week per-query AI report |
 | POST | `/api/plan/week` | Work Week AI week planner |
 | GET | `/api/chat/status` | Chat provider readiness + OAuth state |
@@ -349,6 +406,7 @@ Artifacts are saved when the user generates:
 | Jira notes + row priorities (UI cache) | `localStorage` | `workWeekTasksJiraNotes`, `workWeekTasksJiraRowPriorities` |
 | Chat session artifacts (reports/plans) | `localStorage` | `taskManagerChatSessionArtifacts` |
 | Header reminders | `localStorage` | `workWeekTasksReminders` |
+| Work Week header banners | `localStorage` | `workWeekTasksHeaderPreferences` (`showJokeTicker`, `showUpcomingDueBanner`) |
 | Collapsible open/closed | `localStorage` via `usePersistedState` | various `ww-*` / `dashboard-*` keys |
 | Dashboard visible sections | `localStorage` | `dashboard-visible-sections` (`dueByUpcoming`, `dueByPastDue`, …) |
 | Issue notes + P1–P10 (persisted) | SQLite via proxy | `issue_metadata` |
@@ -356,6 +414,21 @@ Artifacts are saved when the user generates:
 | Packaged desktop `.env` + SQLite | OS user data folder | `TASK_MANAGER_USER_DATA` (see Packaged desktop below) |
 | Epic preset selections (Dashboard/Chat) | `localStorage` | `epicFilterSelectedIds` |
 | Rovo OAuth tokens | SQLite via proxy | `chat_sessions` |
+
+### Background jobs (survive navigation)
+
+Long-running UI actions run through `src/utils/backgroundJobStore.js` via `runBackgroundJob()` in `src/hooks/useBackgroundJobs.js`. Jobs keep running when the user navigates away; `BackgroundJobIndicator` in the nav shows in-progress work. Pages re-attach on mount with `useAttachBackgroundJob()` and merge loading state with `useBackgroundJobRunning()`. Results are persisted inside the job `run()` callback so returning to the page shows completed output even if React state was torn down.
+
+| `BACKGROUND_JOB_IDS` | Trigger | Persisted result |
+|----------------------|---------|------------------|
+| `dashboard-refresh` | Dashboard **Refresh status** | SQLite snapshot |
+| `dashboard-report` | Dashboard LLM report | `localStorage` (`taskManagerPersistedDashboardReport`) |
+| `dashboard-weekly-digest` | Weekly digest panel | In-page state (regenerate anytime) |
+| `work-week-jql-run` | **Run JQL** / **Load remaining** | `localStorage` (`workWeekTasksJiraLastJqlRuns`) |
+| `work-week-week-plan` | Week plan generate | `localStorage` week plan key |
+| `work-week-project-report:{runKey}` | Per-tab project report | `localStorage` project reports map |
+
+Wired in: `useDashboardRefresh.js`, `useReportGeneration.js`, `WeeklyDigestPanel.jsx`, `useTaskManagerJira.js`, `WorkWeekTasks.jsx` (`ProjectReportPanel`, `WeeklyPlanPanel`).
 
 ### Packaged desktop (Electron installer)
 
@@ -416,7 +489,7 @@ Key values used throughout `workWeekTaskElements.css`:
 | `npm run desktop:doctor` | Rebuilds `better-sqlite3` native module, then starts desktop dev |
 | `npm run desktop:rebuild-native` | Rebuilds native modules for current Electron version |
 | `npm run check:jira-client-exports` | Verifies every imported `jiraClient` symbol is exported (prevents runtime blank-screen import failures) |
-| `npm test` | Unit tests: `dashboardMetrics.mjs`, `epicFilterJql.mjs`, `chatSessionPrompt.mjs` |
+| `npm test` | Unit tests: `dashboardMetrics.mjs`, `epicFilterJql.mjs`, `chatSessionPrompt.mjs`, `priorityFromComment.mjs` |
 | `npm run seed:presets` | Seed shared Epic/JQL presets into local SQLite — see [pilot-presets.md](./pilot-presets.md) |
 | `npm run build` | Runs export guard (`prebuild`), then creates production Vite bundle → `dist/` |
 | `npm run desktop:dist` | Full build + electron-builder → `release/` |
@@ -439,10 +512,12 @@ node --check server/routes/dashboardRoutes.mjs
 npm run build
 
 # 4. Smoke test (with a real Jira test site):
-#    - Run JQL on Work Week, confirm table loads
-#    - Generate a project report
+#    - Run JQL on Work Week; confirm Loaded X of Y and Load remaining when needed
+#    - Confirm PRIORITY P# in latest Jira comment sets row priority + Jira badge
+#    - Generate a project report; navigate away and back while it runs
 #    - Generate a week plan
-#    - Dashboard refresh (Refresh status) + optional due-date views + Generate Report
+#    - Dashboard refresh + weekly digest + Generate Report; drill-down link to Work Week
+#    - Settings: export/import team preset pack
 #    - Chat: ask about a generated week plan or report (session context)
 #    - Packaged desktop: edit userData `.env`, confirm Test Jira Connection
 #    - Create Issue modal
@@ -461,12 +536,12 @@ Produces artifacts: `desktop-macos` (`.dmg`) and `desktop-windows` (NSIS install
 
 1. Add a new route in `server/routes/reportRoutes.mjs` following the `app.post("/api/report/project", ...)` pattern — call `callLLMForReport({ systemPrompt, context })` and return `res.json({ report, label })`.
 2. Add a client function in `src/services/jiraClient.js`.
-3. Create a panel component (or extend an existing one) following the `ProjectReportPanel` pattern: `loading`, `report`, `error`, `copied` state; `Generate` → `Copy` → `Download` buttons.
+3. Create a panel component (or extend an existing one) following the `ProjectReportPanel` pattern: `loading`, `report`, `error`, `copied` state; `Generate` → `Copy` → `Download` buttons. Use `runBackgroundJob()` if generation can take long and users may navigate away.
 4. Wrap in `<CollapsibleSection>` on Work Week or Dashboard.
 5. If the output should be available in Chat, call `saveChatSessionArtifact()` from `src/utils/chatSessionContext.js` after a successful generation (see existing report/plan panels).
 
 ---
 
 More setup detail: [JIRA_SETUP.md](./JIRA_SETUP.md)
-Non-technical usage: [END_USER_GUIDE.md](./END_USER_GUIDE.md)
+Non-technical usage: [END_USER_GUIDE.md](./END_USER_GUIDE.md). Mixed IC/PM/manager roadmap: [ROADMAP-ODI-MIXED-TEAM.md](./ROADMAP-ODI-MIXED-TEAM.md).
 App overview: [README.md](./README.md)

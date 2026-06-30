@@ -8,8 +8,20 @@ import {
   updateJiraIssueAssignee,
   updateJiraIssueStatus,
 } from "../../services/jiraClient";
-import { runJqlWorkflow } from "./jiraJqlRunWorkflow.js";
+import { runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey } from "./jiraJqlRunWorkflow.js";
+import {
+  mergeJqlRuns,
+  partitionJqlRuns,
+  persistJqlRunsToStorage,
+  savableJqlRuns,
+} from "../../utils/jqlRunPersistence.js";
 import { enrichRunWithParentDoneDates, runsNeedParentMrddEnrich } from "../../utils/jiraIssueDoneDates.js";
+import {
+  BACKGROUND_JOB_IDS,
+  runBackgroundJob,
+  useAttachBackgroundJob,
+  useBackgroundJobRunning,
+} from "../../hooks/useBackgroundJobs.js";
 
 const STORAGE_KEY = "workWeekTasksJiraPreferences";
 const NOTES_STORAGE_KEY = "workWeekTasksJiraNotes";
@@ -115,7 +127,7 @@ const loadStoredJqlRuns = () => {
       return [];
     }
 
-    const runs = parsed.filter(isValidJqlRun);
+    const runs = parsed.filter((run) => isValidJqlRun(run) && !run?.isDrillDown);
     return runs.length === 0 ? [] : [...runs].sort((a, b) => a.index - b.index);
   } catch {
     return [];
@@ -186,7 +198,10 @@ export const useTaskManagerJira = () => {
   const [jqlCount, setJqlCount] = React.useState(stored.jqlCount);
   const [jqlInputs, setJqlInputs] = React.useState(stored.jqlInputs);
   const [jqlLabels, setJqlLabels] = React.useState(stored.jqlLabels);
-  const [jqlLoading, setJqlLoading] = React.useState(false);
+  const [jqlLoadingLocal, setJqlLoadingLocal] = React.useState(false);
+  const [jqlPending, setJqlPending] = React.useState(false);
+  const bgJqlRunning = useBackgroundJobRunning(BACKGROUND_JOB_IDS.WORK_WEEK_JQL);
+  const jqlLoading = jqlLoadingLocal || jqlPending || bgJqlRunning;
   const [jqlRuns, setJqlRuns] = React.useState(loadStoredJqlRuns);
   const [showRestoredJqlBanner, setShowRestoredJqlBanner] = React.useState(
     () => loadStoredJqlRuns().length > 0
@@ -196,6 +211,7 @@ export const useTaskManagerJira = () => {
   const [pullLatestComment, setPullLatestComment] = React.useState(stored.pullLatestComment);
   const [jiraNotes, setJiraNotes] = React.useState(storedNotes);
   const [jiraRowPriorities, setJiraRowPriorities] = React.useState(storedRowPriorities);
+  const [prioritySourceByKey, setPrioritySourceByKey] = React.useState({});
   const [selectedForPush, setSelectedForPush] = React.useState({});
   const [lastPushedJiraNoteByKey, setLastPushedJiraNoteByKey] = React.useState({});
   const [pushState, setPushState] = React.useState({});
@@ -205,6 +221,25 @@ export const useTaskManagerJira = () => {
   const [rowUpdateState, setRowUpdateState] = React.useState({});
   const [fieldMappingRows, setFieldMappingRows] = React.useState([]);
   const [fieldMappingsLoading, setFieldMappingsLoading] = React.useState(true);
+
+  const reloadJqlRunsFromStorage = React.useCallback(() => {
+    const storedRuns = loadStoredJqlRuns();
+    if (storedRuns.length > 0) {
+      setShowRestoredJqlBanner(false);
+    }
+    setJqlRuns((prev) => {
+      const { drillDown } = partitionJqlRuns(prev);
+      if (storedRuns.length === 0) {
+        return drillDown.length > 0 ? drillDown : prev;
+      }
+      return mergeJqlRuns(drillDown, storedRuns);
+    });
+  }, []);
+
+  useAttachBackgroundJob(BACKGROUND_JOB_IDS.WORK_WEEK_JQL, {
+    onSuccess: reloadJqlRunsFromStorage,
+    onFinally: () => setJqlPending(false),
+  });
 
   React.useEffect(() => {
     setFieldMappingsLoading(true);
@@ -217,16 +252,25 @@ export const useTaskManagerJira = () => {
   }, []);
 
   React.useEffect(() => {
-    if (fieldMappingsLoading || jqlRuns.length === 0 || !runsNeedParentMrddEnrich(jqlRuns)) {
+    const { drillDown, regular } = partitionJqlRuns(jqlRuns);
+    if (fieldMappingsLoading || regular.length === 0 || !runsNeedParentMrddEnrich(regular)) {
       return;
     }
 
     let cancelled = false;
-    Promise.all(jqlRuns.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows))).then(
-      (enriched) => {
-        if (!cancelled) {
-          setJqlRuns([...enriched].sort((a, b) => a.index - b.index));
+    Promise.all(regular.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows))).then(
+      (enrichedRegular) => {
+        if (cancelled) {
+          return;
         }
+        setJqlRuns((prev) => {
+          const { drillDown: currentDrillDown } = partitionJqlRuns(prev);
+          const enrichedByIndex = new Map(enrichedRegular.map((run) => [run.index, run]));
+          const mergedRegular = partitionJqlRuns(prev)
+            .regular.map((run) => enrichedByIndex.get(run.index) || run)
+            .sort((a, b) => a.index - b.index);
+          return mergeJqlRuns(currentDrillDown, mergedRegular);
+        });
       }
     );
 
@@ -258,13 +302,14 @@ export const useTaskManagerJira = () => {
       return;
     }
 
-    if (jqlRuns.length === 0) {
+    const savable = savableJqlRuns(jqlRuns);
+    if (savable.length === 0) {
       window.localStorage.removeItem(JQL_RUNS_STORAGE_KEY);
       return;
     }
 
     try {
-      window.localStorage.setItem(JQL_RUNS_STORAGE_KEY, JSON.stringify(jqlRuns));
+      window.localStorage.setItem(JQL_RUNS_STORAGE_KEY, JSON.stringify(savable));
     } catch (error) {
       console.warn("Could not persist JQL results to localStorage (size or quota).", error);
     }
@@ -433,6 +478,11 @@ export const useTaskManagerJira = () => {
     const priority = clampPriority(value);
 
     setJiraRowPriorities((prev) => patchIssueKeyed(prev, issueKey, priority));
+    setPrioritySourceByKey((prev) => {
+      const next = { ...prev };
+      delete next[issueKey];
+      return next;
+    });
 
     saveIssueMetadata({ issueKey, priority }).catch((error) => {
       console.error("Failed to persist priority", issueKey, error);
@@ -536,22 +586,84 @@ export const useTaskManagerJira = () => {
     }
   };
 
-  const handleRunJql = () =>
-    runJqlWorkflow({
-      jqlInputs,
-      jqlCount,
-      jqlLabels,
-      jqlMaxResults,
-      pullLatestComment,
-      clampPriority,
-      setJqlError,
-      setJqlRuns,
-      setShowRestoredJqlBanner,
-      setJqlLoading,
-      setJiraNotes,
-      setJiraRowPriorities,
-      fieldMappingRows,
+  const handleRunJql = () => {
+    setJqlPending(true);
+    runBackgroundJob(BACKGROUND_JOB_IDS.WORK_WEEK_JQL, {
+      label: "Running JQL",
+      run: () =>
+        runJqlWorkflow({
+          jqlInputs,
+          jqlCount,
+          jqlLabels,
+          jqlMaxResults,
+          pullLatestComment,
+          clampPriority,
+          setJqlError,
+          setJqlRuns,
+          setShowRestoredJqlBanner,
+          setJqlLoading: setJqlLoadingLocal,
+          setJiraNotes,
+          setJiraRowPriorities,
+          setPrioritySourceByKey,
+          fieldMappingRows,
+        }),
+    }).finally(() => setJqlPending(false));
+  };
+
+  const handleLoadRemainingJql = (runIndex) => {
+    setJqlPending(true);
+    runBackgroundJob(BACKGROUND_JOB_IDS.WORK_WEEK_JQL, {
+      label: "Loading JQL results",
+      run: () =>
+        loadRemainingJqlIssues({
+          runIndex,
+          jqlRuns,
+          jqlMaxResults,
+          clampPriority,
+          setJqlRuns,
+          setJqlLoading: setJqlLoadingLocal,
+          setJiraRowPriorities,
+          setPrioritySourceByKey,
+          setJiraNotes,
+          pullLatestComment,
+          fieldMappingRows,
+        }),
+    }).finally(() => setJqlPending(false));
+  };
+
+  const drillDownFetchSeqRef = React.useRef(0);
+
+  const handleDrillDownToKey = React.useCallback(
+    (issueKey) => {
+      const fetchSeq = ++drillDownFetchSeqRef.current;
+      return loadDrillDownIssueByKey({
+        issueKey,
+        pullLatestComment,
+        clampPriority,
+        setJqlRuns,
+        setJqlLoading: setJqlLoadingLocal,
+        setJiraRowPriorities,
+        setPrioritySourceByKey,
+        setJiraNotes,
+        setJqlError,
+        fieldMappingRows,
+        isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
+      });
+    },
+    [pullLatestComment, clampPriority, fieldMappingRows]
+  );
+
+  const clearDrillDownRuns = React.useCallback(() => {
+    drillDownFetchSeqRef.current += 1;
+    setJqlRuns((prev) => {
+      const next = prev.filter((run) => !run.isDrillDown);
+      if (next.length === prev.length) {
+        return prev;
+      }
+      persistJqlRunsToStorage(next);
+      return next;
     });
+  }, []);
 
   return {
     jiraState,
@@ -567,6 +679,7 @@ export const useTaskManagerJira = () => {
     pullLatestComment,
     jiraNotes,
     jiraRowPriorities,
+    prioritySourceByKey,
     selectedForPush,
     lastPushedJiraNoteByKey,
     pushState,
@@ -588,6 +701,9 @@ export const useTaskManagerJira = () => {
     handleJqlLabelChange,
     handleResetSavedQueries,
     handleRunJql,
+    handleLoadRemainingJql,
+    handleDrillDownToKey,
+    clearDrillDownRuns,
     handlePushSelected,
     handleSaveMetadata,
     handleSelectAll,

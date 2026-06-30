@@ -1,4 +1,6 @@
+import { Link } from "react-router-dom";
 import { formatPercent } from "../../../utils/format";
+import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 import MetricBar from "./MetricBar";
 
 const getAssigneeStatusMessage = (person) => {
@@ -20,11 +22,17 @@ const AssigneeMetricCard = ({ person }) => {
   const pct = (n) => total > 0 ? (Number(n || 0) / total) * 100 : 0;
   const resolved = Number(counts.totalResolved || 0);
   const open = Number(counts.totalAssigned || 0);
+  const assigneeName = person.resolvedDisplayName || person.queryName;
 
   return (
     <div className="dashboard-assignee-card">
       <h4>
-        {person.resolvedDisplayName || person.queryName}
+        <Link
+          to={buildWorkWeekHref({ assignee: assigneeName })}
+          className="dashboard-work-week-link"
+        >
+          {assigneeName}
+        </Link>
         {person.queryType === "jql" ? (
           <span className="dashboard-badge dashboard-badge-jql">JQL</span>
         ) : null}
@@ -71,7 +79,16 @@ const AssigneeMetricCard = ({ person }) => {
         </div>
       ) : null}
       {person.overdueIssueKeys?.length > 0 ? (
-        <p className="dashboard-overdue-keys">{person.overdueIssueKeys.join(", ")}</p>
+        <p className="dashboard-overdue-keys">
+          {person.overdueIssueKeys.map((issueKey, idx) => (
+            <span key={issueKey}>
+              {idx > 0 ? ", " : null}
+              <Link to={buildWorkWeekHref({ key: issueKey })} className="dashboard-work-week-link">
+                {issueKey}
+              </Link>
+            </span>
+          ))}
+        </p>
       ) : null}
     </div>
   );

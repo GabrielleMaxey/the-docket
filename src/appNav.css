@@ -85,6 +85,44 @@
   opacity: 1;
 }
 
+.app-nav-background-jobs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  padding: 0 0.5rem;
+}
+
+.app-nav-background-job {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fdd219;
+  background: rgba(0, 0, 0, 0.14);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+}
+
+.app-nav-background-job-spinner {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fdd219;
+  border-radius: 50%;
+  animation: app-nav-spin 0.8s linear infinite;
+}
+
+@keyframes app-nav-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 600px) {
   .app-nav { padding: 0 0.75rem; }
   .app-nav-logo { font-size: 0.95rem; }

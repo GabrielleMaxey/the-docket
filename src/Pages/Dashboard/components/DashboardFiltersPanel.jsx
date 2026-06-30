@@ -115,7 +115,7 @@ const DashboardFiltersPanel = ({
       <div className="dashboard-controls-divider" style={{ marginTop: "0.75rem" }} />
       <div className="dashboard-people-section">
         <p className="dashboard-watch-group-label">
-          2 — Track progress metrics for
+          2 — Track workload and Metrics for
           {(selectedWatchedIds.length > 0 || assigneeNames.length > 0) ? (
             <button
               type="button"
@@ -142,8 +142,9 @@ const DashboardFiltersPanel = ({
           ) : null}
         </p>
         <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "0 0 0.5rem" }}>
-          Add anyone whose workload and overdue metrics you want to see — yourself, a colleague, or a whole team.
-          Use saved groups from Settings, or type a display name or email directly.
+          Optional — choose people for the <strong>Individual Contributor Metrics</strong> section.
+          Metrics are calculated within the projects you selected in step 1 (not a separate project list).
+          Use saved groups from Settings, or type a display name or email.
         </p>
         {personWatches.length > 0 || jqlWatches.length > 0 ? (
           <div className="dashboard-watched-chips">
@@ -382,7 +383,7 @@ const DashboardFiltersPanel = ({
         </Button>
         {!hasEpicScope ? (
           <span className="dashboard-submit-hint">
-            Select at least one project preset above first.
+            Select at least one project preset in step 1 first — people tracking alone cannot refresh.
           </span>
         ) : (
           <span className="dashboard-submit-hint">

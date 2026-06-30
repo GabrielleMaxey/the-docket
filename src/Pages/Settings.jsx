@@ -18,10 +18,13 @@ import {
   syncFieldMappingsFromJira,
   testJiraConnection,
   updateEpicPreset,
+  exportEpicPresetsPack,
+  importEpicPresetsPack,
 } from "../services/jiraClient.js";
 import { getApiBase, setStoredProxyUrl } from "../services/apiBase.js";
 import { JQL_PRESET_TEMPLATES, getJqlPresetTemplateByKey } from "../utils/jqlPresetTemplates.js";
 import { useFlash } from "./hooks/useFlash.js";
+import { useWorkWeekHeaderPreferences } from "./hooks/useWorkWeekHeaderPreferences.js";
 
 // Collapsible wrapper for each Settings section. Accepts an optional
 // `description` shown as a subtitle line when the section is collapsed,
@@ -114,9 +117,11 @@ const Settings = () => {
   // own “✓ done” note right there — not just the shared banner at the top of
   // a long page that's easy to miss once you've scrolled down.
   const [epicPresetFlash, flashEpicPreset] = useFlash();
+  const teamPackInputRef = React.useRef(null);
   const [fieldMappingsFlash, flashFieldMappings] = useFlash();
   const [settingsFlash, flashSettings] = useFlash();
   const [watchedAssigneeFlash, flashWatchedAssignee] = useFlash();
+  const [headerPrefs, setHeaderPrefs] = useWorkWeekHeaderPreferences();
 
   const [jiraConnStatus, setJiraConnStatus] = React.useState(null); // null | 'loading' | 'ok' | 'error'
   const [jiraConnMessage, setJiraConnMessage] = React.useState("");
@@ -198,6 +203,67 @@ const Settings = () => {
       setEpicPresets(await fetchEpicPresets());
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Failed to save epic preset");
+    }
+  };
+
+  const handleExportTeamPack = async () => {
+    setError("");
+    try {
+      const pack = await exportEpicPresetsPack();
+      const blob = new Blob([JSON.stringify(pack, null, 2)], {
+        type: "application/json;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `team-presets_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+      flashSuccess("Team preset pack exported.");
+      flashEpicPreset("Team preset pack exported.");
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : "Failed to export team pack");
+    }
+  };
+
+  const handleImportTeamPackFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    const replace = window.confirm(
+      "Import team preset pack?\n\nOK = replace all existing presets with the file.\nCancel = merge (skip duplicates)."
+    );
+    const mode = replace ? "replace" : "merge";
+
+    if (
+      mode === "replace" &&
+      !window.confirm("Replace will delete all current presets. Continue?")
+    ) {
+      return;
+    }
+
+    setError("");
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const presets = Array.isArray(parsed?.presets) ? parsed.presets : parsed;
+      if (!Array.isArray(presets) || presets.length === 0) {
+        throw new Error("No presets found in file");
+      }
+      const result = await importEpicPresetsPack({ presets, mode });
+      await loadAll();
+      const imported = Number(result?.imported || 0);
+      const skipped = Number(result?.skipped || 0);
+      const message = `Imported ${imported} preset${imported === 1 ? "" : "s"}${skipped > 0 ? ` (${skipped} skipped)` : ""}.`;
+      flashSuccess(message);
+      flashEpicPreset(message);
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : "Failed to import team pack");
     }
   };
 
@@ -458,6 +524,25 @@ const Settings = () => {
             )}
           </Table.Body>
         </Table>
+
+        <div className="settings-team-pack-row" style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+          <Button type="button" onClick={() => void handleExportTeamPack()}>
+            Export team pack
+          </Button>
+          <Button type="button" onClick={() => teamPackInputRef.current?.click()}>
+            Import team pack
+          </Button>
+          <input
+            ref={teamPackInputRef}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: "none" }}
+            onChange={(event) => void handleImportTeamPackFile(event)}
+          />
+          <span style={{ fontSize: "0.82rem", color: "#64748b" }}>
+            Share epic/JQL presets as JSON. Import merges by default; choose Replace to overwrite.
+          </span>
+        </div>
 
         <Form style={{ marginTop: "1rem" }}>
           <Form.Select
@@ -769,6 +854,30 @@ const Settings = () => {
               ✓ {watchedAssigneeFlash}
             </Message>
           ) : null}
+        </Form>
+      </SettingsSection>
+
+      <SettingsSection title="Work Week header" description="Optional joke ticker and upcoming due-date banner at the top of Work Week.">
+        <p style={{ fontSize: "0.85rem", color: "#475569", marginTop: 0 }}>
+          The due-date banner uses the latest Dashboard snapshot, filtered to issues assigned to you
+          (same upcoming-due window as Dashboard → Upcoming due). Refresh Dashboard after changing
+          due-date filters.
+        </p>
+        <Form>
+          <Form.Checkbox
+            label="Show joke ticker"
+            checked={headerPrefs.showJokeTicker}
+            onChange={(_e, { checked }) =>
+              setHeaderPrefs((prev) => ({ ...prev, showJokeTicker: Boolean(checked) }))
+            }
+          />
+          <Form.Checkbox
+            label="Show my upcoming due dates banner (issues assigned to you)"
+            checked={headerPrefs.showUpcomingDueBanner}
+            onChange={(_e, { checked }) =>
+              setHeaderPrefs((prev) => ({ ...prev, showUpcomingDueBanner: Boolean(checked) }))
+            }
+          />
         </Form>
       </SettingsSection>
 
