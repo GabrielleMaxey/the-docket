@@ -1,6 +1,7 @@
 // Core Jira endpoints: connection test and JQL search.
 
 import { getJiraSearchFields } from "../lib/jiraSearchFields.mjs";
+import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
 
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
 
@@ -90,6 +91,34 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
     const jql = String(req.body?.jql || "").trim();
     const maxResults = Number(req.body?.maxResults || 5);
     return handleJiraSearch(jql, maxResults, res);
+  });
+
+  // POST /api/jira/search/all — paginated fetch up to maxTotal (cap 5000).
+  app.post("/api/jira/search/all", async (req, res) => {
+    if (!ensureEnvOrRespond(res)) {
+      return;
+    }
+
+    const jql = String(req.body?.jql || "").trim();
+    if (!jql) {
+      return res.status(400).json({ error: "Missing required field: jql" });
+    }
+
+    const maxTotal = Math.min(5000, Math.max(1, Number(req.body?.maxTotal || 200)));
+
+    try {
+      const { issues, total, loaded, isComplete } = await searchAllIssues({
+        jql,
+        runJiraSearchRequest,
+        maxTotal,
+      });
+      return res.json({ issues, total, loaded, isComplete });
+    } catch (error) {
+      return res.status(500).json({
+        error: "Failed to call Jira search",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
   });
 
   // GET /api/jira/search — kept for curl/testing convenience.

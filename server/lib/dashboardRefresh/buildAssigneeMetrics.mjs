@@ -30,6 +30,20 @@ const emptyJqlWatchMetric = (watched, error) => ({
   ...(error ? { error } : {}),
 });
 
+const emptyPersonWatchMetric = (queryName, error) => ({
+  queryType: "person",
+  jql: "",
+  queryName,
+  resolvedDisplayName: queryName,
+  resolvedAccountId: "",
+  overduePercent: null,
+  overdueOpenCount: 0,
+  totalOpenCount: 0,
+  overdueIssueKeys: [],
+  workloadCounts: emptyWorkloadCounts(),
+  ...(error ? { error } : {}),
+});
+
 export const buildAssigneeMetricsForRefresh = async ({
   assigneeNames,
   watchedAssigneeIds,
@@ -43,22 +57,31 @@ export const buildAssigneeMetricsForRefresh = async ({
   const assigneeMetrics = [];
 
   for (const queryName of assigneeNames) {
-    const resolvedUser = await resolveJiraUser({ query: queryName, jiraRequest });
-    const metrics = computeAssigneeMetrics(
-      scopedChildIssues,
-      queryName,
-      resolvedUser?.displayName,
-      dueFieldId
-    );
+    try {
+      const resolvedUser = await resolveJiraUser({ query: queryName, jiraRequest });
+      const metrics = computeAssigneeMetrics(
+        scopedChildIssues,
+        queryName,
+        resolvedUser?.displayName,
+        dueFieldId
+      );
 
-    assigneeMetrics.push({
-      queryType: "person",
-      jql: "",
-      queryName,
-      resolvedDisplayName: resolvedUser?.displayName || queryName,
-      resolvedAccountId: resolvedUser?.accountId || "",
-      ...metrics,
-    });
+      assigneeMetrics.push({
+        queryType: "person",
+        jql: "",
+        queryName,
+        resolvedDisplayName: resolvedUser?.displayName || queryName,
+        resolvedAccountId: resolvedUser?.accountId || "",
+        ...metrics,
+      });
+    } catch (error) {
+      assigneeMetrics.push(
+        emptyPersonWatchMetric(
+          queryName,
+          error instanceof Error ? error.message : "Failed to resolve assignee"
+        )
+      );
+    }
   }
 
   for (const watchedId of watchedAssigneeIds) {
@@ -111,22 +134,31 @@ export const buildAssigneeMetricsForRefresh = async ({
       continue;
     }
 
-    const resolvedUser = await resolveJiraUser({ query: watched.displayName, jiraRequest });
-    const metrics = computeAssigneeMetrics(
-      scopedChildIssues,
-      watched.displayName,
-      resolvedUser?.displayName,
-      dueFieldId
-    );
+    try {
+      const resolvedUser = await resolveJiraUser({ query: watched.displayName, jiraRequest });
+      const metrics = computeAssigneeMetrics(
+        scopedChildIssues,
+        watched.displayName,
+        resolvedUser?.displayName,
+        dueFieldId
+      );
 
-    assigneeMetrics.push({
-      queryType: "person",
-      jql: "",
-      queryName: watched.displayName,
-      resolvedDisplayName: resolvedUser?.displayName || watched.displayName,
-      resolvedAccountId: resolvedUser?.accountId || watched.resolvedAccountId || "",
-      ...metrics,
-    });
+      assigneeMetrics.push({
+        queryType: "person",
+        jql: "",
+        queryName: watched.displayName,
+        resolvedDisplayName: resolvedUser?.displayName || watched.displayName,
+        resolvedAccountId: resolvedUser?.accountId || watched.resolvedAccountId || "",
+        ...metrics,
+      });
+    } catch (error) {
+      assigneeMetrics.push(
+        emptyPersonWatchMetric(
+          watched.displayName,
+          error instanceof Error ? error.message : "Failed to resolve watched assignee"
+        )
+      );
+    }
   }
 
   return assigneeMetrics;

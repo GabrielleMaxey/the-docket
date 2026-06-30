@@ -37,6 +37,7 @@ export const resolveJiraUser = async ({ query, jiraRequest }) => {
 export const searchAllIssues = async ({ jql, runJiraSearchRequest, batchSize = 100, maxTotal = 5000 }) => {
   const issues = [];
   let nextPageToken = "";
+  let jiraTotal = null;
 
   while (issues.length < maxTotal) {
     const result = await runJiraSearchRequest(jql, {
@@ -53,6 +54,13 @@ export const searchAllIssues = async ({ jql, runJiraSearchRequest, batchSize = 1
     }
 
     const batch = Array.isArray(result.data?.issues) ? result.data.issues : [];
+    if (jiraTotal === null) {
+      const reported = Number(result.data?.total);
+      if (Number.isFinite(reported) && reported >= 0) {
+        jiraTotal = reported;
+      }
+    }
+
     issues.push(...batch);
 
     if (batch.length === 0 || result.data?.isLast) {
@@ -65,8 +73,16 @@ export const searchAllIssues = async ({ jql, runJiraSearchRequest, batchSize = 1
     }
   }
 
-  const capped = issues.slice(0, maxTotal);
-  return { issues: capped, total: capped.length };
+  const loaded = issues.length;
+  const total = jiraTotal ?? loaded;
+  const isComplete = loaded >= total || loaded >= maxTotal;
+
+  return {
+    issues: issues.slice(0, maxTotal),
+    total,
+    loaded: Math.min(loaded, maxTotal),
+    isComplete,
+  };
 };
 
 export const fetchEpicIssue = async ({ epicKey, mappingsByRole, jiraRequest }) => {

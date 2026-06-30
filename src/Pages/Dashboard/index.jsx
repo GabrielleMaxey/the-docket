@@ -13,6 +13,7 @@ import { useDashboardRefresh } from "./hooks/useDashboardRefresh";
 import CollapsibleSection from "../../components/CollapsibleSection";
 import DashboardFiltersPanel from "./components/DashboardFiltersPanel";
 import ReportPanel from "./components/ReportPanel";
+import WeeklyDigestPanel from "./components/WeeklyDigestPanel";
 import OverallSummaryCard from "./components/OverallSummaryCard";
 import AssigneeMetricCard from "./components/AssigneeMetricCard";
 import ProjectMetricsSection from "./components/ProjectMetricsSection";
@@ -171,11 +172,15 @@ const Dashboard = () => {
             chartVariant={chartVariant}
             epics={displayEpics}
           />
+          <WeeklyDigestPanel hasSnapshot={Boolean(snapshot)} />
         </CollapsibleSection>
       ) : null}
 
       {filtersStale ? (
-        <Message info>Filters changed — click Submit to update stored metrics.</Message>
+        <Message info>Filters changed — click <strong>Refresh status</strong> to update stored metrics.</Message>
+      ) : null}
+      {refreshError ? (
+        <Message negative>{refreshError}</Message>
       ) : null}
       {metricsLoading && !snapshot ? <Message info>Loading stored metrics...</Message> : null}
       {!metricsLoading && !snapshot ? (

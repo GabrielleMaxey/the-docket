@@ -1278,3 +1278,38 @@
 .dashboard-page .dashboard-project-tab.is-active .dashboard-project-tab-stat {
   color: #0c93d9;
 }
+
+.dashboard-page .dashboard-work-week-link {
+  color: #0c93d9;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: 0.45rem;
+}
+
+.dashboard-page .dashboard-work-week-link:hover {
+  text-decoration: underline;
+}
+
+.dashboard-page .dashboard-jira-external-link {
+  color: #64748b;
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+  text-decoration: none;
+}
+
+.dashboard-page .dashboard-jira-external-link:hover {
+  color: #0c93d9;
+}
+
+.dashboard-page .dashboard-weekly-digest-panel {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.dashboard-page .dashboard-weekly-digest-title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  color: #0f172a;
+}

@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { formatPercent } from "../../../utils/format";
 import StatusPieChart from "../../../components/StatusPieChart";
 import { getTerminalIssueCount } from "../../../../shared/dashboardMetrics.mjs";
@@ -9,6 +10,7 @@ import {
   formatIssueTypeLabel,
 } from "../utils/dashboardMetricsUtils";
 import { isEpicIssueType } from "../../../../shared/dashboardMetrics.mjs";
+import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 import MetricBar from "./MetricBar";
 
 const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePastDue }) => {
@@ -34,6 +36,15 @@ const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePas
           ) : (
             epic.label
           )}
+          {!isJqlPreset && epic.epicKey ? (
+            <Link
+              to={buildWorkWeekHref({ key: epic.epicKey })}
+              className="dashboard-work-week-link"
+              title="Open epic in Work Week"
+            >
+              Work Week
+            </Link>
+          ) : null}
         </h3>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           {epic.isPastDue ? (
@@ -114,7 +125,12 @@ const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePas
                 {contributorMetrics.map((person) => (
                   <div key={person.name} className="dashboard-epic-contributor-row">
                     <div className="dashboard-epic-contributor-head">
-                      <span className="dashboard-epic-contributor-name">{person.name}</span>
+                      <Link
+                        to={buildWorkWeekHref({ assignee: person.name })}
+                        className="dashboard-epic-contributor-name dashboard-work-week-link"
+                      >
+                        {person.name}
+                      </Link>
                       <span className="dashboard-epic-contributor-stats">
                         {person.openIssues} open · {person.resolvedIssues} resolved
                         {person.overdueOpenIssues > 0 ? ` · ${person.overdueOpenIssues} overdue` : ""}
@@ -152,18 +168,24 @@ const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePas
                       <ul className="dashboard-epic-contributor-overdue-list">
                         {person.overdueIssues.map((task) => (
                           <li key={task.key} className="dashboard-epic-contributor-overdue-item">
+                            <Link
+                              to={buildWorkWeekHref({ key: task.key })}
+                              className="dashboard-epic-contributor-overdue-key dashboard-work-week-link"
+                            >
+                              {task.key}
+                            </Link>
                             {jiraBaseUrl && task.key ? (
                               <a
                                 href={`${jiraBaseUrl}/browse/${encodeURIComponent(task.key)}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="dashboard-epic-contributor-overdue-key"
+                                className="dashboard-jira-external-link"
+                                title="Open in Jira"
+                                aria-label={`Open ${task.key} in Jira`}
                               >
-                                {task.key}
+                                ↗
                               </a>
-                            ) : (
-                              <span className="dashboard-epic-contributor-overdue-key">{task.key}</span>
-                            )}
+                            ) : null}
                             <span
                               className={`dashboard-due-by-type-badge dashboard-epic-contributor-type-badge${
                                 isEpicIssueType(task.issueType)

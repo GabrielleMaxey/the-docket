@@ -48,6 +48,8 @@ To add a preset:
 2. Choose type, fill in the label and JQL or epic key
 3. Click **Add preset**
 
+**Share presets with your team:** use **Export team pack** to download a JSON file of all epic/JQL presets. New teammates click **Import team pack** and choose **merge** (add new, skip duplicates) or **replace** (overwrite all local presets). Align with your team's canonical preset list or `npm run seed:presets` for admins — see [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md).
+
 ### Watched people
 
 Add team members here (by Jira display name) so the Dashboard's **Individual Contributor Metrics** section tracks their workload. You can also add a custom JQL query as a "watch" if a person's name doesn't match their Jira display name exactly.
@@ -85,17 +87,20 @@ This is the main screen for managing your open work.
 
 ### Header
 
-- **Joke ticker** — rotating jokes at the top; cosmetic only.
+- **Header banners** (optional) — at the top of Work Week, toggle **Joke ticker** and/or **My upcoming due dates**. The due-date banner lists **your** assigned issues (issue key, summary, due date) from the latest Dashboard snapshot. Refresh Dashboard after changing due-date filters. Same toggles in **Settings → Work Week header**.
 - **Date & calendar** — shows today; useful when planning.
 - **Reminders** — four short text lines, for your eyes only. Check the box to mark done (greyed out). They are never sent to Jira.
 
 ### Task Manager card
 
 1. **JQL count** — choose 1–4 query slots. Each has a label (your name for it) and a JQL box.
-2. **Max results** — caps issues per query. Raise it if you're missing items.
-3. **Run JQL** — loads fresh results from Jira. Shortcut: **Ctrl+Enter** (Windows/Linux) or **⌘+Enter** (Mac).
-4. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes or priorities.
-5. **Create Issue** — opens a modal to create a new Jira issue. The epic/query dropdown shows all your saved presets, plus a "Enter epic key manually" option.
+2. **Max results** — first page size per query. The app can load **all** matching issues (up to a safe cap) — see Results table below.
+3. **Pull most recent Jira comment** — when checked, each **Run JQL** copies the latest Jira comment into the row **Notes** box (useful with shared `PRIORITY P#` comments).
+4. **Run JQL** — loads fresh results from Jira, applies priority from latest comments when present, and saves results locally. Shortcut: **Ctrl+Enter** (Windows/Linux) or **⌘+Enter** (Mac).
+5. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes or priorities in the local database, or header reminders.
+6. **Create Issue** — opens a modal to create a new Jira issue. The epic/query dropdown shows all your saved presets, plus a "Enter epic key manually" option.
+
+> **Background work:** Dashboard refresh, report generation, week plan, project report, and **Run JQL** keep running if you switch pages. A yellow status pill in the top nav shows what's in progress. Return to the page when it finishes — results are saved automatically.
 
 > **Tip:** Click the **🗂️ Task Manager** header to collapse/expand the whole section once your queries are saved.
 
@@ -128,10 +133,16 @@ Each row is one Jira issue. What you can do per row:
 |--------|-----|
 | Change **status** in Jira | Dropdown → **Update Status** |
 | Change **assignee** in Jira | Dropdown → **Update Assignee** |
-| Set personal **priority** (P1–P10) | Priority dropdown — P1 = most urgent, P10 = least |
+| Set personal **priority** (P1–P10) | Priority dropdown — P1 = most urgent, P10 = least. A **Jira** badge means priority was set from the latest comment on **Run JQL** |
 | Write a **note** (local) | Type in the Notes box — saves automatically |
 | Push note to Jira as a **comment** | Check the row checkbox → **Push note** (or **Push Selected** for multiple) |
-| Filter visible rows | **Filter by key** box above the table |
+| Filter visible rows | **Filter by key**, **Status**, or **Assignee** above the table; **Clear filters** resets all three |
+| Page through results | **First / Prev / Next / Last** below the table (30 rows per page) |
+| Load more issues | When the status line shows **Loaded X of Y** and Y is larger than X, click **Load remaining** |
+
+**Load status:** After **Run JQL**, the line above the table shows **Loaded X of Y matched** (how many rows are in the table vs how many Jira matched). If your query returns more than the first batch, click **Load remaining** to fetch the rest (up to a documented safe cap).
+
+**Deep links from Dashboard:** Opening Work Week from Dashboard (`?key=ODI-123` or `?assignee=Name`) applies table filters automatically. The app fetches that issue from Jira and opens a green **Drill-down: ODI-123** tab (first tab), even if the issue also appears in your saved JQL results. A green banner confirms the active filter; use **Clear drill-down** to remove the tab and filters.
 
 **MRD column:** The header shows **MRD** (hover for “Most Recent Done Date”). It displays the issue’s automated Most Recent Done Date when that field is set on the task. When the task has no MRD, the app walks the **parent chain** (for example Story → Epic) and shows the first ancestor that has an MRD. This uses the same ODI field mapping as Dashboard (`customfield_10009` by default). Standard Jira **Due date** is not shown in the table; it is still used behind the scenes for My Metrics past-due/upcoming counts and Chat context.
 
@@ -155,7 +166,19 @@ Use Dashboard when you want to see how a whole project (or several) is tracking,
 4. **Choose views** — under **Views**, check which dashboard sections you want visible (including separate toggles for upcoming vs past-due due-date cards)
 5. Click **Refresh status** — the app pulls metrics from Jira and stores them
 
-The stored snapshot stays until you click **Refresh status** again. The page loads from the last snapshot even if Jira is slow.
+The stored snapshot stays until you click **Refresh status** again. The page loads from the last snapshot even if Jira is slow. You can navigate away while refresh runs — watch the top nav for **Refreshing dashboard** and return when it finishes.
+
+### Jump to Work Week from Dashboard
+
+Many Dashboard lists link into **Work Week** with filters already applied:
+
+| Where you click | What opens in Work Week |
+|-----------------|-------------------------|
+| Issue key (upcoming / past-due lists, overdue items) | Table filtered to that key |
+| Assignee name | Table filtered to that person |
+| **Work Week** link on an epic or contributor | Filtered to that epic key or assignee |
+
+Jira browse links (↗) still open the issue in Jira in a new tab.
 
 ### Optional due-date views
 
@@ -204,7 +227,10 @@ Choose an audience and click Generate:
 | Product Owner Report | Feature delivery, backlog health, blockers |
 | Developer Report | Team workload, overdue by person, WIP |
 
-Reports can be **copied** or **downloaded as a .md file**.
+Reports can be **copied** or **downloaded as a .md file**. Generation continues in the background if you leave the page.
+
+**Weekly digest** (same section, below the LLM reports)  
+Snapshot-based stand-up brief — overdue/upcoming highlights, contributor load, and project health. **No LLM required.** Click **Generate weekly digest** after a Dashboard refresh, then copy or download. Useful for managers who want a quick brief without running an AI report.
 
 ---
 
@@ -299,10 +325,10 @@ PRIORITY P2 — Blocked on vendor response. Target fix by Friday.
 
 **Rules for everyone else on the team:**
 
-1. Read the latest comment on the issue in Jira (or open the issue in Jira's UI).
-2. In Task Manager, set your local **Priority** dropdown to match the `P#` in the comment.
-3. Optionally copy the rest of the comment into your local **Notes** box for quick reference while you work.
-4. Run **Run JQL** when you need fresh issue data. Optionally choose **Pull most recent Jira comment** under JQL controls to load the latest comment into each row's Notes box (useful for shared `PRIORITY P#` comments).
+1. **Run JQL** on Work Week — the app reads the **latest Jira comment** on each issue and, when it starts with `PRIORITY P1` … `P10`, sets your local **Priority** dropdown automatically (look for the **Jira** badge on the row).
+2. Change priority manually anytime; that clears the Jira badge until the next **Run JQL** picks up a new comment.
+3. Optionally enable **Pull most recent Jira comment** to copy the full comment text into your local **Notes** box.
+4. Read the issue in Jira if you need the full thread or history beyond the latest comment.
 
 **Personal work:** On issues only you track, use local notes and priority without pushing, or push comments without the `PRIORITY` prefix if the note is informational only.
 
@@ -319,16 +345,23 @@ PRIORITY P2 — Blocked on vendor response. Target fix by Friday.
 | Desktop app credentials + DB (packaged) | `%APPDATA%\Task Manager\` (Windows) or `~/Library/Application Support/Task Manager/` (Mac) | No |
 | Header reminders | This browser only | No |
 | Issue notes + priorities (P1–P10) | Local file (`data/workweek.sqlite`) | No — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) for team workflow |
+| Epic/JQL preset team pack (export/import) | JSON file you save/share | No |
 | Dashboard metrics snapshot | Local file (`data/workweek.sqlite`) | No |
 | Status/assignee changes | Jira | Yes |
-| Notes you push as comments (with `PRIORITY P#` prefix) | Jira | Yes — team reads in Jira and updates local priority manually |
+| Notes you push as comments (with `PRIORITY P#` prefix) | Jira | Yes — ICs sync local priority on **Run JQL** from the latest comment |
 
 ---
 
 ## Common questions
 
 **The table is empty after Run JQL**
-Your JQL returned no results, or Max results is set too low. Try widening the JQL in Jira's own search first to confirm issues exist.
+Your JQL returned no results, or filters are hiding rows. Check **Loaded X of Y** — if Y > X, click **Load remaining**. Try widening the JQL in Jira's own search first to confirm issues exist.
+
+**I left the page while a refresh or report was running**
+That's fine — work continues in the background. Look for the yellow pill in the top nav. Return to Dashboard or Work Week when it finishes; refresh updates the stored snapshot, and reports/plans are saved to this browser.
+
+**How do we share the same epic/JQL presets across the team?**
+One person exports a **team pack** from Settings; others **Import team pack** (merge or replace). See [Epic & JQL presets](#epic--jql-presets) above.
 
 **"Showing saved results" banner appears**
 That's normal — the table was restored from the last time you ran JQL. Click **Run JQL** to get fresh data.
@@ -337,7 +370,7 @@ That's normal — the table was restored from the last time you ran JQL. Click *
 Expected. Notes are stored in a local file on the machine you started the app on. Use one machine, or ask a developer about exporting the SQLite file. For **shared projects**, use pushed Jira comments with the `PRIORITY P#` prefix — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
 
 **How do we share priority on a project like we did in Excel?**
-Task Manager does not sync priority between users automatically. PMs/managers push comments starting with `PRIORITY P#` (e.g. `PRIORITY P2 — …`). Everyone else reads the comment in Jira and sets their local Priority dropdown to match. See [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
+Task Manager does not sync priority between users automatically. PMs/managers push comments starting with `PRIORITY P#` (e.g. `PRIORITY P2 — …`). ICs **Run JQL** to auto-apply priority from the latest comment. See [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
 
 **The Push note button is greyed out**
 You've already pushed that exact text as a comment. Edit the note text and the button will re-enable.
