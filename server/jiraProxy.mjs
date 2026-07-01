@@ -54,12 +54,51 @@ app.use(express.json());
 
 // Request logger — records method, path, and response status/duration.
 const reqLog = createLogger("http");
+
+const HTTP_DEBUG_ONLY_PATHS = new Set(["/api/jira/users/search"]);
+
+const truncateForLog = (value, max = 80) => {
+  const text = String(value || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!text) {
+    return "";
+  }
+  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+};
+
+const formatHttpLogMessage = (req, statusCode, ms) => {
+  if (req.path === "/api/jira/search" || req.path === "/api/jira/search/all") {
+    const jql = truncateForLog(req.body?.jql || req.query?.jql);
+    if (jql) {
+      return `JQL search → ${statusCode} (${ms}ms) — ${jql}`;
+    }
+  }
+
+  if (req.path === "/api/epic-filters/run") {
+    const presetCount = Array.isArray(req.body?.epicPresetIds) ? req.body.epicPresetIds.length : 0;
+    const pastDue = req.body?.includePastDue ? " + past due" : "";
+    return `epic filter run → ${statusCode} (${ms}ms) — ${presetCount} preset${presetCount === 1 ? "" : "s"}${pastDue}`;
+  }
+
+  return `${req.method} ${req.path} → ${statusCode} (${ms}ms)`;
+};
+
 app.use((req, res, next) => {
   const start = Date.now();
   res.on("finish", () => {
     const ms = Date.now() - start;
-    const level = res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
-    reqLog[level](`${req.method} ${req.path} → ${res.statusCode} (${ms}ms)`);
+    const statusCode = res.statusCode;
+    let level = "info";
+    if (statusCode >= 500) {
+      level = "error";
+    } else if (statusCode >= 400) {
+      level = "warn";
+    } else if (HTTP_DEBUG_ONLY_PATHS.has(req.path)) {
+      level = "debug";
+    }
+
+    reqLog[level](formatHttpLogMessage(req, statusCode, ms));
   });
   next();
 });
