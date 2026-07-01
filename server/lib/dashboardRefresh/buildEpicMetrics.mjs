@@ -15,6 +15,9 @@ import {
 } from "../epicFilterJql.mjs";
 import { fetchEpicIssue, resolveJiraUser, searchAllIssues } from "../jiraSearchHelpers.mjs";
 import { buildEpicLevelDueByIssues } from "./dueByHelpers.mjs";
+import { createLogger } from "../../lib/logger.mjs";
+
+const log = createLogger("dashboard");
 
 const emptyEpicMetricFromPreset = (preset, error) => ({
   epicPresetId: preset.id,
@@ -134,7 +137,12 @@ const resolveJqlPresetDueByIssues = async ({
       const grandparentKey = String(parentData?.fields?.parent?.key || "").trim();
       if (grandparentKey) {
         resolvedEpicKey = grandparentKey;
+        log.info(`due-by walk: ${parentKey} (Story) → epic ${grandparentKey}`);
+      } else {
+        log.info(`due-by walk: ${parentKey} (Story) → no epic parent found, using Story as scope`);
       }
+    } else {
+      log.info(`due-by walk: ${parentKey} is already an Epic`);
     }
     if (!epicKeyToIssues.has(resolvedEpicKey)) {
       epicKeyToIssues.set(resolvedEpicKey, []);
@@ -146,6 +154,7 @@ const resolveJqlPresetDueByIssues = async ({
   for (const [epicKey, epicChildIssues] of epicKeyToIssues.entries()) {
     const epicIssue = await fetchEpicIssue({ epicKey, mappingsByRole, jiraRequest });
     if (!epicIssue) {
+      log.info(`due-by: skipping ${epicKey} — could not fetch epic`);
       continue;
     }
 
@@ -159,6 +168,13 @@ const resolveJqlPresetDueByIssues = async ({
       pastDueFloor,
       includePastDueInList,
     });
+
+    log.info(
+      `due-by: epic ${epicKey} — ${epicChildIssues.length} child issue(s) | ` +
+      `${epicLevelDueBy.length} added to due-by list ` +
+      `(${epicLevelDueBy.filter((i) => !i.isOverdue).length} upcoming, ` +
+      `${epicLevelDueBy.filter((i) => i.isOverdue).length} past-due)`
+    );
 
     for (const item of epicLevelDueBy) {
       existingDueByKeys.add(item.key);
@@ -291,6 +307,7 @@ export const buildEpicMetricsFromPresets = async ({
     try {
       ({ issues } = await searchAllIssues({ jql: metricsJql, runJiraSearchRequest }));
     } catch (error) {
+      log.error(`preset "${preset.epicName}" — Jira search failed: ${error instanceof Error ? error.message : error}`);
       epicMetrics.push(
         emptyEpicMetricFromPreset(
           preset,
@@ -299,6 +316,8 @@ export const buildEpicMetricsFromPresets = async ({
       );
       continue;
     }
+
+    log.info(`preset "${preset.epicName}" (${preset.presetType}) — ${issues.length} issues fetched`);
 
     if (preset.presetType === "jql") {
       const childMetrics = computeChildIssueMetrics(
@@ -320,6 +339,12 @@ export const buildEpicMetricsFromPresets = async ({
         pastDueFloor: ctx.pastDueFloor,
         includePastDueInList: ctx.includePastDue,
       });
+
+      log.info(
+        `preset "${preset.epicName}" due-by result — ${jqlDueByIssues.length} total ` +
+        `(${jqlDueByIssues.filter((i) => !i.isOverdue).length} upcoming, ` +
+        `${jqlDueByIssues.filter((i) => i.isOverdue).length} past-due)`
+      );
 
       epicMetrics.push({
         epicPresetId: preset.id,
@@ -387,6 +412,12 @@ export const buildEpicMetricsFromPresets = async ({
       includePastDueInList: ctx.includePastDue,
     });
     const { combined, dueByOpenIssues } = combineDueByIssues(childMetrics, epicLevelDueBy);
+
+    log.info(
+      `preset "${preset.epicName}" (epic ${preset.epicKey}) due-by result — ${combined.length} total ` +
+      `(${combined.filter((i) => !i.isOverdue).length} upcoming, ` +
+      `${combined.filter((i) => i.isOverdue).length} past-due)`
+    );
 
     epicMetrics.push(
       buildEpicMetricRecord({

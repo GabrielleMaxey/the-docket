@@ -657,24 +657,53 @@ export const normalizeAssigneeName = (issue) => {
   };
 };
 
-export const personMatchesIssue = (issue, queryName, resolvedDisplayName) => {
-  const query = String(queryName || "").trim().toLowerCase();
+export const normalizePersonQuery = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[._-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export const personMatchesIssue = (
+  issue,
+  queryName,
+  resolvedDisplayName,
+  resolvedAccountId = ""
+) => {
+  const query = normalizePersonQuery(queryName);
   if (!query) {
     return false;
   }
 
   const { displayName, emailAddress, accountId } = normalizeAssigneeName(issue);
-  const canonical = String(resolvedDisplayName || displayName || "").trim().toLowerCase();
+  const issueAccountId = String(accountId || "").trim();
+  const targetAccountId = String(resolvedAccountId || "").trim();
 
-  if (displayName.toLowerCase() === query || emailAddress.toLowerCase() === query) {
+  if (targetAccountId && issueAccountId && targetAccountId === issueAccountId) {
     return true;
   }
 
-  if (canonical && (canonical === query || canonical.includes(query) || query.includes(canonical))) {
+  const normalizedDisplay = normalizePersonQuery(displayName);
+  const normalizedEmailLocal = normalizePersonQuery(String(emailAddress || "").split("@")[0]);
+  const normalizedCanonical = normalizePersonQuery(resolvedDisplayName || displayName);
+
+  if (
+    normalizedDisplay === query ||
+    normalizedEmailLocal === query ||
+    normalizedCanonical === query
+  ) {
     return true;
   }
 
-  if (displayName.toLowerCase().includes(query)) {
+  if (
+    normalizedCanonical &&
+    (normalizedCanonical.includes(query) || query.includes(normalizedCanonical))
+  ) {
+    return true;
+  }
+
+  if (normalizedDisplay.includes(query) || query.includes(normalizedDisplay)) {
     return true;
   }
 
@@ -722,9 +751,15 @@ export const computeAssigneeWorkloadCounts = (allIssues, dueFieldId) => {
   return counts;
 };
 
-export const computeAssigneeMetrics = (issues, queryName, resolvedDisplayName, dueFieldId) => {
+export const computeAssigneeMetrics = (
+  issues,
+  queryName,
+  resolvedDisplayName,
+  dueFieldId,
+  resolvedAccountId = ""
+) => {
   const personIssues = issues.filter((issue) =>
-    personMatchesIssue(issue, queryName, resolvedDisplayName)
+    personMatchesIssue(issue, queryName, resolvedDisplayName, resolvedAccountId)
   );
   const personOpen = personIssues.filter((issue) => isIssueOpen(issue));
   const personOverdueOpen = personOpen.filter((issue) => isTaskOverdue(issue, dueFieldId));

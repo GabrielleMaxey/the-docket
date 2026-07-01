@@ -15,40 +15,45 @@ Everything in the app talks to **your own Jira project (ODI)** through a local p
 ## What it does
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    Task Manager                     │
-│                                                     │
-│  Work Week   │  Dashboard  │  Chat  │  Settings     │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                         Task Manager                             │
+│                                                                  │
+│  Work Week  │  Dashboard  │  Past Reports  │  Chat  │  Settings │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ### Work Week *(daily driver)*
 Run up to five saved JQL queries side-by-side and manage every issue in one table.
 
-- **Run JQL** — pulls live results from Jira into the table
-- **Task table** — update status, assignee, and priority; **MRD** column (Most Recent Done Date, with parent-chain inheritance); write notes; push notes to Jira as comments (shared projects: use `PRIORITY P#` prefix — see [END_USER_GUIDE.md](./docs/END_USER_GUIDE.md))
-- **My Metrics** — per-query progress summary with issue counts and a per-project AI report (written for you, the assignee, in second person)
+- **Run JQL** — pulls live results from Jira into the table; optional **Notes on run** (keep local notes or pull the latest Jira comment into each row)
+- **Task table** — update status, assignee (type display name, email, or username with Jira search), and priority; **MRD** column (Most Recent Done Date, with parent-chain inheritance); write notes; push notes to Jira as comments (shared projects: use `PRIORITY P#` prefix — see [END_USER_GUIDE.md](./docs/END_USER_GUIDE.md))
+- **My Metrics** — per-query progress summary with issue counts and a per-project AI report (written for you, the assignee, in second person); **Clear report** removes the on-page copy only
 - **Help me plan my week** — answers 4 quick questions, then generates a day-by-day Monday–Friday plan based on your actual open issues
-- **Create Issue** — creates a new Jira issue from a modal with epic/query selection
+- **Create Issue** — creates a new Jira issue from a modal with epic/parent selection and **✦ AI Draft** for ODI-standard descriptions; Stories get suggested sub-tasks (editable checkboxes, created automatically on submit), Bugs get a suggested priority based on ODI severity definitions
+- **Dashboard drill-down** — links from Dashboard open assignee or issue deep links (`?assignee=`, `?key=`)
 
 ### Dashboard *(project-level view)*
 Select one or more saved Epic or JQL presets and get a metrics snapshot across all of them.
 
 - **Overall Status** — aggregate % resolved, % in progress, % complete, and % overdue across selected projects
 - **Project Metrics** — per-epic cards showing issue %, epic %, overdue %, status breakdown (pie or bar chart), and deadline dates
-- **Upcoming Due Dates** — optional card: open tasks due from today through a chosen window (7d–90d or custom), grouped by project → assignee; issue type shown per row
+- **Upcoming Due Dates** — optional card: open tasks due from today through a chosen window (7d–90d or custom date), grouped by project → assignee; issue type shown per row
 - **Past Due in lookback** — optional card: missed deadlines within a 1–3 year lookback when Past Due Projects is enabled
-- **Individual Contributor Metrics** — per-person workload cards (open, in progress, overdue, backlog)
-- **Generate Report** — AI-written report in Executive Summary, Product Owner, or Developer format; copyable and downloadable as Markdown
+- **Individual Contributor Metrics** — per-person workload cards (open, in progress, overdue, backlog); names link to Work Week assignee drill-down
+- **Generate Report** — AI-written report in Executive Summary, Product Owner, or Developer format; optional status chart; copy, download, or **Clear report** (on-page only)
+- **Weekly digest** — snapshot-based stand-up brief without LLM
+
+### Past Reports *(archive)*
+Browse reports saved to the local database: Work Week project reports and week plans, Dashboard audience reports (auto-saved on generate), and Chat replies you saved with **Save to Past Reports** (Ad-hoc tab).
 
 ### Chat *(Jira Q&A)*
-Ask natural-language questions about selected epics, your Work Week JQL results, Dashboard metrics, and reports or week plans you already generated. The assistant searches Jira when needed and cites session context for prior queries and AI outputs. Works with Anthropic, OpenAI, Ollama, or opt-in Rovo — configured in `.env`.
+Ask natural-language questions about selected epics, your Work Week JQL results, Dashboard metrics, and reports or week plans you already generated. The assistant searches Jira when needed and cites session context for prior queries and AI outputs. **Save to Past Reports** on any assistant reply. Works with Anthropic, OpenAI, Ollama, or opt-in Rovo — configured in `.env`.
 
 ### Settings *(one-time configuration)*
-- **Epic & JQL presets** — the named queries used on Dashboard, Work Week, and Chat
+- **Epic & JQL presets** — the named queries used on Dashboard, Work Week, and Chat; each preset becomes a project tab and quick-pick option
 - **Jira field mapping** — maps custom Jira date fields (Initial Done Date, Most Recent Done Date, etc.) to the app's roles
 - **Past due rules** — controls which date field triggers the "past due" badge on epics
-- **Watched people & JQL** — saved assignee watches for the Dashboard's Individual Contributor section
+- **Contributor Metrics** — saved people and custom JQL queries for the Dashboard's Individual Contributor Metrics section; person entries track by display name, custom queries can scope any group by project, team, label, or combination
 - **Chat instructions** — personal system-prompt additions layered on top of built-in rules
 - **Test Jira Connection** — verifies `.env` credentials before you change anything else
 
@@ -59,8 +64,9 @@ Ask natural-language questions about selected epics, your Work Week JQL results,
 | Page | Primary purpose | AI features |
 |------|----------------|-------------|
 | Work Week | Daily JQL run + issue management | Per-project report, week planner |
-| Dashboard | Multi-project metrics snapshot | Executive / PM / Developer reports |
-| Chat | Natural-language Jira Q&A + session context | Conversation with Jira tool access; references cached JQL, dashboard snapshot, and generated reports |
+| Dashboard | Multi-project metrics snapshot | Executive / PM / Developer reports, weekly digest |
+| Past Reports | Archived reports and saved Chat replies | View/copy/download prior outputs |
+| Chat | Natural-language Jira Q&A + session context | Conversation with Jira tool access; optional save to Ad-hoc archive |
 | Settings | Configuration | Custom chat instructions |
 
 ---
@@ -132,6 +138,8 @@ Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 |------|-------------|----------------------|
 | JQL text, labels, last table snapshot | Browser `localStorage` | No |
 | Chat session artifacts (reports/plans for context) | Browser `localStorage` | No |
+| On-page reports/plans (Work Week + Dashboard) | Browser `localStorage` | No |
+| **Past Reports** archive | `data/workweek.sqlite` → `generated_reports` | No |
 | Header reminders | Browser `localStorage` | No |
 | Per-issue notes + P1–P10 priority | `data/workweek.sqlite` (local file) | No |
 | Status/assignee changes, pushed comments | Jira (lumen.atlassian.net) | Yes — visible in Jira to anyone with access |

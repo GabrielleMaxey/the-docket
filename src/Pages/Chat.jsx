@@ -8,8 +8,8 @@ import {
   Segment,
 } from "semantic-ui-react";
 import EpicFilterPanel from "./components/EpicFilterPanel";
-import { useEpicFilters } from "./hooks/useEpicFilters";
-import { fetchChatStatus, fetchDashboardMetrics, sendChatMessage, signOutChat, startChatOAuth } from "../services/jiraClient";
+import { useEpicFilters } from "../context/EpicFiltersContext.jsx";
+import { fetchChatStatus, fetchDashboardMetrics, saveAdHocReport, sendChatMessage, signOutChat, startChatOAuth } from "../services/jiraClient";
 import { buildApiUrl } from "../services/apiBase";
 import { buildChatSessionContext } from "../utils/chatSessionContext";
 import "./chat.css";
@@ -33,6 +33,8 @@ const Chat = () => {
   const [chatError, setChatError] = React.useState("");
   const [chatStatus, setChatStatus] = React.useState(null);
   const [dashboardSnapshot, setDashboardSnapshot] = React.useState(null);
+  const [savedMessageIndexes, setSavedMessageIndexes] = React.useState(() => new Set());
+  const [savingMessageIndex, setSavingMessageIndex] = React.useState(null);
 
   const loadDashboardSnapshot = React.useCallback(async () => {
     try {
@@ -139,6 +141,49 @@ const Chat = () => {
     }
   };
 
+  const findUserPromptForIndex = (messageIndex) => {
+    for (let idx = messageIndex - 1; idx >= 0; idx -= 1) {
+      if (messages[idx]?.role === "user") {
+        return String(messages[idx].content || "").trim();
+      }
+    }
+    return "";
+  };
+
+  const buildSaveLabel = (userPrompt) => {
+    const trimmed = String(userPrompt || "").trim();
+    if (!trimmed) {
+      return "Chat response";
+    }
+    return trimmed.length > 80 ? `${trimmed.slice(0, 77)}…` : trimmed;
+  };
+
+  const handleSaveResponse = async (messageIndex) => {
+    const message = messages[messageIndex];
+    const content = String(message?.content || "").trim();
+    if (!content || message?.role !== "assistant") {
+      return;
+    }
+
+    setSavingMessageIndex(messageIndex);
+    setChatError("");
+
+    try {
+      const userPrompt = findUserPromptForIndex(messageIndex);
+      await saveAdHocReport({
+        content,
+        label: buildSaveLabel(userPrompt),
+        userPrompt,
+        provider: message.provider || chatStatus?.provider || "",
+      });
+      setSavedMessageIndexes((prev) => new Set([...prev, messageIndex]));
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Failed to save response");
+    } finally {
+      setSavingMessageIndex(null);
+    }
+  };
+
   const chatReady = Boolean(chatStatus?.ready);
 
   return (
@@ -216,6 +261,19 @@ const Chat = () => {
             >
               <p>{message.content}</p>
               {message.note ? <p className="chat-bubble-note">{message.note}</p> : null}
+              {message.role === "assistant" ? (
+                <div className="chat-bubble-actions">
+                  <Button
+                    size="mini"
+                    basic
+                    loading={savingMessageIndex === index}
+                    disabled={savedMessageIndexes.has(index) || savingMessageIndex !== null}
+                    onClick={() => void handleSaveResponse(index)}
+                  >
+                    {savedMessageIndexes.has(index) ? "Saved to Past Reports" : "Save to Past Reports"}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           ))
         )}

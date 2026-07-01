@@ -14,6 +14,9 @@ import { registerJiraIssueRoutes } from "./routes/jiraIssueRoutes.mjs";
 import { registerIssueMetadataRoutes } from "./routes/issueMetadataRoutes.mjs";
 import { resolveJiraUser } from "./lib/jiraSearchHelpers.mjs";
 import { getJiraSearchFields } from "./lib/jiraSearchFields.mjs";
+import { createLogger } from "./lib/logger.mjs";
+
+const log = createLogger("server");
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
@@ -49,6 +52,18 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// Request logger — records method, path, and response status/duration.
+const reqLog = createLogger("http");
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const ms = Date.now() - start;
+    const level = res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
+    reqLog[level](`${req.method} ${req.path} → ${res.statusCode} (${ms}ms)`);
+  });
+  next();
+});
+
 const PROXY_VERSION = "2026-06-23-modular";
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
 const requiredEnv = ["JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_API_TOKEN"];
@@ -69,13 +84,11 @@ try {
   initDatabase(db);
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
-  console.error("[task-manager] Failed to open SQLite database at", dbPath);
-  console.error(message);
+  log.error("Failed to open SQLite database at " + dbPath);
+  log.error(message);
   if (message.includes("NODE_MODULE_VERSION")) {
-    console.error(
-      "better-sqlite3 must match your Node version. Run: npm rebuild better-sqlite3"
-    );
-    console.error("Or start the API via: npm run dev:api (rebuilds automatically)");
+    log.error("better-sqlite3 must match your Node version. Run: npm rebuild better-sqlite3");
+    log.error("Or start the API via: npm run dev:api (rebuilds automatically)");
   }
   process.exit(1);
 }
@@ -117,9 +130,10 @@ const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
   try { data = text ? JSON.parse(text) : null; } catch { data = { message: text.slice(0, 500) }; }
 
   if (!response.ok) {
-    console.error(`[jira] ${method} ${target} → ${response.status}`);
+    log.error(`${method} ${target} → ${response.status}`);
     return { ok: false, status: response.status, data: data || {} };
   }
+  log.debug(`${method} ${target} → ${response.status}`);
   return { ok: true, status: response.status, data };
 };
 
@@ -258,5 +272,12 @@ if (fs.existsSync(distDir)) {
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 app.listen(port, () => {
-  console.log(`Jira proxy listening on http://localhost:${port}`);
+  log.info(`Jira proxy listening on http://localhost:${port}`);
+  log.info(`Database: ${dbPath}`);
+  const missing = getMissingEnv();
+  if (missing.length > 0) {
+    log.warn(`Missing env vars: ${missing.join(", ")} — Jira calls will fail`);
+  } else {
+    log.info(`Jira base URL: ${process.env.JIRA_BASE_URL}`);
+  }
 });

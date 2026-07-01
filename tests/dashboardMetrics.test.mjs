@@ -355,6 +355,17 @@ describe("personMatchesIssue", () => {
     assert.equal(personMatchesIssue(issue, "jane", "Jane Doe"), true);
     assert.equal(personMatchesIssue(issue, "alice", "Bob Wilson"), false);
   });
+
+  it("matches email-style queries against display names", () => {
+    const issue = makeIssue({ assignee: "Gabrielle Maxey" });
+    assert.equal(personMatchesIssue(issue, "gabrielle.maxey", "Gabrielle Maxey"), true);
+  });
+
+  it("matches by account id when available", () => {
+    const issue = makeIssue({ assignee: "Gabrielle Maxey" });
+    issue.fields.assignee.accountId = "abc123";
+    assert.equal(personMatchesIssue(issue, "gabrielle.maxey", "", "abc123"), true);
+  });
 });
 
 describe("computeAssigneeMetrics", () => {

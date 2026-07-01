@@ -8,7 +8,7 @@ import {
   updateJiraIssueAssignee,
   updateJiraIssueStatus,
 } from "../../services/jiraClient";
-import { runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey } from "./jiraJqlRunWorkflow.js";
+import { runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey, loadDrillDownIssuesByAssignee } from "./jiraJqlRunWorkflow.js";
 import {
   mergeJqlRuns,
   partitionJqlRuns,
@@ -574,10 +574,15 @@ export const useTaskManagerJira = () => {
           assignee: {
             ...(issue.fields?.assignee || {}),
             displayName: nextAssignee,
+            accountId: result?.accountId || issue.fields?.assignee?.accountId,
           },
         },
       }));
-      setRowUpdateMessage(issueKey, { loading: false, success: "Assignee updated." });
+      setAssigneeDrafts((prev) => ({ ...prev, [issueKey]: nextAssignee }));
+      setRowUpdateMessage(issueKey, {
+        loading: false,
+        success: `Assigned to ${nextAssignee}.`,
+      });
     } catch (error) {
       setRowUpdateMessage(issueKey, {
         loading: false,
@@ -653,6 +658,27 @@ export const useTaskManagerJira = () => {
     [pullLatestComment, clampPriority, fieldMappingRows]
   );
 
+  const handleDrillDownToAssignee = React.useCallback(
+    (assigneeName) => {
+      const fetchSeq = ++drillDownFetchSeqRef.current;
+      return loadDrillDownIssuesByAssignee({
+        assigneeName,
+        jqlMaxResults,
+        pullLatestComment,
+        clampPriority,
+        setJqlRuns,
+        setJqlLoading: setJqlLoadingLocal,
+        setJiraRowPriorities,
+        setPrioritySourceByKey,
+        setJiraNotes,
+        setJqlError,
+        fieldMappingRows,
+        isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
+      });
+    },
+    [jqlMaxResults, pullLatestComment, clampPriority, fieldMappingRows]
+  );
+
   const clearDrillDownRuns = React.useCallback(() => {
     drillDownFetchSeqRef.current += 1;
     setJqlRuns((prev) => {
@@ -703,6 +729,7 @@ export const useTaskManagerJira = () => {
     handleRunJql,
     handleLoadRemainingJql,
     handleDrillDownToKey,
+    handleDrillDownToAssignee,
     clearDrillDownRuns,
     handlePushSelected,
     handleSaveMetadata,

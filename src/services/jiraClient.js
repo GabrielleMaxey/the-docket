@@ -129,6 +129,13 @@ export const updateJiraIssueAssignee = async ({ issueKey, assignee }) => {
   });
 };
 
+export const searchJiraUsers = async (query) => {
+  const data = await requestJson(
+    `/api/jira/users/search?query=${encodeURIComponent(String(query || "").trim())}`
+  );
+  return data?.items || [];
+};
+
 export const fetchIssueMetadataBulk = async (issueKeys) => {
   const data = await requestJson("/api/jira/issue-metadata/bulk", {
     method: "POST",
@@ -386,6 +393,14 @@ export const createJiraIssue = async (payload) => {
   });
 };
 
+export const generateIssueDescription = async ({ summary, issueType, epicKey, epicName }) => {
+  return requestJson("/api/jira/issues/generate-description", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ summary, issueType, epicKey: epicKey || "", epicName: epicName || "" }),
+  });
+};
+
 export const generateProjectReport = async ({ label, summary }) => {
   return requestJson("/api/report/project", {
     method: "POST",
@@ -419,4 +434,14 @@ export const fetchArchivedReports = async ({ source, limit } = {}) => {
 export const fetchArchivedReportById = async (id) => {
   const data = await requestJson(`/api/reports/archive/${encodeURIComponent(id)}`);
   return data?.item || null;
+};
+
+export const saveAdHocReport = async ({ content, label, userPrompt, provider }) => {
+  return requestJson("/api/reports/archive", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ content, label, userPrompt, provider }),
+  });
 };

@@ -12,6 +12,7 @@ const REPORT_TYPE_LABELS = {
   work_week_project_report: "Project report",
   week_plan: "Week plan",
   dashboard_report: "Dashboard report",
+  chat_response: "Chat response",
 };
 
 const formatReportType = (item) => {
@@ -41,7 +42,7 @@ const getArchivedChartProps = (report) => {
   };
 };
 
-const ReportList = ({ items, loading, error, selectedId, onSelect }) => {
+const ReportList = ({ items, loading, error, selectedId, onSelect, emptyMessage }) => {
   if (loading) {
     return <Message info size="small">Loading archived reports…</Message>;
   }
@@ -57,7 +58,8 @@ const ReportList = ({ items, loading, error, selectedId, onSelect }) => {
   if (!items.length) {
     return (
       <Message info size="small">
-        No archived reports yet. Generate a report on Work Week or Dashboard to save one here.
+        {emptyMessage ||
+          "No archived reports yet. Generate a report on Work Week or Dashboard to save one here."}
       </Message>
     );
   }
@@ -94,7 +96,7 @@ const ReportList = ({ items, loading, error, selectedId, onSelect }) => {
   );
 };
 
-const ReportArchivePanel = ({ source, title }) => {
+const ReportArchivePanel = ({ source, title, emptyMessage }) => {
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
@@ -168,6 +170,7 @@ const ReportArchivePanel = ({ source, title }) => {
         error={error}
         selectedId={selectedId}
         onSelect={handleSelect}
+        emptyMessage={emptyMessage}
       />
       {detailLoading ? <Message info size="small">Loading report…</Message> : null}
       {detailError ? (
@@ -178,7 +181,11 @@ const ReportArchivePanel = ({ source, title }) => {
       {selectedReport ? (
         <CollapsibleSection
           title={selectedReport.label || "Report"}
-          subtitle={formatTimestamp(selectedReport.createdAt)}
+          subtitle={
+            selectedReport.meta?.userPrompt
+              ? `Question: ${selectedReport.meta.userPrompt}`
+              : formatTimestamp(selectedReport.createdAt)
+          }
           badge={formatReportType(selectedReport)}
           storageKey={`detail-${selectedId}`}
           persistKeyPrefix="report-archive-"
@@ -228,14 +235,26 @@ const ReportArchive = () => {
         </Tab.Pane>
       ),
     },
+    {
+      menuItem: "Ad-hoc",
+      render: () => (
+        <Tab.Pane attached={false}>
+          <ReportArchivePanel
+            source="adhoc"
+            title="Ad-hoc saved responses"
+            emptyMessage="No ad-hoc reports yet. Use Save to Past Reports on a Chat assistant reply to add one here."
+          />
+        </Tab.Pane>
+      ),
+    },
   ];
 
   return (
     <Container fluid className="report-archive-page">
       <Header as="h2" className="report-archive-heading">Past reports</Header>
       <p className="report-archive-intro">
-        Every generated report and week plan is saved on this machine. Browse previous Work Week and Dashboard
-        outputs below.
+        Every generated report and week plan is saved on this machine. Browse previous Work Week, Dashboard,
+        and ad-hoc Chat responses below.
       </p>
       <Tab menu={{ secondary: true, pointing: true }} panes={panes} />
     </Container>

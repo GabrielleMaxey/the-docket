@@ -36,6 +36,7 @@ Open `.env` in any text editor and fill in:
 | `JIRA_EMAIL` | `gabrielle.maxey@lumen.com` | Atlassian account email |
 | `JIRA_API_TOKEN` | `ATATTxxx...` | From step 1 |
 | `API_PORT` | `8787` | Optional; default is `8787` |
+| `LOG_LEVEL` | `info` | Optional; controls server log verbosity — `error`, `warn`, `info` (default), or `debug` |
 
 ### Chat & AI (explicit opt-in)
 
@@ -208,10 +209,11 @@ Each Chat message includes **session context** assembled in the browser and sent
 | Work Week JQL summaries | `localStorage` (`workWeekTasksJiraLastJqlRuns`) — last Run JQL results |
 | Dashboard metrics summary | `GET /api/dashboard/metrics` — refreshed when Chat loads and on each send |
 | Generated artifacts | `localStorage` (`taskManagerChatSessionArtifacts`) — last 8 reports/plans |
+| Past Reports archive | SQLite (`generated_reports`) — all auto-saved reports/plans plus Chat saves |
 
-Artifacts are saved automatically when the user generates a Work Week project report, week plan, or Dashboard audience report. The proxy formats this into the system prompt via `shared/chatSessionPrompt.mjs` so the model can answer questions like "what did my week plan say?" without re-running Jira searches.
+Artifacts are saved automatically when the user generates a Work Week project report, week plan, or Dashboard audience report (also written to **Past Reports** in SQLite). Chat replies are **not** auto-archived — use **Save to Past Reports** on the assistant bubble. The proxy formats session context into the system prompt via `shared/chatSessionPrompt.mjs` so the model can answer questions like "what did my week plan say?" without re-running Jira searches.
 
-Session context stays in the browser and SQLite (dashboard snapshot); only the formatted prompt text is sent to your LLM provider (or Rovo) with each chat message.
+Session context stays in the browser and SQLite (dashboard snapshot + archived reports); only the formatted prompt text is sent to your LLM provider (or Rovo) with each chat message.
 
 ### OpenAI-compatible providers (Databricks, Azure, LiteLLM, vLLM, etc.)
 

@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { formatPercent } from "../../../utils/format";
-import StatusPieChart from "../../../components/StatusPieChart";
+import StatusPieChart from "../../../Components/StatusPieChart";
 import { getTerminalIssueCount } from "../../../../shared/dashboardMetrics.mjs";
 import {
   buildEpicPieStatusCounts,

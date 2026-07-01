@@ -63,7 +63,8 @@ export const buildAssigneeMetricsForRefresh = async ({
         scopedChildIssues,
         queryName,
         resolvedUser?.displayName,
-        dueFieldId
+        dueFieldId,
+        resolvedUser?.accountId
       );
 
       assigneeMetrics.push({
@@ -140,7 +141,8 @@ export const buildAssigneeMetricsForRefresh = async ({
         scopedChildIssues,
         watched.displayName,
         resolvedUser?.displayName,
-        dueFieldId
+        dueFieldId,
+        resolvedUser?.accountId || watched.resolvedAccountId
       );
 
       assigneeMetrics.push({

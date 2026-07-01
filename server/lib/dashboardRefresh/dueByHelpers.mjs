@@ -6,8 +6,16 @@ import {
   parseJiraDate,
   startOfToday,
 } from "../../../shared/dashboardMetrics.mjs";
+import { createLogger } from "../../lib/logger.mjs";
+
+const log = createLogger("dashboard");
 
 export const resolveCandidateFieldIds = (dueByField, { dueFieldId, mrdFieldId, iddFieldId, pedFieldId }) => {
+  if (dueByField === "due_date") {
+    // For epic-level date inheritance: prefer standard duedate, fall back to
+    // MRD / IDD / PED since ODI epics don't use the standard duedate field.
+    return [dueFieldId, mrdFieldId, iddFieldId, pedFieldId].filter(Boolean);
+  }
   if (dueByField === "initial_done_date") {
     return [iddFieldId].filter(Boolean);
   }
@@ -58,11 +66,16 @@ export const buildEpicLevelDueByIssues = ({
   }
 
   if (!epicDueDate) {
+    log.info(`epic ${epicIssue.key} — no date found in candidateFieldIds: [${candidateFieldIds.join(", ")}]`);
     return [];
   }
 
   const today = startOfToday();
   const isUpcomingEpic = epicDueDate >= today && epicDueDate <= cutoff;
+  log.info(
+    `epic ${epicIssue.key} — resolved date ${formatDateOnly(epicDueDate)} via candidateFieldIds | ` +
+    `upcoming: ${isUpcomingEpic} | childIssues: ${childIssues.length}`
+  );
   let includeEpic = isUpcomingEpic;
 
   if (!includeEpic && includePastDueInList && pastDueFloor) {

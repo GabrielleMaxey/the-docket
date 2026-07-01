@@ -1,4 +1,7 @@
 import { mapWatchedAssigneeRow } from "../db/schema.mjs";
+import { createLogger } from "../lib/logger.mjs";
+const log = createLogger("dashboard");
+
 import { loadLatestDashboardSnapshot } from "../lib/dashboardRefresh/loadSnapshot.mjs";
 import { runDashboardRefresh } from "../lib/dashboardRefresh/runDashboardRefresh.mjs";
 
@@ -168,6 +171,7 @@ export const registerDashboardRoutes = (
       return;
     }
 
+    log.info("dashboard refresh started");
     try {
       const result = await runDashboardRefresh({
         body: req.body,
@@ -186,12 +190,15 @@ export const registerDashboardRoutes = (
         return res.status(result.status).json({ error: result.error });
       }
 
+      log.info("dashboard refresh completed");
       const snapshot = loadLatestDashboardSnapshot(db, snapshotStmts);
       return res.json({ snapshot });
     } catch (error) {
+      const detail = error instanceof Error ? error.message : "Unknown error";
+      log.error("dashboard refresh failed", detail);
       return res.status(500).json({
-        error: "Failed to refresh dashboard metrics",
-        message: error instanceof Error ? error.message : "Unknown error",
+        error: detail || "Failed to refresh dashboard metrics",
+        message: detail,
       });
     }
   });

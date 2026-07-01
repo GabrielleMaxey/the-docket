@@ -1,6 +1,6 @@
 import React from "react";
 import { Container, Header, Message } from "semantic-ui-react";
-import { useEpicFilters } from "../hooks/useEpicFilters";
+import { useEpicFilters } from "../../context/EpicFiltersContext.jsx";
 import { usePersistedState } from "../hooks/usePersistedState";
 import { formatPercent, formatTimestamp } from "../../utils/format";
 import {
@@ -10,7 +10,7 @@ import {
   splitDueByIssues,
 } from "./utils/dashboardMetricsUtils";
 import { useDashboardRefresh } from "./hooks/useDashboardRefresh";
-import CollapsibleSection from "../../components/CollapsibleSection";
+import CollapsibleSection from "../../Components/CollapsibleSection";
 import DashboardFiltersPanel from "./components/DashboardFiltersPanel";
 import ReportPanel from "./components/ReportPanel";
 import WeeklyDigestPanel from "./components/WeeklyDigestPanel";
@@ -263,10 +263,13 @@ const Dashboard = () => {
             </CollapsibleSection>
           ) : null}
 
-          {visibleSections.overdue && assigneeMetrics.length > 0 ? (
+          {visibleSections.overdue &&
+          (assigneeMetrics.length > 0 ||
+            assigneeNames.length > 0 ||
+            selectedWatchedIds.length > 0) ? (
             <CollapsibleSection
-              title="Individual  Contributor Metrics"
-              subtitle="Per-person workload and overdue performance for your selected people and saved watches."
+              title="Individual Contributor Metrics"
+              subtitle="Per-person workload and overdue performance for your selected people and custom queries."
               storageKey="overdue"
               persistKeyPrefix="dashboard-collapse-"
               className="app-collapsible--spaced"
@@ -274,14 +277,21 @@ const Dashboard = () => {
               badge={
                 assigneeMetrics.length > 0
                   ? `${assigneeMetrics.length} tracked`
-                  : undefined
+                  : "Refresh to load"
               }
             >
-              <div className="dashboard-assignee-grid">
-                {assigneeMetrics.map((person) => (
-                  <AssigneeMetricCard key={person.id} person={person} />
-                ))}
-              </div>
+              {assigneeMetrics.length > 0 ? (
+                <div className="dashboard-assignee-grid">
+                  {assigneeMetrics.map((person) => (
+                    <AssigneeMetricCard key={person.id} person={person} />
+                  ))}
+                </div>
+              ) : (
+                <Message info size="small">
+                  People are selected above — click <strong>Refresh status</strong> to load their
+                  workload metrics for the projects in step 1.
+                </Message>
+              )}
             </CollapsibleSection>
           ) : null}
 
@@ -321,6 +331,21 @@ const Dashboard = () => {
               ) : (
                 <Message info size="small">
                   No upcoming tasks due through {snapshot.dueByDate}.
+                  {!snapshot.includePastDue && dueByIssueSplit.pastDue.length > 0 ? (
+                    <>
+                      {" "}
+                      Some tasks appear past-due from a previous snapshot — click{" "}
+                      <strong>Refresh status</strong> to update.
+                    </>
+                  ) : null}
+                  {snapshot.includePastDue && dueByIssueSplit.pastDue.length > 0 ? (
+                    <>
+                      {" "}
+                      {dueByIssueSplit.pastDue.length} past-due task
+                      {dueByIssueSplit.pastDue.length !== 1 ? "s are" : " is"} in the lookback —
+                      visible in the <strong>Past Due in lookback</strong> card below.
+                    </>
+                  ) : null}
                 </Message>
               )}
             </CollapsibleSection>
