@@ -1,4 +1,5 @@
 import { buildApiUrl } from "./apiBase.js";
+import { getLocalTimestampPayload } from "../utils/localTimestamp.js";
 
 const formatErrorDetail = (value) => {
   if (value == null || value === "") {
@@ -345,6 +346,7 @@ export const generateReport = async ({
       additionalContext,
       statusCounts,
       chartVariant,
+      ...getLocalTimestampPayload(),
     }),
   });
 };
@@ -405,7 +407,7 @@ export const generateProjectReport = async ({ label, summary }) => {
   return requestJson("/api/report/project", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label, summary }),
+    body: JSON.stringify({ label, summary, ...getLocalTimestampPayload() }),
   });
 };
 
@@ -413,7 +415,13 @@ export const generateWeekPlan = async ({ projects, focusStyle, capacityHours, ad
   return requestJson("/api/plan/week", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ projects, focusStyle, capacityHours, additionalContext }),
+    body: JSON.stringify({
+      projects,
+      focusStyle,
+      capacityHours,
+      additionalContext,
+      ...getLocalTimestampPayload(),
+    }),
   });
 };
 
@@ -442,6 +450,6 @@ export const saveAdHocReport = async ({ content, label, userPrompt, provider }) 
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ content, label, userPrompt, provider }),
+    body: JSON.stringify({ content, label, userPrompt, provider, ...getLocalTimestampPayload() }),
   });
 };

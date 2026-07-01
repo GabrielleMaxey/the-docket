@@ -1,28 +1,26 @@
 import React from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { Button, Container, Divider, Icon, Message } from "semantic-ui-react";
-import "semantic-ui-css/semantic.min.css";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Button, Container, Divider } from "semantic-ui-react";
 import "./workWeekTaskElements.css";
 import CollapsibleSection from "../Components/CollapsibleSection";
 import JiraResultsTable from "./components/JiraResultsTable";
 import TaskManagerHeaderPanel from "./components/TaskManagerHeaderPanel";
 import JiraFilterImportModal from "./components/JiraFilterImportModal";
 import CreateIssueModal from "./components/CreateIssueModal";
+import JqlControlsPanel from "./components/JqlControlsPanel";
 import WeeklyPlanPanel from "./components/WeeklyPlanPanel";
 import MyMetricsSection from "./components/MyMetricsSection";
 import { useEpicFilters } from "../context/EpicFiltersContext.jsx";
 import { usePersistedState } from "./hooks/usePersistedState";
-import { useFlash } from "./hooks/useFlash";
 import { useJokeTicker } from "./hooks/useJokeTicker";
 import { useCalendarData } from "./hooks/useCalendarData";
 import { useWorkWeekHeaderPreferences } from "./hooks/useWorkWeekHeaderPreferences";
 import { useUpcomingDueBanner } from "./hooks/useUpcomingDueBanner";
 import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.js";
-import { findRunIndexForAssignee } from "../utils/workWeekNavigation";
+import { WORK_WEEK_STORAGE_KEYS, normalizeJqlCount } from "../utils/workWeekStorage.js";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
-const REMINDERS_STORAGE_KEY = "workWeekTasksReminders";
 const REMINDER_SLOT_COUNT = 4;
 const TASK_MANAGER_KEY = "ww-task-manager-open";
 
@@ -65,11 +63,13 @@ const WorkWeekTasks = () => {
   } = useUpcomingDueBanner(showUpcomingDueBanner);
   const { todayDay, monthLabel, fullDateLabel, calendarCells } = useCalendarData();
 
-  const [reminders, setReminders] = usePersistedState(REMINDERS_STORAGE_KEY, defaultReminderRows(), { sanitize: sanitizeReminders });
+  const [reminders, setReminders] = usePersistedState(WORK_WEEK_STORAGE_KEYS.reminders, defaultReminderRows(), { sanitize: sanitizeReminders });
   const [importSlotIndex, setImportSlotIndex] = React.useState(null);
   const [createIssueOpen, setCreateIssueOpen] = React.useState(false);
   const [quickPickValueBySlot, setQuickPickValueBySlot] = React.useState({});
+  const drillDownBannerRef = React.useRef(null);
 
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const drillDownFilters = React.useMemo(
     () => ({
@@ -89,13 +89,12 @@ const WorkWeekTasks = () => {
     getPriorityRowClass, formatDate, filtersLoading,
     setJqlCount, setJqlMaxResults, setPullLatestComment,
     handleJqlChange, handleJqlLabelChange,
-    handleResetSavedQueries, handleRunJql, handleLoadRemainingJql, handleDrillDownToKey, handleDrillDownToAssignee, clearDrillDownRuns, handlePushSelected,
+    handleResetSavedQueries, handleRunJql, handleLoadRemainingJql, handleDrillDownToKey, handleDrillDownToAssignee, clearDrillDownRun, handlePushSelected,
     handleSaveMetadata, handleSelectAll, handleStatusDraftChange,
     handleStatusUpdate, handleAssigneeDraftChange, handleAssigneeUpdate,
     handleRowPriorityChange, handleNoteChange, handleSelectForPush, handlePushNote,
   } = useTaskManagerJira();
 
-  const [jqlRunFlash, flashJqlRun] = useFlash();
   const [activeRunIndex, setActiveRunIndex] = React.useState(0);
 
   const activeRun = React.useMemo(() => {
@@ -125,21 +124,20 @@ const WorkWeekTasks = () => {
     return true;
   });
   const drillDownPending =
-    hasDrillDownFilter && !hasDrillDownTab && jqlLoading;
-
-  const hadDrillDownFilterRef = React.useRef(false);
+    hasDrillDownFilter && !hasDrillDownTab && !jqlError;
 
   React.useEffect(() => {
-    if (hasDrillDownFilter) {
-      hadDrillDownFilterRef.current = true;
+    if (!hasDrillDownFilter) {
       return;
     }
-    if (!hadDrillDownFilterRef.current) {
-      return;
-    }
-    hadDrillDownFilterRef.current = false;
-    clearDrillDownRuns();
-  }, [hasDrillDownFilter, clearDrillDownRuns]);
+
+    window.requestAnimationFrame(() => {
+      drillDownBannerRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, [hasDrillDownFilter, drillDownAssignee, drillDownKey]);
 
   React.useEffect(() => {
     if (!drillDownKey || filtersLoading) {
@@ -154,10 +152,6 @@ const WorkWeekTasks = () => {
 
   React.useEffect(() => {
     if (!drillDownAssignee || filtersLoading || drillDownKey) {
-      return;
-    }
-
-    if (findRunIndexForAssignee(jqlRuns, drillDownAssignee) >= 0) {
       return;
     }
 
@@ -249,6 +243,42 @@ const WorkWeekTasks = () => {
     setQuickPickValueBySlot((prev) => ({ ...prev, [index]: "" }));
   }, [epicPresets, handleQuickPick]);
 
+  const handleJqlCountChange = React.useCallback((value) => {
+    setJqlCount(normalizeJqlCount(value));
+  }, [setJqlCount]);
+
+  const handleClearDrillDownFilter = React.useCallback(() => {
+    navigate("/work-week");
+  }, [navigate]);
+
+  const routeFilterMatchesRun = React.useCallback(
+    (run) => {
+      if (!run?.isDrillDown) {
+        return false;
+      }
+      if (drillDownKey && run.drillDownType === "issue") {
+        return (run.issues || []).some(
+          (issue) => String(issue.key || "").trim().toUpperCase() === drillDownKey.toUpperCase()
+        );
+      }
+      if (drillDownAssignee && run.drillDownType === "assignee") {
+        return String(run.drillDownAssignee || "").trim() === drillDownAssignee;
+      }
+      return false;
+    },
+    [drillDownAssignee, drillDownKey]
+  );
+
+  const handleClearDrillDownRun = React.useCallback(
+    (run) => {
+      clearDrillDownRun(run?.drillDownId);
+      if (routeFilterMatchesRun(run)) {
+        handleClearDrillDownFilter();
+      }
+    },
+    [clearDrillDownRun, handleClearDrillDownFilter, routeFilterMatchesRun]
+  );
+
   return (
     <>
       <Container fluid className="work-week-page">
@@ -275,151 +305,31 @@ const WorkWeekTasks = () => {
         />
 
         <CollapsibleSection title="🗂️ Task Manager" storageKey={TASK_MANAGER_KEY} defaultOpen>
-          <div className="ww-task-manager-body">
-            {epicPresetsError ? (
-              <Message warning size="small">
-                Could not load Epic/JQL presets for Quick pick ({epicPresetsError}). Is the API
-                running at <code>http://localhost:8787</code>? Try{" "}
-                <code>npm run dev:api</code> or <code>npm run dev:all</code>, then{" "}
-                <button type="button" className="ww-page-btn" onClick={() => void reloadPresets()}>
-                  retry
-                </button>
-                .
-              </Message>
-            ) : null}
-            {!epicPresetsLoading && !epicPresetsError && epicPresets.length === 0 ? (
-              <Message info size="small">
-                No presets in the database yet. Add them in Settings → Epic & JQL presets, or run{" "}
-                <code>npm run seed:presets -- --all</code>.
-              </Message>
-            ) : null}
-            <div className="ww-create-issue-row">
-              <Button primary onClick={() => setCreateIssueOpen(true)}>Create Issue</Button>
-            </div>
-
-            <div className="ww-jql-controls">
-              <label htmlFor="jql-count">JQL count:</label>
-              <select id="jql-count" value={jqlCount} onChange={(e) => setJqlCount(Number(e.target.value))}>
-                {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
-
-            {Array.from({ length: jqlCount }).map((_, index) => (
-              <div key={`jql-input-${index}`} className="ww-jql-input-wrap">
-                <div className="ww-jql-row-head">
-                  <label htmlFor={`jql-label-${index}`}>Label {index + 1}</label>
-                </div>
-                {epicPresets.length > 0 ? (
-                  <div className="ww-quick-pick-row">
-                    <div className="ww-quick-pick-main">
-                      <label className="ww-quick-pick-label" htmlFor={`quick-pick-${index}`}>
-                        Quick pick:
-                      </label>
-                      <select
-                        id={`quick-pick-${index}`}
-                        className="ww-quick-pick-select"
-                        value={quickPickValueBySlot[index] ?? ""}
-                        onChange={(e) => handleQuickPickSelect(index, e.target.value)}
-                      >
-                        <option value="">Choose preset…</option>
-                        {epicPresets.map((preset) => (
-                          <option
-                            key={`qp-${index}-${preset.id}`}
-                            value={preset.id}
-                            title={
-                              preset.presetType === "jql"
-                                ? (preset.jql || preset.label)
-                                : preset.epicKey
-                            }
-                          >
-                            {preset.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      className="ww-import-filter-btn ww-import-filter-btn-inline"
-                      onClick={() => setImportSlotIndex(index)}
-                    >
-                      Import from Jira
-                    </button>
-                  </div>
-                ) : (
-                  <div className="ww-quick-pick-row">
-                    <button type="button" className="ww-import-filter-btn ww-import-filter-btn-inline"
-                      onClick={() => setImportSlotIndex(index)}>
-                      Import from Jira
-                    </button>
-                  </div>
-                )}
-                <div className="ww-jql-row-inline">
-                  <input id={`jql-label-${index}`} type="text" value={jqlLabels[index]}
-                    onChange={(e) => handleJqlLabelChange(index, e.target.value)}
-                    placeholder={`Label for JQL ${index + 1}`} />
-                </div>
-                <input id={`jql-${index}`} type="text" value={jqlInputs[index]}
-                  onChange={(e) => handleJqlChange(index, e.target.value)}
-                  placeholder="project = ABC ORDER BY updated DESC" />
-              </div>
-            ))}
-
-            <div className="ww-jql-maxresults">
-              <label htmlFor="jql-max-results">Max results:</label>
-              <input id="jql-max-results" type="number" min={1} max={1000} value={jqlMaxResults}
-                onChange={(e) => setJqlMaxResults(Math.max(1, Number(e.target.value) || 200))} />
-            </div>
-
-            <div className="ww-jql-pull-comments">
-              <span className="ww-jql-pull-comments-label">Notes on run</span>
-              <label className="ww-jql-pull-comments-option">
-                <input
-                  type="radio"
-                  name="jqlPullComments"
-                  value="off"
-                  checked={!pullLatestComment}
-                  onChange={() => setPullLatestComment(false)}
-                />
-                Keep local notes
-              </label>
-              <label className="ww-jql-pull-comments-option">
-                <input
-                  type="radio"
-                  name="jqlPullComments"
-                  value="latest"
-                  checked={pullLatestComment}
-                  onChange={() => setPullLatestComment(true)}
-                />
-                Pull most recent Jira comment
-              </label>
-              <button
-                type="button"
-                className="ww-selector-clear"
-                onClick={() => setPullLatestComment(false)}
-              >
-                Clear
-              </button>
-              <span className="ww-jql-pull-comments-hint">
-                When enabled, Run JQL and Refresh overwrite note text with each issue&apos;s latest Jira comment.
-              </span>
-            </div>
-
-            <div className="ww-jql-action-row">
-              <Button secondary size="small" onClick={handleRunJql} loading={jqlLoading} disabled={filtersLoading}>
-                Run JQL
-              </Button>
-              <Button size="small" className="ww-reset-btn" onClick={handleResetSavedQueriesWithConfirm} disabled={filtersLoading}>
-                <Icon name="warning sign" />Reset Saved Queries
-              </Button>
-            </div>
-
-            {jqlError ? <p className="ww-jira-status ww-jira-error">{jqlError}</p> : null}
-            {jqlRunFlash ? <p className="ww-inline-success">{jqlRunFlash}</p> : null}
-            <p className="ww-jql-shortcut-hint">
-              Tip: Press <kbd className="ww-kbd">Ctrl</kbd>+<kbd className="ww-kbd">Enter</kbd> or{" "}
-              <kbd className="ww-kbd">⌘</kbd>+<kbd className="ww-kbd">Enter</kbd> to run or refresh JQL results.
-            </p>
-          </div>
+          <JqlControlsPanel
+            epicPresets={epicPresets}
+            epicPresetsLoading={epicPresetsLoading}
+            epicPresetsError={epicPresetsError}
+            onReloadPresets={() => void reloadPresets()}
+            onCreateIssue={() => setCreateIssueOpen(true)}
+            jqlCount={jqlCount}
+            jqlInputs={jqlInputs}
+            jqlLabels={jqlLabels}
+            onJqlCountChange={handleJqlCountChange}
+            onJqlChange={handleJqlChange}
+            onJqlLabelChange={handleJqlLabelChange}
+            quickPickValueBySlot={quickPickValueBySlot}
+            onQuickPickSelect={handleQuickPickSelect}
+            onImportSlot={setImportSlotIndex}
+            jqlMaxResults={jqlMaxResults}
+            onJqlMaxResultsChange={setJqlMaxResults}
+            pullLatestComment={pullLatestComment}
+            onPullLatestCommentChange={setPullLatestComment}
+            onRunJql={handleRunJql}
+            onResetSavedQueries={handleResetSavedQueriesWithConfirm}
+            jqlLoading={jqlLoading}
+            filtersLoading={filtersLoading}
+            jqlError={jqlError}
+          />
         </CollapsibleSection>
 
         {jqlRuns.some((r) => r.issues?.length > 0) ? null : null}
@@ -439,19 +349,23 @@ const WorkWeekTasks = () => {
         ) : null}
 
         {hasDrillDownFilter ? (
-          <div className="ww-drill-down-banner">
+          <div className="ww-drill-down-banner" ref={drillDownBannerRef}>
             <div className="ww-drill-down-banner-content">
               <strong>Dashboard drill-down</strong>
               <p className="ww-restored-jql-banner-copy">
                 {drillDownFilters.key ? `Filtering to ${drillDownFilters.key}` : null}
                 {drillDownFilters.key && drillDownFilters.assignee ? " · " : null}
                 {drillDownFilters.assignee ? `assignee ${drillDownFilters.assignee}` : null}
-                {jqlLoading ? " — loading from Jira…" : null}
-                {!jqlLoading && jqlError && drillDownKey ? ` — ${jqlError}` : null}
+                {drillDownPending || jqlLoading ? " — loading from Jira…" : null}
+                {!drillDownPending && !jqlLoading && jqlError ? ` — ${jqlError}` : null}
               </p>
-              <Link to="/work-week" className="ww-drill-down-clear-link">
-                Clear drill-down
-              </Link>
+              <button
+                type="button"
+                className="ww-drill-down-clear-link"
+                onClick={handleClearDrillDownFilter}
+              >
+                Clear filter
+              </button>
             </div>
           </div>
         ) : null}
@@ -479,6 +393,8 @@ const WorkWeekTasks = () => {
           handleSelectForPush={handleSelectForPush} handlePushNote={handlePushNote}
           onActiveTabChange={setActiveRunIndex}
           onLoadRemaining={handleLoadRemainingJql}
+          onClearDrillDownRun={handleClearDrillDownRun}
+          onClearDrillDownFilter={hasDrillDownFilter ? handleClearDrillDownFilter : null}
           jqlLoading={jqlLoading}
           drillDownFilters={drillDownFilters}
           drillDownPending={drillDownPending}

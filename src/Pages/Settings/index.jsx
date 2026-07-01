@@ -1,6 +1,5 @@
 import React from "react";
 import { Button, Container, Header, Message, Segment } from "semantic-ui-react";
-import "semantic-ui-css/semantic.min.css";
 import {
   fetchAppSettings,
   fetchChatStatus,

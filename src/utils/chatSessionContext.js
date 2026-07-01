@@ -7,9 +7,10 @@ import {
   formatDateOnly,
   getFieldValue,
 } from "../../shared/dashboardMetrics.mjs";
+import { WORK_WEEK_STORAGE_KEYS } from "./workWeekStorage.js";
 
-export const CHAT_SESSION_ARTIFACTS_KEY = "taskManagerChatSessionArtifacts";
-export const JQL_RUNS_STORAGE_KEY = "workWeekTasksJiraLastJqlRuns";
+export const CHAT_SESSION_ARTIFACTS_KEY = WORK_WEEK_STORAGE_KEYS.chatSessionArtifacts;
+export const JQL_RUNS_STORAGE_KEY = WORK_WEEK_STORAGE_KEYS.jqlRuns;
 
 const MAX_STORED_ARTIFACTS = 8;
 const MAX_ARTIFACT_CHARS = 6000;

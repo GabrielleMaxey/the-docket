@@ -83,6 +83,17 @@ const sanitizeStatusCounts = (value) => {
 
 const sanitizeChartVariant = (value) => (String(value || "").trim() === "bar" ? "bar" : "pie");
 
+const getClientArchiveTimestamp = (req) => String(req.body?.savedAtLocal || "").trim();
+
+const getClientArchiveMeta = (req) => {
+  const savedAtLocal = String(req.body?.savedAtLocal || "").trim();
+  const savedTimeZone = String(req.body?.savedTimeZone || "").trim();
+  return {
+    ...(savedAtLocal ? { savedAtLocal } : {}),
+    ...(savedTimeZone ? { savedTimeZone } : {}),
+  };
+};
+
 const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics }) => {
   const lines = [
     "## Overall Project Metrics",
@@ -255,11 +266,13 @@ export const registerReportRoutes = (app, { db }) => {
         reportType: "dashboard_report",
         label: config.label,
         content: report,
+        createdAt: getClientArchiveTimestamp(req),
         meta: {
           audience: audienceKey,
           epicPresetIds: requestedEpicIds,
           additionalContext,
           snapshotRefreshedAt: snapshot.refreshedAt,
+          ...getClientArchiveMeta(req),
           ...(statusCounts ? { statusCounts, chartVariant } : {}),
         },
       });
@@ -329,7 +342,8 @@ Tone: supportive and honest — like a thoughtful colleague reviewing your work 
         reportType: "work_week_project_report",
         label,
         content: report,
-        meta: { summary },
+        createdAt: getClientArchiveTimestamp(req),
+        meta: { summary, ...getClientArchiveMeta(req) },
       });
       return res.json({ report, label, archiveId });
     } catch (error) {
@@ -399,7 +413,14 @@ Rules:
         reportType: "week_plan",
         label: "Week plan",
         content: plan,
-        meta: { focusStyle, capacityHours, additionalContext, projectLabels: projects.map((p) => p.label) },
+        createdAt: getClientArchiveTimestamp(req),
+        meta: {
+          focusStyle,
+          capacityHours,
+          additionalContext,
+          projectLabels: projects.map((p) => p.label),
+          ...getClientArchiveMeta(req),
+        },
       });
       return res.json({ plan, archiveId });
     } catch (error) {
@@ -463,8 +484,10 @@ Rules:
         reportType: "chat_response",
         label,
         content,
+        createdAt: getClientArchiveTimestamp(req),
         meta: {
           savedFrom: "chat",
+          ...getClientArchiveMeta(req),
           ...(userPrompt ? { userPrompt } : {}),
           ...(provider ? { provider } : {}),
         },

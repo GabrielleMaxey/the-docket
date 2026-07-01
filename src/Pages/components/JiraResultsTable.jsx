@@ -284,6 +284,8 @@ const JiraResultsTable = ({
   onActiveTabChange,
   prioritySourceByKey,
   onLoadRemaining,
+  onClearDrillDownRun,
+  onClearDrillDownFilter,
   jqlLoading,
   drillDownFilters,
   drillDownPending,
@@ -296,9 +298,33 @@ const JiraResultsTable = ({
   const [sortField, setSortField] = React.useState("default");
   const [sortDirection, setSortDirection] = React.useState("asc");
 
+  const pendingDrillDownRun = React.useMemo(() => {
+    if (!drillDownPending) {
+      return null;
+    }
+
+    return {
+      index: "pending-drill-down",
+      drillDownId: "pending-drill-down",
+      label: "Loading drill-down...",
+      jql: "",
+      issues: [],
+      total: 0,
+      loaded: 0,
+      loadComplete: true,
+      isDrillDown: true,
+      isPendingDrillDown: true,
+    };
+  }, [drillDownPending]);
+
+  const visibleRuns = React.useMemo(
+    () => (pendingDrillDownRun ? [pendingDrillDownRun, ...jqlRuns] : jqlRuns),
+    [jqlRuns, pendingDrillDownRun]
+  );
+
   React.useEffect(() => {
-    setActiveTab((prev) => Math.min(Math.max(prev, 0), Math.max(0, jqlRuns.length - 1)));
-  }, [jqlRuns.length]);
+    setActiveTab((prev) => Math.min(Math.max(prev, 0), Math.max(0, visibleRuns.length - 1)));
+  }, [visibleRuns.length]);
 
   const hadDrillDownFiltersRef = React.useRef(false);
 
@@ -318,20 +344,20 @@ const JiraResultsTable = ({
       return;
     }
 
-    if (jqlRuns.length === 0) {
+    if (visibleRuns.length === 0) {
       return;
     }
 
     hadDrillDownFiltersRef.current = true;
 
-    const targetTab = findRunIndexForDrillDown(jqlRuns, { key, assignee });
+    const targetTab = findRunIndexForDrillDown(visibleRuns, { key, assignee });
     const safeTargetTab = targetTab >= 0 ? targetTab : 0;
-    const targetRun = jqlRuns[safeTargetTab];
+    const targetRun = visibleRuns[safeTargetTab];
     const stateKey = getRunStateKey(targetRun, safeTargetTab);
 
     setActiveTab(safeTargetTab);
-    if (onActiveTabChange) {
-      onActiveTabChange(safeTargetTab);
+    if (onActiveTabChange && !targetRun?.isPendingDrillDown) {
+      onActiveTabChange(pendingDrillDownRun ? safeTargetTab - 1 : safeTargetTab);
     }
 
     if (key) {
@@ -341,37 +367,14 @@ const JiraResultsTable = ({
       setAssigneeFilterByRunIndex((prevFilters) => ({ ...prevFilters, [stateKey]: assignee }));
     }
     setPageByRunIndex((prevPages) => ({ ...prevPages, [stateKey]: 1 }));
-  }, [drillDownFilters, jqlRuns, onActiveTabChange]);
+  }, [drillDownFilters, onActiveTabChange, pendingDrillDownRun, visibleRuns]);
 
-  if (jqlRuns.length === 0 && !drillDownPending) {
+  if (visibleRuns.length === 0) {
     return null;
   }
 
-  if (jqlRuns.length === 0 && drillDownPending) {
-    return (
-      <div className="ww-results-section">
-        <div className="ww-jql-tab-bar">
-          <div className="ww-jql-tabs" role="tablist" aria-label="JQL result tabs">
-            <button
-              type="button"
-              role="tab"
-              aria-selected
-              className="ww-jql-tab-btn is-active is-drill-down"
-              disabled
-            >
-              Loading drill-down…
-            </button>
-          </div>
-        </div>
-        <div className="ww-jql-result">
-          <p className="ww-jira-status">Loading issue from Jira…</p>
-        </div>
-      </div>
-    );
-  }
-
-  const safeTab = Math.min(activeTab, jqlRuns.length - 1);
-  const run = jqlRuns[safeTab];
+  const safeTab = Math.min(activeTab, visibleRuns.length - 1);
+  const run = visibleRuns[safeTab];
   const runStateKey = getRunStateKey(run, safeTab);
   const runSlotIndex = run.index ?? safeTab;
   const allLoadedIssues = run.issues || [];
@@ -400,9 +403,11 @@ const JiraResultsTable = ({
   const loadedCount = Number(run.loaded ?? allLoadedIssues.length);
   const hasMoreToLoad = !run.isDrillDown && !run.loadComplete && jiraTotal > loadedCount;
 
-  const handleTabChange = (idx) => {
+  const handleTabChange = (idx, item) => {
     setActiveTab(idx);
-    if (onActiveTabChange) onActiveTabChange(idx);
+    if (onActiveTabChange && !item?.isPendingDrillDown) {
+      onActiveTabChange(pendingDrillDownRun ? idx - 1 : idx);
+    }
   };
 
   const handlePageChange = (nextPage) => {
@@ -478,21 +483,40 @@ const JiraResultsTable = ({
 
       <div className="ww-jql-tab-bar">
         <div className="ww-jql-tabs" role="tablist" aria-label="JQL result tabs">
-          {jqlRuns.map((item, idx) => (
-            <button
-              key={`jql-tab-${item.index ?? idx}`}
-              type="button"
-              role="tab"
-              aria-selected={idx === safeTab}
+          {visibleRuns.map((item, idx) => (
+            <div
+              key={`jql-tab-${getRunStateKey(item, idx)}`}
               className={
-                "ww-jql-tab-btn" +
+                "ww-jql-tab-item" +
                 (idx === safeTab ? " is-active" : "") +
                 (item.isDrillDown ? " is-drill-down" : "")
               }
-              onClick={() => handleTabChange(idx)}
             >
-              {item.label || ("JQL " + (idx + 1))}
-            </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={idx === safeTab}
+                className={
+                  "ww-jql-tab-btn" +
+                  (idx === safeTab ? " is-active" : "") +
+                  (item.isDrillDown ? " is-drill-down" : "")
+                }
+                onClick={() => handleTabChange(idx, item)}
+              >
+                {item.label || ("JQL " + (idx + 1))}
+              </button>
+              {item.isDrillDown && !item.isPendingDrillDown ? (
+                <button
+                  type="button"
+                  className="ww-jql-tab-clear-btn"
+                  onClick={() => onClearDrillDownRun?.(item)}
+                  aria-label={`Clear ${item.label || "drill-down tab"}`}
+                  title="Clear drill-down tab"
+                >
+                  x
+                </button>
+              ) : null}
+            </div>
           ))}
         </div>
       </div>
@@ -503,7 +527,9 @@ const JiraResultsTable = ({
           <p className="ww-jql-query">{run.jql || "(empty)"}</p>
         </div>
 
-        {run.error ? (
+        {run.isPendingDrillDown ? (
+          <p className="ww-jira-status">Loading drill-down from Jira...</p>
+        ) : run.error ? (
           <p className="ww-jira-status ww-jira-error">{run.error}</p>
         ) : (
           <div>
@@ -594,6 +620,16 @@ const JiraResultsTable = ({
                   aria-label="Clear all filters"
                 >
                   Clear filters
+                </button>
+              ) : null}
+              {onClearDrillDownFilter ? (
+                <button
+                  type="button"
+                  className="ww-page-btn"
+                  onClick={onClearDrillDownFilter}
+                  aria-label="Clear dashboard drill-down filter"
+                >
+                  Clear drill-down filter
                 </button>
               ) : null}
             </div>

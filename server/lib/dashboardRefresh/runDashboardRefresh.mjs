@@ -45,12 +45,22 @@ export const runDashboardRefresh = async ({
     .filter(Boolean)
     .map(mapEpicPresetRow);
 
-  log.info(
-    `refresh started — presets: [${selectedPresets.map((p) => `${p.epicName}(${p.presetType})`).join(", ")}]` +
-    ` | dueByDate: ${ctx.dueByDate || "none"} | dueByField: ${ctx.dueByField}` +
-    ` | compareFieldId: ${ctx.dueByCompareFieldId || "—"} | candidateFieldIds: [${ctx.candidateFieldIds.join(", ")}]` +
-    ` | includePastDue: ${ctx.includePastDue} | pastDueFloor: ${ctx.pastDueFloor ? ctx.pastDueFloor.toISOString().slice(0, 10) : "none"}`
-  );
+  const presetQueryTypes = selectedPresets.map((preset) => preset.presetType || "epic");
+  const watchedQueryTypes = input.watchedAssigneeIds
+    .map((id) => getWatchedAssignee(id))
+    .filter(Boolean)
+    .map(mapWatchedAssigneeRow)
+    .map((watched) => (watched.watchType === "jql" ? "jql" : "person"));
+  const contributorQueryTypes = [
+    ...(input.assigneeNames.length > 0 ? ["person"] : []),
+    ...watchedQueryTypes,
+  ];
+  const queryTypes = Array.from(new Set([
+    ...presetQueryTypes,
+    ...(ctx.includePastDue ? ["past_due"] : []),
+    ...contributorQueryTypes,
+  ]));
+  log.info(`dashboard query types: ${queryTypes.length > 0 ? queryTypes.join(", ") : "none"}`);
 
   const { epicMetrics, scopedChildIssues } = await buildEpicMetricsForRefresh({
     ctx,
@@ -62,13 +72,6 @@ export const runDashboardRefresh = async ({
   const rollup = computeOverallRollup(epicMetrics);
   const refreshedAt = new Date().toISOString();
   const allDueByIssues = collectDueByIssues(epicMetrics, ctx.dueByDate);
-
-  const upcomingCount = allDueByIssues.filter((i) => !i.isOverdue).length;
-  const pastDueCount  = allDueByIssues.filter((i) => i.isOverdue).length;
-  log.info(
-    `refresh complete — ${epicMetrics.length} preset(s) | due-by: ${allDueByIssues.length} total` +
-    ` (${upcomingCount} upcoming, ${pastDueCount} past-due)`
-  );
 
   const assigneeMetrics = await buildAssigneeMetricsForRefresh({
     assigneeNames: input.assigneeNames,

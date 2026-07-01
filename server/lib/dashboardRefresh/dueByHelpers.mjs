@@ -6,9 +6,6 @@ import {
   parseJiraDate,
   startOfToday,
 } from "../../../shared/dashboardMetrics.mjs";
-import { createLogger } from "../../lib/logger.mjs";
-
-const log = createLogger("dashboard");
 
 export const resolveCandidateFieldIds = (dueByField, { dueFieldId, mrdFieldId, iddFieldId, pedFieldId }) => {
   if (dueByField === "due_date") {
@@ -66,16 +63,11 @@ export const buildEpicLevelDueByIssues = ({
   }
 
   if (!epicDueDate) {
-    log.info(`epic ${epicIssue.key} — no date found in candidateFieldIds: [${candidateFieldIds.join(", ")}]`);
     return [];
   }
 
   const today = startOfToday();
   const isUpcomingEpic = epicDueDate >= today && epicDueDate <= cutoff;
-  log.info(
-    `epic ${epicIssue.key} — resolved date ${formatDateOnly(epicDueDate)} via candidateFieldIds | ` +
-    `upcoming: ${isUpcomingEpic} | childIssues: ${childIssues.length}`
-  );
   let includeEpic = isUpcomingEpic;
 
   if (!includeEpic && includePastDueInList && pastDueFloor) {
