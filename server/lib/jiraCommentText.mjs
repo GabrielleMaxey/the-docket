@@ -46,8 +46,11 @@ export const fetchLatestCommentTextForIssue = async ({ issueKey, jiraRequest }) 
   const comments = Array.isArray(result.data?.comments) ? result.data.comments : [];
   const latest = comments[0];
   const text = adfToPlainText(latest?.body);
+  const author = String(
+    latest?.author?.displayName || latest?.author?.name || ""
+  ).trim();
 
-  return { issueKey, text, error: null };
+  return { issueKey, text, author, error: null };
 };
 
 export const fetchLatestCommentTextBulk = async ({
@@ -74,9 +77,9 @@ export const fetchLatestCommentTextBulk = async ({
       chunk.map((issueKey) => fetchLatestCommentTextForIssue({ issueKey, jiraRequest }))
     );
 
-    results.forEach(({ issueKey, text }) => {
+    results.forEach(({ issueKey, text, author }) => {
       if (text) {
-        items[issueKey] = text;
+        items[issueKey] = { text, author: author || "" };
       }
     });
   }

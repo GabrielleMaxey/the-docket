@@ -41,7 +41,7 @@ const shuffleItems = (items) => {
   return shuffled;
 };
 
-export const useJokeTicker = () => {
+export const useJokeTicker = (enabled = true) => {
   const [jokeIndex, setJokeIndex] = React.useState(0);
   const [apiJokes, setApiJokes] = React.useState([]);
 
@@ -77,10 +77,16 @@ export const useJokeTicker = () => {
   }, []);
 
   React.useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     fetchApiJokes();
-  }, [fetchApiJokes]);
+  }, [enabled, fetchApiJokes]);
 
   React.useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     const intervalId = window.setInterval(() => {
       void fetchApiJokes();
       setJokeIndex((prev) => (prev + 1) % tickerJokes.length);
@@ -89,7 +95,7 @@ export const useJokeTicker = () => {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [fetchApiJokes, tickerJokes.length]);
+  }, [enabled, fetchApiJokes, tickerJokes.length]);
 
   React.useEffect(() => {
     setJokeIndex((prev) => (prev >= tickerJokes.length ? 0 : prev));

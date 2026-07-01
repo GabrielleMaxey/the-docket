@@ -1,6 +1,7 @@
 // Dashboard AI reports from the latest stored snapshot + configured LLM.
 
 import { completeLlmText, resolveFirstReadyReportProvider } from "../lib/llmClient.mjs";
+import { loadWeeklyDigestFromDb } from "../lib/weeklyDigest.mjs";
 import {
   insertGeneratedReport,
   getGeneratedReportById,
@@ -400,6 +401,24 @@ Rules:
     } catch (error) {
       console.error("[plan/week] generation failed:", error);
       return res.status(500).json({ error: "Week plan generation failed", message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.get("/api/reports/weekly-digest", (_req, res) => {
+    try {
+      const digest = loadWeeklyDigestFromDb(db);
+      if (!digest) {
+        return res.status(404).json({
+          error: "No dashboard snapshot found. Run a Dashboard refresh first.",
+        });
+      }
+      return res.json({ digest });
+    } catch (error) {
+      console.error("[reports/weekly-digest] failed:", error);
+      return res.status(500).json({
+        error: "Failed to build weekly digest",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   });
 

@@ -287,7 +287,18 @@ export const buildEpicMetricsFromPresets = async ({
     }
 
     const metricsJql = buildDashboardMetricsJql(jql) || jql;
-    const { issues } = await searchAllIssues({ jql: metricsJql, runJiraSearchRequest });
+    let issues = [];
+    try {
+      ({ issues } = await searchAllIssues({ jql: metricsJql, runJiraSearchRequest }));
+    } catch (error) {
+      epicMetrics.push(
+        emptyEpicMetricFromPreset(
+          preset,
+          error instanceof Error ? error.message : "Jira search failed for this preset."
+        )
+      );
+      continue;
+    }
 
     if (preset.presetType === "jql") {
       const childMetrics = computeChildIssueMetrics(

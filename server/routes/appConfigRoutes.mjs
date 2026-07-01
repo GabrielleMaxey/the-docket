@@ -194,6 +194,86 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
     return res.json({ ok: true, id });
   });
 
+  app.get("/api/epic-presets/export", (_req, res) => {
+    const items = listEpicPresetsStmt.all().map(mapEpicPresetRow);
+    return res.json({
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      presets: items.map((preset) => ({
+        presetType: preset.presetType,
+        epicKey: preset.epicKey,
+        epicName: preset.epicName,
+        label: preset.label,
+        jiraFilterId: preset.jiraFilterId,
+        jql: preset.jql,
+        sortOrder: preset.sortOrder,
+      })),
+    });
+  });
+
+  app.post("/api/epic-presets/import", (req, res) => {
+    const incoming = Array.isArray(req.body?.presets) ? req.body.presets : [];
+    const mode = req.body?.mode === "replace" ? "replace" : "merge";
+
+    if (incoming.length === 0) {
+      return res.status(400).json({ error: "No presets provided" });
+    }
+
+    if (mode === "replace") {
+      db.prepare("DELETE FROM epic_presets").run();
+    }
+
+    const presetFingerprint = (preset) =>
+      [
+        String(preset.presetType || "").trim(),
+        String(preset.epicKey || "").trim(),
+        String(preset.jql || "").trim(),
+        String(preset.epicName || preset.label || "").trim(),
+      ].join("|");
+
+    const existingFingerprints = new Set(
+      mode === "merge"
+        ? listEpicPresetsStmt.all().map((row) => presetFingerprint(mapEpicPresetRow(row)))
+        : []
+    );
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const raw of incoming) {
+      const payload = normalizeEpicPresetPayload({
+        presetType: raw?.presetType,
+        epicKey: raw?.epicKey,
+        epicName: raw?.epicName || raw?.label,
+        jiraFilterId: raw?.jiraFilterId,
+        jql: raw?.jql,
+        sortOrder: raw?.sortOrder,
+      });
+
+      if (payload.error) {
+        skipped += 1;
+        continue;
+      }
+
+      const fp = presetFingerprint(payload);
+      if (mode === "merge" && existingFingerprints.has(fp)) {
+        skipped += 1;
+        continue;
+      }
+
+      insertEpicPresetStmt.run(payload);
+      existingFingerprints.add(fp);
+      imported += 1;
+    }
+
+    return res.json({
+      ok: true,
+      imported,
+      skipped,
+      items: listEpicPresetsStmt.all().map(mapEpicPresetRow),
+    });
+  });
+
   app.get("/api/jira/filters/favourite", async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;

@@ -8,6 +8,7 @@ import Chat from "./Pages/Chat.jsx";
 import ReportArchive from "./Pages/ReportArchive.jsx";
 import Settings from "./Pages/Settings.jsx";
 import "./appNav.css";
+import BackgroundJobIndicator from "./components/BackgroundJobIndicator.jsx";
 
 const NAV_LINKS = [
   { to: "/work-week", label: "Work Week" },
@@ -24,6 +25,7 @@ const AppLayout = () => (
         <img src="/task-manager-favicon.svg" alt="" aria-hidden="true" className="app-nav-logo-icon" />
         Task Manager
       </NavLink>
+      <BackgroundJobIndicator />
       <ul className="app-nav-links">
         {NAV_LINKS.map(({ to, label, icon }) => (
           <li key={to}>

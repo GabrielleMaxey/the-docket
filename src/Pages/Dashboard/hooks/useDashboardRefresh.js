@@ -6,6 +6,12 @@ import {
   refreshDashboardMetrics,
 } from "../../../services/jiraClient";
 import { useFlash } from "../../hooks/useFlash";
+import {
+  BACKGROUND_JOB_IDS,
+  runBackgroundJob,
+  useAttachBackgroundJob,
+  useBackgroundJobRunning,
+} from "../../../hooks/useBackgroundJobs.js";
 import { getTerminalIssueCount, normalizePastDueLookbackYears } from "../../../../shared/dashboardMetrics.mjs";
 import {
   sameNumberSet,
@@ -21,7 +27,6 @@ export const useDashboardRefresh = ({
 }) => {
   const [snapshot, setSnapshot] = React.useState(null);
   const [metricsLoading, setMetricsLoading] = React.useState(true);
-  const [refreshLoading, setRefreshLoading] = React.useState(false);
   const [refreshError, setRefreshError] = React.useState("");
   const [jiraBaseUrl, setJiraBaseUrl] = React.useState("");
   const [watchedPeople, setWatchedPeople] = React.useState([]);
@@ -32,6 +37,20 @@ export const useDashboardRefresh = ({
   const [dueByField, setDueByField] = React.useState("most_recent_done_date");
   const [pastDueLookbackYears, setPastDueLookbackYears] = React.useState(1);
   const [refreshFlash, flashRefresh] = useFlash();
+  const [refreshPending, setRefreshPending] = React.useState(false);
+  const bgRefreshRunning = useBackgroundJobRunning(BACKGROUND_JOB_IDS.DASHBOARD_REFRESH);
+  const refreshLoading = refreshPending || bgRefreshRunning;
+
+  useAttachBackgroundJob(BACKGROUND_JOB_IDS.DASHBOARD_REFRESH, {
+    onSuccess: (data) => {
+      setSnapshot(data);
+      flashRefresh("Dashboard updated.");
+    },
+    onError: (error) => {
+      setRefreshError(error instanceof Error ? error.message : "Failed to refresh dashboard");
+    },
+    onFinally: () => setRefreshPending(false),
+  });
 
   const loadMetrics = React.useCallback(async () => {
     setMetricsLoading(true);
@@ -93,26 +112,32 @@ export const useDashboardRefresh = ({
     selectedWatchedIds,
   ]);
 
-  const handleRefresh = React.useCallback(async () => {
+  const handleRefresh = React.useCallback(() => {
     setRefreshError("");
-    setRefreshLoading(true);
-    try {
-      const data = await refreshDashboardMetrics({
-        epicPresetIds: selectedPresetIds,
-        includePastDue,
-        dueByDate: dueByDate || null,
-        dueByField,
-        pastDueLookbackYears,
-        assigneeNames,
-        watchedAssigneeIds: selectedWatchedIds,
-      });
-      setSnapshot(data);
-      flashRefresh("Dashboard updated.");
-    } catch (error) {
-      setRefreshError(error instanceof Error ? error.message : "Failed to refresh dashboard");
-    } finally {
-      setRefreshLoading(false);
-    }
+    setRefreshPending(true);
+    runBackgroundJob(BACKGROUND_JOB_IDS.DASHBOARD_REFRESH, {
+      label: "Refreshing dashboard",
+      run: () =>
+        refreshDashboardMetrics({
+          epicPresetIds: selectedPresetIds,
+          includePastDue,
+          dueByDate: dueByDate || null,
+          dueByField,
+          pastDueLookbackYears,
+          assigneeNames,
+          watchedAssigneeIds: selectedWatchedIds,
+        }),
+    })
+      .then((data) => {
+        setSnapshot(data);
+        flashRefresh("Dashboard updated.");
+      })
+      .catch((error) => {
+        setRefreshError(
+          error instanceof Error ? error.message : "Failed to refresh dashboard"
+        );
+      })
+      .finally(() => setRefreshPending(false));
   }, [
     selectedPresetIds,
     includePastDue,

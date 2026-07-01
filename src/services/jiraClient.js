@@ -89,6 +89,16 @@ export const fetchJiraSearch = async ({ jql, maxResults = 5 }) => {
   });
 };
 
+export const fetchJiraSearchAll = async ({ jql, maxTotal = 200 }) => {
+  return requestJson("/api/jira/search/all", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ jql, maxTotal }),
+  });
+};
+
 export const pushJiraIssueNote = async ({ issueKey, note }) => {
   return requestJson(`/api/jira/issues/${encodeURIComponent(issueKey)}/comment`, {
     method: "POST",
@@ -191,6 +201,17 @@ export const deleteEpicPreset = async (id) => {
     method: "DELETE",
   });
 };
+
+export const exportEpicPresetsPack = async () => requestJson("/api/epic-presets/export");
+
+export const importEpicPresetsPack = async ({ presets, mode = "merge" }) =>
+  requestJson("/api/epic-presets/import", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ presets, mode }),
+  });
 
 export const fetchFavouriteJiraFilters = async () => {
   const data = await requestJson("/api/jira/filters/favourite");
@@ -320,6 +341,8 @@ export const generateReport = async ({
     }),
   });
 };
+
+export const fetchWeeklyDigest = async () => requestJson("/api/reports/weekly-digest");
 
 export const fetchChatStatus = async () => requestJson("/api/chat/status");
 

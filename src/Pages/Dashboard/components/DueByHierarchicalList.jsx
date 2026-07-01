@@ -1,6 +1,8 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { getDueBrowseUrl, groupIssuesByEpicAndAssignee, formatIssueTypeLabel } from "../utils/dashboardMetricsUtils";
 import { isEpicIssueType } from "../../../../shared/dashboardMetrics.mjs";
+import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 
 const DueByHierarchicalList = ({
   issues,
@@ -33,6 +35,15 @@ const DueByHierarchicalList = ({
                 ) : (
                   epicName
                 )}
+                {epicKey ? (
+                  <Link
+                    to={buildWorkWeekHref({ key: epicKey })}
+                    className="dashboard-work-week-link"
+                    title="Open in Work Week"
+                  >
+                    Work Week
+                  </Link>
+                ) : null}
               </span>
               <span className="dashboard-due-by-epic-count">
                 {total} item{total !== 1 ? "s" : ""}
@@ -42,7 +53,9 @@ const DueByHierarchicalList = ({
             {[...assignees.entries()].map(([assignee, assigneeIssues]) => (
               <div key={assignee} className="dashboard-due-by-assignee-group">
                 <div className="dashboard-due-by-assignee-header">
-                  <span>{assignee}</span>
+                  <Link to={buildWorkWeekHref({ assignee })} className="dashboard-work-week-link">
+                    {assignee}
+                  </Link>
                   <span className="dashboard-due-by-assignee-count">
                     {assigneeIssues.length} item{assigneeIssues.length !== 1 ? "s" : ""}
                   </span>
@@ -62,13 +75,19 @@ const DueByHierarchicalList = ({
                         }`}
                       >
                         <span className="dashboard-due-by-task-key">
+                          <Link to={buildWorkWeekHref({ key: issue.key })}>{issue.key}</Link>
                           {url ? (
-                            <a href={url} target="_blank" rel="noreferrer noopener">
-                              {issue.key}
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              className="dashboard-jira-external-link"
+                              title="Open in Jira"
+                              aria-label={`Open ${issue.key} in Jira`}
+                            >
+                              ↗
                             </a>
-                          ) : (
-                            issue.key
-                          )}
+                          ) : null}
                         </span>
                         <span
                           className={`dashboard-due-by-type-badge${
