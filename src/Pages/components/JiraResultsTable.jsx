@@ -836,7 +836,6 @@ const JiraResultsTable = ({
                           assignee={assignee}
                           isClosedOrResolved={isClosedOrResolved}
                           draftValue={assigneeDrafts[issueKey]}
-                          datalistId={"assignee-options-" + runStateKey}
                           knownAssignees={knownAssignees}
                           loading={rowUpdate.loading}
                           confirmation={rowUpdate}
