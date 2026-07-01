@@ -361,6 +361,9 @@ export async function loadRemainingJqlIssues({
 
 const DRILL_DOWN_RUN_INDEX = -1;
 
+const makeDrillDownId = (kind, value) =>
+  `${kind}:${String(value || "").trim().toLowerCase()}`;
+
 export async function loadDrillDownIssueByKey({
   issueKey,
   pullLatestComment,
@@ -398,6 +401,9 @@ export async function loadDrillDownIssueByKey({
 
     const drillRun = {
       index: DRILL_DOWN_RUN_INDEX,
+      drillDownId: makeDrillDownId("issue", normalized),
+      drillDownType: "issue",
+      drillDownValue: normalized,
       label: `Drill-down: ${normalized}`,
       jql,
       issues,
@@ -431,8 +437,12 @@ export async function loadDrillDownIssueByKey({
     }
 
     setJqlRuns((prev) => {
-      const { regular } = partitionJqlRuns(prev);
-      const next = mergeJqlRuns([enriched], regular);
+      const { drillDown, regular } = partitionJqlRuns(prev);
+      const nextDrillDown = [
+        enriched,
+        ...drillDown.filter((run) => run.drillDownId !== enriched.drillDownId),
+      ];
+      const next = mergeJqlRuns(nextDrillDown, regular);
       persistJqlRunsToStorage(next);
       return next;
     });
@@ -485,6 +495,9 @@ export async function loadDrillDownIssuesByAssignee({
 
     const drillRun = {
       index: DRILL_DOWN_RUN_INDEX,
+      drillDownId: makeDrillDownId("assignee", assignee),
+      drillDownType: "assignee",
+      drillDownValue: assignee,
       label: `Drill-down: ${assignee}`,
       jql,
       issues,
@@ -519,8 +532,12 @@ export async function loadDrillDownIssuesByAssignee({
     }
 
     setJqlRuns((prev) => {
-      const { regular } = partitionJqlRuns(prev);
-      const next = mergeJqlRuns([enriched], regular);
+      const { drillDown, regular } = partitionJqlRuns(prev);
+      const nextDrillDown = [
+        enriched,
+        ...drillDown.filter((run) => run.drillDownId !== enriched.drillDownId),
+      ];
+      const next = mergeJqlRuns(nextDrillDown, regular);
       persistJqlRunsToStorage(next);
       return next;
     });

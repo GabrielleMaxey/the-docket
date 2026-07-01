@@ -30,7 +30,7 @@ Run up to five saved JQL queries side-by-side and manage every issue in one tabl
 - **My Metrics** — per-query progress summary with issue counts and a per-project AI report (written for you, the assignee, in second person); **Clear report** removes the on-page copy only
 - **Help me plan my week** — answers 4 quick questions, then generates a day-by-day Monday–Friday plan based on your actual open issues
 - **Create Issue** — creates a new Jira issue from a modal with epic/parent selection and **✦ AI Draft** for ODI-standard descriptions; Stories get suggested sub-tasks (editable checkboxes, created automatically on submit), Bugs get a suggested priority based on ODI severity definitions
-- **Dashboard drill-down** — links from Dashboard open assignee or issue deep links (`?assignee=`, `?key=`)
+- **Dashboard drill-down** — links from Dashboard open assignee or issue deep links (`?assignee=`, `?key=`); drill-down tabs persist for the current browser session and can be cleared one at a time
 
 ### Dashboard *(project-level view)*
 Select one or more saved Epic or JQL presets and get a metrics snapshot across all of them.
@@ -137,9 +137,10 @@ Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 | What | Where stored | Leaves your machine? |
 |------|-------------|----------------------|
 | JQL text, labels, last table snapshot | Browser `localStorage` | No |
+| Work Week drill-down tabs | Browser `sessionStorage` | No |
 | Chat session artifacts (reports/plans for context) | Browser `localStorage` | No |
 | On-page reports/plans (Work Week + Dashboard) | Browser `localStorage` | No |
-| **Past Reports** archive | `data/workweek.sqlite` → `generated_reports` | No |
+| **Past Reports** archive | `data/workweek.sqlite` → `generated_reports`; saved under your browser's local timestamp/timezone | No |
 | Header reminders | Browser `localStorage` | No |
 | Per-issue notes + P1–P10 priority | `data/workweek.sqlite` (local file) | No |
 | Status/assignee changes, pushed comments | Jira (lumen.atlassian.net) | Yes — visible in Jira to anyone with access |

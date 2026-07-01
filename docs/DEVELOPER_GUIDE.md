@@ -324,14 +324,15 @@ Separately, the latest comment text is always scanned for team priority: `parseP
 
 Drill-down behavior:
 
-1. **`findRunIndexForDrillDown`** (`workWeekNavigation.js`) — prefers an existing JQL tab that contains the issue or matches `drillDownAssignee`; otherwise selects the assignee-heavy tab.
+1. **`findRunIndexForDrillDown`** (`workWeekNavigation.js`) — prefers an existing drill-down tab of the same type, then falls back to a regular JQL tab that contains the issue or assignee.
 2. **Re-apply when JQL loads** — filter state updates when `jqlRuns` populates (fixes early apply-before-data bug).
-3. **`loadDrillDownIssueByKey`** (`jiraJqlRunWorkflow.js`) — fetches `key = "ISSUE-KEY"` from Jira and prepends a temporary **Drill-down** tab (`isDrillDown: true`).
-4. **`loadDrillDownIssuesByAssignee`** — when the assignee is not already in saved JQL results, runs `assignee = "Name"` in Jira and prepends a **Drill-down: Name** tab. `WorkWeekTasks.jsx` triggers this from `?assignee=` when no matching run exists.
+3. **Pending state** — `JiraResultsTable.jsx` creates a temporary **Loading drill-down...** tab while `WorkWeekTasks.jsx` is fetching the target, so Dashboard clicks show the loading message even when regular JQL tabs already exist.
+4. **`loadDrillDownIssueByKey`** (`jiraJqlRunWorkflow.js`) — fetches `key = "ISSUE-KEY"` from Jira and prepends/refreshes a **Drill-down: ISSUE-KEY** tab (`isDrillDown: true`, `drillDownType: "issue"`, stable `drillDownId`).
+5. **`loadDrillDownIssuesByAssignee`** — when the assignee is not already in saved JQL results, runs `assignee = "Name"` in Jira and prepends/refreshes a **Drill-down: Name** tab (`drillDownType: "assignee"`). `WorkWeekTasks.jsx` triggers this from `?assignee=` when no matching run exists.
 
-A fetch sequence guard drops stale responses when keys change quickly or **Clear drill-down** is used.
+A fetch sequence guard drops stale responses when keys change quickly or all drill-down runs are cleared internally.
 
-**Drill-down run isolation** (`jqlRunPersistence.js`): `partitionJqlRuns` / `mergeJqlRuns` / `savableJqlRuns` keep `isDrillDown` tabs out of `localStorage` and preserve them when background JQL completes, MRDD enrichment runs, or **Load remaining** updates regular tabs. **Clear drill-down** (`/work-week` without query) removes `isDrillDown` runs via `clearDrillDownRuns()` and invalidates in-flight fetches.
+**Drill-down run isolation** (`jqlRunPersistence.js`): `partitionJqlRuns` / `mergeJqlRuns` / `savableJqlRuns` keep `isDrillDown` tabs out of the regular `localStorage` JQL snapshot and preserve them when background JQL completes, MRDD enrichment runs, or **Load remaining** updates regular tabs. Drill-down tabs are stored separately in `sessionStorage` (`workWeekTasksJiraDrillDownRuns`) via `persistDrillDownRunsToSessionStorage()` and restored only for the current browser session. `clearDrillDownRun(drillDownId)` removes one drill-down tab; clearing the Dashboard filter navigates to `/work-week` without deleting session drill-down tabs.
 
 ### Epic preset team pack
 
@@ -344,7 +345,7 @@ Settings UI: **Export team pack** / **Import team pack**. Align with `npm run se
 
 ### Past Reports archive
 
-`server/lib/reportArchive.mjs` — `REPORT_SOURCES` (`work_week`, `dashboard`, `adhoc`), `insertGeneratedReport`, `listGeneratedReports`, `getGeneratedReportById`. Tab filters use `report_type` sets (Work Week: project report + week plan; Dashboard: `dashboard_report`; Ad-hoc: `chat_response` or `source=adhoc`).
+`server/lib/reportArchive.mjs` — `REPORT_SOURCES` (`work_week`, `dashboard`, `adhoc`), `insertGeneratedReport`, `listGeneratedReports`, `getGeneratedReportById`. Tab filters use `report_type` sets (Work Week: project report + week plan; Dashboard: `dashboard_report`; Ad-hoc: `chat_response` or `source=adhoc`). Report saves pass `savedAtLocal` / `savedTimeZone` from the browser (`src/utils/localTimestamp.js`) so archived rows are created under the user's local timestamp; the timezone is also kept in `meta_json` when provided.
 
 UI: `ReportArchive.jsx` — three tabs, list + `ReportOutput` viewer. Dashboard archived items may include `meta.statusCounts` / `chartVariant` for chart replay.
 
@@ -494,6 +495,7 @@ Ad-hoc Chat saves use `saveAdHocReport()` → `POST /api/reports/archive` (not a
 |------|-----------|--------|
 | JQL inputs, labels, count | `localStorage` | `workWeekTasksJiraPreferences` |
 | Last JQL results snapshot | `localStorage` | `workWeekTasksJiraLastJqlRuns` |
+| Work Week drill-down runs | `sessionStorage` | `workWeekTasksJiraDrillDownRuns` |
 | Jira notes + row priorities (UI cache) | `localStorage` | `workWeekTasksJiraNotes`, `workWeekTasksJiraRowPriorities` |
 | Chat session artifacts (reports/plans for Chat context) | `localStorage` | `taskManagerChatSessionArtifacts` |
 | On-page Dashboard report | `localStorage` | `taskManagerPersistedDashboardReport` |
@@ -594,7 +596,7 @@ All route modules and the proxy entry point use `server/lib/logger.mjs` via `cre
 |-------|---------------|
 | `error` | Failures only |
 | `warn` | HTTP 4xx responses + missing env vars at startup |
-| `info` | Every HTTP request (method, path, status, duration), dashboard refresh start/complete, report generation start, preset mutations (create/update/delete/import), issue mutations (comment push, status update, assignee update), server startup details |
+| `info` | Every HTTP request (method, path, status, duration), dashboard refresh query type summary, report generation start, preset mutations (create/update/delete/import), issue mutations (comment push, status update, assignee update), server startup details |
 | `debug` | All of the above **plus** every individual Jira API call (method, full URL, status code) |
 
 Set `LOG_LEVEL=debug` when tracing Jira API issues. The HTTP request logger fires on `res.finish` so it always captures the final status code even for streamed responses.
@@ -657,6 +659,7 @@ npm run build
 #    - Generate a project report; navigate away and back while it runs
 #    - Generate a week plan
 #    - Dashboard refresh + weekly digest + Generate Report; drill-down link to Work Week (?key=, ?assignee=)
+#    - Work Week drill-down tabs persist for the browser session; clear one tab and clear the URL filter separately
 #    - Past Reports: view archived Work Week / Dashboard / Ad-hoc items; Chat Save to Past Reports
 #    - Clear report on Work Week / Dashboard (on-page only)
 #    - Assignee cell: type name/email, pick suggestion, Update Assignee

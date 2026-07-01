@@ -199,48 +199,6 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-// ─── Legacy inline routes (issue metadata + basic search) ────────────────────
-
-const clampDbPriority = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? Math.max(0, Math.min(10, Math.round(n))) : 0;
-};
-
-const selectMetaStmt = db.prepare("SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key = ?");
-const upsertMetaStmt = db.prepare(`
-  INSERT INTO issue_metadata (issue_key, note, priority, updated_at)
-  VALUES (@issueKey, @note, @priority, CURRENT_TIMESTAMP)
-  ON CONFLICT(issue_key) DO UPDATE SET
-    note = excluded.note, priority = excluded.priority, updated_at = CURRENT_TIMESTAMP
-`);
-
-app.post("/api/jira/issue-metadata/bulk", (req, res) => {
-  const keys = Array.isArray(req.body?.issueKeys)
-    ? req.body.issueKeys.map((k) => String(k || "").trim()).filter(Boolean)
-    : [];
-  if (!keys.length) return res.json({ items: {} });
-  const placeholders = keys.map(() => "?").join(",");
-  const rows = db.prepare(`SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key IN (${placeholders})`).all(...keys);
-  const items = rows.reduce((acc, row) => {
-    acc[row.issue_key] = { note: String(row.note || ""), priority: clampDbPriority(row.priority) };
-    return acc;
-  }, {});
-  return res.json({ items });
-});
-
-app.put("/api/jira/issue-metadata/:issueKey", (req, res) => {
-  const issueKey = String(req.params.issueKey || "").trim();
-  if (!issueKey) return res.status(400).json({ error: "Missing issue key" });
-  const current = selectMetaStmt.get(issueKey) || {};
-  const hasNote = typeof req.body?.note === "string";
-  const hasPriority = req.body?.priority !== undefined;
-  if (!hasNote && !hasPriority) return res.status(400).json({ error: "Provide note or priority" });
-  const note = hasNote ? String(req.body.note) : String(current.note || "");
-  const priority = hasPriority ? clampDbPriority(req.body.priority) : clampDbPriority(current.priority);
-  upsertMetaStmt.run({ issueKey, note, priority });
-  return res.json({ ok: true, issueKey, note, priority });
-});
-
 // ─── Mount all route modules ──────────────────────────────────────────────────
 
 const routeCtx = {

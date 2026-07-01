@@ -93,7 +93,7 @@ This is the main screen for managing your open work.
 
 ### Task Manager card
 
-1. **JQL count** — choose 1–4 query slots. Each has a label (your name for it) and a JQL box.
+1. **JQL count** — choose 1–5 query slots. Each has a label (your name for it) and a JQL box.
 2. **Max results** — first page size per query. The app can load **all** matching issues (up to a safe cap) — see Results table below.
 3. **Notes on run** — choose how row notes are filled when you **Run JQL** or refresh:
    - **Keep local notes** (default) — notes come from your local database for issues in the result set.
@@ -154,7 +154,7 @@ Each row is one Jira issue. What you can do per row:
 - **Issue key** — the app fetches that issue from Jira and opens a green **Drill-down: ODI-123** tab (first tab), even if the issue also appears in your saved JQL results.
 - **Assignee name** — if that person is not already in your saved JQL results, the app runs `assignee = "Name"` in Jira and opens a **Drill-down: Name** tab with their tasks. If their issues are already loaded in a JQL tab, that tab is selected and filtered by assignee instead.
 
-A green banner confirms the active drill-down; use **Clear drill-down** to remove drill-down tabs and filters.
+A green banner confirms the active drill-down. Use **Clear filter** to remove the Dashboard filter from the URL while keeping any drill-down tabs you opened in this browser session. Use the small **x** on an individual green drill-down tab to remove only that tab.
 
 **MRD column:** The header shows **MRD** (hover for “Most Recent Done Date”). It displays the issue’s automated Most Recent Done Date when that field is set on the task. When the task has no MRD, the app walks the **parent chain** (for example Story → Epic) and shows the first ancestor that has an MRD. This uses the same ODI field mapping as Dashboard (`customfield_10009` by default). Standard Jira **Due date** is not shown in the table; it is still used behind the scenes for My Metrics past-due/upcoming counts and Chat context.
 
@@ -370,8 +370,9 @@ PRIORITY P2 — Blocked on vendor response. Target fix by Friday.
 | Data | Stored where | Shared with Jira? |
 |------|-------------|-------------------|
 | JQL inputs, labels, table snapshot | This browser only (`localStorage`) | No |
+| Work Week drill-down tabs | This browser session only (`sessionStorage`) | No |
 | On-page report/plan display (before archive) | This browser only (`localStorage`) | No |
-| **Past Reports** archive | Local file (`data/workweek.sqlite` → `generated_reports`) | No |
+| **Past Reports** archive | Local file (`data/workweek.sqlite` → `generated_reports`), saved with your browser's local timestamp/timezone | No |
 | Chat session artifacts (for Chat context) | This browser only (`localStorage`) | No |
 | Desktop app credentials + DB (packaged) | `%APPDATA%\Task Manager\` (Windows) or `~/Library/Application Support/Task Manager/` (Mac) | No |
 | Header reminders | This browser only | No |

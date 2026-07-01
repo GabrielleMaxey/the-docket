@@ -31,7 +31,7 @@
 | Chat page + LLM fallback (Anthropic/OpenAI/Ollama) | Phase 5 (partial) | ✅ Complete |
 | **Rovo MCP OAuth** | Phase 5 | ⏸ **Parked** — `ROVO_OAUTH_ENABLED = false`; routes/handlers preserved but disabled; Rovo not available for this Jira instance |
 | `chat_sessions` SQLite table | Phase 5 | ⏸ Parked with Rovo |
-| JQL slot cap (target: 5) | Phase 5 | ⚠️ Partial — UI/persistence still capped below 5 in code |
+| JQL slot cap (target: 5) | Phase 5 | ✅ Complete |
 | **Post-spec additions** | — | — |
 | Work Week per-project AI report (assignee-perspective) | Added during dev | ✅ Complete |
 | Help me plan my week (AI week planner) | Added during dev | ✅ Complete |
@@ -43,10 +43,10 @@
 | Due-date list: issue type badges, epic inheritance for MRD/IDD compare | Added during dev | ✅ Complete |
 | Chat session context (Work Week JQL, dashboard snapshot, generated artifacts) | Added during dev | ✅ Complete |
 | Work Week results table: **MRD** column with parent-chain inheritance | Added during dev | ✅ Complete |
+| Dashboard → Work Week drill-down tabs with session persistence | Added during dev | ✅ Complete |
 
 ### Remaining before distribution
 
-- [ ] Fix JQL slot cap to 5 (align spec, UI, and `loadStoredPreferences()` — currently capped lower in code)
 - [ ] Confirm Rovo MCP availability; enable and test OAuth when ready
 - [ ] Seed `epic_presets` with real ODI epic keys and filter IDs
 - [ ] Validate past-due rules and due-date compare behavior against team expectations
@@ -75,7 +75,7 @@ Expand the existing Jira workbench (React + Vite + Express proxy + SQLite) into 
 | Persistence | `localStorage` for JQL prefs; SQLite `issue_metadata` for notes/priority |
 | Routes | `/`, `/work-week` only (real feature); `/home` stub |
 | Desktop | Electron spawns proxy; packaged build loads `file://dist` (API routing gap) |
-| JQL slots | UI allows 4; `loadStoredPreferences()` caps stored count at 5 |
+| JQL slots | UI allows 5; `loadStoredPreferences()` normalizes stored count to 1–5 |
 
 ---
 
@@ -92,7 +92,7 @@ Expand the existing Jira workbench (React + Vite + Express proxy + SQLite) into 
 
 ### User custom filters
 
-- Up to **5** user-defined JQL slots (fix 3/4/5 inconsistency across UI and persistence — see Open Items).
+- Up to **5** user-defined JQL slots.
 - **Import from Jira**: browse favourite saved filters (`GET /rest/api/3/filter/favourite`), pick one to fill a slot.
 - Epic presets and user JQL slots are independent.
 
@@ -369,10 +369,9 @@ Rovo MCP path (`mcp.atlassian.com`) remains in codebase (`rovoChat.mjs`, OAuth r
 
 ## Open Items
 
-1. **JQL slot cap** — align UI, spec, and persistence to 5 slots (verify current code cap).
-2. **Rovo MCP** — confirm org availability; test OAuth sign-in when enabled.
-3. **Epic preset seeding** — populate `epic_presets` with real ODI epic keys and filter IDs.
-4. **Past-due / due-date validation** — confirm team expectations for MRDD vs Project End Date, upcoming vs past-due card split, and compare-field behavior with real ODI data.
+1. **Rovo MCP** — confirm org availability; test OAuth sign-in when enabled.
+2. **Epic preset seeding** — populate `epic_presets` with real ODI epic keys and filter IDs.
+3. **Past-due / due-date validation** — confirm team expectations for MRDD vs Project End Date, upcoming vs past-due card split, and compare-field behavior with real ODI data.
 
 ---
 

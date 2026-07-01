@@ -39,9 +39,10 @@ Short product roadmap for teams with **individual contributors (ICs)**, **PMs**,
 | | |
 |--|--|
 | **Effort** | Medium |
+| **Status** | Complete |
 | **Who benefits** | Everyone on large ODI queries |
 | **Problem** | **Max results** caps one Jira page; with sort order, issues visible in Jira may be missing from the table. |
-| **Build** | Proxy paginates Jira search (`startAt`) until all matches are loaded (or a documented safe cap). UI: “Loaded 847 of 847” or “Loaded 200 of 847 — Load rest” with progress. |
+| **Build** | Proxy paginates Jira search until all matches are loaded (or a documented safe cap). UI: “Loaded 847 of 847” or “Loaded 200 of 847 — Load rest” with progress. |
 | **Success** | Work Week table matches Jira for the same JQL; PMs trust audits and ICs trust their queue. |
 
 ---
@@ -51,9 +52,10 @@ Short product roadmap for teams with **individual contributors (ICs)**, **PMs**,
 | | |
 |--|--|
 | **Effort** | Medium |
+| **Status** | Complete |
 | **Who benefits** | PM, Manager |
 | **Problem** | Dashboard shows risk and counts; leaders still hunt issue keys in Jira or ask ICs. |
-| **Build** | Click epic card, due-date row, or contributor metric → open **Work Week** with that issue key (or preset + filter). Keep **Open in Jira** on rows where applicable. |
+| **Build** | Click epic card, due-date row, or contributor metric → open **Work Week** with that issue key or assignee filter. Drill-down tabs persist for the browser session and can be cleared one at a time. Keep **Open in Jira** on rows where applicable. |
 | **Success** | One click from “what’s red on Dashboard” to “act on it in Work Week”. |
 
 ---
@@ -98,9 +100,9 @@ Short product roadmap for teams with **individual contributors (ICs)**, **PMs**,
 |-------|--------|---------|
 | **Now** | Presets + `PRIORITY P#` SOP | Shared language for ODI priority |
 | **Phase 1** | Step 1 — parse priority from comments | ICs see PM ranking automatically |
-| **Phase 2** | Step 2 — full JQL pagination | Table matches Jira at scale |
-| **Phase 3** | Step 3 — Dashboard drill-down | Leaders drive ICs from metrics |
-| **Phase 4** | Steps 4–5 — team pack + digest | Faster onboarding and manager briefings |
+| **Complete** | Step 2 — full JQL pagination | Table matches Jira at scale |
+| **Complete** | Step 3 — Dashboard drill-down | Leaders drive ICs from metrics |
+| **Next** | Steps 4–5 — team pack + digest | Faster onboarding and manager briefings |
 
 ---
 

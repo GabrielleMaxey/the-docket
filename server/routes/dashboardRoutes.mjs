@@ -171,7 +171,6 @@ export const registerDashboardRoutes = (
       return;
     }
 
-    log.info("dashboard refresh started");
     try {
       const result = await runDashboardRefresh({
         body: req.body,
@@ -190,7 +189,6 @@ export const registerDashboardRoutes = (
         return res.status(result.status).json({ error: result.error });
       }
 
-      log.info("dashboard refresh completed");
       const snapshot = loadLatestDashboardSnapshot(db, snapshotStmts);
       return res.json({ snapshot });
     } catch (error) {
