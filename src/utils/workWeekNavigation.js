@@ -71,6 +71,14 @@ export const findRunIndexForDrillDown = (jqlRuns, { key, assignee } = {}) => {
   }
 
   if (assigneeName) {
+    const drillDownIdx = jqlRuns.findIndex(
+      (run) =>
+        run.isDrillDown &&
+        String(run.drillDownAssignee || "").trim() === assigneeName
+    );
+    if (drillDownIdx >= 0) {
+      return drillDownIdx;
+    }
     return findRunIndexForAssignee(jqlRuns, assigneeName);
   }
 

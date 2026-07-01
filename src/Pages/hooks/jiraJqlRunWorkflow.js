@@ -29,6 +29,67 @@ const readCommentEntry = (entry) => {
   return { text: "", author: "" };
 };
 
+const escapeJqlString = (value) =>
+  String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
+const applyDrillDownMetadata = async ({
+  issueKeys,
+  pullLatestComment,
+  clampPriority,
+  setJiraRowPriorities,
+  setPrioritySourceByKey,
+  setJiraNotes,
+}) => {
+  if (issueKeys.length === 0) {
+    return;
+  }
+
+  const latestComments = await fetchLatestJiraCommentsBulk(issueKeys);
+  const priorityFromComment = {};
+  const prioritySource = {};
+
+  issueKeys.forEach((key) => {
+    const { text, author } = readCommentEntry(latestComments?.[key]);
+    const parsed = parsePriorityFromComment(text);
+    if (parsed) {
+      priorityFromComment[key] = clampPriority(parsed.priority);
+      prioritySource[key] = { source: "jira-comment", author: author || "Jira" };
+    }
+    if (pullLatestComment && text) {
+      setJiraNotes((prev) => ({ ...prev, [key]: text }));
+    }
+  });
+
+  if (Object.keys(priorityFromComment).length > 0) {
+    setJiraRowPriorities((prev) => ({ ...prev, ...priorityFromComment }));
+    if (setPrioritySourceByKey) {
+      setPrioritySourceByKey((prev) => ({ ...prev, ...prioritySource }));
+    }
+  }
+
+  const persisted = await fetchIssueMetadataBulk(issueKeys);
+  const nextNotes = {};
+  const nextPriorities = {};
+  issueKeys.forEach((key) => {
+    const item = persisted?.[key];
+    if (!item) {
+      return;
+    }
+    if (!pullLatestComment && typeof item.note === "string") {
+      nextNotes[key] = item.note;
+    }
+    if (item.priority !== undefined && priorityFromComment[key] === undefined) {
+      nextPriorities[key] = clampPriority(item.priority);
+    }
+  });
+  if (!pullLatestComment && Object.keys(nextNotes).length > 0) {
+    setJiraNotes((prev) => mergeIssueMapsPreferExisting(prev, nextNotes));
+  }
+  if (Object.keys(nextPriorities).length > 0) {
+    setJiraRowPriorities((prev) => mergeIssueMapsPreferExisting(prev, nextPriorities));
+  }
+};
+
 /**
  * Runs JQL slot(s), merges persisted notes/priorities from the proxy DB for returned keys,
  * syncs PRIORITY P# from latest Jira comments, and updates React state via the provided setters.
@@ -352,55 +413,17 @@ export async function loadDrillDownIssueByKey({
       .map((issue) => String(issue.key || "").trim())
       .filter(Boolean);
 
-    if (issueKeys.length > 0) {
-      try {
-        const latestComments = await fetchLatestJiraCommentsBulk(issueKeys);
-        const priorityFromComment = {};
-        const prioritySource = {};
-
-        issueKeys.forEach((key) => {
-          const { text, author } = readCommentEntry(latestComments?.[key]);
-          const parsed = parsePriorityFromComment(text);
-          if (parsed) {
-            priorityFromComment[key] = clampPriority(parsed.priority);
-            prioritySource[key] = { source: "jira-comment", author: author || "Jira" };
-          }
-          if (pullLatestComment && text) {
-            setJiraNotes((prev) => ({ ...prev, [key]: text }));
-          }
-        });
-
-        if (Object.keys(priorityFromComment).length > 0) {
-          setJiraRowPriorities((prev) => ({ ...prev, ...priorityFromComment }));
-          if (setPrioritySourceByKey) {
-            setPrioritySourceByKey((prev) => ({ ...prev, ...prioritySource }));
-          }
-        }
-
-        const persisted = await fetchIssueMetadataBulk(issueKeys);
-        const nextNotes = {};
-        const nextPriorities = {};
-        issueKeys.forEach((key) => {
-          const item = persisted?.[key];
-          if (!item) {
-            return;
-          }
-          if (!pullLatestComment && typeof item.note === "string") {
-            nextNotes[key] = item.note;
-          }
-          if (item.priority !== undefined && priorityFromComment[key] === undefined) {
-            nextPriorities[key] = clampPriority(item.priority);
-          }
-        });
-        if (!pullLatestComment && Object.keys(nextNotes).length > 0) {
-          setJiraNotes((prev) => mergeIssueMapsPreferExisting(prev, nextNotes));
-        }
-        if (Object.keys(nextPriorities).length > 0) {
-          setJiraRowPriorities((prev) => mergeIssueMapsPreferExisting(prev, nextPriorities));
-        }
-      } catch (error) {
-        console.error("Failed to enrich drill-down issue", error);
-      }
+    try {
+      await applyDrillDownMetadata({
+        issueKeys,
+        pullLatestComment,
+        clampPriority,
+        setJiraRowPriorities,
+        setPrioritySourceByKey,
+        setJiraNotes,
+      });
+    } catch (error) {
+      console.error("Failed to enrich drill-down issue", error);
     }
 
     if (isStale()) {
@@ -417,6 +440,94 @@ export async function loadDrillDownIssueByKey({
     return true;
   } catch (error) {
     setJqlError(errorMessage(error, `Failed to load ${normalized}`));
+    return false;
+  } finally {
+    setJqlLoading(false);
+  }
+}
+
+export async function loadDrillDownIssuesByAssignee({
+  assigneeName,
+  jqlMaxResults = 200,
+  pullLatestComment,
+  clampPriority,
+  setJqlRuns,
+  setJqlLoading,
+  setJiraRowPriorities,
+  setPrioritySourceByKey,
+  setJiraNotes,
+  setJqlError,
+  fieldMappingRows,
+  isStale = () => false,
+}) {
+  const assignee = String(assigneeName || "").trim();
+  if (!assignee) {
+    return false;
+  }
+
+  setJqlLoading(true);
+  setJqlError("");
+
+  try {
+    const jql = `assignee = "${escapeJqlString(assignee)}" ORDER BY updated DESC`;
+    const data = await fetchJiraSearchAll({ jql, maxTotal: jqlMaxResults });
+    if (isStale()) {
+      return false;
+    }
+
+    const issues = data?.issues || [];
+    const total = Number(data?.total ?? issues.length);
+
+    if (issues.length === 0) {
+      setJqlError(`No open issues found for assignee "${assignee}".`);
+      return false;
+    }
+
+    const drillRun = {
+      index: DRILL_DOWN_RUN_INDEX,
+      label: `Drill-down: ${assignee}`,
+      jql,
+      issues,
+      total,
+      loaded: issues.length,
+      loadComplete: issues.length >= total,
+      error: null,
+      isDrillDown: true,
+      drillDownAssignee: assignee,
+    };
+
+    const enriched = await enrichRunWithParentDoneDates(drillRun, fieldMappingRows);
+    const issueKeys = issues
+      .map((issue) => String(issue.key || "").trim())
+      .filter(Boolean);
+
+    try {
+      await applyDrillDownMetadata({
+        issueKeys,
+        pullLatestComment,
+        clampPriority,
+        setJiraRowPriorities,
+        setPrioritySourceByKey,
+        setJiraNotes,
+      });
+    } catch (error) {
+      console.error("Failed to enrich assignee drill-down issues", error);
+    }
+
+    if (isStale()) {
+      return false;
+    }
+
+    setJqlRuns((prev) => {
+      const { regular } = partitionJqlRuns(prev);
+      const next = mergeJqlRuns([enriched], regular);
+      persistJqlRunsToStorage(next);
+      return next;
+    });
+
+    return true;
+  } catch (error) {
+    setJqlError(errorMessage(error, `Failed to load tasks for ${assignee}`));
     return false;
   } finally {
     setJqlLoading(false);

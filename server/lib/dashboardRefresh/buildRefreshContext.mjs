@@ -14,6 +14,9 @@ const resolveDueByCompareFieldId = (dueByField, iddFieldId, mrdFieldId, dueField
   if (dueByField === "most_recent_done_date") {
     return mrdFieldId;
   }
+  if (dueByField === "due_date") {
+    return dueFieldId;
+  }
   return dueFieldId;
 };
 
@@ -65,7 +68,11 @@ export const buildDashboardRefreshContext = ({
     dueByOptions: input.dueByDate
       ? {
           dueByCompareFieldId,
-          dueByFallbackFieldId: dueFieldId,
+          // When comparing by MRD or IDD, the fallback is the same field —
+          // standard task duedate should NOT override the user's chosen compare
+          // field (a task's old duedate would incorrectly resolve as past-due
+          // even when the epic's MRD/IDD is in the future).
+          dueByFallbackFieldId: input.dueByField === "due_date" ? dueFieldId : dueByCompareFieldId,
           includePastDueInList: input.includePastDue,
           pastDueFloor,
         }

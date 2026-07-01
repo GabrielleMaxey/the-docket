@@ -1,3 +1,104 @@
+export const normalizeJiraUserQuery = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[._-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const scoreJiraUserMatch = (user, rawQuery) => {
+  const query = normalizeJiraUserQuery(rawQuery);
+  if (!query) {
+    return 0;
+  }
+
+  const displayName = normalizeJiraUserQuery(user?.displayName);
+  const email = String(user?.emailAddress || "").trim().toLowerCase();
+  const emailLocal = normalizeJiraUserQuery(email.split("@")[0]);
+
+  if (displayName === query || email === rawQuery.trim().toLowerCase() || emailLocal === query) {
+    return 100;
+  }
+  if (displayName.startsWith(query) || query.startsWith(displayName)) {
+    return 80;
+  }
+  if (displayName.includes(query) || query.includes(displayName)) {
+    return 60;
+  }
+  if (emailLocal.includes(query) || query.includes(emailLocal)) {
+    return 50;
+  }
+
+  return 0;
+};
+
+export const mapJiraUserRow = (user) => ({
+  accountId: String(user?.accountId || "").trim(),
+  displayName: String(user?.displayName || "").trim(),
+  emailAddress: String(user?.emailAddress || "").trim(),
+});
+
+export const pickBestJiraUser = (users, rawQuery) => {
+  if (!Array.isArray(users) || users.length === 0) {
+    return null;
+  }
+
+  const query = String(rawQuery || "").trim();
+  if (!query) {
+    return null;
+  }
+
+  const ranked = users
+    .map((user) => ({ user, score: scoreJiraUserMatch(user, query) }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score);
+
+  if (ranked.length === 0) {
+    return users.length === 1 && query.length >= 2 ? users[0] : null;
+  }
+
+  if (ranked.length >= 2 && ranked[0].score === ranked[1].score && ranked[0].score < 100) {
+    return null;
+  }
+
+  return ranked[0].user;
+};
+
+export const searchJiraUsers = async ({ query, jiraRequest, maxResults = 20 }) => {
+  const assigneeRaw = String(query || "").trim();
+  if (!assigneeRaw) {
+    return [];
+  }
+
+  const searchResult = await jiraRequest({
+    pathWithQuery: `/rest/api/3/user/search?query=${encodeURIComponent(assigneeRaw)}&maxResults=${maxResults}`,
+  });
+
+  if (!searchResult.ok) {
+    return [];
+  }
+
+  const users = Array.isArray(searchResult.data) ? searchResult.data : [];
+  const ranked = users
+    .map((user) => ({ user, score: scoreJiraUserMatch(user, assigneeRaw) }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score);
+
+  const ordered =
+    ranked.length > 0 ? ranked.map((entry) => entry.user) : assigneeRaw.length >= 2 ? users : [];
+
+  const seen = new Set();
+  return ordered
+    .map(mapJiraUserRow)
+    .filter((user) => {
+      if (!user.displayName || seen.has(user.accountId)) {
+        return false;
+      }
+      seen.add(user.accountId);
+      return true;
+    });
+};
+
 export const resolveJiraUser = async ({ query, jiraRequest }) => {
   const assigneeRaw = String(query || "").trim();
   if (!assigneeRaw) {
@@ -13,25 +114,12 @@ export const resolveJiraUser = async ({ query, jiraRequest }) => {
   }
 
   const users = Array.isArray(searchResult.data) ? searchResult.data : [];
-  const exact = users.find((user) => {
-    const displayName = String(user?.displayName || "").toLowerCase();
-    const email = String(user?.emailAddress || "").toLowerCase();
-    const normalizedQuery = assigneeRaw.toLowerCase();
-    return displayName === normalizedQuery || email === normalizedQuery;
-  });
-
-  const selectedUser = exact || users[0];
+  const selectedUser = pickBestJiraUser(users, assigneeRaw);
   if (!selectedUser) {
     return null;
   }
 
-  return {
-    accountId: String(selectedUser.accountId || "").trim(),
-    displayName: String(
-      selectedUser.displayName || selectedUser.emailAddress || assigneeRaw
-    ).trim(),
-    emailAddress: String(selectedUser.emailAddress || "").trim(),
-  };
+  return mapJiraUserRow(selectedUser);
 };
 
 export const searchAllIssues = async ({ jql, runJiraSearchRequest, batchSize = 100, maxTotal = 5000 }) => {
@@ -90,6 +178,7 @@ export const fetchEpicIssue = async ({ epicKey, mappingsByRole, jiraRequest }) =
     "summary",
     "status",
     "issuetype",
+    "parent",       // needed to walk up Story → Epic when fetching intermediate parents
     "duedate",
     mappingsByRole.get("initial_done_date")?.fieldId,
     mappingsByRole.get("most_recent_done_date")?.fieldId,

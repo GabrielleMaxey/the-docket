@@ -1,4 +1,7 @@
 import crypto from "crypto";
+import { createLogger } from "../lib/logger.mjs";
+const log = createLogger("chat");
+
 import { sendChatMessage } from "../lib/chatProviders.mjs";
 import {
   getConfiguredChatProvider,
@@ -203,7 +206,7 @@ export const registerChatRoutes = (app, { db, jiraRequest }) => {
       });
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Unknown error";
-      console.error("[chat] request failed:", detail, error);
+      log.error("request failed", { detail, error: error instanceof Error ? error.message : error });
       return res.status(500).json({
         error: "Chat request failed",
         message: detail,

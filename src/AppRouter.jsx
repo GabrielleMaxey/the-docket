@@ -1,14 +1,14 @@
 import React from "react";
 import { createHashRouter, Outlet, NavLink } from "react-router-dom";
 import Errors from "./Pages/Errors.jsx";
-import Home from "./Pages/Home.jsx";
 import WorkWeekTasks from "./Pages/WorkWeekTasks.jsx";
 import Dashboard from "./Pages/Dashboard.jsx";
 import Chat from "./Pages/Chat.jsx";
 import ReportArchive from "./Pages/ReportArchive.jsx";
 import Settings from "./Pages/Settings.jsx";
-import "./appNav.css";
-import BackgroundJobIndicator from "./components/BackgroundJobIndicator.jsx";
+import "./AppRouter.css";
+import BackgroundJobIndicator from "./Components/BackgroundJobIndicator.jsx";
+import { EpicFiltersProvider } from "./context/EpicFiltersContext.jsx";
 
 const NAV_LINKS = [
   { to: "/work-week", label: "Work Week" },
@@ -41,7 +41,9 @@ const AppLayout = () => (
         ))}
       </ul>
     </nav>
-    <Outlet />
+    <EpicFiltersProvider>
+      <Outlet />
+    </EpicFiltersProvider>
   </>
 );
 
@@ -56,7 +58,6 @@ const router = createHashRouter([
       { path: "/reports", element: <ReportArchive /> },
       { path: "/chat", element: <Chat /> },
       { path: "/settings", element: <Settings /> },
-      { path: "/home", element: <Home /> },
     ],
   },
 ]);

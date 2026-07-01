@@ -1,7 +1,10 @@
 // Core Jira endpoints: connection test and JQL search.
 
 import { getJiraSearchFields } from "../lib/jiraSearchFields.mjs";
-import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
+import { createLogger } from "../lib/logger.mjs";
+const log = createLogger("jira-core");
+
+import { searchAllIssues, searchJiraUsers } from "../lib/jiraSearchHelpers.mjs";
 
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
 
@@ -51,6 +54,28 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
     } catch (error) {
       return res.status(500).json({
         error: "Failed to fetch Jira filters",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // GET /api/jira/users/search?query=... — resolve display names / emails for assignee updates.
+  app.get("/api/jira/users/search", async (req, res) => {
+    if (!ensureEnvOrRespond(res)) {
+      return;
+    }
+
+    const query = String(req.query.query || "").trim();
+    if (!query) {
+      return res.json({ items: [] });
+    }
+
+    try {
+      const items = await searchJiraUsers({ query, jiraRequest });
+      return res.json({ items });
+    } catch (error) {
+      return res.status(500).json({
+        error: "Failed to search Jira users",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

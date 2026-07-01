@@ -63,7 +63,7 @@ export const persistDashboardSnapshot = ({
         queryName: assignee.queryName,
         resolvedDisplayName: assignee.resolvedDisplayName,
         resolvedAccountId: assignee.resolvedAccountId,
-        overduePercent: assignee.overduePercent,
+        overduePercent: assignee.overduePercent ?? 0,
         overdueOpenCount: assignee.overdueOpenCount,
         totalOpenCount: assignee.totalOpenCount,
         overdueIssueKeysJson: JSON.stringify(assignee.overdueIssueKeys || []),

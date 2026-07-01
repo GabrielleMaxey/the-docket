@@ -1,5 +1,6 @@
 import React from "react";
 import PriorityCell from "./cells/PriorityCell";
+import AssigneeCell from "./cells/AssigneeCell.jsx";
 import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
 import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js";
 
@@ -794,33 +795,18 @@ const JiraResultsTable = ({
                           </div>
                         </td>
 
-                        <td>
-                          <div className={"ww-edit-cell" + (isClosedOrResolved ? " ww-edit-disabled" : "")}>
-                            <input
-                              list={"assignee-options-" + run.index}
-                              className="ww-edit-input"
-                              value={assigneeDrafts[issueKey] || assignee}
-                              onChange={(event) =>
-                                handleAssigneeDraftChange(issueKey, event.target.value)
-                              }
-                              placeholder="Pick or type assignee"
-                              disabled={isClosedOrResolved}
-                            />
-                            <button
-                              type="button"
-                              className="ww-inline-action-btn"
-                              onClick={() => handleAssigneeUpdate(issueKey)}
-                              disabled={rowUpdate.loading || isClosedOrResolved}
-                            >
-                              Update Assignee
-                            </button>
-                          </div>
-                          <datalist id={"assignee-options-" + run.index}>
-                            {knownAssignees.map((name) => (
-                              <option key={"assignee-opt-" + run.index + "-" + name} value={name} />
-                            ))}
-                          </datalist>
-                        </td>
+                        <AssigneeCell
+                          issueKey={issueKey}
+                          assignee={assignee}
+                          isClosedOrResolved={isClosedOrResolved}
+                          draftValue={assigneeDrafts[issueKey]}
+                          datalistId={"assignee-options-" + runStateKey}
+                          knownAssignees={knownAssignees}
+                          loading={rowUpdate.loading}
+                          confirmation={rowUpdate}
+                          onDraftChange={handleAssigneeDraftChange}
+                          onUpdate={handleAssigneeUpdate}
+                        />
 
                         <td>{updated}</td>
 

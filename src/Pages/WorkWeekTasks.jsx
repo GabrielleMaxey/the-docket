@@ -1,90 +1,30 @@
 import React from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Container, Divider, Icon, Message } from "semantic-ui-react";
+import { Button, Container, Divider, Icon, Message } from "semantic-ui-react";
 import "semantic-ui-css/semantic.min.css";
 import "./workWeekTaskElements.css";
-import CollapsibleSection from "../components/CollapsibleSection";
-import ReportOutput from "../components/ReportOutput";
+import CollapsibleSection from "../Components/CollapsibleSection";
 import JiraResultsTable from "./components/JiraResultsTable";
 import TaskManagerHeaderPanel from "./components/TaskManagerHeaderPanel";
 import JiraFilterImportModal from "./components/JiraFilterImportModal";
 import CreateIssueModal from "./components/CreateIssueModal";
-import { useEpicFilters } from "./hooks/useEpicFilters";
+import WeeklyPlanPanel from "./components/WeeklyPlanPanel";
+import MyMetricsSection from "./components/MyMetricsSection";
+import { useEpicFilters } from "../context/EpicFiltersContext.jsx";
 import { usePersistedState } from "./hooks/usePersistedState";
 import { useFlash } from "./hooks/useFlash";
-import { useReportClipboard } from "../hooks/useReportClipboard";
 import { useJokeTicker } from "./hooks/useJokeTicker";
 import { useCalendarData } from "./hooks/useCalendarData";
 import { useWorkWeekHeaderPreferences } from "./hooks/useWorkWeekHeaderPreferences";
 import { useUpcomingDueBanner } from "./hooks/useUpcomingDueBanner";
 import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.js";
-import { generateProjectReport, generateWeekPlan } from "../services/jiraClient";
-import { saveChatSessionArtifact } from "../utils/chatSessionContext";
-import {
-  BACKGROUND_JOB_IDS,
-  runBackgroundJob,
-  useAttachBackgroundJob,
-  useBackgroundJobRunning,
-  workWeekProjectReportJobId,
-} from "../hooks/useBackgroundJobs.js";
-import {
-  clearWeekPlanState,
-  getWorkWeekRunKey,
-  loadWeekPlanState,
-  loadWorkWeekProjectReport,
-  saveWeekPlanState,
-  saveWorkWeekProjectReport,
-} from "../utils/pageReportPersistence";
+import { findRunIndexForAssignee } from "../utils/workWeekNavigation";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const REMINDERS_STORAGE_KEY = "workWeekTasksReminders";
 const REMINDER_SLOT_COUNT = 4;
 const TASK_MANAGER_KEY = "ww-task-manager-open";
-const MY_METRICS_KEY = "ww-my-metrics-open";
-const WEEKLY_PLAN_KEY = "ww-weekly-plan-open";
-
-const FOCUS_OPTIONS = [
-  { value: "balance", label: "Balance across projects" },
-  { value: "overdue", label: "Clear overdue first" },
-  { value: "single", label: "Focus on one project" },
-  { value: "meetings", label: "Light week (lots of meetings)" },
-];
-
-const Button = ({
-  children,
-  className = "",
-  size,
-  primary,
-  secondary,
-  basic,
-  loading,
-  disabled,
-  type = "button",
-  ...rest
-}) => {
-  const classes = ["ui"];
-  if (size) classes.push(size);
-  if (primary) classes.push("primary");
-  if (secondary) classes.push("secondary");
-  if (basic) classes.push("basic");
-  if (loading) classes.push("loading");
-  if (disabled || loading) classes.push("disabled");
-  if (className) classes.push(className);
-  classes.push("button");
-
-  return (
-    <button
-      type={type}
-      className={classes.join(" ")}
-      disabled={disabled || loading}
-      aria-busy={loading ? "true" : undefined}
-      {...rest}
-    >
-      {children}
-    </button>
-  );
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -101,378 +41,6 @@ const sanitizeReminders = (parsed) => {
     }
   }
   return next;
-};
-
-const isIssueOpen = (issue) => {
-  const status = String(issue?.fields?.status?.name || issue?.status || "").toLowerCase();
-  return !/(closed|resolved|done)/.test(status);
-};
-
-// ─── Project Report Panel ─────────────────────────────────────────────────────
-
-const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
-  const runKey = getWorkWeekRunKey(run);
-  const jobId = workWeekProjectReportJobId(runKey);
-  const persisted = loadWorkWeekProjectReport(runKey);
-
-  const [reportPending, setReportPending] = React.useState(false);
-  const bgReportRunning = useBackgroundJobRunning(jobId);
-  const loading = reportPending || bgReportRunning;
-  const [report, setReport] = React.useState(persisted?.report ?? null);
-  const [error, setError] = React.useState("");
-  const { copied, handleCopy, handleDownload } = useReportClipboard(report);
-
-  React.useEffect(() => {
-    const saved = loadWorkWeekProjectReport(runKey);
-    setReport(saved?.report ?? null);
-    setError("");
-  }, [runKey]);
-
-  const applyReport = React.useCallback((result) => {
-    if (!result) {
-      return;
-    }
-    setReport(result);
-  }, []);
-
-  useAttachBackgroundJob(jobId, {
-    onSuccess: applyReport,
-    onError: (err) => {
-      setError(err instanceof Error ? err.message : "Report generation failed");
-    },
-    onFinally: () => setReportPending(false),
-  });
-
-  const handleGenerate = () => {
-    setReportPending(true);
-    setError("");
-    setReport(null);
-
-    runBackgroundJob(jobId, {
-      label: `Generating project report`,
-      run: async () => {
-        const issues = run.issues || [];
-        const open = issues.filter(isIssueOpen);
-        const summary = {
-          total: issues.length,
-          open: open.length,
-          closed: issues.length - open.length,
-          overdue: issues.filter((iss) => isIssueOpen(iss) && iss.isOverdue).length,
-          topPriorities: issues
-            .filter(isIssueOpen)
-            .sort((a, b) => (jiraRowPriorities[a.key] || 99) - (jiraRowPriorities[b.key] || 99))
-            .slice(0, 8)
-            .map((iss) => ({
-              key: iss.key,
-              summary: iss.fields?.summary || iss.summary || "",
-              status: iss.fields?.status?.name || iss.status || "",
-              assignee: iss.fields?.assignee?.displayName || iss.assignee || "Unassigned",
-              isOverdue: Boolean(iss.isOverdue),
-            })),
-        };
-        const result = await generateProjectReport({
-          label: run.label || `Run ${(run.index || 0) + 1}`,
-          summary,
-        });
-        saveWorkWeekProjectReport(runKey, {
-          report: result,
-          runLabel: run.label || `Run ${(run.index || 0) + 1}`,
-          jql: run.jql || "",
-        });
-        saveChatSessionArtifact({
-          type: "work_week_project_report",
-          label: result.label || run.label || `Run ${(run.index || 0) + 1}`,
-          content: result.report,
-          meta: { jql: run.jql || "" },
-        });
-        return result;
-      },
-    })
-      .then(applyReport)
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Report generation failed");
-      })
-      .finally(() => setReportPending(false));
-  };
-
-  return (
-    <CollapsibleSection title="📄 Project Report">
-      <div className="app-report-controls">
-        <Button
-          size="small"
-          primary
-          onClick={handleGenerate}
-          loading={loading}
-          disabled={loading || !run.issues?.length}
-        >
-          Generate Report
-        </Button>
-      </div>
-      {error ? <p className="ww-jira-status ww-jira-error">{error}</p> : null}
-      <ReportOutput
-        report={report}
-        copied={copied}
-        onCopy={handleCopy}
-        onDownload={handleDownload}
-      />
-    </CollapsibleSection>
-  );
-};
-
-// ─── JQL Run Metrics ──────────────────────────────────────────────────────────
-
-const JqlRunMetrics = ({ run }) => {
-  const issues = run.issues || [];
-  const total = issues.length;
-  const open = issues.filter(isIssueOpen).length;
-  const closed = total - open;
-  const overdue = issues.filter((i) => isIssueOpen(i) && i.isOverdue).length;
-  const inProgress = issues.filter((i) => {
-    const s = String(i.fields?.status?.name || i.status || "").toLowerCase();
-    return s.includes("in progress");
-  }).length;
-  const readyForVerification = issues.filter((i) => {
-    const s = String(i.fields?.status?.name || i.status || "").toLowerCase();
-    return s.includes("verif");
-  }).length;
-
-  const closedPct = total > 0 ? Math.round((closed / total) * 100) : 0;
-  const overduePct = open > 0 ? Math.round((overdue / open) * 100) : 0;
-  const inProgressPct = open > 0 ? Math.round((inProgress / open) * 100) : 0;
-
-  return (
-    <div className="ww-run-metrics">
-      <div className="ww-run-metrics-chips">
-        <span className="ww-run-metric-chip">{total} total</span>
-        <span className="ww-run-metric-chip">{open} open</span>
-        <span className="ww-run-metric-chip ww-chip-resolved">{closed} resolved</span>
-        {overdue > 0 ? <span className="ww-run-metric-chip ww-chip-overdue">{overdue} overdue</span> : null}
-        {inProgress > 0 ? <span className="ww-run-metric-chip">{inProgress} in progress</span> : null}
-        {readyForVerification > 0 ? <span className="ww-run-metric-chip ww-chip-verify">{readyForVerification} ready for verification</span> : null}
-      </div>
-      <div className="ww-run-progress-bars">
-        <div className="ww-run-progress-row">
-          <span className="ww-run-progress-label">Resolved</span>
-          <div className="ww-run-progress-track">
-            <div className="ww-run-progress-fill ww-progress-resolved" style={{ width: `${closedPct}%` }} />
-          </div>
-          <span className="ww-run-progress-pct">{closedPct}%</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─── My Metrics Section ───────────────────────────────────────────────────────
-// Shows metrics only for the active JQL tab.
-
-const MyMetricsSection = ({ run, jiraRowPriorities }) => {
-  const totalOpen = React.useMemo(() => {
-    let sum = 0;
-    for (const issue of run?.issues || []) {
-      if (isIssueOpen(issue)) sum++;
-    }
-    return sum;
-  }, [run]);
-
-  if (!run?.issues?.length) {
-    return null;
-  }
-
-  return (
-    <CollapsibleSection title="📊 My Metrics" badge={`${totalOpen} open`} storageKey={MY_METRICS_KEY} defaultOpen>
-      <div key={`run-summary-${run.index}`} className="ww-run-summary">
-        <div className="ww-run-summary-label">{run.label || `Run ${(run.index || 0) + 1}`}</div>
-        <JqlRunMetrics run={run} jiraRowPriorities={jiraRowPriorities} />
-        <ProjectReportPanel run={run} jiraRowPriorities={jiraRowPriorities} />
-      </div>
-    </CollapsibleSection>
-  );
-};
-
-// ─── Weekly Plan Panel ────────────────────────────────────────────────────────
-
-const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
-  const persistedPlan = loadWeekPlanState();
-
-  const [planPending, setPlanPending] = React.useState(false);
-  const bgPlanRunning = useBackgroundJobRunning(BACKGROUND_JOB_IDS.WORK_WEEK_WEEK_PLAN);
-  const loading = planPending || bgPlanRunning;
-  const [plan, setPlan] = React.useState(persistedPlan?.plan ?? null);
-  const [error, setError] = React.useState("");
-  const planReport = plan ? { report: plan, label: "Week plan" } : null;
-  const { copied, handleCopy, handleDownload } = useReportClipboard(planReport);
-  const [step, setStep] = React.useState(persistedPlan?.step || "questions");
-  const [focusStyle, setFocusStyle] = React.useState(persistedPlan?.focusStyle || "balance");
-  const [capacityHours, setCapacityHours] = React.useState(
-    String(persistedPlan?.capacityHours ?? "40")
-  );
-  const [fixedCommitments, setFixedCommitments] = React.useState(
-    String(persistedPlan?.fixedCommitments || "")
-  );
-  const [additionalContext, setAdditionalContext] = React.useState(
-    String(persistedPlan?.additionalContext || "")
-  );
-
-  const hasRuns = jqlRuns.some((r) => r.issues?.length > 0);
-
-  const applyPlan = React.useCallback((result) => {
-    if (!result?.plan) {
-      return;
-    }
-    setPlan(result.plan);
-    setStep("done");
-  }, []);
-
-  useAttachBackgroundJob(BACKGROUND_JOB_IDS.WORK_WEEK_WEEK_PLAN, {
-    onSuccess: applyPlan,
-    onError: (err) => {
-      setError(err instanceof Error ? err.message : "Plan generation failed");
-    },
-    onFinally: () => setPlanPending(false),
-  });
-
-  const handleGenerate = () => {
-    setPlanPending(true);
-    setError("");
-
-    const projects = jqlRuns
-      .filter((r) => r.issues?.length > 0)
-      .map((r) => ({
-        label: r.label || `Run ${(r.index || 0) + 1}`,
-        total: r.issues.length,
-        open: r.issues.filter(isIssueOpen).length,
-        overdue: r.issues.filter((i) => isIssueOpen(i) && i.isOverdue).length,
-        tasks: r.issues
-          .filter(isIssueOpen)
-          .sort((a, b) => (jiraRowPriorities[a.key] || 99) - (jiraRowPriorities[b.key] || 99))
-          .slice(0, 10)
-          .map((i) => ({
-            key: i.key,
-            summary: i.fields?.summary || i.summary || "",
-            status: i.fields?.status?.name || i.status || "",
-            assignee: i.fields?.assignee?.displayName || i.assignee || "Unassigned",
-            isOverdue: Boolean(i.isOverdue),
-          })),
-      }));
-    const combined = [fixedCommitments.trim(), additionalContext.trim()].filter(Boolean).join(" | ");
-
-    runBackgroundJob(BACKGROUND_JOB_IDS.WORK_WEEK_WEEK_PLAN, {
-      label: "Generating week plan",
-      run: async () => {
-        const result = await generateWeekPlan({
-          projects,
-          focusStyle,
-          capacityHours: Number(capacityHours) || 40,
-          additionalContext: combined,
-        });
-        saveWeekPlanState({
-          plan: result.plan,
-          step: "done",
-          focusStyle,
-          capacityHours,
-          fixedCommitments,
-          additionalContext,
-        });
-        saveChatSessionArtifact({
-          type: "week_plan",
-          label: "Week plan",
-          content: result.plan,
-          meta: { focusStyle, capacityHours: Number(capacityHours) || 40 },
-        });
-        return result;
-      },
-    })
-      .then(applyPlan)
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Plan generation failed");
-      })
-      .finally(() => setPlanPending(false));
-  };
-
-  const handleReset = () => {
-    setStep("questions");
-    setPlan(null);
-    setError("");
-    setFocusStyle("balance");
-    setCapacityHours("40");
-    setFixedCommitments("");
-    setAdditionalContext("");
-    clearWeekPlanState();
-  };
-
-  return (
-    <CollapsibleSection title="🗓️ Help me plan my week" storageKey={WEEKLY_PLAN_KEY}>
-      <div className="ww-weekly-plan-body">
-        {!hasRuns ? (
-          <p className="ww-plan-intro">Run JQL queries first to load your tasks, then generate a week plan.</p>
-        ) : step === "questions" ? (
-          <div className="ww-plan-questions">
-            <p className="ww-plan-intro">Answer a few quick questions so the plan fits your week:</p>
-            <div className="ww-plan-question-block">
-              <label className="ww-plan-question-label">1. How would you like to approach this week?</label>
-              <div className="ww-plan-focus-options">
-                {FOCUS_OPTIONS.map((opt) => (
-                  <button key={opt.value} type="button"
-                    className={`ww-plan-focus-btn${focusStyle === opt.value ? " ww-plan-focus-btn--active" : ""}`}
-                    onClick={() => setFocusStyle(opt.value)}>{opt.label}</button>
-                ))}
-              </div>
-            </div>
-            <div className="ww-plan-question-block">
-              <label className="ww-plan-question-label" htmlFor="ww-capacity-hours">2. How many hours available for project work?</label>
-              <div className="ww-plan-capacity-row">
-                <input id="ww-capacity-hours" type="number" min={1} max={60} value={capacityHours}
-                  onChange={(e) => setCapacityHours(e.target.value)} className="ww-plan-capacity-input" />
-                <span className="ww-plan-question-label" style={{ fontWeight: 400 }}>hours</span>
-              </div>
-            </div>
-            <div className="ww-plan-question-block">
-              <label className="ww-plan-question-label">3. Fixed commitments or blockers this week?
-                <span className="ww-plan-optional"> (optional)</span>
-              </label>
-              <input type="text" className="ww-plan-text-input"
-                placeholder="e.g. Deployment Thursday, 1:1s Tuesday"
-                value={fixedCommitments} onChange={(e) => setFixedCommitments(e.target.value)} />
-            </div>
-            <div className="ww-plan-question-block">
-              <label className="ww-plan-question-label" htmlFor="ww-extra-context">4. Any other priorities or context?
-                <span className="ww-plan-optional"> (optional)</span>
-              </label>
-              <textarea id="ww-extra-context" className="ww-plan-context-input" rows={2}
-                placeholder="e.g. Prep for Friday stakeholder review..."
-                value={additionalContext} onChange={(e) => setAdditionalContext(e.target.value)} />
-            </div>
-            <div>
-              <Button primary size="small" onClick={() => setStep("ready")}>Continue →</Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="ww-plan-summary-chips">
-              <span className="ww-run-metric-chip">{FOCUS_OPTIONS.find((o) => o.value === focusStyle)?.label || focusStyle}</span>
-              <span className="ww-run-metric-chip">{capacityHours}h available</span>
-              {(fixedCommitments || additionalContext) ? <span className="ww-run-metric-chip">+ notes</span> : null}
-              <button type="button" className="ww-plan-edit-btn" onClick={handleReset}>✎ Edit</button>
-            </div>
-            <div className="ww-weekly-plan-controls">
-              <Button primary size="small" onClick={handleGenerate} loading={loading} disabled={loading}>
-                Generate week plan
-              </Button>
-              {plan ? <Button basic size="small" onClick={handleReset}>Start over</Button> : null}
-            </div>
-            {error ? <p className="ww-jira-status ww-jira-error">{error}</p> : null}
-            <ReportOutput
-              report={planReport}
-              copied={copied}
-              onCopy={handleCopy}
-              onDownload={handleDownload}
-            />
-          </>
-        )}
-      </div>
-    </CollapsibleSection>
-  );
 };
 
 // ─── Main page component ──────────────────────────────────────────────────────
@@ -521,7 +89,7 @@ const WorkWeekTasks = () => {
     getPriorityRowClass, formatDate, filtersLoading,
     setJqlCount, setJqlMaxResults, setPullLatestComment,
     handleJqlChange, handleJqlLabelChange,
-    handleResetSavedQueries, handleRunJql, handleLoadRemainingJql, handleDrillDownToKey, clearDrillDownRuns, handlePushSelected,
+    handleResetSavedQueries, handleRunJql, handleLoadRemainingJql, handleDrillDownToKey, handleDrillDownToAssignee, clearDrillDownRuns, handlePushSelected,
     handleSaveMetadata, handleSelectAll, handleStatusDraftChange,
     handleStatusUpdate, handleAssigneeDraftChange, handleAssigneeUpdate,
     handleRowPriorityChange, handleNoteChange, handleSelectForPush, handlePushNote,
@@ -537,12 +105,27 @@ const WorkWeekTasks = () => {
   }, [jqlRuns, activeRunIndex]);
 
   const drillDownKey = drillDownFilters.key.trim();
+  const drillDownAssignee = drillDownFilters.assignee.trim();
 
   const hasDrillDownFilter =
-    drillDownFilters.key.trim().length > 0 || drillDownFilters.assignee.trim().length > 0;
+    drillDownKey.length > 0 || drillDownAssignee.length > 0;
 
-  const hasDrillDownTab = jqlRuns.some((run) => run.isDrillDown);
-  const drillDownPending = Boolean(drillDownKey) && !hasDrillDownTab && (jqlLoading || !jqlError);
+  const hasDrillDownTab = jqlRuns.some((run) => {
+    if (!run.isDrillDown) {
+      return false;
+    }
+    if (drillDownKey) {
+      return (run.issues || []).some(
+        (issue) => String(issue.key || "").trim().toUpperCase() === drillDownKey.toUpperCase()
+      );
+    }
+    if (drillDownAssignee) {
+      return String(run.drillDownAssignee || "").trim() === drillDownAssignee;
+    }
+    return true;
+  });
+  const drillDownPending =
+    hasDrillDownFilter && !hasDrillDownTab && jqlLoading;
 
   const hadDrillDownFilterRef = React.useRef(false);
 
@@ -568,6 +151,38 @@ const WorkWeekTasks = () => {
       }
     });
   }, [drillDownKey, filtersLoading, handleDrillDownToKey]);
+
+  React.useEffect(() => {
+    if (!drillDownAssignee || filtersLoading || drillDownKey) {
+      return;
+    }
+
+    if (findRunIndexForAssignee(jqlRuns, drillDownAssignee) >= 0) {
+      return;
+    }
+
+    if (
+      jqlRuns.some(
+        (run) =>
+          run.isDrillDown &&
+          String(run.drillDownAssignee || "").trim() === drillDownAssignee
+      )
+    ) {
+      return;
+    }
+
+    void handleDrillDownToAssignee(drillDownAssignee).then((loaded) => {
+      if (loaded) {
+        setActiveRunIndex(0);
+      }
+    });
+  }, [
+    drillDownAssignee,
+    drillDownKey,
+    filtersLoading,
+    handleDrillDownToAssignee,
+    jqlRuns,
+  ]);
 
   const handleResetSavedQueriesWithConfirm = React.useCallback(() => {
     if (!window.confirm(
@@ -831,7 +446,7 @@ const WorkWeekTasks = () => {
                 {drillDownFilters.key ? `Filtering to ${drillDownFilters.key}` : null}
                 {drillDownFilters.key && drillDownFilters.assignee ? " · " : null}
                 {drillDownFilters.assignee ? `assignee ${drillDownFilters.assignee}` : null}
-                {jqlLoading ? " — loading issue from Jira…" : null}
+                {jqlLoading ? " — loading from Jira…" : null}
                 {!jqlLoading && jqlError && drillDownKey ? ` — ${jqlError}` : null}
               </p>
               <Link to="/work-week" className="ww-drill-down-clear-link">

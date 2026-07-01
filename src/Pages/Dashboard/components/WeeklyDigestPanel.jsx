@@ -1,6 +1,6 @@
 import React from "react";
 import { Button, Message } from "semantic-ui-react";
-import ReportOutput from "../../../components/ReportOutput";
+import ReportOutput from "../../../Components/ReportOutput";
 import { useReportClipboard } from "../../../hooks/useReportClipboard";
 import { fetchWeeklyDigest } from "../../../services/jiraClient";
 import {
@@ -54,6 +54,11 @@ const WeeklyDigestPanel = ({ hasSnapshot }) => {
       .finally(() => setDigestPending(false));
   };
 
+  const handleClear = () => {
+    setDigestReport(null);
+    setError("");
+  };
+
   return (
     <div className="dashboard-weekly-digest-panel">
       <h4 className="dashboard-weekly-digest-title">Weekly digest</h4>
@@ -77,6 +82,7 @@ const WeeklyDigestPanel = ({ hasSnapshot }) => {
         copied={copied}
         onCopy={handleCopy}
         onDownload={handleDownload}
+        onClear={digestReport ? handleClear : undefined}
       />
     </div>
   );
