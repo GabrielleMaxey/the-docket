@@ -212,6 +212,7 @@ export const useTaskManagerJira = () => {
   const [saveState, setSaveState] = React.useState({});
   const [statusDrafts, setStatusDrafts] = React.useState({});
   const [assigneeDrafts, setAssigneeDrafts] = React.useState({});
+  const [assigneeAccountIds, setAssigneeAccountIds] = React.useState({});
   const [rowUpdateState, setRowUpdateState] = React.useState({});
   const [fieldMappingRows, setFieldMappingRows] = React.useState([]);
   const [fieldMappingsLoading, setFieldMappingsLoading] = React.useState(true);
@@ -466,8 +467,17 @@ export const useTaskManagerJira = () => {
     setStatusDrafts((prev) => patchIssueKeyed(prev, issueKey, value));
   };
 
-  const handleAssigneeDraftChange = (issueKey, value) => {
+  const handleAssigneeDraftChange = (issueKey, value, accountId) => {
     setAssigneeDrafts((prev) => patchIssueKeyed(prev, issueKey, value));
+    setAssigneeAccountIds((prev) => {
+      const next = { ...prev };
+      if (accountId) {
+        next[issueKey] = accountId;
+      } else {
+        delete next[issueKey];
+      }
+      return next;
+    });
   };
 
   const setRowUpdateMessage = (issueKey, next) => {
@@ -529,7 +539,8 @@ export const useTaskManagerJira = () => {
   };
 
   const handleAssigneeUpdate = async (issueKey) => {
-    const assignee = String(assigneeDrafts[issueKey] || "").trim();
+    const assignee =
+      String(assigneeAccountIds[issueKey] || assigneeDrafts[issueKey] || "").trim();
     if (!assignee) {
       setRowUpdateMessage(issueKey, { error: "Choose or type an assignee before updating." });
       return;
@@ -539,7 +550,7 @@ export const useTaskManagerJira = () => {
 
     try {
       const result = await updateJiraIssueAssignee({ issueKey, assignee });
-      const nextAssignee = String(result?.resolvedAssignee || assignee).trim() || assignee;
+      const nextAssignee = String(result?.resolvedAssignee || assigneeDrafts[issueKey] || assignee).trim() || assignee;
       updateIssueInRuns(issueKey, (issue) => ({
         ...issue,
         fields: {
@@ -552,6 +563,11 @@ export const useTaskManagerJira = () => {
         },
       }));
       setAssigneeDrafts((prev) => ({ ...prev, [issueKey]: nextAssignee }));
+      setAssigneeAccountIds((prev) => {
+        const next = { ...prev };
+        delete next[issueKey];
+        return next;
+      });
       setRowUpdateMessage(issueKey, {
         loading: false,
         success: `Assigned to ${nextAssignee}.`,
