@@ -15,6 +15,9 @@ import {
 } from "../epicFilterJql.mjs";
 import { fetchEpicIssue, resolveJiraUser, searchAllIssues } from "../jiraSearchHelpers.mjs";
 import { buildEpicLevelDueByIssues } from "./dueByHelpers.mjs";
+import { createLogger } from "../../lib/logger.mjs";
+
+const log = createLogger("dashboard");
 
 const emptyEpicMetricFromPreset = (preset, error) => ({
   epicPresetId: preset.id,
@@ -146,6 +149,7 @@ const resolveJqlPresetDueByIssues = async ({
   for (const [epicKey, epicChildIssues] of epicKeyToIssues.entries()) {
     const epicIssue = await fetchEpicIssue({ epicKey, mappingsByRole, jiraRequest });
     if (!epicIssue) {
+      log.warn(`due-by: skipping ${epicKey} — could not fetch epic`);
       continue;
     }
 
@@ -176,6 +180,7 @@ export const buildPastDueOnlyEpicMetrics = async ({
 }) => {
   const epicMetrics = [];
   const scopedChildIssues = [];
+  log.info("dashboard query type: past_due");
   const pastDueJql = buildPastDueJql({
     mappingsByRole: ctx.mappingsByRole,
     epicPastDueMode: ctx.epicPastDueMode,
@@ -278,6 +283,7 @@ export const buildEpicMetricsFromPresets = async ({
   const scopedChildIssues = [];
 
   for (const preset of selectedPresets) {
+    log.info(`dashboard query type: ${preset.presetType}`);
     const jql = await resolvePresetJql({ preset, jiraRequest });
     if (!jql) {
       epicMetrics.push(
@@ -291,6 +297,7 @@ export const buildEpicMetricsFromPresets = async ({
     try {
       ({ issues } = await searchAllIssues({ jql: metricsJql, runJiraSearchRequest }));
     } catch (error) {
+      log.error(`preset "${preset.epicName}" — Jira search failed: ${error instanceof Error ? error.message : error}`);
       epicMetrics.push(
         emptyEpicMetricFromPreset(
           preset,

@@ -55,11 +55,31 @@ const DashboardFiltersPanel = ({
   hasEpicScope,
   refreshFlash,
 }) => {
-  const upcomingPreset = inferUpcomingDuePreset(dueByDate);
-  const showUpcomingCustomDate =
-    upcomingPreset === UPCOMING_DUE_PRESET_CUSTOM && Boolean(dueByDate);
+  const isInternalDuePresetUpdate = React.useRef(false);
+  const [upcomingPresetMode, setUpcomingPresetMode] = React.useState(() =>
+    inferUpcomingDuePreset(dueByDate)
+  );
+  const showUpcomingCustomDate = upcomingPresetMode === UPCOMING_DUE_PRESET_CUSTOM;
+
+  React.useEffect(() => {
+    if (isInternalDuePresetUpdate.current) {
+      isInternalDuePresetUpdate.current = false;
+      return;
+    }
+
+    setUpcomingPresetMode((previous) => {
+      if (previous === UPCOMING_DUE_PRESET_CUSTOM) {
+        return previous;
+      }
+
+      return inferUpcomingDuePreset(dueByDate);
+    });
+  }, [dueByDate]);
 
   const handleUpcomingPresetChange = (presetId) => {
+    isInternalDuePresetUpdate.current = true;
+    setUpcomingPresetMode(presetId);
+
     if (presetId === UPCOMING_DUE_PRESET_OFF) {
       setDueByDate("");
       return;
@@ -79,6 +99,8 @@ const DashboardFiltersPanel = ({
   };
 
   const clearUpcomingOptions = () => {
+    isInternalDuePresetUpdate.current = true;
+    setUpcomingPresetMode(UPCOMING_DUE_PRESET_OFF);
     setDueByDate("");
   };
 
@@ -108,14 +130,14 @@ const DashboardFiltersPanel = ({
         onIncludePastDueChange={setIncludePastDue}
         showRunButton={false}
         showPastDue={false}
-        title="1 — Select projects to analyze"
-        description="Choose one or more saved Jira presets. Each preset is a Jira query that loads a set of tasks."
+        title="1 — Select projects"
+        description="Choose one or more saved Epic & JQL presets. Each preset is a named Jira query that loads a set of tasks. Add or edit presets in Settings → Epic & JQL presets."
       />
 
       <div className="dashboard-controls-divider" style={{ marginTop: "0.75rem" }} />
       <div className="dashboard-people-section">
         <p className="dashboard-watch-group-label">
-          2 — Track workload and Metrics for
+          2 — Contributor Metrics
           {(selectedWatchedIds.length > 0 || assigneeNames.length > 0) ? (
             <button
               type="button"
@@ -142,9 +164,9 @@ const DashboardFiltersPanel = ({
           ) : null}
         </p>
         <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "0 0 0.5rem" }}>
-          Optional — choose people for the <strong>Individual Contributor Metrics</strong> section.
-          Metrics are calculated within the projects you selected in step 1 (not a separate project list).
-          Use saved groups from Settings, or type a display name or email.
+          Optional — choose people or custom queries for the <strong>Individual Contributor Metrics</strong> section.
+          Metrics are calculated within the projects selected in step 1.
+          Use saved entries from Settings → <strong>Contributor Metrics</strong>, or type a display name directly.
         </p>
         {personWatches.length > 0 || jqlWatches.length > 0 ? (
           <div className="dashboard-watched-chips">
@@ -260,7 +282,7 @@ const DashboardFiltersPanel = ({
               type="radio"
               name="upcomingDuePreset"
               value={UPCOMING_DUE_PRESET_OFF}
-              checked={upcomingPreset === UPCOMING_DUE_PRESET_OFF}
+              checked={upcomingPresetMode === UPCOMING_DUE_PRESET_OFF}
               onChange={() => handleUpcomingPresetChange(UPCOMING_DUE_PRESET_OFF)}
             />
             None
@@ -271,7 +293,7 @@ const DashboardFiltersPanel = ({
                 type="radio"
                 name="upcomingDuePreset"
                 value={preset.id}
-                checked={upcomingPreset === preset.id}
+                checked={upcomingPresetMode === preset.id}
                 onChange={() => handleUpcomingPresetChange(preset.id)}
               />
               {preset.label}
@@ -282,7 +304,7 @@ const DashboardFiltersPanel = ({
               type="radio"
               name="upcomingDuePreset"
               value={UPCOMING_DUE_PRESET_CUSTOM}
-              checked={upcomingPreset === UPCOMING_DUE_PRESET_CUSTOM}
+              checked={upcomingPresetMode === UPCOMING_DUE_PRESET_CUSTOM}
               onChange={() => handleUpcomingPresetChange(UPCOMING_DUE_PRESET_CUSTOM)}
             />
             Through custom date
@@ -305,6 +327,16 @@ const DashboardFiltersPanel = ({
         {dueByDate ? (
           <div className="dashboard-due-by-field-row">
             <span className="dashboard-due-by-field-label">Compare against</span>
+            <label className="dashboard-due-by-field-option">
+              <input
+                type="radio"
+                name="dueByField"
+                value="due_date"
+                checked={dueByField === "due_date"}
+                onChange={() => setDueByField("due_date")}
+              />
+              Task due date
+            </label>
             <label className="dashboard-due-by-field-option">
               <input
                 type="radio"
@@ -335,8 +367,8 @@ const DashboardFiltersPanel = ({
             { key: "overall", label: "Overall Status" },
             { key: "epicMetrics", label: "Project Metrics" },
             { key: "dueByUpcoming", label: "Upcoming Due Dates" },
-            { key: "dueByPastDue", label: "Past Due Due Dates" },
-            { key: "overdue", label: "Individual Metrics" },
+            { key: "dueByPastDue", label: "Past Due in lookback" },
+            { key: "overdue", label: "Contributor Metrics" },
             { key: "report", label: "Report" },
           ].map(({ key, label }) => (
             <label key={key} className="dashboard-section-toggle-label">

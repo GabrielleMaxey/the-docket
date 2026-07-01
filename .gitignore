@@ -11,10 +11,18 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+out
 release
 
-# Vite
+# Vite / build cache
 *.local
+.cache
+
+# Test coverage
+coverage
+
+# TypeScript incremental build info
+*.tsbuildinfo
 
 # Local app data (SQLite, exports) — never commit personal DBs or snapshots
 data/
@@ -22,6 +30,10 @@ data/
 *.sqlite-shm
 *.sqlite-wal
 *.db
+
+# Electron-builder debug artifacts (generated at project root on some builds)
+builder-debug.yml
+builder-effective-config.yaml
 
 # Local misc notes (folder name varies by machine)
 MiscFiles/

@@ -1,4 +1,7 @@
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
+import { createLogger } from "../lib/logger.mjs";
+const log = createLogger("config");
+
 import {
   buildFieldMappingsMap,
   buildPastDueJql,
@@ -164,6 +167,7 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
 
     const result = insertEpicPresetStmt.run(payload);
     const row = getEpicPresetStmt.get(result.lastInsertRowid);
+    log.info(`created epic preset ${row.id} "${payload.epicName}" (${payload.presetType})`);
     return res.status(201).json(mapEpicPresetRow(row));
   });
 
@@ -180,6 +184,7 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
     }
 
     updateEpicPresetStmt.run({ id, ...payload });
+    log.info(`updated epic preset ${id} "${payload.epicName}"`);
     return res.json(mapEpicPresetRow(getEpicPresetStmt.get(id)));
   });
 
@@ -191,6 +196,7 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
     }
 
     deleteEpicPresetStmt.run(id);
+    log.info(`deleted epic preset ${id}`);
     return res.json({ ok: true, id });
   });
 
@@ -266,6 +272,7 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
       imported += 1;
     }
 
+    log.info(`preset import: ${imported} imported, ${skipped} skipped (mode=${mode})`);
     return res.json({
       ok: true,
       imported,

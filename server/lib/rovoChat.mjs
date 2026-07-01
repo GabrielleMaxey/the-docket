@@ -1,4 +1,7 @@
 import { callRovoSearch } from "./rovoMcpClient.mjs";
+import { createLogger } from "./logger.mjs";
+const log = createLogger("rovo");
+
 import {
   completeLlmWithJiraTools,
   resolveFirstReadyLlmProvider,
@@ -29,7 +32,7 @@ export const sendRovoChatMessage = async ({
       return { reply, provider: "rovo" };
     } catch (rovoError) {
       const detail = rovoError instanceof Error ? rovoError.message : String(rovoError);
-      console.warn("[chat] Rovo MCP request failed:", detail);
+      log.warn("Rovo MCP request failed", detail);
       if (!hasLlmFallback()) {
         throw new Error(
           `Rovo MCP failed (${detail}). Sign in with Atlassian or configure an LLM fallback (ANTHROPIC_API_KEY, OPENAI_API_KEY, or Ollama).`

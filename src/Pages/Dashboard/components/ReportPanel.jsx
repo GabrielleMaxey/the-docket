@@ -1,6 +1,6 @@
 import { Button, Message } from "semantic-ui-react";
-import StatusPieChart from "../../../components/StatusPieChart";
-import ReportOutput from "../../../components/ReportOutput";
+import StatusPieChart from "../../../Components/StatusPieChart";
+import ReportOutput from "../../../Components/ReportOutput";
 import { AUDIENCE_OPTIONS, useReportGeneration } from "../hooks/useReportGeneration";
 
 const ReportPanel = ({ hasSnapshot, overallStatusCounts, chartVariant, epics = [] }) => {
@@ -18,6 +18,7 @@ const ReportPanel = ({ hasSnapshot, overallStatusCounts, chartVariant, epics = [
     setAdditionalContext,
     selectedOption,
     handleGenerate,
+    handleClearReport,
     handleCopy,
     handleDownload,
     toggleEpicSelection,
@@ -144,6 +145,7 @@ const ReportPanel = ({ hasSnapshot, overallStatusCounts, chartVariant, epics = [
         copied={copied}
         onCopy={handleCopy}
         onDownload={handleDownload}
+        onClear={report ? handleClearReport : undefined}
         chartSlot={
           hasChartData ? (
             <>

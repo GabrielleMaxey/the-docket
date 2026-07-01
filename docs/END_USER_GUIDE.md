@@ -4,10 +4,10 @@ This guide covers how to use the app day-to-day. No programming knowledge needed
 
 ---
 
-## The four pages
+## The five pages
 
 ```
-Work Week  |  Dashboard  |  Chat  |  Settings
+Work Week  |  Dashboard  |  Past Reports  |  Chat  |  Settings
 ```
 
 Navigate between them using the menu at the top of the screen.
@@ -50,9 +50,9 @@ To add a preset:
 
 **Share presets with your team:** use **Export team pack** to download a JSON file of all epic/JQL presets. New teammates click **Import team pack** and choose **merge** (add new, skip duplicates) or **replace** (overwrite all local presets). Align with your team's canonical preset list or `npm run seed:presets` for admins — see [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md).
 
-### Watched people
+### Contributor Metrics
 
-Add team members here (by Jira display name) so the Dashboard's **Individual Contributor Metrics** section tracks their workload. You can also add a custom JQL query as a "watch" if a person's name doesn't match their Jira display name exactly.
+Add team members here by Jira display name so the Dashboard's **Individual Contributor Metrics** section tracks their workload and overdue rate. You can also add a **Custom query** — a JQL expression that scopes a group by project, team, label, or any combination — useful when a person's display name doesn't match Jira exactly, or when you want to track a whole team or project slice rather than one person.
 
 ### Chat instructions
 
@@ -87,18 +87,24 @@ This is the main screen for managing your open work.
 
 ### Header
 
-- **Header banners** (optional) — at the top of Work Week, toggle **Joke ticker** and/or **My upcoming due dates**. The due-date banner lists **your** assigned issues (issue key, summary, due date) from the latest Dashboard snapshot. Refresh Dashboard after changing due-date filters. Same toggles in **Settings → Work Week header**.
+- **Header banners** (optional) — at the top of Work Week, toggle **Joke ticker** and/or **My upcoming due dates**. The due-date banner lists **only your** assigned issues (matched by your Jira display name) from the latest Dashboard snapshot's upcoming due-date window. Refresh Dashboard after changing due-date filters or if the banner is empty when you expect tasks. Same toggles in **Settings → Work Week header**.
 - **Date & calendar** — shows today; useful when planning.
 - **Reminders** — four short text lines, for your eyes only. Check the box to mark done (greyed out). They are never sent to Jira.
 
 ### Task Manager card
 
-1. **JQL count** — choose 1–4 query slots. Each has a label (your name for it) and a JQL box.
+1. **JQL count** — choose 1–5 query slots. Each has a label (your name for it) and a JQL box.
 2. **Max results** — first page size per query. The app can load **all** matching issues (up to a safe cap) — see Results table below.
-3. **Pull most recent Jira comment** — when checked, each **Run JQL** copies the latest Jira comment into the row **Notes** box (useful with shared `PRIORITY P#` comments).
+3. **Notes on run** — choose how row notes are filled when you **Run JQL** or refresh:
+   - **Keep local notes** (default) — notes come from your local database for issues in the result set.
+   - **Pull most recent Jira comment** — overwrites each row's **Notes** box with that issue's latest Jira comment (useful for shared `PRIORITY P#` comments). Use **Clear** to reset to **Keep local notes**.
 4. **Run JQL** — loads fresh results from Jira, applies priority from latest comments when present, and saves results locally. Shortcut: **Ctrl+Enter** (Windows/Linux) or **⌘+Enter** (Mac).
 5. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes or priorities in the local database, or header reminders.
-6. **Create Issue** — opens a modal to create a new Jira issue. The epic/query dropdown shows all your saved presets, plus a "Enter epic key manually" option.
+6. **Create Issue** — opens a modal to create a new Jira issue in ODI. Fill in the epic/parent and title, then click **✦ AI Draft** (Lumen blue button next to the Description label) to generate a description and, for Stories, a suggested sub-task list — all following ODI Jira standards:
+   - **Story**: AI rewrites the title into Job Story format ("When… I want… so I can…") if it isn't already, and generates a description that expands on the situation, motivation, and desired outcome. 2–5 suggested sub-tasks appear as editable checkboxes; uncheck any you don't want before clicking Create.
+   - **Bug**: AI generates a structured description covering what is broken, steps to reproduce, expected vs actual, environment, and any known workaround. A suggested priority (Low / Medium / High / Critical) appears based on ODI severity definitions.
+   - **Task**: AI generates a plain description.
+   - The **Create** button label updates to show "Create + N subtasks" when Story sub-tasks are selected. Sub-tasks are created as Task type under the new story immediately after it is created; the success message lists each with its issue key.
 
 > **Background work:** Dashboard refresh, report generation, week plan, project report, and **Run JQL** keep running if you switch pages. A yellow status pill in the top nav shows what's in progress. Return to the page when it finishes — results are saved automatically.
 
@@ -109,6 +115,7 @@ This is the main screen for managing your open work.
 Appears after you Run JQL and get results. Shows:
 - Issue count chips (total, open, overdue, in progress) per query
 - A **📄 Project Report** section inside each query — click to expand, then **Generate Report** for an AI-written summary *from your perspective as the assignee*
+- When a report is showing, use **Clear report** in the report header to remove it from this page only (does not delete copies in **Past Reports**)
 
 > The badge in the **📊 My Metrics** header shows your total open issue count at a glance.
 
@@ -123,7 +130,7 @@ Click **🗓️ Help me plan my week** to expand. Answer four questions:
 | 3 | Fixed commitments or blockers? | "Deployment Thursday" |
 | 4 | Any other context? | "Need to prep for Friday review" |
 
-Click **Continue →**, then **Generate week plan**. The result is a Monday–Friday plan using your actual issue keys. Copy or start over from the same panel.
+Click **Continue →**, then **Generate week plan**. The result is a Monday–Friday plan using your actual issue keys. Copy, download, **Clear report** (removes the plan text from this page only), or **Start over** to reset the questions.
 
 ### Results table
 
@@ -132,7 +139,7 @@ Each row is one Jira issue. What you can do per row:
 | Action | How |
 |--------|-----|
 | Change **status** in Jira | Dropdown → **Update Status** |
-| Change **assignee** in Jira | Dropdown → **Update Assignee** |
+| Change **assignee** in Jira | Type a **display name, email, or username** in the Assignee box — suggestions appear as you type from Jira user search and assignees already in the table. Press **Enter** or click **Update Assignee** |
 | Set personal **priority** (P1–P10) | Priority dropdown — P1 = most urgent, P10 = least. A **Jira** badge means priority was set from the latest comment on **Run JQL** |
 | Write a **note** (local) | Type in the Notes box — saves automatically |
 | Push note to Jira as a **comment** | Check the row checkbox → **Push note** (or **Push Selected** for multiple) |
@@ -142,7 +149,12 @@ Each row is one Jira issue. What you can do per row:
 
 **Load status:** After **Run JQL**, the line above the table shows **Loaded X of Y matched** (how many rows are in the table vs how many Jira matched). If your query returns more than the first batch, click **Load remaining** to fetch the rest (up to a documented safe cap).
 
-**Deep links from Dashboard:** Opening Work Week from Dashboard (`?key=ODI-123` or `?assignee=Name`) applies table filters automatically. The app fetches that issue from Jira and opens a green **Drill-down: ODI-123** tab (first tab), even if the issue also appears in your saved JQL results. A green banner confirms the active filter; use **Clear drill-down** to remove the tab and filters.
+**Deep links from Dashboard:** Opening Work Week from Dashboard (`?key=ODI-123` or `?assignee=Name`) applies table filters automatically.
+
+- **Issue key** — the app fetches that issue from Jira and opens a green **Drill-down: ODI-123** tab (first tab), even if the issue also appears in your saved JQL results.
+- **Assignee name** — if that person is not already in your saved JQL results, the app runs `assignee = "Name"` in Jira and opens a **Drill-down: Name** tab with their tasks. If their issues are already loaded in a JQL tab, that tab is selected and filtered by assignee instead.
+
+A green banner confirms the active drill-down. Use **Clear filter** to remove the Dashboard filter from the URL while keeping any drill-down tabs you opened in this browser session. Use the small **x** on an individual green drill-down tab to remove only that tab.
 
 **MRD column:** The header shows **MRD** (hover for “Most Recent Done Date”). It displays the issue’s automated Most Recent Done Date when that field is set on the task. When the task has no MRD, the app walks the **parent chain** (for example Story → Epic) and shows the first ancestor that has an MRD. This uses the same ODI field mapping as Dashboard (`customfield_10009` by default). Standard Jira **Due date** is not shown in the table; it is still used behind the scenes for My Metrics past-due/upcoming counts and Chat context.
 
@@ -160,9 +172,9 @@ Use Dashboard when you want to see how a whole project (or several) is tracking,
 
 ### How to use it
 
-1. **Select presets** — pick one or more epic or JQL presets from the panel at the top
+1. **Select projects** — pick one or more Epic & JQL presets from the panel at the top (add or edit them in Settings → **Epic & JQL presets**)
 2. **Optional due-date views** — set an upcoming window, past-due lookback, and which date field to compare against (see below)
-3. **Optional people** — add team members to track in **Individual Contributor Metrics**
+3. **Contributor Metrics** — add people or custom queries to track in the **Individual Contributor Metrics** section (saved entries from Settings → **Contributor Metrics**, or type a display name directly)
 4. **Choose views** — under **Views**, check which dashboard sections you want visible (including separate toggles for upcoming vs past-due due-date cards)
 5. Click **Refresh status** — the app pulls metrics from Jira and stores them
 
@@ -188,8 +200,8 @@ These filters are optional. **Refresh status** always updates resolution, worklo
 |---------|----------------|
 | **Also include → Past Due Projects** | Adds missed-deadline project cards to Project Metrics and past-due rows to the past-due due-date list |
 | **Show past due** (1 / 2 / 3 years) | How far back to look for past-due rows and epic past-due flags. Only applies when Past Due Projects is checked. Default: 1 year |
-| **Show upcoming due dates** | None, 7 days, 2 weeks, 30 days, 90 days, or a custom “through” date. Drives the **Upcoming Due Dates** card |
-| **Compare against** | **Most Recent Done Date** or **Initial Done Date** (ODI automated done-date fields). Task due dates take priority; when a task has no due date, the parent epic’s compare field is used |
+| **Show upcoming due dates** | None, 7 days, 2 weeks, 30 days, 90 days, or **Through custom date** (shows a date picker when custom is selected). Drives the **Upcoming Due Dates** card |
+| **Compare against** | **Task due date**, **Most Recent Done Date**, or **Initial Done Date**. Task due dates take priority; when a task has no due date, the parent epic's compare field is used |
 
 **Clear** buttons reset each row of options without affecting the others.
 
@@ -216,7 +228,7 @@ Green-accent card listing open tasks with due dates from **today through** your 
 Red-accent card listing open tasks that missed their deadline within the selected lookback (1–3 years). Populated only when **Past Due Projects** is enabled. Empty state explains how to enable it.
 
 **Individual Contributor Metrics**  
-One card per watched person showing their open workload, overdue count, and a status breakdown chart.
+One card per person or custom query configured in Settings → **Contributor Metrics** (or names you add directly in the Dashboard filter panel). The section appears as soon as people are selected — click **Refresh status** to load metrics. After refresh: open workload, overdue count, and status breakdown per person. Person names link to Work Week with an assignee drill-down. Metrics are scoped to the projects selected in step 1; a person with no open issues in that scope still appears with a “no open issues” message.
 
 **Generate Report**  
 Choose an audience and click Generate:
@@ -227,10 +239,26 @@ Choose an audience and click Generate:
 | Product Owner Report | Feature delivery, backlog health, blockers |
 | Developer Report | Team workload, overdue by person, WIP |
 
-Reports can be **copied** or **downloaded as a .md file**. Generation continues in the background if you leave the page.
+Reports include an optional status chart when Dashboard data supports it. Use **Copy**, **Download .md**, or **Clear report** (removes the report from this page only — archived copies remain in **Past Reports**). Generation continues in the background if you leave the page.
 
 **Weekly digest** (same section, below the LLM reports)  
-Snapshot-based stand-up brief — overdue/upcoming highlights, contributor load, and project health. **No LLM required.** Click **Generate weekly digest** after a Dashboard refresh, then copy or download. Useful for managers who want a quick brief without running an AI report.
+Snapshot-based stand-up brief — overdue/upcoming highlights, contributor load, and project health. **No LLM required.** Click **Generate weekly digest** after a Dashboard refresh, then copy, download, or **Clear report**.
+
+---
+
+## Past Reports — saved outputs
+
+**Past Reports** lists every report the app has archived on this machine. Open it from the top nav.
+
+| Tab | Contents |
+|-----|----------|
+| **Work Week** | Project reports and week plans (saved automatically when you click Generate) |
+| **Dashboard** | Executive / PM / Developer audience reports (saved automatically on Generate) |
+| **Ad-hoc** | Chat assistant replies you explicitly saved with **Save to Past Reports** |
+
+For each tab: pick a row → **View** → expand the report to read, copy, or download. Dashboard archived reports may include the status chart that was shown at generation time.
+
+**Clear report** on Work Week or Dashboard removes the on-page copy and browser cache only — it does **not** delete items already listed here.
 
 ---
 
@@ -248,6 +276,7 @@ Chat lets you ask natural-language questions about your Jira data. Each message 
 1. Go to **Chat**
 2. Select presets in the filter panel (optional but helps scope Jira searches)
 3. Type a question and press Enter or click **Send**
+4. On any assistant reply, click **Save to Past Reports** to archive it under **Past Reports → Ad-hoc** (optional — Chat does not auto-save replies)
 
 For the best experience, run JQL on Work Week, refresh Dashboard, or generate a report/plan **before** asking Chat to summarize or reference that work.
 
@@ -341,7 +370,10 @@ PRIORITY P2 — Blocked on vendor response. Target fix by Friday.
 | Data | Stored where | Shared with Jira? |
 |------|-------------|-------------------|
 | JQL inputs, labels, table snapshot | This browser only (`localStorage`) | No |
-| Generated reports/plans for Chat context | This browser only (`localStorage`) | No |
+| Work Week drill-down tabs | This browser session only (`sessionStorage`) | No |
+| On-page report/plan display (before archive) | This browser only (`localStorage`) | No |
+| **Past Reports** archive | Local file (`data/workweek.sqlite` → `generated_reports`), saved with your browser's local timestamp/timezone | No |
+| Chat session artifacts (for Chat context) | This browser only (`localStorage`) | No |
 | Desktop app credentials + DB (packaged) | `%APPDATA%\Task Manager\` (Windows) or `~/Library/Application Support/Task Manager/` (Mac) | No |
 | Header reminders | This browser only | No |
 | Issue notes + priorities (P1–P10) | Local file (`data/workweek.sqlite`) | No — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) for team workflow |
@@ -378,6 +410,9 @@ You've already pushed that exact text as a comment. Edit the note text and the b
 **Chat gave a generic answer about my report**
 Generate the report or week plan first on Work Week or Dashboard, then ask Chat in the same browser. Session context is stored locally when you click Generate — it is not sent to a third-party cloud beyond your configured LLM provider.
 
+**What's the difference between Clear report and Past Reports?**
+**Clear report** removes the report from the Work Week or Dashboard page (and its browser cache). **Past Reports** keeps everything saved to the local database when you generated a report/plan, or when you clicked **Save to Past Reports** on a Chat reply. Clearing on-page does not delete archived rows.
+
 **Chat says it's not ready**
 For Anthropic/OpenAI/Ollama: set `CHAT_PROVIDER` and the matching API key in `.env` on the proxy host. For Rovo: set OAuth vars, sign in with Atlassian from Chat, or configure an LLM fallback key. See [JIRA_SETUP.md](./JIRA_SETUP.md) §8.
 
@@ -385,7 +420,7 @@ For Anthropic/OpenAI/Ollama: set `CHAT_PROVIDER` and the matching API key in `.e
 Click **Refresh status** after changing presets, due-date options, or watched people. A banner appears when filters differ from the stored snapshot.
 
 **I only see upcoming tasks, not past due**
-Past due rows are in a separate **Past Due in lookback** card. Enable **Also include → Past Due Projects**, choose a lookback (1–3 years), refresh, and turn on **Past Due Due Dates** under **Views**.
+Past due rows are in a separate **Past Due in lookback** card. Enable **Also include → Past Due Projects**, choose a lookback (1–3 years), refresh, and turn on **Past Due in lookback** under **Views**.
 
 **Upcoming search works with Initial Done Date but not Most Recent Done Date**
 The app prefers each task’s own Jira due date over automated done-date fields on subtasks, then falls back to the parent epic’s compare field. Refresh after changing **Compare against** so the snapshot matches.

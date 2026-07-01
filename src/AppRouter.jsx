@@ -1,14 +1,16 @@
 import React from "react";
 import { createHashRouter, Outlet, NavLink } from "react-router-dom";
 import Errors from "./Pages/Errors.jsx";
-import Home from "./Pages/Home.jsx";
-import WorkWeekTasks from "./Pages/WorkWeekTasks.jsx";
-import Dashboard from "./Pages/Dashboard.jsx";
-import Chat from "./Pages/Chat.jsx";
-import ReportArchive from "./Pages/ReportArchive.jsx";
-import Settings from "./Pages/Settings.jsx";
-import "./appNav.css";
-import BackgroundJobIndicator from "./components/BackgroundJobIndicator.jsx";
+import "semantic-ui-css/semantic.min.css";
+import "./AppRouter.css";
+import BackgroundJobIndicator from "./Components/BackgroundJobIndicator.jsx";
+import { EpicFiltersProvider } from "./context/EpicFiltersContext.jsx";
+
+const WorkWeekTasks = React.lazy(() => import("./Pages/WorkWeekTasks.jsx"));
+const Dashboard = React.lazy(() => import("./Pages/Dashboard.jsx"));
+const Chat = React.lazy(() => import("./Pages/Chat.jsx"));
+const ReportArchive = React.lazy(() => import("./Pages/ReportArchive.jsx"));
+const Settings = React.lazy(() => import("./Pages/Settings.jsx"));
 
 const NAV_LINKS = [
   { to: "/work-week", label: "Work Week" },
@@ -17,6 +19,12 @@ const NAV_LINKS = [
   { to: "/chat", label: "Chat" },
   { to: "/settings", label: "Settings", icon: "⚙️" },
 ];
+
+const PageFallback = () => (
+  <main className="app-page-loading" aria-live="polite">
+    Loading...
+  </main>
+);
 
 const AppLayout = () => (
   <>
@@ -41,7 +49,11 @@ const AppLayout = () => (
         ))}
       </ul>
     </nav>
-    <Outlet />
+    <EpicFiltersProvider>
+      <React.Suspense fallback={<PageFallback />}>
+        <Outlet />
+      </React.Suspense>
+    </EpicFiltersProvider>
   </>
 );
 
@@ -56,7 +68,6 @@ const router = createHashRouter([
       { path: "/reports", element: <ReportArchive /> },
       { path: "/chat", element: <Chat /> },
       { path: "/settings", element: <Settings /> },
-      { path: "/home", element: <Home /> },
     ],
   },
 ]);

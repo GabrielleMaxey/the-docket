@@ -1,6 +1,9 @@
 // Issue mutations (comment, status, assignee) and SQLite note/priority metadata.
 
 import { fetchLatestCommentTextBulk } from "../lib/jiraCommentText.mjs";
+import { createLogger } from "../lib/logger.mjs";
+const log = createLogger("metadata");
+
 
 export const registerIssueMetadataRoutes = (
   app,
@@ -72,8 +75,10 @@ export const registerIssueMetadataRoutes = (
         return res.status(result.status).json(result.data);
       }
 
+      log.info(`comment pushed to ${issueKey}`);
       return res.json(result.data);
     } catch (error) {
+      log.error(`comment push failed for ${issueKey}`, error instanceof Error ? error.message : error);
       return res.status(500).json({
         error: "Failed to push comment to Jira",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -140,6 +145,7 @@ export const registerIssueMetadataRoutes = (
         return res.status(transitionResult.status).json(transitionResult.data);
       }
 
+      log.info(`status updated ${issueKey} → ${targetStatus}`);
       return res.json({
         ok: true,
         issueKey,
@@ -148,6 +154,7 @@ export const registerIssueMetadataRoutes = (
         transitionId: matchingTransition.id,
       });
     } catch (error) {
+      log.error(`status update failed for ${issueKey}`, error instanceof Error ? error.message : error);
       return res.status(500).json({
         error: "Failed to update Jira status",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -188,7 +195,7 @@ export const registerIssueMetadataRoutes = (
 
       if (!accountId) {
         return res.status(404).json({
-          error: `No Jira user found for '${assigneeRaw}'`,
+          error: `No Jira user found for '${assigneeRaw}'. Try a display name, email, or username.`,
         });
       }
 
@@ -204,6 +211,7 @@ export const registerIssueMetadataRoutes = (
         return res.status(updateResult.status).json(updateResult.data);
       }
 
+      log.info(`assignee updated ${issueKey} → ${resolvedAssignee}`);
       return res.json({
         ok: true,
         issueKey,
@@ -211,6 +219,7 @@ export const registerIssueMetadataRoutes = (
         resolvedAssignee,
       });
     } catch (error) {
+      log.error(`assignee update failed for ${issueKey}`, error instanceof Error ? error.message : error);
       return res.status(500).json({
         error: "Failed to update Jira assignee",
         message: error instanceof Error ? error.message : "Unknown error",

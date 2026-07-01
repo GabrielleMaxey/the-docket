@@ -1,5 +1,4 @@
 import React from "react";
-import { personMatchesIssue } from "../../../shared/dashboardMetrics.mjs";
 import { fetchDashboardMetrics, fetchJiraMyself } from "../../services/jiraClient.js";
 import { splitDueByIssues } from "../Dashboard/utils/dashboardMetricsUtils.js";
 
@@ -8,23 +7,32 @@ const sortByDueDate = (left, right) =>
     numeric: true,
   });
 
+const normalize = (value) =>
+  String(value || "").trim().toLowerCase();
+
 const issueAssignedToUser = (issue, profile) => {
-  const assignee = String(issue?.assignee || "").trim();
-  if (!assignee || assignee === "Unassigned") {
+  const assignee = normalize(issue?.assignee);
+  if (!assignee || assignee === "unassigned") {
     return false;
   }
 
-  const displayName = String(profile?.displayName || "").trim();
-  const emailAddress = String(profile?.emailAddress || "").trim();
-  if (!displayName && !emailAddress) {
-    return false;
+  const displayName = normalize(profile?.displayName);
+  const emailLocal = normalize(String(profile?.emailAddress || "").split("@")[0]);
+
+  // Exact display name match (most reliable for how due-by issues are stored)
+  if (displayName && assignee === displayName) {
+    return true;
   }
 
-  const syntheticIssue = { fields: { assignee: { displayName: assignee } } };
-  return (
-    personMatchesIssue(syntheticIssue, displayName, displayName) ||
-    personMatchesIssue(syntheticIssue, emailAddress, displayName)
-  );
+  // Email local-part match (e.g. "gabrielle.maxey" ↔ "gabrielle maxey" after normalising dots)
+  if (emailLocal) {
+    const normEmailLocal = emailLocal.replace(/[._-]+/g, " ").trim();
+    if (normEmailLocal && assignee === normEmailLocal) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
 export const useUpcomingDueBanner = (enabled) => {
