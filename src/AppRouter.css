@@ -123,6 +123,13 @@
   }
 }
 
+.app-page-loading {
+  padding: 2rem 1rem;
+  color: #64748b;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
 @media (max-width: 600px) {
   .app-nav { padding: 0 0.75rem; }
   .app-nav-logo { font-size: 0.95rem; }

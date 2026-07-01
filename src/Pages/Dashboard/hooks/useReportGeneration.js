@@ -4,6 +4,7 @@ import { saveChatSessionArtifact } from "../../../utils/chatSessionContext";
 import {
   loadDashboardReportState,
   saveDashboardReportState,
+  clearDashboardReportState,
 } from "../../../utils/pageReportPersistence";
 import { useReportClipboard } from "../../../hooks/useReportClipboard";
 import {
@@ -160,6 +161,13 @@ export const useReportGeneration = ({ epics = [], overallStatusCounts, chartVari
 
   const selectAllEpics = React.useCallback(() => setSelectedEpicIds([]), []);
 
+  const handleClearReport = React.useCallback(() => {
+    clearDashboardReportState();
+    setReport(null);
+    setReportStatusCounts(null);
+    setError("");
+  }, []);
+
   return {
     audience,
     setAudience,
@@ -174,6 +182,7 @@ export const useReportGeneration = ({ epics = [], overallStatusCounts, chartVari
     setAdditionalContext,
     selectedOption,
     handleGenerate,
+    handleClearReport,
     handleCopy,
     handleDownload,
     toggleEpicSelection,

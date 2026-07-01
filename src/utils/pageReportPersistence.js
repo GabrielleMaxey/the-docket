@@ -51,6 +51,18 @@ export const saveDashboardReportState = (state) => {
   });
 };
 
+export const clearDashboardReportState = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(DASHBOARD_REPORT_KEY);
+  } catch {
+    // ignore
+  }
+};
+
 export const loadWorkWeekProjectReport = (runKey) => {
   const all = readJson(WORK_WEEK_PROJECT_REPORTS_KEY, {});
   const entry = all[String(runKey)];
@@ -67,6 +79,12 @@ export const saveWorkWeekProjectReport = (runKey, data) => {
     ...data,
     savedAt: new Date().toISOString(),
   };
+  writeJson(WORK_WEEK_PROJECT_REPORTS_KEY, all);
+};
+
+export const clearWorkWeekProjectReport = (runKey) => {
+  const all = readJson(WORK_WEEK_PROJECT_REPORTS_KEY, {});
+  delete all[String(runKey)];
   writeJson(WORK_WEEK_PROJECT_REPORTS_KEY, all);
 };
 
@@ -99,4 +117,13 @@ export const clearWeekPlanState = () => {
   } catch {
     // ignore
   }
+};
+
+export const clearWeekPlanReportOnly = () => {
+  const current = loadWeekPlanState();
+  if (!current) {
+    return;
+  }
+
+  saveWeekPlanState({ ...current, plan: null });
 };

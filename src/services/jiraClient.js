@@ -1,4 +1,5 @@
 import { buildApiUrl } from "./apiBase.js";
+import { getLocalTimestampPayload } from "../utils/localTimestamp.js";
 
 const formatErrorDetail = (value) => {
   if (value == null || value === "") {
@@ -127,6 +128,13 @@ export const updateJiraIssueAssignee = async ({ issueKey, assignee }) => {
     },
     body: JSON.stringify({ assignee }),
   });
+};
+
+export const searchJiraUsers = async (query) => {
+  const data = await requestJson(
+    `/api/jira/users/search?query=${encodeURIComponent(String(query || "").trim())}`
+  );
+  return data?.items || [];
 };
 
 export const fetchIssueMetadataBulk = async (issueKeys) => {
@@ -338,6 +346,7 @@ export const generateReport = async ({
       additionalContext,
       statusCounts,
       chartVariant,
+      ...getLocalTimestampPayload(),
     }),
   });
 };
@@ -386,11 +395,19 @@ export const createJiraIssue = async (payload) => {
   });
 };
 
+export const generateIssueDescription = async ({ summary, issueType, epicKey, epicName }) => {
+  return requestJson("/api/jira/issues/generate-description", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ summary, issueType, epicKey: epicKey || "", epicName: epicName || "" }),
+  });
+};
+
 export const generateProjectReport = async ({ label, summary }) => {
   return requestJson("/api/report/project", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label, summary }),
+    body: JSON.stringify({ label, summary, ...getLocalTimestampPayload() }),
   });
 };
 
@@ -398,7 +415,13 @@ export const generateWeekPlan = async ({ projects, focusStyle, capacityHours, ad
   return requestJson("/api/plan/week", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ projects, focusStyle, capacityHours, additionalContext }),
+    body: JSON.stringify({
+      projects,
+      focusStyle,
+      capacityHours,
+      additionalContext,
+      ...getLocalTimestampPayload(),
+    }),
   });
 };
 
@@ -419,4 +442,14 @@ export const fetchArchivedReports = async ({ source, limit } = {}) => {
 export const fetchArchivedReportById = async (id) => {
   const data = await requestJson(`/api/reports/archive/${encodeURIComponent(id)}`);
   return data?.item || null;
+};
+
+export const saveAdHocReport = async ({ content, label, userPrompt, provider }) => {
+  return requestJson("/api/reports/archive", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ content, label, userPrompt, provider, ...getLocalTimestampPayload() }),
+  });
 };

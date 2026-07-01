@@ -1,5 +1,5 @@
 import React from "react";
-import StatusPieChart from "../../../components/StatusPieChart";
+import StatusPieChart from "../../../Components/StatusPieChart";
 import { buildEpicPieStatusCounts, sumEpicMetrics } from "../utils/dashboardMetricsUtils";
 
 const EpicMetricsSummary = ({ epics, chartVariant }) => {

@@ -755,6 +755,7 @@
   border: 1px solid #a7f3d0;
   border-radius: 10px;
   background: #ecfdf5;
+  scroll-margin-top: 72px;
 }
 
 .work-week-page .ww-drill-down-banner-content {
@@ -765,10 +766,15 @@
 }
 
 .work-week-page .ww-drill-down-clear-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
   font-size: 0.82rem;
   font-weight: 600;
   color: #047857;
   text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .work-week-page .ww-drill-down-clear-link:hover {
@@ -985,6 +991,12 @@
   gap: 0.5rem;
 }
 
+.work-week-page .ww-jql-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
 .work-week-page .ww-jql-tab-btn {
   border: 1px solid #cbd5e1;
   background: #f8fafc;
@@ -1012,6 +1024,25 @@
   border-color: #059669;
   color: #065f46;
   background: #d1fae5;
+}
+
+.work-week-page .ww-jql-tab-clear-btn {
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #047857;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.work-week-page .ww-jql-tab-clear-btn:hover {
+  border-color: #059669;
+  background: #dcfce7;
+  color: #065f46;
 }
 
 .work-week-page .ww-key-filter-row {

@@ -8,6 +8,11 @@ import {
 } from "../../../shared/dashboardMetrics.mjs";
 
 export const resolveCandidateFieldIds = (dueByField, { dueFieldId, mrdFieldId, iddFieldId, pedFieldId }) => {
+  if (dueByField === "due_date") {
+    // For epic-level date inheritance: prefer standard duedate, fall back to
+    // MRD / IDD / PED since ODI epics don't use the standard duedate field.
+    return [dueFieldId, mrdFieldId, iddFieldId, pedFieldId].filter(Boolean);
+  }
   if (dueByField === "initial_done_date") {
     return [iddFieldId].filter(Boolean);
   }

@@ -7,6 +7,7 @@ const ReportOutput = ({
   copied,
   onCopy,
   onDownload,
+  onClear,
   chartSlot,
   title,
   hideTitle = false,
@@ -28,6 +29,11 @@ const ReportOutput = ({
       <div className="app-report-output-header">
         {displayTitle ? <strong className="app-report-output-title">{displayTitle}</strong> : <span />}
         <div className="app-report-output-actions">
+          {onClear ? (
+            <Button basic size="mini" onClick={onClear}>
+              Clear report
+            </Button>
+          ) : null}
           <Button basic size="mini" onClick={onCopy}>
             {copied ? "✓ Copied" : "Copy"}
           </Button>

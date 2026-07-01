@@ -8,6 +8,9 @@ import {
   listGeneratedReports,
   REPORT_SOURCES,
 } from "../lib/reportArchive.mjs";
+import { createLogger } from "../lib/logger.mjs";
+
+const log = createLogger("report");
 
 const REPORT_MAX_TOKENS = 2048;
 
@@ -80,6 +83,17 @@ const sanitizeStatusCounts = (value) => {
 
 const sanitizeChartVariant = (value) => (String(value || "").trim() === "bar" ? "bar" : "pie");
 
+const getClientArchiveTimestamp = (req) => String(req.body?.savedAtLocal || "").trim();
+
+const getClientArchiveMeta = (req) => {
+  const savedAtLocal = String(req.body?.savedAtLocal || "").trim();
+  const savedTimeZone = String(req.body?.savedTimeZone || "").trim();
+  return {
+    ...(savedAtLocal ? { savedAtLocal } : {}),
+    ...(savedTimeZone ? { savedTimeZone } : {}),
+  };
+};
+
 const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics }) => {
   const lines = [
     "## Overall Project Metrics",
@@ -145,7 +159,8 @@ const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics }) => {
   return lines.join("\n");
 };
 
-const callLLMForReport = async ({ systemPrompt, context }) => {
+const callLLMForReport = async ({ systemPrompt, context, label = "report" }) => {
+  log.info(`generating ${label}`);
   const provider = resolveFirstReadyReportProvider();
   return completeLlmText({
     systemPrompt,
@@ -245,17 +260,19 @@ export const registerReportRoutes = (app, { db }) => {
     const systemPrompt = systemParts.join("\n\n");
 
     try {
-      const report = await callLLMForReport({ systemPrompt, context });
+      const report = await callLLMForReport({ systemPrompt, context, label: config.label });
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.DASHBOARD,
         reportType: "dashboard_report",
         label: config.label,
         content: report,
+        createdAt: getClientArchiveTimestamp(req),
         meta: {
           audience: audienceKey,
           epicPresetIds: requestedEpicIds,
           additionalContext,
           snapshotRefreshedAt: snapshot.refreshedAt,
+          ...getClientArchiveMeta(req),
           ...(statusCounts ? { statusCounts, chartVariant } : {}),
         },
       });
@@ -267,7 +284,7 @@ export const registerReportRoutes = (app, { db }) => {
         ...(statusCounts ? { statusCounts, chartVariant } : {}),
       });
     } catch (error) {
-      console.error("[report] generation failed:", error);
+      log.error("generation failed", error instanceof Error ? error.message : error);
       return res.status(500).json({
         error: "Report generation failed",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -319,17 +336,18 @@ Tone: supportive and honest — like a thoughtful colleague reviewing your work 
     ];
     if (customInstructions) systemParts.push(`\nAdditional instructions:\n${customInstructions}`);
     try {
-      const report = await callLLMForReport({ systemPrompt: systemParts.join("\n\n"), context: contextLines.join("\n") });
+      const report = await callLLMForReport({ systemPrompt: systemParts.join("\n\n"), context: contextLines.join("\n"), label });
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.WORK_WEEK,
         reportType: "work_week_project_report",
         label,
         content: report,
-        meta: { summary },
+        createdAt: getClientArchiveTimestamp(req),
+        meta: { summary, ...getClientArchiveMeta(req) },
       });
       return res.json({ report, label, archiveId });
     } catch (error) {
-      console.error("[report/project] generation failed:", error);
+      log.error("project report generation failed", error instanceof Error ? error.message : error);
       return res.status(500).json({ error: "Project report generation failed", message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
@@ -389,17 +407,24 @@ Rules:
     ].join("\n\n");
 
     try {
-      const plan = await callLLMForReport({ systemPrompt, context: contextLines.join("\n") });
+      const plan = await callLLMForReport({ systemPrompt, context: contextLines.join("\n"), label: "week plan" });
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.WORK_WEEK,
         reportType: "week_plan",
         label: "Week plan",
         content: plan,
-        meta: { focusStyle, capacityHours, additionalContext, projectLabels: projects.map((p) => p.label) },
+        createdAt: getClientArchiveTimestamp(req),
+        meta: {
+          focusStyle,
+          capacityHours,
+          additionalContext,
+          projectLabels: projects.map((p) => p.label),
+          ...getClientArchiveMeta(req),
+        },
       });
       return res.json({ plan, archiveId });
     } catch (error) {
-      console.error("[plan/week] generation failed:", error);
+      log.error("week plan generation failed", error instanceof Error ? error.message : error);
       return res.status(500).json({ error: "Week plan generation failed", message: error instanceof Error ? error.message : "Unknown error" });
     }
   });
@@ -414,7 +439,7 @@ Rules:
       }
       return res.json({ digest });
     } catch (error) {
-      console.error("[reports/weekly-digest] failed:", error);
+      log.error("weekly digest failed", error instanceof Error ? error.message : error);
       return res.status(500).json({
         error: "Failed to build weekly digest",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -430,9 +455,48 @@ Rules:
       const items = listGeneratedReports(db, { source, limit });
       return res.json({ items });
     } catch (error) {
-      console.error("[reports/archive] list failed:", error);
+      log.error("archive list failed", error instanceof Error ? error.message : error);
       return res.status(500).json({
         error: "Failed to load archived reports",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.post("/api/reports/archive", (req, res) => {
+    const content = String(req.body?.content || "").trim();
+    if (!content) {
+      return res.status(400).json({ error: "Missing report content" });
+    }
+
+    const labelRaw = String(req.body?.label || "").trim();
+    const label =
+      labelRaw ||
+      content.split(/\r?\n/).find((line) => line.trim())?.slice(0, 80) ||
+      "Chat response";
+
+    const userPrompt = String(req.body?.userPrompt || "").trim();
+    const provider = String(req.body?.provider || "").trim();
+
+    try {
+      const archiveId = insertGeneratedReport(db, {
+        source: REPORT_SOURCES.ADHOC,
+        reportType: "chat_response",
+        label,
+        content,
+        createdAt: getClientArchiveTimestamp(req),
+        meta: {
+          savedFrom: "chat",
+          ...getClientArchiveMeta(req),
+          ...(userPrompt ? { userPrompt } : {}),
+          ...(provider ? { provider } : {}),
+        },
+      });
+      return res.json({ ok: true, archiveId, label });
+    } catch (error) {
+      log.error("archive save failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to save report",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
@@ -451,7 +515,7 @@ Rules:
       }
       return res.json({ item });
     } catch (error) {
-      console.error("[reports/archive] get failed:", error);
+      log.error("archive get failed", error instanceof Error ? error.message : error);
       return res.status(500).json({
         error: "Failed to load archived report",
         message: error instanceof Error ? error.message : "Unknown error",

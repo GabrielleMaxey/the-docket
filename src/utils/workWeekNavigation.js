@@ -62,6 +62,7 @@ export const findRunIndexForDrillDown = (jqlRuns, { key, assignee } = {}) => {
     const drillDownIdx = jqlRuns.findIndex(
       (run) =>
         run.isDrillDown &&
+        run.drillDownType === "issue" &&
         (run.issues || []).some((issue) => issueKeyMatches(issue.key, issueKey))
     );
     if (drillDownIdx >= 0) {
@@ -71,6 +72,15 @@ export const findRunIndexForDrillDown = (jqlRuns, { key, assignee } = {}) => {
   }
 
   if (assigneeName) {
+    const drillDownIdx = jqlRuns.findIndex(
+      (run) =>
+        run.isDrillDown &&
+        run.drillDownType === "assignee" &&
+        String(run.drillDownAssignee || "").trim() === assigneeName
+    );
+    if (drillDownIdx >= 0) {
+      return drillDownIdx;
+    }
     return findRunIndexForAssignee(jqlRuns, assigneeName);
   }
 
@@ -79,7 +89,7 @@ export const findRunIndexForDrillDown = (jqlRuns, { key, assignee } = {}) => {
 
 export const getRunStateKey = (run, arrayIndex) => {
   if (run?.isDrillDown) {
-    return "drill-down";
+    return run.drillDownId || `drill-down-${arrayIndex}`;
   }
   return String(run?.index ?? arrayIndex);
 };

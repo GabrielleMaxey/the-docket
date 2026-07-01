@@ -1,17 +1,18 @@
 import React from "react";
 import {
-  fetchJiraHealth,
-  fetchJiraMyself,
   fetchFieldMappings,
   pushJiraIssueNote,
   saveIssueMetadata,
   updateJiraIssueAssignee,
   updateJiraIssueStatus,
 } from "../../services/jiraClient";
-import { runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey } from "./jiraJqlRunWorkflow.js";
+import { runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey, loadDrillDownIssuesByAssignee } from "./jiraJqlRunWorkflow.js";
 import {
+  drillDownJqlRuns,
+  loadDrillDownRunsFromSessionStorage,
   mergeJqlRuns,
   partitionJqlRuns,
+  persistDrillDownRunsToSessionStorage,
   persistJqlRunsToStorage,
   savableJqlRuns,
 } from "../../utils/jqlRunPersistence.js";
@@ -22,14 +23,14 @@ import {
   useAttachBackgroundJob,
   useBackgroundJobRunning,
 } from "../../hooks/useBackgroundJobs.js";
-
-const STORAGE_KEY = "workWeekTasksJiraPreferences";
-const NOTES_STORAGE_KEY = "workWeekTasksJiraNotes";
-const ROW_PRIORITY_STORAGE_KEY = "workWeekTasksJiraRowPriorities";
-const JQL_RUNS_STORAGE_KEY = "workWeekTasksJiraLastJqlRuns";
-const DEFAULT_JQL_COUNT = 1;
-const DEFAULT_JQLS = ["assignee = currentUser() ORDER BY updated DESC", "", ""];
-const DEFAULT_LABELS = ["My Work", "In Progress", "Blocked"];
+import {
+  DEFAULT_JQL_COUNT,
+  DEFAULT_JQL_LABELS,
+  DEFAULT_JQLS,
+  WORK_WEEK_STORAGE_KEYS,
+  normalizeJqlCount,
+  normalizeJqlSlotValues,
+} from "../../utils/workWeekStorage.js";
 
 export const STATUS_OPTIONS = [
   "Backlog",
@@ -48,38 +49,34 @@ const loadStoredPreferences = () => {
     return {
       jqlCount: DEFAULT_JQL_COUNT,
       jqlInputs: DEFAULT_JQLS,
-      jqlLabels: DEFAULT_LABELS,
+      jqlLabels: DEFAULT_JQL_LABELS,
       pullLatestComment: false,
     };
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(WORK_WEEK_STORAGE_KEYS.jiraPreferences);
     if (!raw) {
       return {
         jqlCount: DEFAULT_JQL_COUNT,
         jqlInputs: DEFAULT_JQLS,
-        jqlLabels: DEFAULT_LABELS,
+        jqlLabels: DEFAULT_JQL_LABELS,
         pullLatestComment: false,
       };
     }
 
     const parsed = JSON.parse(raw);
     return {
-      jqlCount: Math.min(3, Math.max(1, Number(parsed?.jqlCount || DEFAULT_JQL_COUNT))),
-      jqlInputs: Array.isArray(parsed?.jqlInputs)
-        ? [parsed.jqlInputs[0] || "", parsed.jqlInputs[1] || "", parsed.jqlInputs[2] || ""]
-        : DEFAULT_JQLS,
-      jqlLabels: Array.isArray(parsed?.jqlLabels)
-        ? [parsed.jqlLabels[0] || "", parsed.jqlLabels[1] || "", parsed.jqlLabels[2] || ""]
-        : DEFAULT_LABELS,
+      jqlCount: normalizeJqlCount(parsed?.jqlCount),
+      jqlInputs: normalizeJqlSlotValues(parsed?.jqlInputs, DEFAULT_JQLS),
+      jqlLabels: normalizeJqlSlotValues(parsed?.jqlLabels, DEFAULT_JQL_LABELS),
       pullLatestComment: parsed?.pullLatestComment === true,
     };
   } catch {
     return {
       jqlCount: DEFAULT_JQL_COUNT,
       jqlInputs: DEFAULT_JQLS,
-      jqlLabels: DEFAULT_LABELS,
+      jqlLabels: DEFAULT_JQL_LABELS,
       pullLatestComment: false,
     };
   }
@@ -117,7 +114,7 @@ const loadStoredJqlRuns = () => {
   }
 
   try {
-    const raw = window.localStorage.getItem(JQL_RUNS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(WORK_WEEK_STORAGE_KEYS.jqlRuns);
     if (!raw) {
       return [];
     }
@@ -133,6 +130,9 @@ const loadStoredJqlRuns = () => {
     return [];
   }
 };
+
+const loadInitialJqlRuns = () =>
+  mergeJqlRuns(loadDrillDownRunsFromSessionStorage(), loadStoredJqlRuns());
 
 const clampPriority = (value) => {
   const num = Number(value);
@@ -186,15 +186,9 @@ const errorMessage = (error, fallback) =>
 
 export const useTaskManagerJira = () => {
   const stored = loadStoredPreferences();
-  const storedNotes = readJsonObject(NOTES_STORAGE_KEY);
-  const storedRowPriorities = readJsonObject(ROW_PRIORITY_STORAGE_KEY);
+  const storedNotes = readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraNotes);
+  const storedRowPriorities = readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraRowPriorities);
 
-  const [jiraState, setJiraState] = React.useState({
-    loading: false,
-    success: null,
-    message: "Not connected yet.",
-  });
-  const [jiraApiMeta, setJiraApiMeta] = React.useState("");
   const [jqlCount, setJqlCount] = React.useState(stored.jqlCount);
   const [jqlInputs, setJqlInputs] = React.useState(stored.jqlInputs);
   const [jqlLabels, setJqlLabels] = React.useState(stored.jqlLabels);
@@ -202,7 +196,7 @@ export const useTaskManagerJira = () => {
   const [jqlPending, setJqlPending] = React.useState(false);
   const bgJqlRunning = useBackgroundJobRunning(BACKGROUND_JOB_IDS.WORK_WEEK_JQL);
   const jqlLoading = jqlLoadingLocal || jqlPending || bgJqlRunning;
-  const [jqlRuns, setJqlRuns] = React.useState(loadStoredJqlRuns);
+  const [jqlRuns, setJqlRuns] = React.useState(loadInitialJqlRuns);
   const [showRestoredJqlBanner, setShowRestoredJqlBanner] = React.useState(
     () => loadStoredJqlRuns().length > 0
   );
@@ -285,7 +279,7 @@ export const useTaskManagerJira = () => {
     }
 
     window.localStorage.setItem(
-      STORAGE_KEY,
+      WORK_WEEK_STORAGE_KEYS.jiraPreferences,
       JSON.stringify({
         jqlCount,
         jqlInputs,
@@ -293,8 +287,11 @@ export const useTaskManagerJira = () => {
         pullLatestComment,
       })
     );
-    window.localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(jiraNotes));
-    window.localStorage.setItem(ROW_PRIORITY_STORAGE_KEY, JSON.stringify(jiraRowPriorities));
+    window.localStorage.setItem(WORK_WEEK_STORAGE_KEYS.jiraNotes, JSON.stringify(jiraNotes));
+    window.localStorage.setItem(
+      WORK_WEEK_STORAGE_KEYS.jiraRowPriorities,
+      JSON.stringify(jiraRowPriorities)
+    );
   }, [jqlCount, jqlInputs, jqlLabels, pullLatestComment, jiraNotes, jiraRowPriorities]);
 
   React.useEffect(() => {
@@ -304,41 +301,17 @@ export const useTaskManagerJira = () => {
 
     const savable = savableJqlRuns(jqlRuns);
     if (savable.length === 0) {
-      window.localStorage.removeItem(JQL_RUNS_STORAGE_KEY);
-      return;
+      window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jqlRuns);
+    } else {
+      try {
+        window.localStorage.setItem(WORK_WEEK_STORAGE_KEYS.jqlRuns, JSON.stringify(savable));
+      } catch (error) {
+        console.warn("Could not persist JQL results to localStorage (size or quota).", error);
+      }
     }
 
-    try {
-      window.localStorage.setItem(JQL_RUNS_STORAGE_KEY, JSON.stringify(savable));
-    } catch (error) {
-      console.warn("Could not persist JQL results to localStorage (size or quota).", error);
-    }
+    persistDrillDownRunsToSessionStorage(jqlRuns);
   }, [jqlRuns]);
-
-  const handleJiraTest = async () => {
-    setJiraState({ loading: true, success: null, message: "Checking Jira connection..." });
-    setJiraApiMeta("");
-
-    try {
-      const health = await fetchJiraHealth();
-      const profile = await fetchJiraMyself();
-      const displayName = profile?.displayName || profile?.emailAddress || "Connected";
-      const endpoint = health?.searchEndpoint || "(unknown endpoint)";
-      const version = health?.version || "(unknown version)";
-      setJiraState({
-        loading: false,
-        success: true,
-        message: `Connected as ${displayName}`,
-      });
-      setJiraApiMeta(`Proxy ${version} using ${endpoint}`);
-    } catch (error) {
-      setJiraState({
-        loading: false,
-        success: false,
-        message: errorMessage(error, "Failed to connect to Jira"),
-      });
-    }
-  };
 
   const handleJqlChange = (index, value) => {
     setJqlInputs((prev) => patchIndexedArray(prev, index, value));
@@ -351,17 +324,17 @@ export const useTaskManagerJira = () => {
   const handleResetSavedQueries = () => {
     setJqlCount(DEFAULT_JQL_COUNT);
     setJqlInputs(DEFAULT_JQLS);
-    setJqlLabels(DEFAULT_LABELS);
+    setJqlLabels(DEFAULT_JQL_LABELS);
     setJqlRuns([]);
     setShowRestoredJqlBanner(false);
     setJqlError("");
     setLastPushedJiraNoteByKey({});
 
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem(STORAGE_KEY);
-      window.localStorage.removeItem(JQL_RUNS_STORAGE_KEY);
+      window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jiraPreferences);
+      window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jqlRuns);
       // Do not remove header reminders (`workWeekTasksReminders` in WorkWeekTasks.jsx) or
-      // `NOTES_STORAGE_KEY` / `ROW_PRIORITY_STORAGE_KEY` — reset is JQL prefs + cached runs only.
+      // notes/priorities — reset is JQL prefs + cached runs only.
     }
   };
 
@@ -574,10 +547,15 @@ export const useTaskManagerJira = () => {
           assignee: {
             ...(issue.fields?.assignee || {}),
             displayName: nextAssignee,
+            accountId: result?.accountId || issue.fields?.assignee?.accountId,
           },
         },
       }));
-      setRowUpdateMessage(issueKey, { loading: false, success: "Assignee updated." });
+      setAssigneeDrafts((prev) => ({ ...prev, [issueKey]: nextAssignee }));
+      setRowUpdateMessage(issueKey, {
+        loading: false,
+        success: `Assigned to ${nextAssignee}.`,
+      });
     } catch (error) {
       setRowUpdateMessage(issueKey, {
         loading: false,
@@ -653,6 +631,27 @@ export const useTaskManagerJira = () => {
     [pullLatestComment, clampPriority, fieldMappingRows]
   );
 
+  const handleDrillDownToAssignee = React.useCallback(
+    (assigneeName) => {
+      const fetchSeq = ++drillDownFetchSeqRef.current;
+      return loadDrillDownIssuesByAssignee({
+        assigneeName,
+        jqlMaxResults,
+        pullLatestComment,
+        clampPriority,
+        setJqlRuns,
+        setJqlLoading: setJqlLoadingLocal,
+        setJiraRowPriorities,
+        setPrioritySourceByKey,
+        setJiraNotes,
+        setJqlError,
+        fieldMappingRows,
+        isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
+      });
+    },
+    [jqlMaxResults, pullLatestComment, clampPriority, fieldMappingRows]
+  );
+
   const clearDrillDownRuns = React.useCallback(() => {
     drillDownFetchSeqRef.current += 1;
     setJqlRuns((prev) => {
@@ -661,13 +660,29 @@ export const useTaskManagerJira = () => {
         return prev;
       }
       persistJqlRunsToStorage(next);
+      persistDrillDownRunsToSessionStorage(next);
+      return next;
+    });
+  }, []);
+
+  const clearDrillDownRun = React.useCallback((drillDownId) => {
+    const id = String(drillDownId || "").trim();
+    if (!id) {
+      return;
+    }
+
+    setJqlRuns((prev) => {
+      const next = prev.filter((run) => run.drillDownId !== id);
+      if (next.length === prev.length) {
+        return prev;
+      }
+      persistJqlRunsToStorage(next);
+      persistDrillDownRunsToSessionStorage(drillDownJqlRuns(next));
       return next;
     });
   }, []);
 
   return {
-    jiraState,
-    jiraApiMeta,
     jqlCount,
     jqlInputs,
     jqlLabels,
@@ -696,14 +711,15 @@ export const useTaskManagerJira = () => {
     setJqlCount,
     setJqlMaxResults,
     setPullLatestComment,
-    handleJiraTest,
     handleJqlChange,
     handleJqlLabelChange,
     handleResetSavedQueries,
     handleRunJql,
     handleLoadRemainingJql,
     handleDrillDownToKey,
+    handleDrillDownToAssignee,
     clearDrillDownRuns,
+    clearDrillDownRun,
     handlePushSelected,
     handleSaveMetadata,
     handleSelectAll,
