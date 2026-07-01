@@ -1,4 +1,6 @@
 import React from "react";
+import PriorityCell from "./cells/PriorityCell";
+import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
 import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js";
 
 const PAGE_SIZE = 30;
@@ -35,9 +37,11 @@ const filterIssues = (issues, { keyQuery, statusFilter, assigneeFilter }) => {
 
   const keyTerm = String(keyQuery || "").trim().toLowerCase();
   if (keyTerm) {
-    result = result.filter((issue) =>
-      String(issue.key || "").toLowerCase().includes(keyTerm)
-    );
+    const looksLikeFullKey = /^[a-z][a-z0-9]*-\d+$/i.test(keyTerm);
+    result = result.filter((issue) => {
+      const issueKey = String(issue.key || "").toLowerCase();
+      return looksLikeFullKey ? issueKey === keyTerm : issueKey.includes(keyTerm);
+    });
   }
 
   if (statusFilter) {
@@ -277,6 +281,11 @@ const JiraResultsTable = ({
   handleSelectForPush,
   handlePushNote,
   onActiveTabChange,
+  prioritySourceByKey,
+  onLoadRemaining,
+  jqlLoading,
+  drillDownFilters,
+  drillDownPending,
 }) => {
   const [activeTab, setActiveTab] = React.useState(0);
   const [pageByRunIndex, setPageByRunIndex] = React.useState({});
@@ -290,17 +299,84 @@ const JiraResultsTable = ({
     setActiveTab((prev) => Math.min(Math.max(prev, 0), Math.max(0, jqlRuns.length - 1)));
   }, [jqlRuns.length]);
 
-  if (jqlRuns.length === 0) {
+  const hadDrillDownFiltersRef = React.useRef(false);
+
+  React.useEffect(() => {
+    const key = String(drillDownFilters?.key || "").trim();
+    const assignee = String(drillDownFilters?.assignee || "").trim();
+    const hasFilters = Boolean(key || assignee);
+
+    if (!hasFilters) {
+      if (!hadDrillDownFiltersRef.current) {
+        return;
+      }
+      hadDrillDownFiltersRef.current = false;
+      setKeyFilterByRunIndex({});
+      setAssigneeFilterByRunIndex({});
+      setPageByRunIndex({});
+      return;
+    }
+
+    if (jqlRuns.length === 0) {
+      return;
+    }
+
+    hadDrillDownFiltersRef.current = true;
+
+    const targetTab = findRunIndexForDrillDown(jqlRuns, { key, assignee });
+    const safeTargetTab = targetTab >= 0 ? targetTab : 0;
+    const targetRun = jqlRuns[safeTargetTab];
+    const stateKey = getRunStateKey(targetRun, safeTargetTab);
+
+    setActiveTab(safeTargetTab);
+    if (onActiveTabChange) {
+      onActiveTabChange(safeTargetTab);
+    }
+
+    if (key) {
+      setKeyFilterByRunIndex((prevFilters) => ({ ...prevFilters, [stateKey]: key }));
+    }
+    if (assignee) {
+      setAssigneeFilterByRunIndex((prevFilters) => ({ ...prevFilters, [stateKey]: assignee }));
+    }
+    setPageByRunIndex((prevPages) => ({ ...prevPages, [stateKey]: 1 }));
+  }, [drillDownFilters, jqlRuns, onActiveTabChange]);
+
+  if (jqlRuns.length === 0 && !drillDownPending) {
     return null;
+  }
+
+  if (jqlRuns.length === 0 && drillDownPending) {
+    return (
+      <div className="ww-results-section">
+        <div className="ww-jql-tab-bar">
+          <div className="ww-jql-tabs" role="tablist" aria-label="JQL result tabs">
+            <button
+              type="button"
+              role="tab"
+              aria-selected
+              className="ww-jql-tab-btn is-active is-drill-down"
+              disabled
+            >
+              Loading drill-down…
+            </button>
+          </div>
+        </div>
+        <div className="ww-jql-result">
+          <p className="ww-jira-status">Loading issue from Jira…</p>
+        </div>
+      </div>
+    );
   }
 
   const safeTab = Math.min(activeTab, jqlRuns.length - 1);
   const run = jqlRuns[safeTab];
-  const runIndex = run.index ?? safeTab;
+  const runStateKey = getRunStateKey(run, safeTab);
+  const runSlotIndex = run.index ?? safeTab;
   const allLoadedIssues = run.issues || [];
-  const keyFilterDraft = keyFilterByRunIndex[runIndex] ?? "";
-  const statusFilter = statusFilterByRunIndex[runIndex] ?? "";
-  const assigneeFilter = assigneeFilterByRunIndex[runIndex] ?? "";
+  const keyFilterDraft = keyFilterByRunIndex[runStateKey] ?? "";
+  const statusFilter = statusFilterByRunIndex[runStateKey] ?? "";
+  const assigneeFilter = assigneeFilterByRunIndex[runStateKey] ?? "";
   const issuesMatchingKey = filterIssues(allLoadedIssues, { keyQuery: keyFilterDraft, statusFilter, assigneeFilter });
   const knownAssignees = getKnownAssignees(allLoadedIssues);
   const knownStatuses = getKnownStatuses(allLoadedIssues);
@@ -314,11 +390,14 @@ const JiraResultsTable = ({
   });
   const totalRows = sortedIssues.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
-  const currentPage = Math.min(pageByRunIndex[runIndex] || 1, totalPages);
+  const currentPage = Math.min(pageByRunIndex[runStateKey] || 1, totalPages);
   const start = (currentPage - 1) * PAGE_SIZE;
   const pagedIssues = sortedIssues.slice(start, start + PAGE_SIZE);
   const rowStartDisplay = totalRows === 0 ? 0 : start + 1;
   const rowEndDisplay = totalRows === 0 ? 0 : Math.min(start + PAGE_SIZE, totalRows);
+  const jiraTotal = Number(run.total || 0);
+  const loadedCount = Number(run.loaded ?? allLoadedIssues.length);
+  const hasMoreToLoad = !run.isDrillDown && !run.loadComplete && jiraTotal > loadedCount;
 
   const handleTabChange = (idx) => {
     setActiveTab(idx);
@@ -327,42 +406,42 @@ const JiraResultsTable = ({
 
   const handlePageChange = (nextPage) => {
     const clamped = Math.min(Math.max(1, nextPage), totalPages);
-    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: clamped }));
+    setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: clamped }));
   };
 
   const handleSortFieldChange = (nextField) => {
     setSortField(nextField);
-    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+    setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
   };
 
   const handleSortDirectionChange = (nextDirection) => {
     setSortDirection(nextDirection);
-    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+    setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
   };
 
   const handleKeyFilterChange = (event) => {
     const value = event.target.value;
-    setKeyFilterByRunIndex((prev) => ({ ...prev, [runIndex]: value }));
-    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+    setKeyFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: value }));
+    setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
   };
 
   const handleStatusFilterChange = (event) => {
     const value = event.target.value;
-    setStatusFilterByRunIndex((prev) => ({ ...prev, [runIndex]: value }));
-    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+    setStatusFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: value }));
+    setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
   };
 
   const handleAssigneeFilterChange = (event) => {
     const value = event.target.value;
-    setAssigneeFilterByRunIndex((prev) => ({ ...prev, [runIndex]: value }));
-    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+    setAssigneeFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: value }));
+    setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
   };
 
   const handleClearFilters = () => {
-    setKeyFilterByRunIndex((prev) => ({ ...prev, [runIndex]: "" }));
-    setStatusFilterByRunIndex((prev) => ({ ...prev, [runIndex]: "" }));
-    setAssigneeFilterByRunIndex((prev) => ({ ...prev, [runIndex]: "" }));
-    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+    setKeyFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: "" }));
+    setStatusFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: "" }));
+    setAssigneeFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: "" }));
+    setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
   };
 
   const handleHeaderSort = (field) => {
@@ -374,7 +453,7 @@ const JiraResultsTable = ({
       setSortDirection("asc");
     }
 
-    setPageByRunIndex((prev) => ({ ...prev, [runIndex]: 1 }));
+    setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
   };
 
   const getHeaderAriaSort = (field) => {
@@ -404,7 +483,11 @@ const JiraResultsTable = ({
               type="button"
               role="tab"
               aria-selected={idx === safeTab}
-              className={"ww-jql-tab-btn" + (idx === safeTab ? " is-active" : "")}
+              className={
+                "ww-jql-tab-btn" +
+                (idx === safeTab ? " is-active" : "") +
+                (item.isDrillDown ? " is-drill-down" : "")
+              }
               onClick={() => handleTabChange(idx)}
             >
               {item.label || ("JQL " + (idx + 1))}
@@ -426,22 +509,37 @@ const JiraResultsTable = ({
             <p className="ww-jira-status">
               {keyFilterDraft.trim().length > 0 ? (
                 <>
-                  Showing {issuesMatchingKey.length} of {allLoadedIssues.length} loaded (key
-                  filter) · {run.total} matched by JQL
+                  Showing {issuesMatchingKey.length} of {loadedCount} loaded (filters) · {jiraTotal}{" "}
+                  matched by JQL
                 </>
               ) : (
                 <>
-                  Showing {allLoadedIssues.length} of {run.total} matched
+                  Loaded {loadedCount} of {jiraTotal} matched
                 </>
               )}
+              {hasMoreToLoad ? (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    className="ww-inline-action-btn ww-load-remaining-btn"
+                    onClick={() => onLoadRemaining?.(runSlotIndex)}
+                    disabled={jqlLoading}
+                  >
+                    {jqlLoading
+                      ? "Loading…"
+                      : `Load remaining (${Math.max(0, jiraTotal - loadedCount)} more)`}
+                  </button>
+                </>
+              ) : null}
             </p>
 
             <div className="ww-key-filter-row">
-              <label className="ww-key-filter-label" htmlFor={`ww-key-filter-${runIndex}`}>
+              <label className="ww-key-filter-label" htmlFor={`ww-key-filter-${runStateKey}`}>
                 Filter by key
               </label>
               <input
-                id={`ww-key-filter-${runIndex}`}
+                id={`ww-key-filter-${runStateKey}`}
                 className="ww-key-filter-input"
                 type="search"
                 placeholder="e.g. ODI-123456 or 123456"
@@ -452,11 +550,11 @@ const JiraResultsTable = ({
                 spellCheck={false}
               />
 
-              <label className="ww-key-filter-label" htmlFor={`ww-status-filter-${runIndex}`}>
+              <label className="ww-key-filter-label" htmlFor={`ww-status-filter-${runStateKey}`}>
                 Status
               </label>
               <select
-                id={`ww-status-filter-${runIndex}`}
+                id={`ww-status-filter-${runStateKey}`}
                 className="ww-key-filter-input"
                 value={statusFilter}
                 onChange={handleStatusFilterChange}
@@ -469,11 +567,11 @@ const JiraResultsTable = ({
                 ))}
               </select>
 
-              <label className="ww-key-filter-label" htmlFor={`ww-assignee-filter-${runIndex}`}>
+              <label className="ww-key-filter-label" htmlFor={`ww-assignee-filter-${runStateKey}`}>
                 Assignee
               </label>
               <select
-                id={`ww-assignee-filter-${runIndex}`}
+                id={`ww-assignee-filter-${runStateKey}`}
                 className="ww-key-filter-input"
                 value={assigneeFilter}
                 onChange={handleAssigneeFilterChange}
@@ -749,25 +847,14 @@ const JiraResultsTable = ({
                             : <span style={{ color: "#94a3b8" }}>—</span>}
                         </td>
 
-                        <td>
-                          {isClosedOrResolved ? (
-                            <span>-</span>
-                          ) : (
-                            <select
-                              className={"ww-row-priority-select " + getPriorityClass(rowPriority)}
-                              value={rowPriority}
-                              onChange={(event) =>
-                                handleRowPriorityChange(issueKey, event.target.value)
-                              }
-                            >
-                              {Array.from({ length: 11 }).map((_, i) => (
-                                <option key={"row-priority-" + issueKey + "-" + i} value={i}>
-                                  {"P" + i}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </td>
+                        <PriorityCell
+                          issueKey={issueKey}
+                          isClosedOrResolved={isClosedOrResolved}
+                          rowPriority={rowPriority}
+                          priorityClassName={getPriorityClass(rowPriority)}
+                          prioritySource={prioritySourceByKey}
+                          onChange={handleRowPriorityChange}
+                        />
 
                         <td>
                           {isClosedOrResolved ? (

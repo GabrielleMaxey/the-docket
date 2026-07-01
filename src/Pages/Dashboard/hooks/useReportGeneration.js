@@ -6,6 +6,12 @@ import {
   saveDashboardReportState,
 } from "../../../utils/pageReportPersistence";
 import { useReportClipboard } from "../../../hooks/useReportClipboard";
+import {
+  BACKGROUND_JOB_IDS,
+  runBackgroundJob,
+  useAttachBackgroundJob,
+  useBackgroundJobRunning,
+} from "../../../hooks/useBackgroundJobs.js";
 
 export const AUDIENCE_OPTIONS = [
   {
@@ -30,7 +36,9 @@ export const useReportGeneration = ({ epics = [], overallStatusCounts, chartVari
   const persisted = loadDashboardReportState();
 
   const [audience, setAudience] = React.useState(persisted?.audience || "executive");
-  const [loading, setLoading] = React.useState(false);
+  const [reportPending, setReportPending] = React.useState(false);
+  const bgReportRunning = useBackgroundJobRunning(BACKGROUND_JOB_IDS.DASHBOARD_REPORT);
+  const loading = reportPending || bgReportRunning;
   const [report, setReport] = React.useState(persisted?.report ?? null);
   const [reportStatusCounts, setReportStatusCounts] = React.useState(persisted?.statusCounts ?? null);
   const [reportChartVariant, setReportChartVariant] = React.useState(
@@ -52,50 +60,80 @@ export const useReportGeneration = ({ epics = [], overallStatusCounts, chartVari
 
   const selectedOption = AUDIENCE_OPTIONS.find((o) => o.value === audience);
 
-  const handleGenerate = React.useCallback(async () => {
-    setLoading(true);
+  const applyReportResult = React.useCallback(
+    (payload) => {
+      const result = payload?.result ?? payload;
+      if (!result) {
+        return;
+      }
+      setReport(result);
+      const nextStatusCounts =
+        payload?.nextStatusCounts ?? result?.statusCounts ?? null;
+      const nextChartVariant =
+        payload?.nextChartVariant ?? result?.chartVariant ?? chartVariant ?? "pie";
+      setReportStatusCounts(nextStatusCounts);
+      setReportChartVariant(nextChartVariant);
+    },
+    [chartVariant]
+  );
+
+  useAttachBackgroundJob(BACKGROUND_JOB_IDS.DASHBOARD_REPORT, {
+    onSuccess: applyReportResult,
+    onError: (err) => {
+      setError(err instanceof Error ? err.message : "Report generation failed");
+    },
+    onFinally: () => setReportPending(false),
+  });
+
+  const handleGenerate = React.useCallback(() => {
+    setReportPending(true);
     setError("");
     setReport(null);
     setReportStatusCounts(null);
-    try {
-      const hasChartData =
-        overallStatusCounts &&
-        Object.values(overallStatusCounts).some((value) => Number(value) > 0);
-      const result = await generateReport({
-        audience,
-        epicPresetIds: epicIds,
-        additionalContext: additionalContext.trim(),
-        ...(hasChartData
-          ? { statusCounts: overallStatusCounts, chartVariant }
-          : {}),
-      });
-      setReport(result);
-      const nextStatusCounts = result?.statusCounts || (hasChartData ? overallStatusCounts : null);
-      const nextChartVariant = result?.chartVariant || chartVariant || "pie";
-      setReportStatusCounts(nextStatusCounts);
-      setReportChartVariant(nextChartVariant);
-      saveDashboardReportState({
-        report: result,
-        audience,
-        selectedEpicIds,
-        additionalContext: additionalContext.trim(),
-        statusCounts: nextStatusCounts,
-        chartVariant: nextChartVariant,
-      });
-      saveChatSessionArtifact({
-        type: "dashboard_report",
-        label: result.label || selectedOption?.label || audience,
-        content: result.report,
-        meta: {
+
+    const hasChartData =
+      overallStatusCounts &&
+      Object.values(overallStatusCounts).some((value) => Number(value) > 0);
+    const trimmedContext = additionalContext.trim();
+
+    runBackgroundJob(BACKGROUND_JOB_IDS.DASHBOARD_REPORT, {
+      label: `Generating ${selectedOption?.label || "report"}`,
+      run: async () => {
+        const result = await generateReport({
           audience,
-          ...(nextStatusCounts ? { statusCounts: nextStatusCounts, chartVariant: nextChartVariant } : {}),
-        },
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Report generation failed");
-    } finally {
-      setLoading(false);
-    }
+          epicPresetIds: epicIds,
+          additionalContext: trimmedContext,
+          ...(hasChartData ? { statusCounts: overallStatusCounts, chartVariant } : {}),
+        });
+        const nextStatusCounts = result?.statusCounts || (hasChartData ? overallStatusCounts : null);
+        const nextChartVariant = result?.chartVariant || chartVariant || "pie";
+
+        saveDashboardReportState({
+          report: result,
+          audience,
+          selectedEpicIds,
+          additionalContext: trimmedContext,
+          statusCounts: nextStatusCounts,
+          chartVariant: nextChartVariant,
+        });
+        saveChatSessionArtifact({
+          type: "dashboard_report",
+          label: result.label || selectedOption?.label || audience,
+          content: result.report,
+          meta: {
+            audience,
+            ...(nextStatusCounts ? { statusCounts: nextStatusCounts, chartVariant: nextChartVariant } : {}),
+          },
+        });
+
+        return { result, nextStatusCounts, nextChartVariant };
+      },
+    })
+      .then(applyReportResult)
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Report generation failed");
+      })
+      .finally(() => setReportPending(false));
   }, [
     audience,
     epicIds,

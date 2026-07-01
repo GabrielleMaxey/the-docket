@@ -1,17 +1,19 @@
 import React from "react";
 import { Grid, Segment } from "semantic-ui-react";
-import { Button } from "semantic-ui-react";
-
-const FOCUS_OPTIONS = [
-  { value: "balance", label: "Balance across projects" },
-  { value: "overdue", label: "Clear overdue first" },
-  { value: "single", label: "Focus on one project" },
-  { value: "meetings", label: "Light week (lots of meetings)" },
-];
+import WorkWeekHeaderBanners from "./WorkWeekHeaderBanners";
 
 const TaskManagerHeaderPanel = ({
+  showJokeTicker,
+  showUpcomingDueBanner,
+  onShowJokeTickerChange,
+  onShowUpcomingDueBannerChange,
   tickerJokes,
   jokeIndex,
+  dueBannerLoading,
+  dueBannerError,
+  dueByDate,
+  upcomingIssues,
+  currentUserDisplayName,
   fullDateLabel,
   monthLabel,
   calendarCells,
@@ -23,10 +25,19 @@ const TaskManagerHeaderPanel = ({
 }) => {
   return (
     <>
-      <div className="ww-joke-ticker" role="status" aria-live="polite">
-        <span className="ww-joke-prefix">Office Joke Ticker:</span>
-        <span className="ww-joke-text">{tickerJokes[jokeIndex % tickerJokes.length]}</span>
-      </div>
+      <WorkWeekHeaderBanners
+        showJokeTicker={showJokeTicker}
+        showUpcomingDueBanner={showUpcomingDueBanner}
+        onShowJokeTickerChange={onShowJokeTickerChange}
+        onShowUpcomingDueBannerChange={onShowUpcomingDueBannerChange}
+        tickerJokes={tickerJokes}
+        jokeIndex={jokeIndex}
+        dueBannerLoading={dueBannerLoading}
+        dueBannerError={dueBannerError}
+        dueByDate={dueByDate}
+        upcomingIssues={upcomingIssues}
+        currentUserDisplayName={currentUserDisplayName}
+      />
 
       <Grid columns={1} stackable>
         <Grid.Row>
