@@ -1377,6 +1377,63 @@
   gap: 0.35rem;
 }
 
+.work-week-page .ww-assignee-cell .ww-assignee-input-wrap {
+  position: relative;
+}
+
+.work-week-page .ww-assignee-suggestions {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  max-height: 12rem;
+  overflow-y: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+.work-week-page .ww-assignee-suggestion {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.76rem;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.work-week-page button.ww-assignee-suggestion:hover,
+.work-week-page button.ww-assignee-suggestion:focus-visible {
+  background: #f1f5f9;
+  outline: none;
+}
+
+.work-week-page .ww-assignee-suggestion--meta {
+  color: #64748b;
+  cursor: default;
+  font-style: italic;
+}
+
+.work-week-page .ww-assignee-suggestion-name {
+  display: block;
+  font-weight: 600;
+}
+
+.work-week-page .ww-assignee-suggestion-email {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
 .work-week-page .ww-edit-select,
 .work-week-page .ww-edit-input {
   border: 1px solid #cbd5e1;
