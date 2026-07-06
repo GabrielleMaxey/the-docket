@@ -39,6 +39,16 @@
       "presetType": "jql",
       "label": "IP Large Project",
       "jql": "issuekey ~ \"ODI-*\" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), \"Sub-task\") AND parent IN (ODI-14817) ORDER BY key DESC, parent ASC, status ASC, rank"
+    },
+    {
+      "presetType": "jql",
+      "label": "Reporter's Current Issues",
+      "jql": "reporter = currentUser() AND resolution = Unresolved ORDER BY priority DESC, updated DESC"
+    },
+    {
+      "presetType": "jql",
+      "label": "My Current Issues",
+      "jql": "assignee = currentUser() AND resolution = Unresolved ORDER BY priority DESC, updated DESC"
     }
   ]
 }
