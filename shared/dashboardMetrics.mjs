@@ -127,21 +127,19 @@ export const getIssueDueByDate = (issue, compareFieldId, fallbackFieldId, epicIs
     return { dueDate: fallbackDate, dueValue: fallbackValue };
   }
 
-  if (compareId !== fallbackId) {
-    const epicKey = String(epicIssue?.key || "").trim();
-    const issueKey = String(issue?.key || "").trim();
-    if (epicIssue && epicKey && epicKey !== issueKey) {
-      const epicValue = getFieldValue(epicIssue, compareId);
-      const epicDate = parseJiraDate(epicValue);
-      if (epicDate) {
-        return { dueDate: epicDate, dueValue: epicValue };
-      }
-    } else if (!epicIssue || epicKey === issueKey) {
-      const compareValue = getFieldValue(issue, compareId);
-      const compareDate = parseJiraDate(compareValue);
-      if (compareDate) {
-        return { dueDate: compareDate, dueValue: compareValue };
-      }
+  const epicKey = String(epicIssue?.key || "").trim();
+  const issueKey = String(issue?.key || "").trim();
+  if (epicIssue && epicKey && epicKey !== issueKey) {
+    const epicValue = getFieldValue(epicIssue, compareId);
+    const epicDate = parseJiraDate(epicValue);
+    if (epicDate) {
+      return { dueDate: epicDate, dueValue: epicValue };
+    }
+  } else if (compareId !== fallbackId) {
+    const compareValue = getFieldValue(issue, compareId);
+    const compareDate = parseJiraDate(compareValue);
+    if (compareDate) {
+      return { dueDate: compareDate, dueValue: compareValue };
     }
   }
 
