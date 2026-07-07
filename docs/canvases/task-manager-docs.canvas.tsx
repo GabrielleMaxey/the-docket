@@ -628,95 +628,101 @@ function SectionPanel({ section }: { section: SectionId }) {
     );
   }
 
+  if (section === "docs") {
+    return (
+      <Stack gap={12}>
+        <Text tone="secondary">
+          Canonical markdown lives under <Text weight="semibold">docs/</Text> and{" "}
+          <Text weight="semibold">README.md</Text>. This canvas summarizes — edit
+          source files for long-form prose.
+        </Text>
+        <Grid columns={2} gap={12}>
+          <Card>
+            <CardHeader>README.md</CardHeader>
+            <CardBody>
+              <Stack gap={8}>
+                <Text size="small" tone="secondary">
+                  Product overview, page summaries, audience, quick start.
+                </Text>
+                <OpenFileButton path={`README.md`} label="Open" />
+              </Stack>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader>DEVELOPER_GUIDE.md</CardHeader>
+            <CardBody>
+              <Stack gap={8}>
+                <Text size="small" tone="secondary">
+                  Full repo layout, SQLite schema, API routes, dashboard pipeline,
+                  persistence, logging.
+                </Text>
+                <OpenFileButton path={`docs/DEVELOPER_GUIDE.md`} label="Open" />
+              </Stack>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader>END_USER_GUIDE.md</CardHeader>
+            <CardBody>
+              <Stack gap={8}>
+                <Text size="small" tone="secondary">
+                  Non-technical usage, storage model, troubleshooting.
+                </Text>
+                <OpenFileButton path={`docs/END_USER_GUIDE.md`} label="Open" />
+              </Stack>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader>JIRA_SETUP.md</CardHeader>
+            <CardBody>
+              <Stack gap={8}>
+                <Text size="small" tone="secondary">
+                  .env variables, run commands, connection test.
+                </Text>
+                <OpenFileButton path={`docs/JIRA_SETUP.md`} label="Open" />
+              </Stack>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader>team-priority-sync.md</CardHeader>
+            <CardBody>
+              <Stack gap={8}>
+                <Text size="small" tone="secondary">
+                  Planned shared program priority: team DB, slot mode, API contract,
+                  resolved decisions (design approved, not built).
+                </Text>
+                <OpenFileButton path={`docs/specs/team-priority-sync.md`} label="Open" />
+              </Stack>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader>pilot-presets.md</CardHeader>
+            <CardBody>
+              <Stack gap={8}>
+                <Text size="small" tone="secondary">
+                  Team preset seeding and import/export workflow.
+                </Text>
+                <OpenFileButton path={`docs/pilot-presets.md`} label="Open" />
+              </Stack>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader>.env.example</CardHeader>
+            <CardBody>
+              <Stack gap={8}>
+                <Text size="small" tone="secondary">
+                  Jira, CHAT_PROVIDER, LLM keys, Rovo OAuth, LOG_LEVEL.
+                </Text>
+                <OpenFileButton path={`.env.example`} label="Open" />
+              </Stack>
+            </CardBody>
+          </Card>
+        </Grid>
+      </Stack>
+    );
+  }
+
   return (
-    <Stack gap={12}>
-      <Text tone="secondary">
-        Canonical markdown lives under <Text weight="semibold">docs/</Text> and{" "}
-        <Text weight="semibold">README.md</Text>. This canvas summarizes — edit
-        source files for long-form prose.
-      </Text>
-      <Grid columns={2} gap={12}>
-        <Card>
-          <CardHeader>README.md</CardHeader>
-          <CardBody>
-            <Stack gap={8}>
-              <Text size="small" tone="secondary">
-                Product overview, page summaries, audience, quick start.
-              </Text>
-              <OpenFileButton path={`README.md`} label="Open" />
-            </Stack>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>DEVELOPER_GUIDE.md</CardHeader>
-          <CardBody>
-            <Stack gap={8}>
-              <Text size="small" tone="secondary">
-                Full repo layout, SQLite schema, API routes, dashboard pipeline,
-                persistence, logging.
-              </Text>
-              <OpenFileButton path={`docs/DEVELOPER_GUIDE.md`} label="Open" />
-            </Stack>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>END_USER_GUIDE.md</CardHeader>
-          <CardBody>
-            <Stack gap={8}>
-              <Text size="small" tone="secondary">
-                Non-technical usage, storage model, troubleshooting.
-              </Text>
-              <OpenFileButton path={`docs/END_USER_GUIDE.md`} label="Open" />
-            </Stack>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>JIRA_SETUP.md</CardHeader>
-          <CardBody>
-            <Stack gap={8}>
-              <Text size="small" tone="secondary">
-                .env variables, run commands, connection test.
-              </Text>
-              <OpenFileButton path={`docs/JIRA_SETUP.md`} label="Open" />
-            </Stack>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>team-priority-sync.md</CardHeader>
-          <CardBody>
-            <Stack gap={8}>
-              <Text size="small" tone="secondary">
-                Planned shared program priority: team DB, slot mode, API contract,
-                resolved decisions (design approved, not built).
-              </Text>
-              <OpenFileButton path={`docs/specs/team-priority-sync.md`} label="Open" />
-            </Stack>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>pilot-presets.md</CardHeader>
-          <CardBody>
-            <Stack gap={8}>
-              <Text size="small" tone="secondary">
-                Team preset seeding and import/export workflow.
-              </Text>
-              <OpenFileButton path={`docs/pilot-presets.md`} label="Open" />
-            </Stack>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>.env.example</CardHeader>
-          <CardBody>
-            <Stack gap={8}>
-              <Text size="small" tone="secondary">
-                Jira, CHAT_PROVIDER, LLM keys, Rovo OAuth, LOG_LEVEL.
-              </Text>
-              <OpenFileButton path={`.env.example`} label="Open" />
-            </Stack>
-          </CardBody>
-        </Card>
-      </Grid>
-    </Stack>
+    <Text tone="secondary">Select a section above.</Text>
   );
 }
 
