@@ -209,6 +209,42 @@ describe("due date checks", () => {
       true
     );
   });
+
+  it("inherits epic MRD when compare and fallback are both MRD and task has no MRD", () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 7);
+    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+    const mrdFieldId = "customfield_10009";
+
+    const issue = makeIssue({ key: "ODI-12", dueValue: null });
+    const epicIssue = {
+      key: "ODI-EPIC",
+      fields: { [mrdFieldId]: tomorrowStr },
+    };
+
+    const { dueValue } = getIssueDueByDate(issue, mrdFieldId, mrdFieldId, epicIssue);
+    assert.equal(dueValue, tomorrowStr);
+    assert.equal(
+      isIssueUpcomingDueBy(issue, mrdFieldId, mrdFieldId, "2099-12-31", epicIssue),
+      true
+    );
+  });
+
+  it("ignores stale task due date when comparing by MRD with matching compare and fallback", () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 7);
+    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+    const mrdFieldId = "customfield_10009";
+
+    const issue = makeIssue({ key: "ODI-13", dueValue: "2020-01-01", dueFieldId: "duedate" });
+    const epicIssue = {
+      key: "ODI-EPIC",
+      fields: { [mrdFieldId]: tomorrowStr },
+    };
+
+    const { dueValue } = getIssueDueByDate(issue, mrdFieldId, mrdFieldId, epicIssue);
+    assert.equal(dueValue, tomorrowStr);
+  });
 });
 
 describe("computeChildIssueMetrics", () => {
