@@ -4,6 +4,19 @@ Internal reference for code structure, data flow, scripts, and extension points.
 
 ---
 
+## For Cursor users
+
+The markdown files in `docs/` (including this guide) are the **canonical** documentation for everyone—GitHub, packaged desktop, and editors other than Cursor.
+
+If you use **Cursor** with the Docs Canvas plugin, an optional navigable summary is versioned at [`docs/canvases/task-manager-docs.canvas.tsx`](./canvases/task-manager-docs.canvas.tsx). Cursor only runs `.canvas.tsx` files from its project **`canvases/` folder** (outside git), so to open the live panel:
+
+1. Copy `docs/canvases/task-manager-docs.canvas.tsx` into `~/.cursor/projects/<your-workspace>/canvases/` (keep the same filename), **or** ask the agent: *“Open the Task Manager docs canvas from docs/canvases/”*
+2. Open that file beside chat (click the path in the agent reply or from the canvases folder).
+
+See [`docs/canvases/README.md`](./canvases/README.md) for the one-line install note. Edit this guide for long-form changes; update the canvas mirror when pages, data model, or architecture change materially.
+
+---
+
 ## Stack
 
 | Layer | Technology |
@@ -159,7 +172,11 @@ taskManager/
 | `priority` | INTEGER | 0–10; 0 = unranked, 1 = highest |
 | `updated_at` | TEXT | ISO 8601 |
 
-**Multi-user / shared projects:** `issue_metadata` is **per machine** (whoever runs the local proxy). There is no server-side sync between users. For team-visible ranking on shared issues, PMs push Jira comments prefixed with `PRIORITY P#` (P1–P10). On **Run JQL**, `shared/priorityFromComment.mjs` parses the latest comment per issue; matching priorities are written to SQLite and shown with a **Jira** badge in the UI (`prioritySourceByKey`). Manual priority changes clear the badge. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
+**Multi-user / shared projects (today):** `issue_metadata` is **per machine**. Team-visible ranking uses Jira comments with `PRIORITY P#` (see below).
+
+**Planned — team priority DB:** Shared program priority in team-owned Postgres/MySQL via a team API. Epic-root scope on writes; Work Week slots **link explicitly** to a shared program for team mode — all other slots (assignee, custom ODI JQL) stay local-only. Spec → **[specs/team-priority-sync.md](./specs/team-priority-sync.md)**.
+
+**Current workaround until team DB ships:** PMs push Jira comments prefixed with `PRIORITY P#` (P1–P10). On **Run JQL**, `shared/priorityFromComment.mjs` parses the latest comment per issue; matching priorities are written to SQLite and shown with a **Jira** badge in the UI (`prioritySourceByKey`). Manual priority changes clear the badge. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
 
 **`epic_presets`** — saved JQL/epic presets
 
