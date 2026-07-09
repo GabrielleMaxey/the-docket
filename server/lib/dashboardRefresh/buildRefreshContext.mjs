@@ -73,6 +73,9 @@ export const buildDashboardRefreshContext = ({
           // field (a task's old duedate would incorrectly resolve as past-due
           // even when the epic's MRD/IDD is in the future).
           dueByFallbackFieldId: input.dueByField === "due_date" ? dueFieldId : dueByCompareFieldId,
+          preferEpicCompareForChildren:
+            input.dueByField === "most_recent_done_date" ||
+            input.dueByField === "initial_done_date",
           includePastDueInList: input.includePastDue,
           pastDueFloor,
         }

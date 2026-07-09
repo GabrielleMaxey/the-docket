@@ -117,9 +117,25 @@ export const isDueDateInDueByWindow = (dueDate, targetDate, pastDueFloor) => {
   return dueDate >= floor;
 };
 
-export const getIssueDueByDate = (issue, compareFieldId, fallbackFieldId, epicIssue = null) => {
+export const getIssueDueByDate = (
+  issue,
+  compareFieldId,
+  fallbackFieldId,
+  epicIssue = null,
+  preferEpicCompareForChildren = false
+) => {
   const fallbackId = String(fallbackFieldId || "duedate").trim();
   const compareId = String(compareFieldId || fallbackId).trim();
+
+  const epicKey = String(epicIssue?.key || "").trim();
+  const issueKey = String(issue?.key || "").trim();
+  if (preferEpicCompareForChildren && epicIssue && epicKey && epicKey !== issueKey) {
+    const epicValue = getFieldValue(epicIssue, compareId);
+    const epicDate = parseJiraDate(epicValue);
+    if (epicDate) {
+      return { dueDate: epicDate, dueValue: epicValue };
+    }
+  }
 
   const fallbackValue = getFieldValue(issue, fallbackId);
   const fallbackDate = parseJiraDate(fallbackValue);
@@ -127,8 +143,6 @@ export const getIssueDueByDate = (issue, compareFieldId, fallbackFieldId, epicIs
     return { dueDate: fallbackDate, dueValue: fallbackValue };
   }
 
-  const epicKey = String(epicIssue?.key || "").trim();
-  const issueKey = String(issue?.key || "").trim();
   if (epicIssue && epicKey && epicKey !== issueKey) {
     const epicValue = getFieldValue(epicIssue, compareId);
     const epicDate = parseJiraDate(epicValue);
@@ -152,7 +166,8 @@ export const isIssueInDueByWindow = (
   fallbackFieldId,
   targetDate,
   pastDueFloor,
-  epicIssue = null
+  epicIssue = null,
+  preferEpicCompareForChildren = false
 ) => {
   if (!isIssueOpen(issue)) {
     return false;
@@ -162,7 +177,8 @@ export const isIssueInDueByWindow = (
     issue,
     compareFieldId,
     fallbackFieldId,
-    epicIssue
+    epicIssue,
+    preferEpicCompareForChildren
   );
   if (!dueDate) {
     return false;
@@ -176,7 +192,8 @@ export const isIssueUpcomingDueBy = (
   compareFieldId,
   fallbackFieldId,
   targetDate,
-  epicIssue = null
+  epicIssue = null,
+  preferEpicCompareForChildren = false
 ) => {
   if (!isIssueOpen(issue)) {
     return false;
@@ -186,7 +203,8 @@ export const isIssueUpcomingDueBy = (
     issue,
     compareFieldId,
     fallbackFieldId,
-    epicIssue
+    epicIssue,
+    preferEpicCompareForChildren
   );
   if (!dueDate || !targetDate) {
     return false;
@@ -207,7 +225,8 @@ export const isIssuePastDueInLookback = (
   compareFieldId,
   fallbackFieldId,
   pastDueFloor,
-  epicIssue = null
+  epicIssue = null,
+  preferEpicCompareForChildren = false
 ) => {
   if (!isIssueOpen(issue) || !pastDueFloor) {
     return false;
@@ -217,7 +236,8 @@ export const isIssuePastDueInLookback = (
     issue,
     compareFieldId,
     fallbackFieldId,
-    epicIssue
+    epicIssue,
+    preferEpicCompareForChildren
   );
   if (!dueDate) {
     return false;
@@ -271,6 +291,30 @@ export const isTaskOverdue = (issue, dueFieldId, extraFieldIds = []) => {
   }
 
   return false;
+};
+
+export const isIssueOverdueForMetrics = (
+  issue,
+  dueFieldId,
+  extraOverdueFieldIds = [],
+  dueByOptions = null
+) => {
+  const preferEpic = Boolean(dueByOptions?.preferEpicCompareForChildren);
+  const epicIssue = dueByOptions?.epicIssue ?? null;
+  if (preferEpic && epicIssue) {
+    const compareFieldId = dueByOptions.dueByCompareFieldId || dueFieldId;
+    const fallbackFieldId = dueByOptions.dueByFallbackFieldId || compareFieldId;
+    const { dueDate } = getIssueDueByDate(
+      issue,
+      compareFieldId,
+      fallbackFieldId,
+      epicIssue,
+      true
+    );
+    return Boolean(dueDate && dueDate < startOfToday());
+  }
+
+  return isTaskOverdue(issue, dueFieldId, extraOverdueFieldIds);
 };
 
 // Open issue with a due date on or after today (not yet missed).
@@ -472,6 +516,7 @@ export const computeChildIssueMetrics = (
   const pastDueFloor = dueByOptions?.pastDueFloor ?? null;
   const includePastDueInList = Boolean(dueByOptions?.includePastDueInList);
   const epicIssue = dueByOptions?.epicIssue ?? null;
+  const preferEpicCompareForChildren = Boolean(dueByOptions?.preferEpicCompareForChildren);
   const childIssues = issues.filter((issue) => String(issue.key || "") !== String(epicKey || ""));
 
   let completedIssues = 0;
@@ -493,7 +538,7 @@ export const computeChildIssueMetrics = (
     } else {
       openIssues += 1;
       openStatusCounts[statusName] = (openStatusCounts[statusName] || 0) + 1;
-      if (isTaskOverdue(issue, dueFieldId, extraOverdueFieldIds)) {
+      if (isIssueOverdueForMetrics(issue, dueFieldId, extraOverdueFieldIds, dueByOptions)) {
         overdueOpenIssues += 1;
       }
       if (dueByDate) {
@@ -501,7 +546,8 @@ export const computeChildIssueMetrics = (
           issue,
           compareFieldId,
           fallbackFieldId,
-          epicIssue
+          epicIssue,
+          preferEpicCompareForChildren
         );
         const today = startOfToday();
         const pushDueByIssue = (isOverdue) => {
@@ -528,7 +574,8 @@ export const computeChildIssueMetrics = (
             compareFieldId,
             fallbackFieldId,
             dueByDate,
-            epicIssue
+            epicIssue,
+            preferEpicCompareForChildren
           )
         ) {
           dueByOpenIssues += 1;
@@ -540,7 +587,8 @@ export const computeChildIssueMetrics = (
             compareFieldId,
             fallbackFieldId,
             pastDueFloor,
-            epicIssue
+            epicIssue,
+            preferEpicCompareForChildren
           )
         ) {
           pushDueByIssue(Boolean(dueMeta.dueDate && dueMeta.dueDate < today));
@@ -572,8 +620,19 @@ export const computeChildIssueMetrics = (
   };
 };
 
-export const computeContributorMetricsFromIssues = (issues, dueFieldId, extraOverdueFieldIds = []) => {
+export const computeContributorMetricsFromIssues = (
+  issues,
+  dueFieldId,
+  extraOverdueFieldIds = [],
+  dueContext = null
+) => {
+  const normalizedDueContext = normalizeAssigneeDueContext(dueContext);
   const byContributor = new Map();
+  const preferEpic = Boolean(normalizedDueContext?.dueByOptions?.preferEpicCompareForChildren);
+  const epicIssue = normalizedDueContext?.dueByOptions?.epicIssue ?? null;
+  const compareFieldId = normalizedDueContext?.dueByOptions?.dueByCompareFieldId || dueFieldId;
+  const fallbackFieldId =
+    normalizedDueContext?.dueByOptions?.dueByFallbackFieldId || compareFieldId;
 
   for (const issue of issues || []) {
     const assignee = String(issue?.fields?.assignee?.displayName || "Unassigned").trim() || "Unassigned";
@@ -590,6 +649,7 @@ export const computeContributorMetricsFromIssues = (issues, dueFieldId, extraOve
         analyzing: 0,
         openStatusCounts: {},
         overdueIssues: [],
+        upcomingDueIssues: [],
       });
     }
 
@@ -606,14 +666,41 @@ export const computeContributorMetricsFromIssues = (issues, dueFieldId, extraOve
     const statusName = getIssueStatusName(issue).trim() || "Unknown";
     bucket.openStatusCounts[statusName] = (bucket.openStatusCounts[statusName] || 0) + 1;
 
-    if (isTaskOverdue(issue, dueFieldId, extraOverdueFieldIds)) {
-      bucket.overdueOpenIssues += 1;
-      bucket.overdueIssues.push({
-        key: String(issue?.key || "").trim(),
-        summary: String(issue?.fields?.summary || "").trim(),
-        dueDate: formatDateOnly(getFieldValue(issue, dueFieldId || "duedate")),
-        issueType: getIssueTypeName(issue),
-      });
+    const issueOpts = resolveIssueDueByOptions(issue, normalizedDueContext);
+    const row = buildDueIssueRow(issue, dueFieldId, issueOpts);
+
+    if (row.dueDate) {
+      if (isIssueOverdueForMetrics(issue, dueFieldId, extraOverdueFieldIds, issueOpts)) {
+        bucket.overdueOpenIssues += 1;
+        bucket.overdueIssues.push(row);
+      } else if (
+        normalizedDueContext?.dueByDate &&
+        isIssueUpcomingDueBy(
+          issue,
+          compareFieldId,
+          fallbackFieldId,
+          normalizedDueContext.dueByDate,
+          epicIssue,
+          preferEpic
+        )
+      ) {
+        bucket.upcomingDueIssues.push(row);
+      } else if (
+        normalizedDueContext?.dueByDate &&
+        issueOpts?.includePastDueInList &&
+        issueOpts?.pastDueFloor &&
+        isIssuePastDueInLookback(
+          issue,
+          compareFieldId,
+          fallbackFieldId,
+          issueOpts.pastDueFloor,
+          epicIssue,
+          preferEpic
+        )
+      ) {
+        bucket.overdueOpenIssues += 1;
+        bucket.overdueIssues.push(row);
+      }
     }
 
     const status = statusName.toLowerCase();
@@ -632,6 +719,8 @@ export const computeContributorMetricsFromIssues = (issues, dueFieldId, extraOve
     .map((row) => ({
       ...row,
       overduePercent: row.openIssues > 0 ? (row.overdueOpenIssues / row.openIssues) * 100 : 0,
+      overdueIssues: [...row.overdueIssues].sort(compareDueIssueRows),
+      upcomingDueIssues: [...row.upcomingDueIssues].sort(compareDueIssueRows),
     }))
     .sort((a, b) => {
       const openDelta = b.openIssues - a.openIssues;
@@ -708,7 +797,12 @@ export const personMatchesIssue = (
   return false;
 };
 
-export const computeAssigneeWorkloadCounts = (allIssues, dueFieldId) => {
+export const computeAssigneeWorkloadCounts = (
+  allIssues,
+  dueFieldId,
+  extraOverdueFieldIds = [],
+  dueContext = null
+) => {
   const openIssues = allIssues.filter((issue) => isIssueOpen(issue));
   const counts = {
     totalIssues: allIssues.length,
@@ -724,7 +818,14 @@ export const computeAssigneeWorkloadCounts = (allIssues, dueFieldId) => {
   };
 
   for (const issue of openIssues) {
-    if (isTaskOverdue(issue, dueFieldId)) {
+    if (
+      isIssueOverdueForMetrics(
+        issue,
+        dueFieldId,
+        extraOverdueFieldIds,
+        resolveIssueDueByOptions(issue, dueContext)
+      )
+    ) {
       counts.pastDue += 1;
       continue;
     }
@@ -749,19 +850,192 @@ export const computeAssigneeWorkloadCounts = (allIssues, dueFieldId) => {
   return counts;
 };
 
+export const normalizeAssigneeDueContext = (value, dueByDate = null) => {
+  if (!value && !dueByDate) {
+    return null;
+  }
+
+  if (value?.dueByOptions || value?.epicByKey || value?.issueToEpicKey) {
+    return {
+      dueByDate: value.dueByDate || dueByDate || null,
+      dueByOptions: value.dueByOptions || null,
+      epicByKey: value.epicByKey || null,
+      issueToEpicKey: value.issueToEpicKey || null,
+    };
+  }
+
+  return {
+    dueByDate: value?.dueByDate || dueByDate || null,
+    dueByOptions: value || null,
+    epicByKey: null,
+    issueToEpicKey: null,
+  };
+};
+
+export const resolveIssueDueByOptions = (issue, dueContext) => {
+  const normalized = normalizeAssigneeDueContext(dueContext);
+  if (!normalized?.dueByOptions) {
+    return null;
+  }
+
+  const issueKey = String(issue?.key || "").trim();
+  const epicKey = normalized.issueToEpicKey?.get(issueKey);
+  const epicIssue =
+    epicKey && normalized.epicByKey?.has(epicKey)
+      ? normalized.epicByKey.get(epicKey)
+      : normalized.dueByOptions.epicIssue ?? null;
+
+  return epicIssue ? { ...normalized.dueByOptions, epicIssue } : normalized.dueByOptions;
+};
+
+export const buildDueIssueRow = (issue, dueFieldId, issueDueByOptions = null) => {
+  const compareFieldId = issueDueByOptions?.dueByCompareFieldId || dueFieldId;
+  const fallbackFieldId = issueDueByOptions?.dueByFallbackFieldId || compareFieldId;
+  const epicIssue = issueDueByOptions?.epicIssue ?? null;
+  const preferEpic = Boolean(issueDueByOptions?.preferEpicCompareForChildren);
+  const { dueValue } = getIssueDueByDate(
+    issue,
+    compareFieldId,
+    fallbackFieldId,
+    epicIssue,
+    preferEpic
+  );
+
+  return {
+    key: String(issue?.key || "").trim(),
+    summary: String(issue?.fields?.summary || "").trim(),
+    dueDate: formatDateOnly(dueValue),
+    issueType: getIssueTypeName(issue),
+  };
+};
+
+const compareDueIssueRows = (left, right) => {
+  const leftDate = left.dueDate || "9999-12-31";
+  const rightDate = right.dueDate || "9999-12-31";
+  if (leftDate !== rightDate) {
+    return leftDate.localeCompare(rightDate);
+  }
+
+  return left.key.localeCompare(right.key);
+};
+
+export const buildAssigneeDueIssueLists = (
+  issues,
+  dueFieldId,
+  extraOverdueFieldIds = [],
+  dueContext = null
+) => {
+  const normalized = normalizeAssigneeDueContext(dueContext);
+  if (!normalized) {
+    const openIssues = (issues || []).filter((issue) => isIssueOpen(issue));
+    return {
+      overdueIssues: buildOverdueIssueRows(openIssues, dueFieldId, extraOverdueFieldIds),
+      upcomingDueIssues: [],
+    };
+  }
+
+  const { dueByDate } = normalized;
+  const overdueIssues = [];
+  const upcomingDueIssues = [];
+
+  for (const issue of issues || []) {
+    if (!isIssueOpen(issue)) {
+      continue;
+    }
+
+    const issueOpts = resolveIssueDueByOptions(issue, normalized);
+    const compareFieldId = issueOpts?.dueByCompareFieldId || dueFieldId;
+    const fallbackFieldId = issueOpts?.dueByFallbackFieldId || compareFieldId;
+    const epicIssue = issueOpts?.epicIssue ?? null;
+    const preferEpic = Boolean(issueOpts?.preferEpicCompareForChildren);
+    const row = buildDueIssueRow(issue, dueFieldId, issueOpts);
+
+    if (!row.dueDate) {
+      continue;
+    }
+
+    if (isIssueOverdueForMetrics(issue, dueFieldId, extraOverdueFieldIds, issueOpts)) {
+      overdueIssues.push(row);
+      continue;
+    }
+
+    if (
+      dueByDate &&
+      isIssueUpcomingDueBy(
+        issue,
+        compareFieldId,
+        fallbackFieldId,
+        dueByDate,
+        epicIssue,
+        preferEpic
+      )
+    ) {
+      upcomingDueIssues.push(row);
+      continue;
+    }
+
+    if (
+      dueByDate &&
+      issueOpts?.includePastDueInList &&
+      issueOpts?.pastDueFloor &&
+      isIssuePastDueInLookback(
+        issue,
+        compareFieldId,
+        fallbackFieldId,
+        issueOpts.pastDueFloor,
+        epicIssue,
+        preferEpic
+      )
+    ) {
+      overdueIssues.push(row);
+    }
+  }
+
+  overdueIssues.sort(compareDueIssueRows);
+  upcomingDueIssues.sort(compareDueIssueRows);
+
+  return { overdueIssues, upcomingDueIssues };
+};
+
+export const buildOverdueIssueRows = (
+  issues,
+  dueFieldId,
+  extraOverdueFieldIds = [],
+  dueByOptions = null
+) =>
+  (issues || [])
+    .filter((issue) => isIssueOpen(issue))
+    .filter((issue) =>
+      isIssueOverdueForMetrics(issue, dueFieldId, extraOverdueFieldIds, dueByOptions)
+    )
+    .map((issue) => buildDueIssueRow(issue, dueFieldId, dueByOptions));
+
 export const computeAssigneeMetrics = (
   issues,
   queryName,
   resolvedDisplayName,
   dueFieldId,
-  resolvedAccountId = ""
+  resolvedAccountId = "",
+  extraOverdueFieldIds = [],
+  dueContext = null
 ) => {
   const personIssues = issues.filter((issue) =>
     personMatchesIssue(issue, queryName, resolvedDisplayName, resolvedAccountId)
   );
   const personOpen = personIssues.filter((issue) => isIssueOpen(issue));
-  const personOverdueOpen = personOpen.filter((issue) => isTaskOverdue(issue, dueFieldId));
-  const workloadCounts = computeAssigneeWorkloadCounts(personIssues, dueFieldId);
+  const normalizedDueContext = normalizeAssigneeDueContext(dueContext);
+  const { overdueIssues, upcomingDueIssues } = buildAssigneeDueIssueLists(
+    personOpen,
+    dueFieldId,
+    extraOverdueFieldIds,
+    normalizedDueContext
+  );
+  const workloadCounts = computeAssigneeWorkloadCounts(
+    personIssues,
+    dueFieldId,
+    extraOverdueFieldIds,
+    normalizedDueContext
+  );
 
   if (personOpen.length === 0) {
     return {
@@ -769,15 +1043,19 @@ export const computeAssigneeMetrics = (
       overdueOpenCount: 0,
       totalOpenCount: 0,
       overdueIssueKeys: [],
+      overdueIssues: [],
+      upcomingDueIssues: [],
       workloadCounts,
     };
   }
 
   return {
-    overduePercent: (personOverdueOpen.length / personOpen.length) * 100,
-    overdueOpenCount: personOverdueOpen.length,
+    overduePercent: (overdueIssues.length / personOpen.length) * 100,
+    overdueOpenCount: overdueIssues.length,
     totalOpenCount: personOpen.length,
-    overdueIssueKeys: personOverdueOpen.map((issue) => issue.key),
+    overdueIssueKeys: overdueIssues.map((row) => row.key),
+    overdueIssues,
+    upcomingDueIssues,
     workloadCounts,
   };
 };
@@ -824,7 +1102,13 @@ export const computeJqlWatchMetricsByAssignee = (jqlIssues, scopedChildIssues, d
   );
 };
 
-export const computeJqlWatchMetrics = (jqlIssues, scopedChildIssues, dueFieldId) => {
+export const computeJqlWatchMetrics = (
+  jqlIssues,
+  scopedChildIssues,
+  dueFieldId,
+  extraOverdueFieldIds = [],
+  dueContext = null
+) => {
   let issues = jqlIssues;
   if (scopedChildIssues.length > 0) {
     const scopeKeys = new Set(scopedChildIssues.map((issue) => String(issue.key || "")));
@@ -832,8 +1116,19 @@ export const computeJqlWatchMetrics = (jqlIssues, scopedChildIssues, dueFieldId)
   }
 
   const openIssues = issues.filter((issue) => isIssueOpen(issue));
-  const overdueOpenIssues = openIssues.filter((issue) => isTaskOverdue(issue, dueFieldId));
-  const workloadCounts = computeAssigneeWorkloadCounts(issues, dueFieldId);
+  const normalizedDueContext = normalizeAssigneeDueContext(dueContext);
+  const { overdueIssues, upcomingDueIssues } = buildAssigneeDueIssueLists(
+    openIssues,
+    dueFieldId,
+    extraOverdueFieldIds,
+    normalizedDueContext
+  );
+  const workloadCounts = computeAssigneeWorkloadCounts(
+    issues,
+    dueFieldId,
+    extraOverdueFieldIds,
+    normalizedDueContext
+  );
 
   if (openIssues.length === 0) {
     return {
@@ -841,15 +1136,19 @@ export const computeJqlWatchMetrics = (jqlIssues, scopedChildIssues, dueFieldId)
       overdueOpenCount: 0,
       totalOpenCount: 0,
       overdueIssueKeys: [],
+      overdueIssues: [],
+      upcomingDueIssues: [],
       workloadCounts,
     };
   }
 
   return {
-    overduePercent: (overdueOpenIssues.length / openIssues.length) * 100,
-    overdueOpenCount: overdueOpenIssues.length,
+    overduePercent: (overdueIssues.length / openIssues.length) * 100,
+    overdueOpenCount: overdueIssues.length,
     totalOpenCount: openIssues.length,
-    overdueIssueKeys: overdueOpenIssues.map((issue) => issue.key),
+    overdueIssueKeys: overdueIssues.map((row) => row.key),
+    overdueIssues,
+    upcomingDueIssues,
     workloadCounts,
   };
 };

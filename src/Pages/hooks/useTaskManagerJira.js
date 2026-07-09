@@ -5,10 +5,14 @@ import {
   saveIssueMetadata,
   updateJiraIssueAssignee,
   updateJiraIssueStatus,
+  JIRA_UNASSIGNED_ASSIGNEE,
+  isJiraUnassignValue,
 } from "../../services/jiraClient";
 import { runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey, loadDrillDownIssuesByAssignee } from "./jiraJqlRunWorkflow.js";
 import {
+  dismissDrillDownId,
   drillDownJqlRuns,
+  isDrillDownDismissed,
   loadDrillDownRunsFromSessionStorage,
   mergeJqlRuns,
   partitionJqlRuns,
@@ -17,6 +21,7 @@ import {
   savableJqlRuns,
 } from "../../utils/jqlRunPersistence.js";
 import { enrichRunWithParentDoneDates, runsNeedParentMrddEnrich } from "../../utils/jiraIssueDoneDates.js";
+import { useFlash } from "./useFlash.js";
 import {
   BACKGROUND_JOB_IDS,
   runBackgroundJob,
@@ -28,6 +33,7 @@ import {
   DEFAULT_JQL_LABELS,
   DEFAULT_JQLS,
   WORK_WEEK_STORAGE_KEYS,
+  isConfiguredJqlRun,
   normalizeJqlCount,
   normalizeJqlSlotValues,
 } from "../../utils/workWeekStorage.js";
@@ -124,7 +130,9 @@ const loadStoredJqlRuns = () => {
       return [];
     }
 
-    const runs = parsed.filter((run) => isValidJqlRun(run) && !run?.isDrillDown);
+    const runs = parsed.filter(
+      (run) => isValidJqlRun(run) && !run?.isDrillDown && isConfiguredJqlRun(run)
+    );
     return runs.length === 0 ? [] : [...runs].sort((a, b) => a.index - b.index);
   } catch {
     return [];
@@ -181,6 +189,44 @@ const patchIssueKeyed = (previous, issueKey, nextValue) => ({
   [issueKey]: nextValue,
 });
 
+const removeIssueKeyed = (previous, issueKey) => {
+  const next = { ...previous };
+  delete next[issueKey];
+  return next;
+};
+
+const countUnsavedAssigneeEdits = (assigneeDrafts, assigneeAccountIds) => {
+  const keys = new Set([
+    ...Object.keys(assigneeDrafts || {}),
+    ...Object.keys(assigneeAccountIds || {}),
+  ]);
+  return keys.size;
+};
+
+const formatJqlRefreshNotice = ({ unsavedAssigneeCount, pullLatestComment }) => {
+  const parts = [];
+
+  if (unsavedAssigneeCount > 0) {
+    parts.push(
+      unsavedAssigneeCount === 1
+        ? "Cleared 1 unsaved assignee edit"
+        : `Cleared ${unsavedAssigneeCount} unsaved assignee edits`
+    );
+  }
+
+  if (pullLatestComment) {
+    parts.push("row notes will be overwritten from Jira where a comment exists");
+  } else if (unsavedAssigneeCount > 0) {
+    parts.push("local notes are unchanged (unpushed notes are kept)");
+  }
+
+  if (parts.length === 0) {
+    return "";
+  }
+
+  return `${parts.join("; ")} while refreshing from Jira.`;
+};
+
 const errorMessage = (error, fallback) =>
   error instanceof Error ? error.message : fallback;
 
@@ -214,25 +260,12 @@ export const useTaskManagerJira = () => {
   const [assigneeDrafts, setAssigneeDrafts] = React.useState({});
   const [assigneeAccountIds, setAssigneeAccountIds] = React.useState({});
   const [rowUpdateState, setRowUpdateState] = React.useState({});
+  const [assigneeRefreshNotice, flashJqlRefreshNotice] = useFlash(5000);
   const [fieldMappingRows, setFieldMappingRows] = React.useState([]);
   const [fieldMappingsLoading, setFieldMappingsLoading] = React.useState(true);
-
-  const reloadJqlRunsFromStorage = React.useCallback(() => {
-    const storedRuns = loadStoredJqlRuns();
-    if (storedRuns.length > 0) {
-      setShowRestoredJqlBanner(false);
-    }
-    setJqlRuns((prev) => {
-      const { drillDown } = partitionJqlRuns(prev);
-      if (storedRuns.length === 0) {
-        return drillDown.length > 0 ? drillDown : prev;
-      }
-      return mergeJqlRuns(drillDown, storedRuns);
-    });
-  }, []);
+  const enrichSeqRef = React.useRef(0);
 
   useAttachBackgroundJob(BACKGROUND_JOB_IDS.WORK_WEEK_JQL, {
-    onSuccess: reloadJqlRunsFromStorage,
     onFinally: () => setJqlPending(false),
   });
 
@@ -247,15 +280,15 @@ export const useTaskManagerJira = () => {
   }, []);
 
   React.useEffect(() => {
-    const { drillDown, regular } = partitionJqlRuns(jqlRuns);
+    const { regular } = partitionJqlRuns(jqlRuns);
     if (fieldMappingsLoading || regular.length === 0 || !runsNeedParentMrddEnrich(regular)) {
       return;
     }
 
-    let cancelled = false;
+    const seq = ++enrichSeqRef.current;
     Promise.all(regular.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows))).then(
       (enrichedRegular) => {
-        if (cancelled) {
+        if (seq !== enrichSeqRef.current) {
           return;
         }
         setJqlRuns((prev) => {
@@ -268,10 +301,6 @@ export const useTaskManagerJira = () => {
         });
       }
     );
-
-    return () => {
-      cancelled = true;
-    };
   }, [fieldMappingRows, fieldMappingsLoading, jqlRuns]);
 
   React.useEffect(() => {
@@ -296,11 +325,22 @@ export const useTaskManagerJira = () => {
   }, [jqlCount, jqlInputs, jqlLabels, pullLatestComment, jiraNotes, jiraRowPriorities]);
 
   React.useEffect(() => {
+    setJqlRuns((prev) => {
+      const { drillDown, regular } = partitionJqlRuns(prev);
+      const nextRegular = regular.filter(isConfiguredJqlRun);
+      if (nextRegular.length === regular.length) {
+        return prev;
+      }
+      return mergeJqlRuns(drillDown, nextRegular);
+    });
+  }, [jqlInputs, jqlLabels]);
+
+  React.useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    const savable = savableJqlRuns(jqlRuns);
+    const savable = savableJqlRuns(jqlRuns).filter(isConfiguredJqlRun);
     if (savable.length === 0) {
       window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jqlRuns);
     } else {
@@ -452,11 +492,7 @@ export const useTaskManagerJira = () => {
     const priority = clampPriority(value);
 
     setJiraRowPriorities((prev) => patchIssueKeyed(prev, issueKey, priority));
-    setPrioritySourceByKey((prev) => {
-      const next = { ...prev };
-      delete next[issueKey];
-      return next;
-    });
+    setPrioritySourceByKey((prev) => removeIssueKeyed(prev, issueKey));
 
     saveIssueMetadata({ issueKey, priority }).catch((error) => {
       console.error("Failed to persist priority", issueKey, error);
@@ -469,15 +505,19 @@ export const useTaskManagerJira = () => {
 
   const handleAssigneeDraftChange = (issueKey, value, accountId) => {
     setAssigneeDrafts((prev) => patchIssueKeyed(prev, issueKey, value));
-    setAssigneeAccountIds((prev) => {
-      const next = { ...prev };
-      if (accountId) {
-        next[issueKey] = accountId;
-      } else {
-        delete next[issueKey];
-      }
-      return next;
-    });
+    setAssigneeAccountIds((prev) =>
+      accountId ? patchIssueKeyed(prev, issueKey, accountId) : removeIssueKeyed(prev, issueKey)
+    );
+  };
+
+  const clearAssigneeDraftForIssue = (issueKey) => {
+    setAssigneeDrafts((prev) => removeIssueKeyed(prev, issueKey));
+    setAssigneeAccountIds((prev) => removeIssueKeyed(prev, issueKey));
+  };
+
+  const clearAllAssigneeDrafts = () => {
+    setAssigneeDrafts({});
+    setAssigneeAccountIds({});
   };
 
   const setRowUpdateMessage = (issueKey, next) => {
@@ -539,35 +579,55 @@ export const useTaskManagerJira = () => {
   };
 
   const handleAssigneeUpdate = async (issueKey) => {
-    const assignee =
-      String(assigneeAccountIds[issueKey] || assigneeDrafts[issueKey] || "").trim();
-    if (!assignee) {
+    const draftOrAccount =
+      assigneeAccountIds[issueKey] === JIRA_UNASSIGNED_ASSIGNEE
+        ? JIRA_UNASSIGNED_ASSIGNEE
+        : String(assigneeAccountIds[issueKey] || assigneeDrafts[issueKey] || "").trim();
+
+    if (!draftOrAccount) {
       setRowUpdateMessage(issueKey, { error: "Choose or type an assignee before updating." });
       return;
     }
 
+    const unassigning = isJiraUnassignValue(draftOrAccount);
+
     setRowUpdateMessage(issueKey, { loading: true, error: "", success: "" });
 
     try {
-      const result = await updateJiraIssueAssignee({ issueKey, assignee });
-      const nextAssignee = String(result?.resolvedAssignee || assigneeDrafts[issueKey] || assignee).trim() || assignee;
+      const result = await updateJiraIssueAssignee({
+        issueKey,
+        assignee: unassigning ? JIRA_UNASSIGNED_ASSIGNEE : draftOrAccount,
+      });
+
+      if (unassigning) {
+        updateIssueInRuns(issueKey, (issue) => ({
+          ...issue,
+          fields: {
+            ...issue.fields,
+            assignee: null,
+          },
+        }));
+        clearAssigneeDraftForIssue(issueKey);
+        setRowUpdateMessage(issueKey, {
+          loading: false,
+          success: "Assignee set to Unassigned.",
+        });
+        return;
+      }
+
+      const nextAssignee =
+        String(result?.resolvedAssignee || assigneeDrafts[issueKey] || draftOrAccount).trim() ||
+        draftOrAccount;
       updateIssueInRuns(issueKey, (issue) => ({
         ...issue,
         fields: {
           ...issue.fields,
-          assignee: {
-            ...(issue.fields?.assignee || {}),
-            displayName: nextAssignee,
-            accountId: result?.accountId || issue.fields?.assignee?.accountId,
-          },
+          assignee: result?.accountId
+            ? { displayName: nextAssignee, accountId: result.accountId }
+            : { displayName: nextAssignee },
         },
       }));
-      setAssigneeDrafts((prev) => ({ ...prev, [issueKey]: nextAssignee }));
-      setAssigneeAccountIds((prev) => {
-        const next = { ...prev };
-        delete next[issueKey];
-        return next;
-      });
+      clearAssigneeDraftForIssue(issueKey);
       setRowUpdateMessage(issueKey, {
         loading: false,
         success: `Assigned to ${nextAssignee}.`,
@@ -581,13 +641,18 @@ export const useTaskManagerJira = () => {
   };
 
   const handleRunJql = () => {
+    const unsavedAssigneeCount = countUnsavedAssigneeEdits(assigneeDrafts, assigneeAccountIds);
+    clearAllAssigneeDrafts();
+    const notice = formatJqlRefreshNotice({ unsavedAssigneeCount, pullLatestComment });
+    if (notice) {
+      flashJqlRefreshNotice(notice);
+    }
     setJqlPending(true);
     runBackgroundJob(BACKGROUND_JOB_IDS.WORK_WEEK_JQL, {
       label: "Running JQL",
       run: () =>
         runJqlWorkflow({
           jqlInputs,
-          jqlCount,
           jqlLabels,
           jqlMaxResults,
           pullLatestComment,
@@ -605,6 +670,12 @@ export const useTaskManagerJira = () => {
   };
 
   const handleLoadRemainingJql = (runIndex) => {
+    const unsavedAssigneeCount = countUnsavedAssigneeEdits(assigneeDrafts, assigneeAccountIds);
+    clearAllAssigneeDrafts();
+    const notice = formatJqlRefreshNotice({ unsavedAssigneeCount, pullLatestComment });
+    if (notice) {
+      flashJqlRefreshNotice(notice);
+    }
     setJqlPending(true);
     runBackgroundJob(BACKGROUND_JOB_IDS.WORK_WEEK_JQL, {
       label: "Loading JQL results",
@@ -629,6 +700,11 @@ export const useTaskManagerJira = () => {
 
   const handleDrillDownToKey = React.useCallback(
     (issueKey) => {
+      const normalized = String(issueKey || "").trim().toUpperCase();
+      if (!normalized || isDrillDownDismissed(`issue:${normalized.toLowerCase()}`)) {
+        return Promise.resolve(false);
+      }
+
       const fetchSeq = ++drillDownFetchSeqRef.current;
       return loadDrillDownIssueByKey({
         issueKey,
@@ -649,6 +725,11 @@ export const useTaskManagerJira = () => {
 
   const handleDrillDownToAssignee = React.useCallback(
     (assigneeName) => {
+      const assignee = String(assigneeName || "").trim();
+      if (!assignee || isDrillDownDismissed(`assignee:${assignee.toLowerCase()}`)) {
+        return Promise.resolve(false);
+      }
+
       const fetchSeq = ++drillDownFetchSeqRef.current;
       return loadDrillDownIssuesByAssignee({
         assigneeName,
@@ -687,6 +768,9 @@ export const useTaskManagerJira = () => {
       return;
     }
 
+    drillDownFetchSeqRef.current += 1;
+    dismissDrillDownId(id);
+
     setJqlRuns((prev) => {
       const next = prev.filter((run) => run.drillDownId !== id);
       if (next.length === prev.length) {
@@ -706,6 +790,7 @@ export const useTaskManagerJira = () => {
     jqlRuns,
     showRestoredJqlBanner,
     jqlError,
+    assigneeRefreshNotice,
     jqlMaxResults,
     pullLatestComment,
     jiraNotes,

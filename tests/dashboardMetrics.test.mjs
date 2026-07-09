@@ -2,6 +2,9 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   computeAssigneeMetrics,
+  computeContributorMetricsFromIssues,
+  computeJqlWatchMetrics,
+  computeJqlWatchMetricsByAssignee,
   computeChildIssueMetrics,
   computeEpicPastDue,
   computeEpicPercent,
@@ -245,6 +248,27 @@ describe("due date checks", () => {
     const { dueValue } = getIssueDueByDate(issue, mrdFieldId, mrdFieldId, epicIssue);
     assert.equal(dueValue, tomorrowStr);
   });
+
+  it("prefers epic MRD over stale task MRD when preferEpicCompareForChildren is set", () => {
+    const epicDateStr = "2026-12-26";
+    const mrdFieldId = "customfield_10009";
+
+    const issue = makeIssue({ key: "ODI-14", dueValue: "2020-01-01", dueFieldId: mrdFieldId });
+    const epicIssue = {
+      key: "ODI-EPIC",
+      fields: { [mrdFieldId]: epicDateStr },
+    };
+
+    const withoutPrefer = getIssueDueByDate(issue, mrdFieldId, mrdFieldId, epicIssue);
+    assert.equal(withoutPrefer.dueValue, "2020-01-01");
+
+    const withPrefer = getIssueDueByDate(issue, mrdFieldId, mrdFieldId, epicIssue, true);
+    assert.equal(withPrefer.dueValue, epicDateStr);
+    assert.equal(
+      isIssueUpcomingDueBy(issue, mrdFieldId, mrdFieldId, epicDateStr, epicIssue, true),
+      true
+    );
+  });
 });
 
 describe("computeChildIssueMetrics", () => {
@@ -262,6 +286,62 @@ describe("computeChildIssueMetrics", () => {
     assert.equal(metrics.openIssues, 2);
     assert.equal(metrics.overdueOpenIssues, 1);
     assert.equal(metrics.issuePercent, (1 / 3) * 100);
+  });
+
+  it("uses epic MRD for upcoming due and overdue when preferEpicCompareForChildren is set", () => {
+    const epicDateStr = "2026-12-26";
+    const mrdFieldId = "customfield_10009";
+    const issue = makeIssue({ key: "ODI-21", dueValue: "2020-01-01", dueFieldId: mrdFieldId });
+    const epicIssue = {
+      key: "ODI-EPIC",
+      fields: { [mrdFieldId]: epicDateStr },
+    };
+
+    const metrics = computeChildIssueMetrics(
+      [issue],
+      "ODI-EPIC",
+      "duedate",
+      epicDateStr,
+      [mrdFieldId],
+      {
+        dueByCompareFieldId: mrdFieldId,
+        dueByFallbackFieldId: mrdFieldId,
+        preferEpicCompareForChildren: true,
+        epicIssue,
+      }
+    );
+
+    assert.equal(metrics.overdueOpenIssues, 0);
+    assert.equal(metrics.dueByOpenIssues, 1);
+    assert.equal(metrics.dueByIssues[0]?.dueDate, epicDateStr);
+  });
+});
+
+describe("computeContributorMetricsFromIssues", () => {
+  it("uses epic MRD instead of stale task MRD for overdue counts", () => {
+    const epicDateStr = "2026-12-26";
+    const mrdFieldId = "customfield_10009";
+    const issue = makeIssue({
+      key: "ODI-20",
+      assignee: "Jane Doe",
+      dueValue: "2020-01-01",
+      dueFieldId: mrdFieldId,
+    });
+    const epicIssue = {
+      key: "ODI-EPIC",
+      fields: { [mrdFieldId]: epicDateStr },
+    };
+
+    const rows = computeContributorMetricsFromIssues([issue], "duedate", [mrdFieldId], {
+      preferEpicCompareForChildren: true,
+      epicIssue,
+      dueByCompareFieldId: mrdFieldId,
+      dueByFallbackFieldId: mrdFieldId,
+    });
+
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].overdueOpenIssues, 0);
+    assert.equal(rows[0].overdueIssues.length, 0);
   });
 });
 
@@ -417,6 +497,75 @@ describe("computeAssigneeMetrics", () => {
     assert.equal(metrics.overdueOpenCount, 1);
     assert.equal(metrics.overduePercent, 50);
     assert.deepEqual(metrics.overdueIssueKeys, ["ODI-1"]);
+    assert.equal(metrics.overdueIssues.length, 1);
+    assert.equal(metrics.overdueIssues[0].key, "ODI-1");
+    assert.deepEqual(metrics.upcomingDueIssues, []);
+  });
+
+  it("includes upcoming due issues through the dashboard cutoff", () => {
+    const issues = [
+      makeIssue({ key: "ODI-1", assignee: "Jane Doe", dueValue: "2099-06-01" }),
+      makeIssue({ key: "ODI-2", assignee: "Jane Doe", dueValue: "2020-01-01" }),
+    ];
+
+    const metrics = computeAssigneeMetrics(issues, "Jane", "Jane Doe", "duedate", "", [], {
+      dueByDate: "2099-12-31",
+      dueByOptions: {
+        dueByCompareFieldId: "duedate",
+        dueByFallbackFieldId: "duedate",
+      },
+    });
+
+    assert.equal(metrics.overdueIssues.length, 1);
+    assert.equal(metrics.overdueIssues[0].key, "ODI-2");
+    assert.equal(metrics.upcomingDueIssues.length, 1);
+    assert.equal(metrics.upcomingDueIssues[0].key, "ODI-1");
+  });
+});
+
+describe("computeJqlWatchMetrics", () => {
+  it("aggregates JQL scope into one card with overdue issue rows", () => {
+    const issues = [
+      makeIssue({ key: "ODI-1", assignee: "Jane Doe", dueValue: "2020-01-01" }),
+      makeIssue({ key: "ODI-2", assignee: "Alex Kim" }),
+    ];
+
+    const metrics = computeJqlWatchMetrics(issues, [], "duedate");
+
+    assert.equal(metrics.totalOpenCount, 2);
+    assert.equal(metrics.overdueOpenCount, 1);
+    assert.equal(metrics.overdueIssues.length, 1);
+    assert.equal(metrics.overdueIssues[0].key, "ODI-1");
+    assert.deepEqual(metrics.upcomingDueIssues, []);
+  });
+});
+
+describe("computeJqlWatchMetricsByAssignee", () => {
+  it("uses all JQL issues when preset scope is empty", () => {
+    const jqlIssues = [
+      makeIssue({ key: "ODI-1", assignee: "Jane Doe" }),
+      makeIssue({ key: "ODI-2", assignee: "Alex Kim" }),
+    ];
+
+    const rows = computeJqlWatchMetricsByAssignee(jqlIssues, [], "duedate");
+
+    assert.equal(rows.length, 2);
+    assert.equal(rows.find((row) => row.queryName === "Jane Doe")?.totalOpenCount, 1);
+    assert.equal(rows.find((row) => row.queryName === "Alex Kim")?.totalOpenCount, 1);
+  });
+
+  it("intersects JQL issues with preset scope when scope keys are provided", () => {
+    const jqlIssues = [
+      makeIssue({ key: "ODI-1", assignee: "Jane Doe" }),
+      makeIssue({ key: "ODI-2", assignee: "Jane Doe" }),
+    ];
+    const scopedChildIssues = [makeIssue({ key: "ODI-1", assignee: "Jane Doe" })];
+
+    const rows = computeJqlWatchMetricsByAssignee(jqlIssues, scopedChildIssues, "duedate");
+
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].totalOpenCount, 1);
+    assert.equal(rows[0].workloadCounts.totalIssues, 1);
   });
 });
 

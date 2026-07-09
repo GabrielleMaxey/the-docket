@@ -1422,6 +1422,12 @@
   font-style: italic;
 }
 
+.work-week-page .ww-assignee-suggestion--unassigned .ww-assignee-suggestion-name {
+  color: #64748b;
+  font-style: italic;
+  font-weight: 500;
+}
+
 .work-week-page .ww-assignee-suggestion-name {
   display: block;
   font-weight: 600;

@@ -30,6 +30,11 @@ export const registerIssueMetadataRoutes = (
     return Math.max(0, Math.min(10, Math.round(numeric)));
   };
 
+  const isUnassignAssigneeRequest = (value) => {
+    const normalized = String(value || "").trim().toLowerCase();
+    return normalized === "unassigned" || normalized === "__unassigned__";
+  };
+
   app.post("/api/jira/issues/:issueKey/comment", async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
@@ -179,6 +184,28 @@ export const registerIssueMetadataRoutes = (
     }
 
     try {
+      if (isUnassignAssigneeRequest(assigneeRaw)) {
+        const updateResult = await jiraRequest({
+          method: "PUT",
+          pathWithQuery: `/rest/api/3/issue/${encodeURIComponent(issueKey)}/assignee`,
+          body: {
+            accountId: null,
+          },
+        });
+
+        if (!updateResult.ok) {
+          return res.status(updateResult.status).json(updateResult.data);
+        }
+
+        log.info(`assignee cleared ${issueKey}`);
+        return res.json({
+          ok: true,
+          issueKey,
+          accountId: null,
+          resolvedAssignee: "Unassigned",
+        });
+      }
+
       let accountId = "";
       let resolvedAssignee = assigneeRaw;
 

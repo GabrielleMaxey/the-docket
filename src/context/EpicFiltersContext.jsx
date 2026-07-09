@@ -8,7 +8,7 @@ export const EpicFiltersProvider = ({ children }) => {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   const [selectedPresetIds, setSelectedPresetIds] = React.useState([]);
-  const [includePastDue, setIncludePastDue] = React.useState(false);
+  const [includePastDue, setIncludePastDue] = React.useState(true);
 
   const reloadPresets = React.useCallback(async () => {
     setLoading(true);

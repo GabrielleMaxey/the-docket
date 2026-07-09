@@ -2,6 +2,69 @@ import { WORK_WEEK_STORAGE_KEYS } from "./workWeekStorage.js";
 
 export const isDrillDownRun = (run) => run?.isDrillDown === true;
 
+const loadDismissedDrillDownIds = () => {
+  if (typeof window === "undefined") {
+    return new Set();
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(WORK_WEEK_STORAGE_KEYS.dismissedDrillDownIds);
+    if (!raw) {
+      return new Set();
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return new Set();
+    }
+
+    return new Set(parsed.map((id) => String(id || "").trim()).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+};
+
+const persistDismissedDrillDownIds = (ids) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    if (ids.size === 0) {
+      window.sessionStorage.removeItem(WORK_WEEK_STORAGE_KEYS.dismissedDrillDownIds);
+      return;
+    }
+    window.sessionStorage.setItem(
+      WORK_WEEK_STORAGE_KEYS.dismissedDrillDownIds,
+      JSON.stringify([...ids])
+    );
+  } catch (error) {
+    console.warn("Could not persist dismissed drill-down ids to sessionStorage.", error);
+  }
+};
+
+export const isDrillDownDismissed = (drillDownId) => {
+  const id = String(drillDownId || "").trim();
+  if (!id) {
+    return false;
+  }
+  return loadDismissedDrillDownIds().has(id);
+};
+
+export const dismissDrillDownId = (drillDownId) => {
+  const id = String(drillDownId || "").trim();
+  if (!id) {
+    return;
+  }
+
+  const dismissed = loadDismissedDrillDownIds();
+  dismissed.add(id);
+  persistDismissedDrillDownIds(dismissed);
+};
+
+const filterDismissedDrillDownRuns = (runs) =>
+  (runs || []).filter((run) => !isDrillDownDismissed(run.drillDownId));
+
 export const partitionJqlRuns = (runs) => {
   const drillDown = [];
   const regular = [];
@@ -58,7 +121,9 @@ export const loadDrillDownRunsFromSessionStorage = () => {
       return [];
     }
 
-    return parsed.filter((run) => isValidStoredRun(run) && isDrillDownRun(run));
+    return filterDismissedDrillDownRuns(
+      parsed.filter((run) => isValidStoredRun(run) && isDrillDownRun(run))
+    );
   } catch {
     return [];
   }
@@ -69,7 +134,7 @@ export const persistDrillDownRunsToSessionStorage = (jqlRuns) => {
     return;
   }
 
-  const drillDown = drillDownJqlRuns(jqlRuns);
+  const drillDown = filterDismissedDrillDownRuns(drillDownJqlRuns(jqlRuns));
 
   try {
     if (drillDown.length === 0) {
