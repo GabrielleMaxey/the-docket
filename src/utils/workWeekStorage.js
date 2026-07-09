@@ -5,6 +5,7 @@ export const WORK_WEEK_STORAGE_KEYS = {
   jiraRowPriorities: "workWeekTasksJiraRowPriorities",
   jqlRuns: "workWeekTasksJiraLastJqlRuns",
   drillDownRuns: "workWeekTasksJiraDrillDownRuns",
+  dismissedDrillDownIds: "workWeekTasksJiraDismissedDrillDownIds",
   reminders: "workWeekTasksReminders",
 };
 
@@ -33,4 +34,52 @@ export const normalizeJqlSlotValues = (value, fallback) => {
     const item = source?.[index];
     return item == null ? String(fallback?.[index] || "") : String(item);
   });
+};
+
+export const isConfiguredJqlSlot = (jqlInputs, jqlLabels, index) => {
+  const jql = String(jqlInputs?.[index] || "").trim();
+  const label = String(jqlLabels?.[index] || "").trim();
+  return jql.length > 0 && label.length > 0;
+};
+
+export const getConfiguredJqlSlotIndexes = (jqlInputs, jqlLabels) => {
+  const indexes = [];
+  for (let i = 0; i < MAX_JQL_SLOTS; i++) {
+    if (isConfiguredJqlSlot(jqlInputs, jqlLabels, i)) {
+      indexes.push(i);
+    }
+  }
+  return indexes;
+};
+
+/** Configured slots plus one trailing row for adding the next query. */
+export const getJqlSlotEditorIndexes = (jqlInputs, jqlLabels) => {
+  const configured = getConfiguredJqlSlotIndexes(jqlInputs, jqlLabels);
+  if (configured.length >= MAX_JQL_SLOTS) {
+    return configured;
+  }
+
+  const trailingEmpty = Array.from({ length: MAX_JQL_SLOTS }, (_, i) => i).find(
+    (i) => !isConfiguredJqlSlot(jqlInputs, jqlLabels, i)
+  );
+
+  if (trailingEmpty === undefined) {
+    return configured.length > 0 ? configured : [0];
+  }
+
+  if (configured.includes(trailingEmpty)) {
+    return configured;
+  }
+
+  return [...configured, trailingEmpty];
+};
+
+export const isConfiguredJqlRun = (run) => {
+  if (run?.isDrillDown || run?.isPendingDrillDown) {
+    return true;
+  }
+
+  const jql = String(run?.jql || "").trim();
+  const label = String(run?.label || "").trim();
+  return jql.length > 0 && label.length > 0;
 };

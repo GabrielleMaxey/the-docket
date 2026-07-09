@@ -17,7 +17,9 @@ import { useCalendarData } from "./hooks/useCalendarData";
 import { useWorkWeekHeaderPreferences } from "./hooks/useWorkWeekHeaderPreferences";
 import { useUpcomingDueBanner } from "./hooks/useUpcomingDueBanner";
 import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.js";
-import { WORK_WEEK_STORAGE_KEYS, normalizeJqlCount } from "../utils/workWeekStorage.js";
+import { isDrillDownDismissed } from "../utils/jqlRunPersistence.js";
+import { resolveCreateIssueDefaults } from "../../shared/createIssuePresetUtils.mjs";
+import { isConfiguredJqlRun, normalizeJqlCount, WORK_WEEK_STORAGE_KEYS } from "../utils/workWeekStorage.js";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -81,7 +83,7 @@ const WorkWeekTasks = () => {
 
   const {
     jqlCount, jqlInputs, jqlLabels, jqlLoading, jqlRuns,
-    showRestoredJqlBanner, jqlError, jqlMaxResults, pullLatestComment,
+    showRestoredJqlBanner, jqlError, jqlMaxResults, pullLatestComment, assigneeRefreshNotice,
     jiraNotes, jiraRowPriorities, prioritySourceByKey, selectedForPush,
     lastPushedJiraNoteByKey, pushState, saveState,
     statusDrafts, assigneeDrafts, rowUpdateState,
@@ -105,9 +107,20 @@ const WorkWeekTasks = () => {
 
   const drillDownKey = drillDownFilters.key.trim();
   const drillDownAssignee = drillDownFilters.assignee.trim();
+  const drillDownKeyId = drillDownKey
+    ? `issue:${drillDownKey.toLowerCase()}`
+    : "";
+  const drillDownAssigneeId = drillDownAssignee
+    ? `assignee:${drillDownAssignee.toLowerCase()}`
+    : "";
 
   const hasDrillDownFilter =
     drillDownKey.length > 0 || drillDownAssignee.length > 0;
+
+  const jqlRunsRef = React.useRef(jqlRuns);
+  React.useEffect(() => {
+    jqlRunsRef.current = jqlRuns;
+  }, [jqlRuns]);
 
   const hasDrillDownTab = jqlRuns.some((run) => {
     if (!run.isDrillDown) {
@@ -123,8 +136,11 @@ const WorkWeekTasks = () => {
     }
     return true;
   });
+  const drillDownDismissed =
+    (drillDownKeyId && isDrillDownDismissed(drillDownKeyId)) ||
+    (drillDownAssigneeId && isDrillDownDismissed(drillDownAssigneeId));
   const drillDownPending =
-    hasDrillDownFilter && !hasDrillDownTab && !jqlError;
+    hasDrillDownFilter && !drillDownDismissed && !hasDrillDownTab && !jqlError;
 
   React.useEffect(() => {
     if (!hasDrillDownFilter) {
@@ -140,7 +156,7 @@ const WorkWeekTasks = () => {
   }, [hasDrillDownFilter, drillDownAssignee, drillDownKey]);
 
   React.useEffect(() => {
-    if (!drillDownKey || filtersLoading) {
+    if (!drillDownKey || filtersLoading || isDrillDownDismissed(drillDownKeyId)) {
       return;
     }
     void handleDrillDownToKey(drillDownKey).then((loaded) => {
@@ -148,15 +164,15 @@ const WorkWeekTasks = () => {
         setActiveRunIndex(0);
       }
     });
-  }, [drillDownKey, filtersLoading, handleDrillDownToKey]);
+  }, [drillDownKey, drillDownKeyId, filtersLoading, handleDrillDownToKey]);
 
   React.useEffect(() => {
-    if (!drillDownAssignee || filtersLoading || drillDownKey) {
+    if (!drillDownAssignee || filtersLoading || drillDownKey || isDrillDownDismissed(drillDownAssigneeId)) {
       return;
     }
 
     if (
-      jqlRuns.some(
+      jqlRunsRef.current.some(
         (run) =>
           run.isDrillDown &&
           String(run.drillDownAssignee || "").trim() === drillDownAssignee
@@ -170,13 +186,7 @@ const WorkWeekTasks = () => {
         setActiveRunIndex(0);
       }
     });
-  }, [
-    drillDownAssignee,
-    drillDownKey,
-    filtersLoading,
-    handleDrillDownToAssignee,
-    jqlRuns,
-  ]);
+  }, [drillDownAssignee, drillDownAssigneeId, drillDownKey, filtersLoading, handleDrillDownToAssignee]);
 
   const handleResetSavedQueriesWithConfirm = React.useCallback(() => {
     if (!window.confirm(
@@ -279,6 +289,30 @@ const WorkWeekTasks = () => {
     [clearDrillDownRun, handleClearDrillDownFilter, routeFilterMatchesRun]
   );
 
+  const createIssueDefaults = React.useMemo(() => {
+    if (activeRun?.jql || activeRun?.label) {
+      return resolveCreateIssueDefaults({
+        epicPresets,
+        jql: activeRun.jql,
+        label: activeRun.label,
+      });
+    }
+
+    for (let index = 0; index < jqlInputs.length; index += 1) {
+      const jql = String(jqlInputs[index] || "").trim();
+      const label = String(jqlLabels[index] || "").trim();
+      if (!jql && !label) {
+        continue;
+      }
+      const defaults = resolveCreateIssueDefaults({ epicPresets, jql, label });
+      if (defaults.epicSelectValue) {
+        return defaults;
+      }
+    }
+
+    return { presetId: "", epicKey: "", epicSelectValue: "" };
+  }, [activeRun, epicPresets, jqlInputs, jqlLabels]);
+
   return (
     <>
       <Container fluid className="work-week-page">
@@ -334,7 +368,7 @@ const WorkWeekTasks = () => {
 
         {jqlRuns.some((r) => r.issues?.length > 0) ? null : null}
 
-        {showRestoredJqlBanner && jqlRuns.length > 0 ? (
+        {showRestoredJqlBanner && jqlRuns.some(isConfiguredJqlRun) ? (
           <div className="ww-restored-banner">
             <div className="ww-restored-banner-content">
               <strong>Showing saved results</strong>
@@ -370,8 +404,12 @@ const WorkWeekTasks = () => {
           </div>
         ) : null}
 
+        {assigneeRefreshNotice ? (
+          <p className="ww-jira-status ww-inline-hint">{assigneeRefreshNotice}</p>
+        ) : null}
+
         {/* My Metrics — directly below restored-results banner; scoped to active tab */}
-        {jqlRuns.some((r) => r.issues?.length > 0) && activeRun?.issues?.length > 0 ? (
+        {jqlRuns.some((r) => isConfiguredJqlRun(r) && r.issues?.length > 0) && activeRun?.issues?.length > 0 ? (
           <MyMetricsSection run={activeRun} jiraRowPriorities={jiraRowPriorities} />
         ) : null}
 
@@ -416,7 +454,7 @@ const WorkWeekTasks = () => {
         open={createIssueOpen}
         onClose={() => setCreateIssueOpen(false)}
         epicPresets={epicPresets}
-        defaultEpicKey=""
+        defaultEpicSelectValue={createIssueDefaults.epicSelectValue}
         onCreated={() => void handleRunJql()}
       />
     </>

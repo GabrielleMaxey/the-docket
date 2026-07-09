@@ -169,7 +169,8 @@ const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
   try { data = text ? JSON.parse(text) : null; } catch { data = { message: text.slice(0, 500) }; }
 
   if (!response.ok) {
-    log.error(`${method} ${target} → ${response.status}`);
+    const detail = data?.errors || data?.errorMessages || data?.message;
+    log.error(`${method} ${target} → ${response.status}`, detail ? JSON.stringify(detail) : "");
     return { ok: false, status: response.status, data: data || {} };
   }
   log.debug(`${method} ${target} → ${response.status}`);

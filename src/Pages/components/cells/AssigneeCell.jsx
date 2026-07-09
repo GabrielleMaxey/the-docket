@@ -1,5 +1,12 @@
 import React from "react";
-import { searchJiraUsers } from "../../../services/jiraClient";
+import { JIRA_UNASSIGNED_ASSIGNEE, searchJiraUsers } from "../../../services/jiraClient";
+
+const UNASSIGNED_SUGGESTION = {
+  accountId: JIRA_UNASSIGNED_ASSIGNEE,
+  displayName: "Unassigned",
+  emailAddress: "",
+  source: "system",
+};
 
 const matchesAssigneeQuery = (value, query) => {
   const normalizedQuery = String(query || "").trim().toLowerCase();
@@ -28,7 +35,8 @@ const AssigneeCell = ({
   const debounceRef = React.useRef(null);
   const blurTimeoutRef = React.useRef(null);
 
-  const inputValue = draftValue ?? assignee ?? "";
+  const committedValue = assignee === "Unassigned" ? "" : assignee;
+  const inputValue = draftValue !== undefined ? draftValue : committedValue;
   const query = String(inputValue || "").trim();
 
   React.useEffect(() => {
@@ -89,9 +97,11 @@ const AssigneeCell = ({
         accountId: String(item?.accountId || "").trim(),
         displayName,
         emailAddress: String(item?.emailAddress || "").trim(),
-        source: item?.accountId ? "jira" : "local",
+        source: item?.source || (item?.accountId ? "jira" : "local"),
       });
     };
+
+    addItem(UNASSIGNED_SUGGESTION);
 
     jiraSuggestions.forEach(addItem);
     localSuggestions.forEach((name) => addItem({ displayName: name }));
@@ -99,7 +109,7 @@ const AssigneeCell = ({
     return items;
   }, [jiraSuggestions, localSuggestions]);
 
-  const openSuggestions = showSuggestions && query.length >= 2 && !isClosedOrResolved;
+  const openSuggestions = showSuggestions && !isClosedOrResolved;
 
   const handleFocus = () => {
     clearTimeout(blurTimeoutRef.current);
@@ -164,7 +174,10 @@ const AssigneeCell = ({
                 <li key={`${issueKey}-${item.accountId || item.displayName}`}>
                   <button
                     type="button"
-                    className="ww-assignee-suggestion"
+                    className={
+                      "ww-assignee-suggestion" +
+                      (item.source === "system" ? " ww-assignee-suggestion--unassigned" : "")
+                    }
                     role="option"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => handleSelectSuggestion(item)}
