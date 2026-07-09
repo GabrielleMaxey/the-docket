@@ -20,12 +20,25 @@ export const getIssueTypeName = (issue) => {
   return String(fromFields?.name || issue?.issueType || "").trim();
 };
 
+export const matchesIssueTypeFamily = (issueTypeName, family) => {
+  const normalized = String(issueTypeName || "").trim().toLowerCase();
+  const base = String(family || "").trim().toLowerCase();
+  if (!normalized || !base) {
+    return false;
+  }
+  return (
+    normalized === base ||
+    normalized.startsWith(`${base} `) ||
+    normalized.startsWith(`${base}(`)
+  );
+};
+
 export const isEpicIssueType = (issueOrTypeName) => {
   if (typeof issueOrTypeName === "string") {
-    return String(issueOrTypeName).trim().toLowerCase() === "epic";
+    return matchesIssueTypeFamily(issueOrTypeName, "epic");
   }
 
-  return getIssueTypeName(issueOrTypeName).toLowerCase() === "epic";
+  return matchesIssueTypeFamily(getIssueTypeName(issueOrTypeName), "epic");
 };
 
 export const getIssueStatusCategoryKey = (issue) =>

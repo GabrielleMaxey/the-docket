@@ -35,8 +35,48 @@ const findSubtaskIssueTypeMeta = (project) => {
   const issueTypes = Array.isArray(project?.issuetypes) ? project.issuetypes : [];
   return issueTypes.find((type) => {
     const name = String(type?.name || "").trim().toLowerCase();
-    return (name === "sub-task" || name === "subtask" || name === "sub task") && type?.fields?.parent;
+    return (
+      (name === "sub-task" || name === "subtask" || name === "sub task") &&
+      (type?.subtask || type?.fields?.parent)
+    );
   });
+};
+
+const wantsStoryParent = ({ issueTypeName, parentRole, isSubtask }) =>
+  Boolean(isSubtask || (issueTypeName === "Task" && parentRole === "story"));
+
+export const loadProjectComponents = async ({ projectKey, jiraRequest }) => {
+  const cacheKey = `components:${String(projectKey || "").trim()}`;
+  if (createMetaCache.has(cacheKey)) {
+    return createMetaCache.get(cacheKey);
+  }
+
+  const result = await jiraRequest({
+    pathWithQuery: `/rest/api/3/project/${encodeURIComponent(projectKey)}/components`,
+  });
+
+  const components = result.ok && Array.isArray(result.data) ? result.data : [];
+  createMetaCache.set(cacheKey, components);
+  return components;
+};
+
+const resolveProjectComponentName = ({ requestedName, meta, projectComponents }) => {
+  const normalized = String(requestedName || "").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const candidates = [];
+  const allowed = Array.isArray(meta?.allowedValues) ? meta.allowedValues : [];
+  for (const item of allowed) {
+    candidates.push(String(item?.name || "").trim());
+  }
+  for (const item of projectComponents || []) {
+    candidates.push(String(item?.name || "").trim());
+  }
+
+  const match = candidates.find((name) => name && name.toLowerCase() === normalized.toLowerCase());
+  return match || null;
 };
 
 export const loadProjectCreateMeta = async ({ projectKey, jiraRequest }) => {
@@ -62,10 +102,24 @@ export const loadProjectCreateMeta = async ({ projectKey, jiraRequest }) => {
   return payload;
 };
 
-export const resolveIssueTypeMeta = ({ project, issueTypeName, needsParent }) => {
+export const resolveIssueTypeMeta = ({
+  project,
+  issueTypeName,
+  needsParent,
+  parentRole = "",
+  isSubtask = false,
+}) => {
   const requested = findIssueTypeMeta(project, issueTypeName);
   if (!requested) {
     return null;
+  }
+
+  // ODI story-backed work uses Task issuetype + parent field (not Jira Sub-task).
+  if (
+    wantsStoryParent({ issueTypeName, parentRole, isSubtask }) &&
+    requested.fields?.parent
+  ) {
+    return requested;
   }
 
   if (!needsParent || requested.fields?.parent) {
@@ -160,30 +214,42 @@ const resolveAllowedOptionValue = (meta, text) => {
   return { value: normalized };
 };
 
-export const applyNamedFieldValue = ({ fields, fieldKey, meta, value }) => {
+export const applyNamedFieldValue = ({ fields, fieldKey, meta, value, projectComponents }) => {
   const text = String(value || "").trim();
   if (!text || !fieldKey || !meta) {
-    return false;
+    return { ok: false };
   }
 
   const schema = meta.schema || {};
-  if (isComponentsField({ fieldKey, name: String(meta?.name || "").toLowerCase(), meta })) {
-    fields.components = [{ name: text }];
-    return true;
+  const name = String(meta?.name || "").trim().toLowerCase();
+  if (isComponentsField({ fieldKey, name, meta })) {
+    const resolvedName = resolveProjectComponentName({
+      requestedName: text,
+      meta,
+      projectComponents,
+    });
+    if (!resolvedName) {
+      return {
+        ok: false,
+        error: `Component name '${text}' is not valid for this Jira project. Choose an existing component or leave the field blank.`,
+      };
+    }
+    fields.components = [{ name: resolvedName }];
+    return { ok: true };
   }
 
   if (schema.type === "option" || Array.isArray(meta.allowedValues)) {
     fields[fieldKey] = resolveAllowedOptionValue(meta, text);
-    return true;
+    return { ok: true };
   }
 
   if (schema.type === "array") {
     fields[fieldKey] = [{ value: text }];
-    return true;
+    return { ok: true };
   }
 
   fields[fieldKey] = text;
-  return true;
+  return { ok: true };
 };
 
 export const applyOdiCreateFields = ({
@@ -193,17 +259,22 @@ export const applyOdiCreateFields = ({
   component,
   verticalComponent,
   bugTracking,
+  projectComponents,
 }) => {
   const componentValue = String(component || "").trim();
   if (componentValue) {
     const match = findCreateMetaField(issueTypeFields, isComponentsField);
     if (match) {
-      applyNamedFieldValue({
+      const result = applyNamedFieldValue({
         fields,
         fieldKey: match.fieldKey,
         meta: match.meta,
         value: componentValue,
+        projectComponents,
       });
+      if (!result.ok) {
+        return result;
+      }
     }
   }
 
@@ -216,6 +287,7 @@ export const applyOdiCreateFields = ({
         fieldKey: match.fieldKey,
         meta: match.meta,
         value: verticalValue,
+        projectComponents,
       });
     }
   }
@@ -229,9 +301,12 @@ export const applyOdiCreateFields = ({
         fieldKey: match.fieldKey,
         meta: match.meta,
         value: bugTrackingValue,
+        projectComponents,
       });
     }
   }
+
+  return { ok: true };
 };
 
 export const applyParentLinkFields = ({
@@ -240,16 +315,18 @@ export const applyParentLinkFields = ({
   parentKey,
   parentRole,
   issueType,
+  isSubtask = false,
 }) => {
   if (!parentKey) {
     return { ok: true };
   }
 
   const useEpicParent = parentRole === "epic" || issueType === "Story" || issueType === "Bug";
+  const useStoryParent = wantsStoryParent({ issueTypeName: issueType, parentRole, isSubtask });
 
-  if (issueTypeFields?.parent) {
+  if (useStoryParent) {
     fields.parent = { key: parentKey };
-    return { ok: true };
+    return { ok: true, linkMode: "parent" };
   }
 
   if (useEpicParent) {
@@ -261,9 +338,14 @@ export const applyParentLinkFields = ({
     }
   }
 
+  if (issueTypeFields?.parent) {
+    fields.parent = { key: parentKey };
+    return { ok: true, linkMode: "parent" };
+  }
+
   for (const [fieldKey, meta] of Object.entries(issueTypeFields || {})) {
     if (isParentLinkField(meta)) {
-      fields[fieldKey] = parentKey;
+      fields[fieldKey] = { key: parentKey };
       return { ok: true, linkMode: "parentLink", fieldKey };
     }
   }
@@ -307,6 +389,7 @@ export const buildJiraCreatePayload = async ({
   descriptionAdf,
   parentKey,
   parentRole,
+  isSubtask = false,
   assigneeAccountId,
   odiPriority,
   component,
@@ -328,6 +411,8 @@ export const buildJiraCreatePayload = async ({
     project: metaResult.project,
     issueTypeName: issueType,
     needsParent,
+    parentRole,
+    isSubtask,
   });
 
   if (!issueTypeMeta) {
@@ -356,6 +441,7 @@ export const buildJiraCreatePayload = async ({
     parentKey,
     parentRole,
     issueType,
+    isSubtask,
   });
   if (!parentResult.ok) {
     return { ok: false, status: 400, error: parentResult.error };
@@ -386,14 +472,19 @@ export const buildJiraCreatePayload = async ({
     fields.assignee = { id: assigneeAccountId };
   }
 
-  applyOdiCreateFields({
+  const projectComponents = await loadProjectComponents({ projectKey, jiraRequest });
+  const odiFieldsResult = applyOdiCreateFields({
     fields,
     issueTypeFields: issueTypeMeta.fields || {},
     issueType,
     component,
     verticalComponent,
     bugTracking,
+    projectComponents,
   });
+  if (!odiFieldsResult.ok) {
+    return { ok: false, status: 400, error: odiFieldsResult.error };
+  }
 
   return {
     ok: true,

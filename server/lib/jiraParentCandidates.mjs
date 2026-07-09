@@ -3,11 +3,13 @@ import {
   normalizeIssueRecord,
   PARENT_CHAIN_MAX_DEPTH,
 } from "../../shared/jiraParentCandidates.mjs";
+import { getJiraSearchFields } from "./jiraSearchFields.mjs";
 import { searchAllIssues } from "./jiraSearchHelpers.mjs";
 
-const PARENT_FIELDS = ["summary", "issuetype", "parent"];
+const EPIC_LINK_FIELD = "customfield_10014";
+const PARENT_FETCH_FIELDS = ["summary", "issuetype", "parent", EPIC_LINK_FIELD];
 
-const fetchIssuesByKeys = async ({ keys, jiraRequest }) => {
+const fetchIssuesByKeys = async ({ keys, jiraRequest, fields = PARENT_FETCH_FIELDS }) => {
   const uniqueKeys = [...new Set(keys.map((key) => String(key || "").trim()).filter(Boolean))];
   if (uniqueKeys.length === 0) {
     return [];
@@ -20,7 +22,7 @@ const fetchIssuesByKeys = async ({ keys, jiraRequest }) => {
     body: {
       jql,
       maxResults: uniqueKeys.length,
-      fields: PARENT_FIELDS,
+      fields: PARENT_FETCH_FIELDS,
     },
   });
 
@@ -41,6 +43,9 @@ const enrichParentChains = async ({ issueByKey, jiraRequest }) => {
     for (const issue of issueByKey.values()) {
       if (issue.parentKey && !issueByKey.has(issue.parentKey)) {
         missing.add(issue.parentKey);
+      }
+      if (issue.epicLinkKey && !issueByKey.has(issue.epicLinkKey)) {
+        missing.add(issue.epicLinkKey);
       }
     }
 
@@ -70,6 +75,7 @@ export const loadParentCandidatesFromJql = async ({
   jql,
   jiraRequest,
   runJiraSearchRequest,
+  searchFields,
   maxTotal = 100,
 }) => {
   const trimmedJql = String(jql || "").trim();
@@ -87,7 +93,11 @@ export const loadParentCandidatesFromJql = async ({
 
   const search = await searchAllIssues({
     jql: trimmedJql,
-    runJiraSearchRequest,
+    runJiraSearchRequest: (jqlArg, options = {}) =>
+      runJiraSearchRequest(jqlArg, {
+        ...options,
+        fields: searchFields || options.fields,
+      }),
     maxTotal,
   });
 

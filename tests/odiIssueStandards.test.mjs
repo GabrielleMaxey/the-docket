@@ -3,9 +3,25 @@ import assert from "node:assert/strict";
 import {
   isJobStorySummary,
   isImperativeSubtaskTitle,
+  isStoryIssueTypeName,
   validateBugDescription,
   validateOdiIssueCreate,
 } from "../shared/odiIssueStandards.mjs";
+import { isEpicIssueType } from "../shared/dashboardMetrics.mjs";
+
+describe("issue type family matching", () => {
+  it("recognizes ODI epic variants", () => {
+    assert.equal(isEpicIssueType("Epic"), true);
+    assert.equal(isEpicIssueType("Epic (Feature)"), true);
+    assert.equal(isEpicIssueType("Story"), false);
+  });
+
+  it("recognizes ODI story variants", () => {
+    assert.equal(isStoryIssueTypeName("Story"), true);
+    assert.equal(isStoryIssueTypeName("Story (User Story)"), true);
+    assert.equal(isStoryIssueTypeName("Epic (Feature)"), false);
+  });
+});
 
 describe("isJobStorySummary", () => {
   it("accepts valid job story titles", () => {

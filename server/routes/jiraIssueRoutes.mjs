@@ -2,6 +2,7 @@ import { createLogger } from "../lib/logger.mjs";
 import { completeLlmText, resolveFirstReadyReportProvider } from "../lib/llmClient.mjs";
 import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
 import { loadParentCandidatesFromJql } from "../lib/jiraParentCandidates.mjs";
+import { getJiraSearchFields } from "../lib/jiraSearchFields.mjs";
 import {
   buildEpicStoriesJql,
   buildJiraCreatePayload,
@@ -150,7 +151,7 @@ const STORY_EVALUATION_RULES = `Story goal evaluation (required):
 
 export const registerJiraIssueRoutes = (
   app,
-  { jiraRequest, ensureEnvOrRespond, resolveJiraUser, runJiraSearchRequest }
+  { db, jiraRequest, ensureEnvOrRespond, resolveJiraUser, runJiraSearchRequest }
 ) => {
   app.get("/api/jira/projects", async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
@@ -313,6 +314,7 @@ export const registerJiraIssueRoutes = (
         maxTotal,
         jiraRequest,
         runJiraSearchRequest,
+        searchFields: getJiraSearchFields(db),
       });
       return res.json(candidates);
     } catch (error) {
@@ -363,6 +365,10 @@ export const registerJiraIssueRoutes = (
       priority: priority || "",
     });
     if (!standardsCheck.valid) {
+      log.warn(`create ${issueType} rejected: ODI standards`, {
+        epicKey,
+        errors: standardsCheck.errors,
+      });
       return res.status(400).json({
         error: "Issue does not meet ODI Jira standards",
         errors: standardsCheck.errors,
@@ -376,6 +382,10 @@ export const registerJiraIssueRoutes = (
       jiraRequest,
     });
     if (parentErrors.length > 0) {
+      log.warn(`create ${issueType} rejected: invalid parent ${epicKey}`, {
+        parentKey: epicKey,
+        errors: parentErrors,
+      });
       return res.status(400).json({
         error: "Invalid parent for issue type",
         errors: parentErrors,
@@ -398,6 +408,7 @@ export const registerJiraIssueRoutes = (
       descriptionAdf,
       parentKey: epicKey,
       parentRole,
+      isSubtask,
       assigneeAccountId,
       odiPriority: priority || "",
       component,
