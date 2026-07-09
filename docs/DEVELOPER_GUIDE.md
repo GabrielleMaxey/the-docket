@@ -65,6 +65,8 @@ taskManager/
 │   │   ├── dashboardRefresh/ # Dashboard refresh pipeline (parse → metrics → persist)
 │   │   ├── epicFilterJql.mjs # JQL builders (metrics scope, past due, presets)
 │   │   ├── jiraSearchHelpers.mjs # Paginated Jira search + user search
+│   │   ├── jiraParentCandidates.mjs # JQL → parent chain walk for Create Issue
+│   │   ├── jiraCreateIssueFields.mjs # createmeta-driven Jira create payload
 │   │   ├── jiraCommentText.mjs   # ADF → plain text; bulk latest comments
 │   │   ├── reportArchive.mjs     # generated_reports CRUD + source filters
 │   │   ├── weeklyDigest.mjs  # Snapshot → markdown weekly digest
@@ -78,12 +80,22 @@ taskManager/
 │       ├── jiraIssueRoutes.mjs    # Status/assignee updates, create issue
 │       └── reportRoutes.mjs       # /api/report/* + /api/plan/week
 ├── shared/
-│   ├── dashboardMetrics.mjs   # Pure metrics helpers (server + UI)
+│   ├── dashboardMetrics.mjs   # Pure metrics helpers (server + UI); issue type family matching
+│   ├── odiIssueStandards.mjs  # ODI create validation (Job Story, bug structure, parent rules)
+│   ├── odiCreateIssueFields.mjs # Components / Vertical / BUG Tracking defaults
+│   ├── createIssuePresetUtils.mjs # Preset dropdown values, JQL epic key extraction
+│   ├── createIssueParentUtils.mjs # Manual key validation + query-issue parent resolution
+│   ├── jiraParentCandidates.mjs   # Parent chain walk + dropdown builders (shared UI/server)
+│   ├── jiraDescriptionAdf.mjs     # Plain-text description → Jira ADF
 │   ├── priorityFromComment.mjs # Parse PRIORITY P1–P10 from Jira comment text
 │   └── chatSessionPrompt.mjs  # Formats Chat session context for LLM prompts
 ├── tests/
 │   ├── dashboardMetrics.test.mjs
 │   ├── epicFilterJql.test.mjs
+│   ├── odiIssueStandards.test.mjs
+│   ├── jiraCreateIssueFields.test.mjs
+│   ├── jiraParentCandidates.test.mjs
+│   ├── createIssuePresetUtils.test.mjs
 │   ├── chatSessionPrompt.test.mjs
 │   └── priorityFromComment.test.mjs
 ├── src/
@@ -361,6 +373,38 @@ A fetch sequence guard drops stale responses when keys change quickly or all dri
 
 Settings UI: **Export team pack** / **Import team pack**. Align with `npm run seed:presets` for admin seeding — see [pilot-presets.md](./pilot-presets.md).
 
+### Create Issue (`CreateIssueModal.jsx` + `jiraIssueRoutes.mjs`)
+
+Work Week **Create Issue** creates Story, Task, or Bug issues in ODI with client and server validation against `shared/odiIssueStandards.mjs`.
+
+**Parent selection (three paths):**
+
+| Path | API | Behavior |
+|------|-----|----------|
+| Epic preset | `GET /api/jira/epics/:epicKey/parent-options` | Epic + stories under that epic |
+| JQL preset (no embedded epic key) | `POST /api/jira/issues/parent-candidates` | Runs preset JQL, walks `parent` + Epic Link (`customfield_10014`), returns `epics`, `stories`, `chains` |
+| Manual key | `GET /api/jira/issues/:issueKey/summary` | Validates epic vs story for the chosen issue type |
+
+Preset preload from the active Work Week tab uses `resolveCreateIssueDefaults` in `shared/createIssuePresetUtils.mjs` (`defaultEpicSelectValue`). Manual key validation and query-issue parent resolution live in `shared/createIssueParentUtils.mjs`; the modal uses `useCreateIssueManualKey` for debounced validation and `setResolvedParent` / `applyQueryIssueParent` for a single parent-state code path.
+
+**Create payload:** `buildJiraCreatePayload` in `server/lib/jiraCreateIssueFields.mjs` reads Jira **createmeta** to choose `parent` vs Epic Link, issue type id, priority mapping (`Critical` → `Highest`), and ODI custom fields (Components, Vertical Components, BUG Tracking). Descriptions are sent as ADF via `shared/jiraDescriptionAdf.mjs`.
+
+**Parent / issue-type rules (ODI):**
+
+| Create | Issue type sent | Jira issuetype used | Parent link |
+|--------|-----------------|---------------------|-------------|
+| Story / Bug under Epic | Story / Bug | Same | Epic Link preferred; `parent` fallback |
+| Task / sub-task under Story | Task (`isSubtask: true` for story flow) | **Task** (not Sub-task) when Task createmeta has `parent` | `fields.parent = { key: storyKey }` |
+| Standalone Task under Story | Task | Task | `fields.parent = { key: storyKey }` |
+
+Story-backed work uses **Task + parent**, matching how `jiraParentCandidates.mjs` walks chains (`Task → Story → Epic`). Jira **Sub-task** issuetype is only a fallback when Task’s create screen has no `parent` field. Portfolio **Parent Link** (`customfield_10018`) is not used for story parents.
+
+**Components:** `loadProjectComponents` fetches `/rest/api/3/project/{key}/components`; unknown component names are rejected before the Jira API call.
+
+**Modal validation UX:** `descriptionError` state shows description/goal/clarification failures below the Description textarea; other errors stay in the top banner. `canSubmit` vs `canEditIssueFields` allows resubmit after fixing validation errors.
+
+**Issue type matching:** ODI uses variant names such as `Epic (Feature)` and `Story (User Story)`. `matchesIssueTypeFamily` in `shared/dashboardMetrics.mjs` treats these as epic/story for parent validation — not only the literal names `Epic` / `Story`.
+
 ### Past Reports archive
 
 `server/lib/reportArchive.mjs` — `REPORT_SOURCES` (`work_week`, `dashboard`, `adhoc`), `insertGeneratedReport`, `listGeneratedReports`, `getGeneratedReportById`. Tab filters use `report_type` sets (Work Week: project report + week plan; Dashboard: `dashboard_report`; Ad-hoc: `chat_response` or `source=adhoc`). Report saves pass `savedAtLocal` / `savedTimeZone` from the browser (`src/utils/localTimestamp.js`) so archived rows are created under the user's local timestamp; the timezone is also kept in `meta_json` when provided.
@@ -411,6 +455,9 @@ All routes mounted by `server/jiraProxy.mjs`.
 | POST | `/api/jira/issues/:issueKey/assignee` | Update assignee |
 | GET | `/api/jira/users/search` | Jira user search (`?query=`) for assignee typing |
 | POST | `/api/jira/issues` | Create issue |
+| GET | `/api/jira/issues/:issueKey/summary` | Issue type summary (`isEpic`, `isStory`) for manual parent validation |
+| GET | `/api/jira/epics/:epicKey/parent-options` | Epic + stories for epic-preset parent picker |
+| POST | `/api/jira/issues/parent-candidates` | Body: `{ jql, maxTotal? }` — parent chains from a saved query |
 | POST | `/api/jira/issues/generate-description` | AI-generated description + subtasks/priority for a new issue (body: `summary`, `issueType`, `epicKey`, `epicName`) |
 | GET | `/api/jira/projects` | List projects |
 | GET | `/api/jira/projects/:key/createmeta` | Create-issue field metadata |
@@ -685,7 +732,7 @@ npm run build
 #    - Settings: export/import team preset pack
 #    - Chat: ask about a generated week plan or report (session context)
 #    - Packaged desktop: edit userData `.env`, confirm Test Jira Connection
-#    - Create Issue modal
+#    - Create Issue modal: epic preset, JQL preset parent chains, manual parent key, AI Draft, Bug priority, post-create Jira link; resubmit after validation error
 ```
 
 ---

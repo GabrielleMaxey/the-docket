@@ -3,6 +3,8 @@
  * Shared by server validation, UI pre-checks, and tests.
  */
 
+import { matchesIssueTypeFamily } from "./dashboardMetrics.mjs";
+
 const JOB_STORY_PATTERN = /^when\s+.+\s+i want\s+.+\s+so (?:i )?can\s+.+/i;
 
 const BUG_SECTION_HINTS = [
@@ -31,7 +33,7 @@ export const normalizeOdiBugPriority = (value) => {
 };
 
 export const isStoryIssueTypeName = (issueTypeName) =>
-  String(issueTypeName || "").trim().toLowerCase() === "story";
+  matchesIssueTypeFamily(issueTypeName, "story");
 
 export const isJobStorySummary = (summary) => {
   const text = String(summary || "").trim();

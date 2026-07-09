@@ -5,7 +5,6 @@ import {
   fetchEpicParentOptions,
   fetchJiraCreateMeta,
   fetchJiraHealth,
-  fetchJiraIssueSummary,
   fetchJiraParentCandidates,
   fetchJiraProjects,
   generateIssueDescription,
@@ -22,10 +21,19 @@ import {
 } from "../../../shared/odiCreateIssueFields.mjs";
 import {
   buildEpicPresetDropdownOptions,
+  isJqlPreset,
   resolveEpicSelectToKey,
   resolvePresetFromSelect,
 } from "../../../shared/createIssuePresetUtils.mjs";
-import { buildParentDropdownFromCandidates } from "../../../shared/jiraParentCandidates.mjs";
+import {
+  buildQueryIssueParentError,
+  resolveQueryIssueParent,
+} from "../../../shared/createIssueParentUtils.mjs";
+import {
+  buildParentDropdownFromCandidates,
+  buildQueryIssueDropdownOptions,
+} from "../../../shared/jiraParentCandidates.mjs";
+import useCreateIssueManualKey from "../hooks/useCreateIssueManualKey";
 
 const COMPONENT_OPTIONS = toCreateIssueDropdownOptions(ODI_COMPONENT_OPTIONS);
 const VERTICAL_COMPONENT_OPTIONS = toCreateIssueDropdownOptions(ODI_VERTICAL_COMPONENT_OPTIONS);
@@ -56,7 +64,7 @@ const ComboDropdownField = ({
       onChange={(_e, { value: nextValue }) => onChange(String(nextValue || ""))}
     />
     <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.25rem" }}>
-      Choose a default option or type a custom value.
+      Choose a default option. Components must already exist in the Jira project.
     </p>
   </Form.Field>
 );
@@ -73,7 +81,24 @@ const PRIORITY_OPTIONS = ODI_BUG_PRIORITIES.map((priority) => ({
   value: priority,
 }));
 
-const ISSUE_KEY_PATTERN = /^[A-Z][A-Z0-9]+-\d+$/i;
+const STORY_NOT_DEFINED_ERROR =
+  "Story is not fully defined. Answer the clarification questions, update the title/description, then run AI Draft again before creating.";
+
+const isDescriptionRelatedError = (message) => {
+  const text = String(message || "").trim().toLowerCase();
+  if (!text) {
+    return false;
+  }
+  return (
+    text === STORY_NOT_DEFINED_ERROR.toLowerCase() ||
+    text.includes("description") ||
+    text.includes("reproduction") ||
+    text.includes("expected vs actual")
+  );
+};
+
+const formatFieldErrors = (errors) =>
+  errors.map((item) => `• ${item}`).join("\n");
 
 const buildJiraBrowseUrl = (jiraBaseUrl, issueKey) => {
   const key = String(issueKey || "").trim();
@@ -129,6 +154,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   const [loadingMeta, setLoadingMeta] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [descriptionError, setDescriptionError] = React.useState("");
   const [success, setSuccess] = React.useState("");
   const [createdIssueKey, setCreatedIssueKey] = React.useState("");
   const [jiraBaseUrl, setJiraBaseUrl] = React.useState("");
@@ -137,16 +163,12 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   const [sourceEpicKey, setSourceEpicKey] = React.useState("");
   const [parentOptions, setParentOptions] = React.useState(null);
   const [jqlParentCandidates, setJqlParentCandidates] = React.useState(null);
+  const [selectedQueryIssueKey, setSelectedQueryIssueKey] = React.useState("");
+  const [manualParentInput, setManualParentInput] = React.useState("");
   const [parentKey, setParentKey] = React.useState("");
   const [parentRole, setParentRole] = React.useState("");
   const [parentSelectValue, setParentSelectValue] = React.useState("");
   const [loadingParents, setLoadingParents] = React.useState(false);
-  const [manualIssueCheck, setManualIssueCheck] = React.useState({
-    loading: false,
-    valid: false,
-    error: "",
-    issue: null,
-  });
 
   const [generatingDesc, setGeneratingDesc] = React.useState(false);
   const [suggestedSubtasks, setSuggestedSubtasks] = React.useState([]);
@@ -160,15 +182,145 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   const [creatingSubtasks, setCreatingSubtasks] = React.useState(false);
   const [subtaskResults, setSubtaskResults] = React.useState([]);
 
+  const isManualEpic = epicSelectValue === "__other__";
+  const activePreset = React.useMemo(
+    () => resolvePresetFromSelect(epicSelectValue, epicPresets),
+    [epicSelectValue, epicPresets]
+  );
+  const isJqlPresetMode = Boolean(activePreset && isJqlPreset(activePreset) && !isManualEpic);
+
+  const clearResolvedParent = React.useCallback(() => {
+    setParentKey("");
+    setParentRole("");
+    setParentSelectValue("");
+    setSourceEpicKey("");
+  }, []);
+
+  const setResolvedParent = React.useCallback((resolved, { clearManualParent = false } = {}) => {
+    if (!resolved?.parentKey || !resolved?.parentRole) {
+      clearResolvedParent();
+      return false;
+    }
+    setParentKey(resolved.parentKey);
+    setParentRole(resolved.parentRole);
+    setParentSelectValue(resolved.parentKey);
+    setSourceEpicKey(resolved.sourceEpicKey || "");
+    if (clearManualParent) {
+      setManualParentInput("");
+    }
+    return true;
+  }, [clearResolvedParent]);
+
+  const onManualEpicBeforeValidate = React.useCallback(() => {
+    setError("");
+  }, []);
+
+  const onManualEpicInvalidFormat = React.useCallback(({ hasInput }) => {
+    if (hasInput) {
+      return;
+    }
+    setSourceEpicKey("");
+    setParentOptions(null);
+    clearResolvedParent();
+  }, [clearResolvedParent]);
+
+  const onManualEpicLoadEpicOptions = React.useCallback(({ epicKey, parentOptions: data }) => {
+    setJqlParentCandidates(null);
+    setSourceEpicKey(epicKey);
+    setParentOptions(data);
+  }, []);
+
+  const onManualEpicDirectParent = React.useCallback((outcome) => {
+    setSourceEpicKey("");
+    setParentOptions(null);
+    setResolvedParent(outcome);
+  }, [setResolvedParent]);
+
+  const onManualEpicInvalidIssue = React.useCallback(() => {
+    setSourceEpicKey("");
+    setParentOptions(null);
+    clearResolvedParent();
+  }, [clearResolvedParent]);
+
+  const onManualEpicNotFound = React.useCallback(() => {
+    setSourceEpicKey("");
+    setParentOptions(null);
+    setJqlParentCandidates(null);
+    setSelectedQueryIssueKey("");
+    setManualParentInput("");
+    clearResolvedParent();
+  }, [clearResolvedParent]);
+
+  const onManualParentBeforeValidate = React.useCallback(() => {
+    setError("");
+  }, []);
+
+  const onManualParentInvalidFormat = React.useCallback(({ hasInput }) => {
+    if (!hasInput) {
+      clearResolvedParent();
+    }
+  }, [clearResolvedParent]);
+
+  const onManualParentDirectParent = React.useCallback((outcome) => {
+    setSelectedQueryIssueKey("");
+    setResolvedParent(outcome);
+  }, [setResolvedParent]);
+
+  const onManualParentInvalidIssue = React.useCallback(() => {
+    clearResolvedParent();
+  }, [clearResolvedParent]);
+
+  const onManualParentNotFound = React.useCallback(() => {
+    clearResolvedParent();
+  }, [clearResolvedParent]);
+
+  const {
+    check: manualIssueCheck,
+    resetCheck: resetManualEpicCheck,
+  } = useCreateIssueManualKey({
+    open,
+    enabled: isManualEpic,
+    inputValue: manualEpicInput,
+    issueType,
+    mode: "preset",
+    onBeforeValidate: onManualEpicBeforeValidate,
+    onInvalidFormat: onManualEpicInvalidFormat,
+    onLoadEpicOptions: onManualEpicLoadEpicOptions,
+    onDirectParent: onManualEpicDirectParent,
+    onInvalidIssue: onManualEpicInvalidIssue,
+    onNotFound: onManualEpicNotFound,
+    setLoadingParents,
+  });
+
+  const {
+    check: manualParentCheck,
+    resetCheck: resetManualParentCheck,
+  } = useCreateIssueManualKey({
+    open,
+    enabled: isJqlPresetMode && !isManualEpic,
+    inputValue: manualParentInput,
+    issueType,
+    mode: "parent",
+    onBeforeValidate: onManualParentBeforeValidate,
+    onInvalidFormat: onManualParentInvalidFormat,
+    onDirectParent: onManualParentDirectParent,
+    onInvalidIssue: onManualParentInvalidIssue,
+    onNotFound: onManualParentNotFound,
+    setLoadingParents,
+  });
+
   const resetParentState = React.useCallback(() => {
     setSourceEpicKey("");
     setParentOptions(null);
     setJqlParentCandidates(null);
+    setSelectedQueryIssueKey("");
+    setManualParentInput("");
     setParentKey("");
     setParentRole("");
     setParentSelectValue("");
-    setManualIssueCheck({ loading: false, valid: false, error: "", issue: null });
-  }, []);
+    resetManualEpicCheck();
+    resetManualParentCheck();
+  }, [resetManualEpicCheck, resetManualParentCheck]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -181,6 +333,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     setDescription("");
     setAssignee("");
     setError("");
+    setDescriptionError("");
     setSuccess("");
     setCreatedIssueKey("");
     setSuggestedSubtasks([]);
@@ -247,12 +400,11 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     }
     setClarificationQuestions([]);
     setNeedsClarification(false);
+    setDescriptionError("");
     if (issueType === "Story") {
       setAssignee("");
     }
   }, [issueType]);
-
-  const isManualEpic = epicSelectValue === "__other__";
 
   React.useEffect(() => {
     if (!open || isManualEpic) return;
@@ -284,7 +436,6 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
           setJqlParentCandidates(null);
           setSourceEpicKey(epicKeyToLoad);
           setParentOptions(data);
-          setManualIssueCheck({ loading: false, valid: true, error: "", issue: null });
           return;
         }
 
@@ -293,7 +444,6 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
         setParentOptions(null);
         setJqlParentCandidates(data);
         setSourceEpicKey("");
-        setManualIssueCheck({ loading: false, valid: true, error: "", issue: null });
       } catch (loadError) {
         if (!cancelled) {
           resetParentState();
@@ -307,77 +457,41 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     return () => { cancelled = true; };
   }, [open, epicSelectValue, isManualEpic, resetParentState, epicPresets]);
 
-  React.useEffect(() => {
-    if (!open || !isManualEpic) return;
+  const applyQueryIssueParent = React.useCallback(
+    (issueKey, { showErrorOnFailure = false } = {}) => {
+      if (!issueKey) {
+        clearResolvedParent();
+        return;
+      }
 
-    const key = manualEpicInput.trim().toUpperCase();
-    if (!ISSUE_KEY_PATTERN.test(key)) {
-      setManualIssueCheck({ loading: false, valid: false, error: "", issue: null });
-      setSourceEpicKey("");
-      setParentOptions(null);
-      setParentKey("");
-      setParentRole("");
-      setParentSelectValue("");
+      const resolved = resolveQueryIssueParent({
+        chains: jqlParentCandidates?.chains,
+        selectedQueryIssueKey: issueKey,
+        issueType,
+      });
+
+      if (setResolvedParent(resolved, { clearManualParent: true })) {
+        resetManualParentCheck();
+        if (showErrorOnFailure) {
+          setError("");
+        }
+        return;
+      }
+
+      clearResolvedParent();
+      if (showErrorOnFailure) {
+        setError(buildQueryIssueParentError(issueKey, issueType));
+      }
+    },
+    [jqlParentCandidates, issueType, setResolvedParent, clearResolvedParent, resetManualParentCheck]
+  );
+
+  React.useEffect(() => {
+    if (!selectedQueryIssueKey || !jqlParentCandidates) {
       return;
     }
-
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      setLoadingParents(true);
-      setManualIssueCheck({ loading: true, valid: false, error: "", issue: null });
-      setError("");
-      try {
-        const issue = await fetchJiraIssueSummary(key);
-        if (cancelled) return;
-
-        if (issue.isEpic) {
-          const data = await fetchEpicParentOptions(key);
-          if (cancelled) return;
-          setManualIssueCheck({ loading: false, valid: true, error: "", issue });
-          setSourceEpicKey(key);
-          setParentOptions(data);
-        } else if (issue.isStory && issueType === "Task") {
-          setManualIssueCheck({ loading: false, valid: true, error: "", issue });
-          setSourceEpicKey("");
-          setParentOptions(null);
-          setParentKey(key);
-          setParentRole("story");
-          setParentSelectValue(key);
-        } else {
-          setManualIssueCheck({
-            loading: false,
-            valid: false,
-            error: issue.isStory
-              ? `${key} is a Story. Enter an Epic key, or switch issue type to Task.`
-              : `${key} is a ${issue.issueType}. Enter an Epic key for Story/Bug, or a Story key for Task.`,
-            issue,
-          });
-          setSourceEpicKey("");
-          setParentOptions(null);
-          setParentKey("");
-          setParentRole("");
-          setParentSelectValue("");
-        }
-      } catch (validateError) {
-        if (!cancelled) {
-          resetParentState();
-          setManualIssueCheck({
-            loading: false,
-            valid: false,
-            error: validateError instanceof Error ? validateError.message : "Issue not found",
-            issue: null,
-          });
-        }
-      } finally {
-        if (!cancelled) setLoadingParents(false);
-      }
-    }, 500);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [open, isManualEpic, manualEpicInput, issueType, resetParentState]);
+    applyQueryIssueParent(selectedQueryIssueKey);
+  }, [selectedQueryIssueKey, jqlParentCandidates, issueType, applyQueryIssueParent]);
 
   React.useEffect(() => {
     if (!parentOptions?.epic?.key) {
@@ -385,18 +499,18 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     }
 
     if (issueType === "Story" || issueType === "Bug") {
-      setParentKey(parentOptions.epic.key);
-      setParentRole("epic");
-      setParentSelectValue(parentOptions.epic.key);
+      setResolvedParent({
+        parentKey: parentOptions.epic.key,
+        parentRole: "epic",
+        sourceEpicKey: parentOptions.epic.key,
+      });
       return;
     }
 
     if (issueType === "Task" && parentRole === "epic") {
-      setParentKey("");
-      setParentRole("");
-      setParentSelectValue("");
+      clearResolvedParent();
     }
-  }, [parentOptions, issueType, parentRole]);
+  }, [parentOptions, issueType, parentRole, setResolvedParent, clearResolvedParent]);
 
   React.useEffect(() => {
     if (!jqlParentCandidates || parentOptions?.epic?.key) {
@@ -404,20 +518,14 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     }
 
     if (issueType === "Task" && parentRole === "epic") {
-      setParentKey("");
-      setParentRole("");
-      setParentSelectValue("");
-      setSourceEpicKey("");
+      clearResolvedParent();
       return;
     }
 
     if ((issueType === "Story" || issueType === "Bug") && parentRole === "story") {
-      setParentKey("");
-      setParentRole("");
-      setParentSelectValue("");
-      setSourceEpicKey("");
+      clearResolvedParent();
     }
-  }, [jqlParentCandidates, parentOptions, issueType, parentRole]);
+  }, [jqlParentCandidates, parentOptions, issueType, parentRole, clearResolvedParent]);
 
   const projectOptions = React.useMemo(() => {
     const fromApi = projects.map((p) => ({
@@ -453,58 +561,101 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     return [];
   }, [parentOptions, jqlParentCandidates, issueType]);
 
+  const queryIssueOptions = React.useMemo(
+    () => buildQueryIssueDropdownOptions(jqlParentCandidates),
+    [jqlParentCandidates]
+  );
+
   const jqlChainPreview = React.useMemo(() => {
-    const chains = jqlParentCandidates?.chains || [];
-    if (chains.length === 0) {
-      return { items: [], remaining: 0 };
+    if (!selectedQueryIssueKey) {
+      return null;
     }
-    const maxItems = 12;
-    return {
-      items: chains.slice(0, maxItems),
-      remaining: Math.max(0, chains.length - maxItems),
-    };
-  }, [jqlParentCandidates]);
+    return jqlParentCandidates?.chains?.find((chain) => chain.issueKey === selectedQueryIssueKey) || null;
+  }, [jqlParentCandidates, selectedQueryIssueKey]);
 
   const parentReady = Boolean(parentKey && parentRole);
   const manualKeyPending = isManualEpic && manualEpicInput.trim() && !manualIssueCheck.valid && !manualIssueCheck.loading;
+  const manualParentPending =
+    isJqlPresetMode &&
+    manualParentInput.trim() &&
+    !manualParentCheck.valid &&
+    !manualParentCheck.loading;
   const parentSelectionPending = !isManualEpic
-    ? Boolean(epicSelectValue && !parentReady && !loadingParents)
+    ? Boolean(
+        epicSelectValue &&
+          !parentReady &&
+          !loadingParents &&
+          (isJqlPresetMode
+            ? queryIssueOptions.length > 0 || parentDropdownOptions.length > 0 || manualParentInput.trim()
+            : true)
+      )
     : manualKeyPending;
-  const canEditIssueFields = parentReady && !parentSelectionPending && !loadingParents;
+  const canEditIssueFields = parentReady
+    ? !loadingParents
+    : !parentSelectionPending && !loadingParents && !manualParentPending && !manualKeyPending;
+  const canSubmit =
+    parentReady &&
+    Boolean(summary.trim()) &&
+    !submitting &&
+    !creatingSubtasks &&
+    !generatingDesc &&
+    !loadingMeta &&
+    !loadingParents;
+
+  const handleQueryIssueSelect = (_e, { value }) => {
+    const issueKey = String(value || "").trim().toUpperCase();
+    setSelectedQueryIssueKey(issueKey);
+    resetManualParentCheck();
+    setError("");
+
+    if (!issueKey) {
+      clearResolvedParent();
+      return;
+    }
+
+    applyQueryIssueParent(issueKey, { showErrorOnFailure: true });
+  };
 
   const handleParentSelect = (_e, { value }) => {
     const selected = String(value || "").trim();
     setParentSelectValue(selected);
+    setSelectedQueryIssueKey("");
+    setManualParentInput("");
+    resetManualParentCheck();
+    if (error) setError("");
     if (!selected) {
-      setParentKey("");
-      setParentRole("");
-      setSourceEpicKey("");
+      clearResolvedParent();
       return;
     }
 
     const option = parentDropdownOptions.find((item) => item.value === selected);
     if (option?.parentRole) {
-      setParentKey(selected);
-      setParentRole(option.parentRole);
-      if (option.parentRole === "epic") {
-        setSourceEpicKey(selected);
-      } else {
-        const story = jqlParentCandidates?.stories?.find((item) => item.key === selected);
-        setSourceEpicKey(story?.epicKey || "");
-      }
+      const sourceEpicKey =
+        option.parentRole === "epic"
+          ? selected
+          : jqlParentCandidates?.stories?.find((item) => item.key === selected)?.epicKey || "";
+      setResolvedParent({
+        parentKey: selected,
+        parentRole: option.parentRole,
+        sourceEpicKey,
+      });
       return;
     }
 
     if (selected === parentOptions?.epic?.key) {
-      setParentKey(selected);
-      setParentRole("epic");
-      setSourceEpicKey(selected);
+      setResolvedParent({
+        parentKey: selected,
+        parentRole: "epic",
+        sourceEpicKey: selected,
+      });
       return;
     }
 
-    setParentKey(selected);
-    setParentRole("story");
-    setSourceEpicKey("");
+    setResolvedParent({
+      parentKey: selected,
+      parentRole: "story",
+      sourceEpicKey: "",
+    });
   };
 
   const handleGenerateDescription = async () => {
@@ -517,6 +668,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       return;
     }
     setError("");
+    setDescriptionError("");
     setGeneratingDesc(true);
     setSuggestedSubtasks([]);
     setSubtaskResults([]);
@@ -563,11 +715,17 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     }
   };
 
-  const formatStandardsErrors = (errors) =>
-    errors.map((item) => `• ${item}`).join("\n");
+  const applyValidationErrors = (errors) => {
+    const list = Array.isArray(errors) ? errors : [];
+    const descriptionErrors = list.filter(isDescriptionRelatedError);
+    const generalErrors = list.filter((item) => !isDescriptionRelatedError(item));
+    setDescriptionError(descriptionErrors.length > 0 ? formatFieldErrors(descriptionErrors) : "");
+    setError(generalErrors.length > 0 ? formatFieldErrors(generalErrors) : "");
+  };
 
   const handleSubmit = async () => {
     setError("");
+    setDescriptionError("");
     setSuccess("");
     if (!parentReady) {
       setError("Select a valid parent before creating the issue.");
@@ -578,9 +736,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       return;
     }
     if (issueType === "Story" && needsClarification) {
-      setError(
-        "Story is not fully defined. Answer the clarification questions, update the title/description, then run AI Draft again before creating."
-      );
+      setDescriptionError(STORY_NOT_DEFINED_ERROR);
       return;
     }
 
@@ -595,7 +751,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       priority: bugPriority,
     });
     if (!standardsCheck.valid) {
-      setError(formatStandardsErrors(standardsCheck.errors));
+      applyValidationErrors(standardsCheck.errors);
       return;
     }
 
@@ -653,7 +809,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             parentRole: "story",
             summary: sub.title.trim(),
             description: "",
-            assignee: "",
+            assignee: assignee.trim(),
             isSubtask: true,
           });
           results.push({ title: sub.title, issueKey: subResult?.issueKey || "" });
@@ -676,7 +832,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   };
 
   const canGenerate = canEditIssueFields && Boolean(summary.trim()) && !generatingDesc && !submitting;
-  const isLoading = loadingMeta || submitting || generatingDesc || creatingSubtasks || loadingParents;
+  const formLoading = loadingMeta || submitting || generatingDesc || creatingSubtasks;
   const createdIssueUrl = buildJiraBrowseUrl(jiraBaseUrl, createdIssueKey);
 
   return (
@@ -716,7 +872,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
           </Message>
         ) : null}
 
-        <Form loading={isLoading}>
+        <Form loading={formLoading}>
           <Form.Field>
             <label>Project</label>
             <Dropdown fluid search selection options={projectOptions} value={projectKey}
@@ -725,7 +881,10 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
           <Form.Field>
             <label>Issue type</label>
             <Dropdown fluid selection options={ISSUE_TYPE_OPTIONS} value={issueType}
-              onChange={(_e, { value }) => setIssueType(String(value || "Story"))} />
+              onChange={(_e, { value }) => {
+                setIssueType(String(value || "Story"));
+                if (error) setError("");
+              }} />
           </Form.Field>
           <Form.Field required>
             <label>Epic preset</label>
@@ -763,6 +922,30 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             ) : null}
           </Form.Field>
 
+          {isJqlPresetMode && queryIssueOptions.length > 0 ? (
+            <Form.Field required>
+              <label>Issue from saved query</label>
+              <Dropdown
+                fluid
+                search
+                selection
+                clearable
+                placeholder="Select a task or story from this query"
+                options={queryIssueOptions}
+                value={selectedQueryIssueKey || null}
+                onChange={handleQueryIssueSelect}
+              />
+              <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+                Pick an issue from the query to auto-fill the parent from its chain.
+              </p>
+              {jqlChainPreview?.chainLabel ? (
+                <p style={{ fontSize: "0.78rem", color: "#64748b", marginTop: "0.25rem" }}>
+                  Chain: {jqlChainPreview.chainLabel}
+                </p>
+              ) : null}
+            </Form.Field>
+          ) : null}
+
           {parentDropdownOptions.length > 0 ? (
             <Form.Field required>
               <label>
@@ -791,7 +974,52 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             </Form.Field>
           ) : null}
 
-          {jqlParentCandidates && !loadingParents && parentDropdownOptions.length === 0 ? (
+          {isJqlPresetMode ? (
+            <Form.Field>
+              <label>Or enter parent key manually</label>
+              <input
+                type="text"
+                placeholder={
+                  issueType === "Task"
+                    ? "e.g. ODI-1234 (Story key)"
+                    : "e.g. ODI-1234 (Epic key)"
+                }
+                value={manualParentInput}
+                onChange={(e) => {
+                  setManualParentInput(e.target.value);
+                  setSelectedQueryIssueKey("");
+                  resetManualParentCheck();
+                  if (error) setError("");
+                  if (!e.target.value.trim()) {
+                    clearResolvedParent();
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "0.5em 0.8em",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "6px",
+                }}
+              />
+              {manualParentCheck.loading ? (
+                <p style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "0.3rem" }}>
+                  Validating parent key…
+                </p>
+              ) : null}
+              {manualParentCheck.error ? (
+                <p style={{ fontSize: "0.8rem", color: "#991b1b", marginTop: "0.3rem" }}>
+                  {manualParentCheck.error}
+                </p>
+              ) : null}
+              {manualParentCheck.valid && manualParentCheck.issue ? (
+                <p style={{ fontSize: "0.8rem", color: "#166534", marginTop: "0.3rem" }}>
+                  Parent {manualParentCheck.issue.issueKey}: {manualParentCheck.issue.summary}
+                </p>
+              ) : null}
+            </Form.Field>
+          ) : null}
+
+          {jqlParentCandidates && !loadingParents && parentDropdownOptions.length === 0 && !parentReady ? (
             <Message warning size="small">
               {jqlParentCandidates.issueCount === 0
                 ? "This saved query returned no issues. Enter an issue key manually."
@@ -801,39 +1029,21 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             </Message>
           ) : null}
 
-          {jqlChainPreview.items.length > 0 ? (
-            <Message info size="small">
-              <p style={{ marginBottom: "0.35rem" }}>
-                Found {jqlParentCandidates.issueCount} issue(s) in this query. Parent chains:
-              </p>
-              <ul style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.82rem" }}>
-                {jqlChainPreview.items.map((chain) => (
-                  <li key={chain.issueKey}>
-                    <strong>{chain.issueKey}</strong>
-                    {chain.summary ? ` — ${chain.summary}` : ""}
-                    <br />
-                    <span style={{ color: "#64748b" }}>{chain.chainLabel}</span>
-                  </li>
-                ))}
-              </ul>
-              {jqlChainPreview.remaining > 0 ? (
-                <p style={{ marginTop: "0.35rem", marginBottom: 0, fontSize: "0.8rem", color: "#64748b" }}>
-                  …and {jqlChainPreview.remaining} more
-                </p>
-              ) : null}
-            </Message>
-          ) : null}
-
           {!canEditIssueFields ? (
             <Message info size="small">
-              Select a preset or enter a valid ODI issue key before filling in the issue details.
+              {isJqlPresetMode
+                ? "Select an issue from the query, choose a parent, or enter a valid parent key before filling in issue details."
+                : "Select a preset or enter a valid ODI issue key before filling in the issue details."}
             </Message>
           ) : null}
 
           <Form.Field required>
             <label>Title</label>
             <input type="text" value={summary} disabled={!canEditIssueFields}
-              onChange={(e) => setSummary(e.target.value)}
+              onChange={(e) => {
+                setSummary(e.target.value);
+                if (error) setError("");
+              }}
               placeholder={issueType === "Story"
                 ? "When <situation>, I want <motivation>, so I can <outcome>."
                 : "Short, specific title"} />
@@ -902,13 +1112,21 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
               </Button>
             </div>
             <textarea value={description} rows={8} disabled={!canEditIssueFields}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                if (descriptionError) setDescriptionError("");
+              }}
               placeholder={issueType === "Story"
                 ? "Short overview, then bulleted development steps. Use AI Draft for ODI formatting."
                 : issueType === "Bug"
                 ? "Short overview, then bulleted steps to reproduce, troubleshooting, and fix approach."
                 : `Short overview, then bulleted work items for this ${issueType.toLowerCase()}…`}
               style={{ width: "100%", padding: "0.5em 0.8em", border: "1px solid #e2e8f0", borderRadius: "6px", resize: "vertical", fontFamily: "inherit", fontSize: "0.9rem", lineHeight: 1.45, whiteSpace: "pre-wrap" }} />
+            {descriptionError ? (
+              <Message negative size="small" style={{ marginTop: "0.35rem", whiteSpace: "pre-wrap" }}>
+                {descriptionError}
+              </Message>
+            ) : null}
           </Form.Field>
 
           {issueType === "Bug" ? (
@@ -985,9 +1203,18 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             <Form.Input label="Assignee" placeholder="Display name or email (optional)"
               disabled={!canEditIssueFields}
               value={assignee} onChange={(_e, { value }) => setAssignee(value)} />
+          ) : suggestedSubtasks.length > 0 ? (
+            <>
+              <Form.Input label="Subtask assignee" placeholder="Display name or email (optional)"
+                disabled={!canEditIssueFields}
+                value={assignee} onChange={(_e, { value }) => setAssignee(value)} />
+              <p style={{ fontSize: "0.78rem", color: "#94a3b8", margin: "0.25rem 0 0" }}>
+                Applied to all checked subtasks. The story itself stays unassigned per ODI standards.
+              </p>
+            </>
           ) : (
             <p style={{ fontSize: "0.78rem", color: "#94a3b8", margin: 0 }}>
-              Stories stay unassigned per ODI standards. Assign work on sub-tasks after creation.
+              Stories stay unassigned per ODI standards. Run AI Draft to add subtasks, then assign them here.
             </p>
           )}
         </Form>
@@ -1005,7 +1232,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             Add more detail in Jira
           </Button>
         ) : (
-          <Button primary loading={submitting || creatingSubtasks} disabled={isLoading || !canEditIssueFields}
+          <Button primary loading={submitting || creatingSubtasks} disabled={!canSubmit}
             onClick={handleSubmit}>
             Create{suggestedSubtasks.filter((s) => s.checked).length > 0
               ? ` + ${suggestedSubtasks.filter((s) => s.checked).length} subtask${suggestedSubtasks.filter((s) => s.checked).length !== 1 ? "s" : ""}`

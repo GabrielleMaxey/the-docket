@@ -125,7 +125,7 @@ See [pilot-presets.md](./pilot-presets.md) for interactive selection and catalog
    - **Epic preset**: epic key (e.g. `ODI-1234`) + a label
    - **JQL preset**: a saved JQL query + a label
 
-These presets appear in the Dashboard filter panel, the Work Week Create Issue modal, and the Chat context panel.
+These presets appear in the Dashboard filter panel, the Work Week **Create Issue** modal (epic presets and saved queries — JQL presets can resolve parents from query results when no single epic key is embedded), and the Chat context panel.
 
 ---
 
