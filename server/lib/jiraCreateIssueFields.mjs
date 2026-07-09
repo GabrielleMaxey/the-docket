@@ -1,4 +1,5 @@
 import { normalizeOdiBugPriority } from "../../shared/odiIssueStandards.mjs";
+import { filterWorkfrontErrorMessages } from "../../shared/jiraErrorUtils.mjs";
 
 const createMetaCache = new Map();
 
@@ -366,7 +367,11 @@ export const applyParentLinkFields = ({
 export const formatJiraApiError = (data) => {
   const messages = [];
   if (Array.isArray(data?.errorMessages)) {
-    messages.push(...data.errorMessages.map((item) => String(item || "").trim()).filter(Boolean));
+    messages.push(
+      ...filterWorkfrontErrorMessages(data.errorMessages)
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    );
   }
   if (data?.errors && typeof data.errors === "object") {
     for (const [field, message] of Object.entries(data.errors)) {
