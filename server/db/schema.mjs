@@ -152,6 +152,10 @@ const migrateDatabase = (db) => {
   ensureColumn(db, "dashboard_assignee_metrics", "query_type", "TEXT NOT NULL DEFAULT 'person'");
   ensureColumn(db, "dashboard_assignee_metrics", "jql", "TEXT");
   ensureColumn(db, "dashboard_assignee_metrics", "workload_counts_json", "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumn(db, "dashboard_assignee_metrics", "overdue_issues_json", "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn(db, "dashboard_assignee_metrics", "upcoming_due_issues_json", "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn(db, "dashboard_assignee_metrics", "contributor_metrics_json", "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn(db, "dashboard_assignee_metrics", "error_message", "TEXT");
   ensureColumn(db, "dashboard_epic_metrics", "open_status_counts_json", "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(db, "dashboard_epic_metrics", "contributor_metrics_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "dashboard_snapshots", "due_by_date", "TEXT");
@@ -328,6 +332,7 @@ export const mapDashboardEpicMetricRow = (row) => {
           ? row.openStatusCounts
           : {},
       overdueIssues: Array.isArray(row?.overdueIssues) ? row.overdueIssues : [],
+      upcomingDueIssues: Array.isArray(row?.upcomingDueIssues) ? row.upcomingDueIssues : [],
     })),
   };
 };
@@ -345,6 +350,34 @@ export const mapDashboardAssigneeMetricRow = (row) => {
     overdueOpenCount: Number(row.overdue_open_count || 0),
     totalOpenCount: Number(row.total_open_count || 0),
     overdueIssueKeys: parseJsonArray(row.overdue_issue_keys_json).map((value) => String(value)),
+    overdueIssues: parseJsonArray(row.overdue_issues_json).map((item) => ({
+      key: String(item?.key || "").trim(),
+      summary: String(item?.summary || "").trim(),
+      dueDate: item?.dueDate || null,
+      issueType: String(item?.issueType || "").trim(),
+    })),
+    upcomingDueIssues: parseJsonArray(row.upcoming_due_issues_json).map((item) => ({
+      key: String(item?.key || "").trim(),
+      summary: String(item?.summary || "").trim(),
+      dueDate: item?.dueDate || null,
+      issueType: String(item?.issueType || "").trim(),
+    })),
+    contributorMetrics: parseJsonArray(row.contributor_metrics_json).map((item) => ({
+      name: String(item?.name || "").trim(),
+      totalIssues: Number(item?.totalIssues || 0),
+      resolvedIssues: Number(item?.resolvedIssues || 0),
+      openIssues: Number(item?.openIssues || 0),
+      overdueOpenIssues: Number(item?.overdueOpenIssues || 0),
+      overduePercent: Number(item?.overduePercent || 0),
+      inProgress: Number(item?.inProgress || 0),
+      readyForVerification: Number(item?.readyForVerification || 0),
+      openStatusCounts:
+        item?.openStatusCounts && typeof item.openStatusCounts === "object"
+          ? item.openStatusCounts
+          : {},
+      overdueIssues: Array.isArray(item?.overdueIssues) ? item.overdueIssues : [],
+      upcomingDueIssues: Array.isArray(item?.upcomingDueIssues) ? item.upcomingDueIssues : [],
+    })),
     queryType: String(row.query_type || "person").trim(),
     jql: String(row.jql || "").trim(),
     workloadCounts: {
@@ -363,6 +396,7 @@ export const mapDashboardAssigneeMetricRow = (row) => {
       readyForVerification: Number(workloadCounts.readyForVerification || 0),
       other: Number(workloadCounts.other || 0),
     },
+    error: String(row.error_message || "").trim() || null,
   };
 };
 

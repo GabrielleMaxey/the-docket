@@ -1,9 +1,94 @@
 import {
   computeAssigneeMetrics,
-  computeJqlWatchMetricsByAssignee,
+  computeContributorMetricsFromIssues,
+  computeJqlWatchMetrics,
 } from "../../../shared/dashboardMetrics.mjs";
 import { buildDashboardMetricsJql } from "../epicFilterJql.mjs";
 import { resolveJiraUser, searchAllIssues } from "../jiraSearchHelpers.mjs";
+import { buildIssueEpicContext } from "./dueByHelpers.mjs";
+
+const escapeJqlString = (value) =>
+  String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
+const buildAssigneeWatchJql = (displayName) =>
+  `assignee = "${escapeJqlString(displayName)}" ORDER BY updated DESC`;
+
+const fetchPersonWatchIssues = async ({ displayName, runJiraSearchRequest }) => {
+  const rawJql = buildAssigneeWatchJql(displayName);
+  const jql = buildDashboardMetricsJql(rawJql) || rawJql;
+  const { issues } = await searchAllIssues({ jql, runJiraSearchRequest });
+  return issues;
+};
+
+const buildAssigneeDueContext = async ({
+  issues,
+  dueByDate,
+  dueByOptions,
+  mappingsByRole,
+  jiraRequest,
+}) => {
+  if (!dueByDate || !dueByOptions) {
+    return null;
+  }
+
+  const { issueToEpicKey, epicByKey } = await buildIssueEpicContext({
+    issues,
+    mappingsByRole,
+    jiraRequest,
+  });
+
+  return {
+    dueByDate,
+    dueByOptions,
+    issueToEpicKey,
+    epicByKey,
+  };
+};
+
+const buildPersonWatchMetric = async ({
+  queryName,
+  resolvedDisplayName,
+  resolvedAccountId,
+  dueFieldId,
+  overdueFieldIds,
+  dueByDate,
+  dueByOptions,
+  mappingsByRole,
+  jiraRequest,
+  runJiraSearchRequest,
+}) => {
+  const assigneeLabel = String(resolvedDisplayName || queryName).trim() || queryName;
+  const issues = await fetchPersonWatchIssues({
+    displayName: assigneeLabel,
+    runJiraSearchRequest,
+  });
+  const dueContext = await buildAssigneeDueContext({
+    issues,
+    dueByDate,
+    dueByOptions,
+    mappingsByRole,
+    jiraRequest,
+  });
+  const metrics = computeAssigneeMetrics(
+    issues,
+    queryName,
+    resolvedDisplayName,
+    dueFieldId,
+    resolvedAccountId,
+    overdueFieldIds,
+    dueContext
+  );
+
+  return {
+    queryType: "person",
+    jql: "",
+    queryName,
+    resolvedDisplayName: assigneeLabel,
+    resolvedAccountId: resolvedAccountId || "",
+    contributorMetrics: [],
+    ...metrics,
+  };
+};
 
 const emptyWorkloadCounts = () => ({
   totalIssues: 0,
@@ -16,20 +101,6 @@ const emptyWorkloadCounts = () => ({
   other: 0,
 });
 
-const emptyJqlWatchMetric = (watched, error) => ({
-  queryType: "jql",
-  jql: watched.jql,
-  queryName: watched.displayName,
-  resolvedDisplayName: watched.displayName,
-  resolvedAccountId: "",
-  overduePercent: null,
-  overdueOpenCount: 0,
-  totalOpenCount: 0,
-  overdueIssueKeys: [],
-  workloadCounts: emptyWorkloadCounts(),
-  ...(error ? { error } : {}),
-});
-
 const emptyPersonWatchMetric = (queryName, error) => ({
   queryType: "person",
   jql: "",
@@ -40,6 +111,26 @@ const emptyPersonWatchMetric = (queryName, error) => ({
   overdueOpenCount: 0,
   totalOpenCount: 0,
   overdueIssueKeys: [],
+  overdueIssues: [],
+  upcomingDueIssues: [],
+  contributorMetrics: [],
+  workloadCounts: emptyWorkloadCounts(),
+  ...(error ? { error } : {}),
+});
+
+const emptyJqlWatchMetric = (watched, error) => ({
+  queryType: "jql",
+  jql: watched.jql,
+  queryName: watched.displayName,
+  resolvedDisplayName: watched.displayName,
+  resolvedAccountId: "",
+  overduePercent: null,
+  overdueOpenCount: 0,
+  totalOpenCount: 0,
+  overdueIssueKeys: [],
+  overdueIssues: [],
+  upcomingDueIssues: [],
+  contributorMetrics: [],
   workloadCounts: emptyWorkloadCounts(),
   ...(error ? { error } : {}),
 });
@@ -47,8 +138,11 @@ const emptyPersonWatchMetric = (queryName, error) => ({
 export const buildAssigneeMetricsForRefresh = async ({
   assigneeNames,
   watchedAssigneeIds,
-  scopedChildIssues,
   dueFieldId,
+  overdueFieldIds = [],
+  dueByDate,
+  dueByOptions,
+  mappingsByRole,
   getWatchedAssignee,
   mapWatchedAssigneeRow,
   jiraRequest,
@@ -59,22 +153,20 @@ export const buildAssigneeMetricsForRefresh = async ({
   for (const queryName of assigneeNames) {
     try {
       const resolvedUser = await resolveJiraUser({ query: queryName, jiraRequest });
-      const metrics = computeAssigneeMetrics(
-        scopedChildIssues,
-        queryName,
-        resolvedUser?.displayName,
-        dueFieldId,
-        resolvedUser?.accountId
+      assigneeMetrics.push(
+        await buildPersonWatchMetric({
+          queryName,
+          resolvedDisplayName: resolvedUser?.displayName,
+          resolvedAccountId: resolvedUser?.accountId,
+          dueFieldId,
+          overdueFieldIds,
+          dueByDate,
+          dueByOptions,
+          mappingsByRole,
+          jiraRequest,
+          runJiraSearchRequest,
+        })
       );
-
-      assigneeMetrics.push({
-        queryType: "person",
-        jql: "",
-        queryName,
-        resolvedDisplayName: resolvedUser?.displayName || queryName,
-        resolvedAccountId: resolvedUser?.accountId || "",
-        ...metrics,
-      });
     } catch (error) {
       assigneeMetrics.push(
         emptyPersonWatchMetric(
@@ -99,31 +191,30 @@ export const buildAssigneeMetricsForRefresh = async ({
           jql: metricsJql,
           runJiraSearchRequest,
         });
-        const byAssignee = computeJqlWatchMetricsByAssignee(
+        const dueContext = await buildAssigneeDueContext({
           issues,
-          scopedChildIssues,
-          dueFieldId
+          dueByDate,
+          dueByOptions,
+          mappingsByRole,
+          jiraRequest,
+        });
+        const metrics = computeJqlWatchMetrics(issues, [], dueFieldId, overdueFieldIds, dueContext);
+        const contributorMetrics = computeContributorMetricsFromIssues(
+          issues,
+          dueFieldId,
+          overdueFieldIds,
+          dueContext
         );
 
-        if (byAssignee.length === 0) {
-          assigneeMetrics.push(emptyJqlWatchMetric(watched));
-          continue;
-        }
-
-        for (const row of byAssignee) {
-          assigneeMetrics.push({
-            queryType: "jql",
-            jql: watched.jql,
-            queryName: row.queryName,
-            resolvedDisplayName: row.resolvedDisplayName,
-            resolvedAccountId: row.resolvedAccountId,
-            overduePercent: row.overduePercent,
-            overdueOpenCount: row.overdueOpenCount,
-            totalOpenCount: row.totalOpenCount,
-            overdueIssueKeys: row.overdueIssueKeys,
-            workloadCounts: row.workloadCounts,
-          });
-        }
+        assigneeMetrics.push({
+          queryType: "jql",
+          jql: watched.jql,
+          queryName: watched.displayName,
+          resolvedDisplayName: watched.displayName,
+          resolvedAccountId: "",
+          contributorMetrics,
+          ...metrics,
+        });
       } catch (error) {
         assigneeMetrics.push(
           emptyJqlWatchMetric(
@@ -137,22 +228,20 @@ export const buildAssigneeMetricsForRefresh = async ({
 
     try {
       const resolvedUser = await resolveJiraUser({ query: watched.displayName, jiraRequest });
-      const metrics = computeAssigneeMetrics(
-        scopedChildIssues,
-        watched.displayName,
-        resolvedUser?.displayName,
-        dueFieldId,
-        resolvedUser?.accountId || watched.resolvedAccountId
+      assigneeMetrics.push(
+        await buildPersonWatchMetric({
+          queryName: watched.displayName,
+          resolvedDisplayName: resolvedUser?.displayName || watched.displayName,
+          resolvedAccountId: resolvedUser?.accountId || watched.resolvedAccountId,
+          dueFieldId,
+          overdueFieldIds,
+          dueByDate,
+          dueByOptions,
+          mappingsByRole,
+          jiraRequest,
+          runJiraSearchRequest,
+        })
       );
-
-      assigneeMetrics.push({
-        queryType: "person",
-        jql: "",
-        queryName: watched.displayName,
-        resolvedDisplayName: resolvedUser?.displayName || watched.displayName,
-        resolvedAccountId: resolvedUser?.accountId || watched.resolvedAccountId || "",
-        ...metrics,
-      });
     } catch (error) {
       assigneeMetrics.push(
         emptyPersonWatchMetric(

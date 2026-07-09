@@ -19,6 +19,14 @@ import { createLogger } from "../../lib/logger.mjs";
 
 const log = createLogger("dashboard");
 
+const buildContributorDueContext = (ctx, epicIssue) =>
+  ctx.dueByOptions
+    ? {
+        dueByDate: ctx.dueByDate,
+        dueByOptions: { ...ctx.dueByOptions, epicIssue },
+      }
+    : null;
+
 const emptyEpicMetricFromPreset = (preset, error) => ({
   epicPresetId: preset.id,
   epicKey: preset.epicKey,
@@ -68,6 +76,7 @@ const buildEpicMetricRecord = ({
   mrdFieldId,
   pedFieldId,
   overdueFieldIds = [],
+  contributorDueByOptions = null,
 }) => ({
   epicPresetId,
   epicKey,
@@ -92,7 +101,8 @@ const buildEpicMetricRecord = ({
   contributorMetrics: computeContributorMetricsFromIssues(
     childMetrics.childIssues,
     childMetrics.dueFieldId,
-    overdueFieldIds
+    overdueFieldIds,
+    contributorDueByOptions
   ),
   childIssues: childMetrics.childIssues,
 });
@@ -105,6 +115,7 @@ const resolveJqlPresetDueByIssues = async ({
   jiraRequest,
   pastDueFloor,
   includePastDueInList,
+  preferEpicCompareForChildren = false,
 }) => {
   let jqlDueByIssues = [...childMetrics.dueByIssues];
   if (!dueByDate) {
@@ -143,6 +154,16 @@ const resolveJqlPresetDueByIssues = async ({
       epicKeyToIssues.set(resolvedEpicKey, []);
     }
     epicKeyToIssues.get(resolvedEpicKey).push(...groupIssues);
+  }
+
+  if (preferEpicCompareForChildren) {
+    const epicMappedKeys = new Set();
+    for (const groupIssues of epicKeyToIssues.values()) {
+      for (const issue of groupIssues) {
+        epicMappedKeys.add(String(issue.key || ""));
+      }
+    }
+    jqlDueByIssues = jqlDueByIssues.filter((item) => !epicMappedKeys.has(item.key));
   }
 
   const existingDueByKeys = new Set(jqlDueByIssues.map((i) => i.key));
@@ -226,17 +247,32 @@ export const buildPastDueOnlyEpicMetrics = async ({
       trackPastDue: ctx.includePastDue,
     });
 
+    const contributorDueByOptions = buildContributorDueContext(ctx, epicIssue);
+
+    let childDueByForEpic = childMetrics.dueByIssues;
+    if (ctx.dueByOptions?.preferEpicCompareForChildren) {
+      const openChildKeys = new Set(
+        childMetrics.childIssues
+          .filter((issue) => isIssueOpen(issue))
+          .map((issue) => String(issue.key || ""))
+      );
+      childDueByForEpic = childMetrics.dueByIssues.filter((item) => !openChildKeys.has(item.key));
+    }
+
     const epicLevelDueBy = buildEpicLevelDueByIssues({
       epicIssue,
       childIssues: childMetrics.childIssues,
       epicKey,
       dueByDate: ctx.dueByDate,
       candidateFieldIds: ctx.candidateFieldIds,
-      existingDueByKeys: new Set(childMetrics.dueByIssues.map((i) => i.key)),
+      existingDueByKeys: new Set(childDueByForEpic.map((i) => i.key)),
       pastDueFloor: ctx.pastDueFloor,
       includePastDueInList: ctx.includePastDue,
     });
-    const { combined, dueByOpenIssues } = combineDueByIssues(childMetrics, epicLevelDueBy);
+    const { combined, dueByOpenIssues } = combineDueByIssues(
+      { ...childMetrics, dueByIssues: childDueByForEpic },
+      epicLevelDueBy
+    );
 
     epicMetrics.push({
       epicPresetId: null,
@@ -262,7 +298,8 @@ export const buildPastDueOnlyEpicMetrics = async ({
       contributorMetrics: computeContributorMetricsFromIssues(
         childMetrics.childIssues,
         ctx.dueFieldId,
-        ctx.overdueFieldIds
+        ctx.overdueFieldIds,
+        contributorDueByOptions
       ),
       childIssues: childMetrics.childIssues,
     });
@@ -326,6 +363,7 @@ export const buildEpicMetricsFromPresets = async ({
         jiraRequest,
         pastDueFloor: ctx.pastDueFloor,
         includePastDueInList: ctx.includePastDue,
+        preferEpicCompareForChildren: Boolean(ctx.dueByOptions?.preferEpicCompareForChildren),
       });
 
       epicMetrics.push({
@@ -383,17 +421,32 @@ export const buildEpicMetricsFromPresets = async ({
       trackPastDue: ctx.includePastDue,
     });
 
+    const contributorDueByOptions = buildContributorDueContext(ctx, epicIssue);
+
+    let childDueByForEpic = childMetrics.dueByIssues;
+    if (ctx.dueByOptions?.preferEpicCompareForChildren) {
+      const openChildKeys = new Set(
+        childMetrics.childIssues
+          .filter((issue) => isIssueOpen(issue))
+          .map((issue) => String(issue.key || ""))
+      );
+      childDueByForEpic = childMetrics.dueByIssues.filter((item) => !openChildKeys.has(item.key));
+    }
+
     const epicLevelDueBy = buildEpicLevelDueByIssues({
       epicIssue,
       childIssues: childMetrics.childIssues,
       epicKey: preset.epicKey,
       dueByDate: ctx.dueByDate,
       candidateFieldIds: ctx.candidateFieldIds,
-      existingDueByKeys: new Set(childMetrics.dueByIssues.map((i) => i.key)),
+      existingDueByKeys: new Set(childDueByForEpic.map((i) => i.key)),
       pastDueFloor: ctx.pastDueFloor,
       includePastDueInList: ctx.includePastDue,
     });
-    const { combined, dueByOpenIssues } = combineDueByIssues(childMetrics, epicLevelDueBy);
+    const { combined, dueByOpenIssues } = combineDueByIssues(
+      { ...childMetrics, dueByIssues: childDueByForEpic },
+      epicLevelDueBy
+    );
 
     epicMetrics.push(
       buildEpicMetricRecord({
@@ -411,6 +464,7 @@ export const buildEpicMetricsFromPresets = async ({
         mrdFieldId: ctx.mrdFieldId,
         pedFieldId: ctx.pedFieldId,
         overdueFieldIds: ctx.overdueFieldIds,
+        contributorDueByOptions,
       })
     );
 

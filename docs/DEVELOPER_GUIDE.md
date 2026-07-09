@@ -267,9 +267,10 @@ These are mapped in Settings → Jira field mapping and synced via `POST /api/ji
 
 1. **`parseRefreshInput.mjs`** — validates preset IDs, `dueByDate`, `dueByField`, `includePastDue`, `pastDueLookbackYears` (1/2/3 only)
 2. **`buildRefreshContext.mjs`** — resolves field IDs, `dueByCompareFieldId`, `pastDueFloor`, and `dueByOptions` (including `epicIssue` when computing per-epic child metrics)
-3. **`buildEpicMetrics.mjs`** — Jira search per preset; `computeChildIssueMetrics` + `buildEpicLevelDueByIssues` for due-date lists
-4. **`collectDueByIssues.mjs`** — merges epic-level due-by rows into snapshot flat list (capped at 200)
-5. **`persistSnapshot.mjs`** — writes `dashboard_snapshots` and related metric rows
+3. **`buildEpicMetrics.mjs`** — Jira search per preset; `computeChildIssueMetrics` + `buildEpicLevelDueByIssues` for due-date lists; per-epic `contributorMetrics` stay scoped to that preset’s issues
+4. **`buildAssigneeMetrics.mjs`** — Individual Contributor Metrics cards: **person** watches run `assignee = "…"` JQL (full assignee workload); **JQL** watches use the saved query without intersecting preset scope
+5. **`collectDueByIssues.mjs`** — merges epic-level due-by rows into snapshot flat list (capped at 200)
+6. **`persistSnapshot.mjs`** — writes `dashboard_snapshots` and related metric rows
 
 ### Due-date resolution (`shared/dashboardMetrics.mjs`)
 

@@ -228,7 +228,11 @@ Green-accent card listing open tasks with due dates from **today through** your 
 Red-accent card listing open tasks that missed their deadline within the selected lookback (1–3 years). Populated only when **Past Due Projects** is enabled. Empty state explains how to enable it.
 
 **Individual Contributor Metrics**  
-One card per person or custom query configured in Settings → **Contributor Metrics** (or names you add directly in the Dashboard filter panel). The section appears as soon as people are selected — click **Refresh status** to load metrics. After refresh: open workload, overdue count, and status breakdown per person. Person names link to Work Week with an assignee drill-down. Metrics are scoped to the projects selected in step 1; a person with no open issues in that scope still appears with a “no open issues” message.
+One card per person or custom query configured in Settings → **Contributor Metrics** (or names you add directly in the Dashboard filter panel). The section appears as soon as people are selected — click **Refresh status** to load metrics. After refresh: open workload, overdue count, and status breakdown per person. Person names link to Work Week with an assignee drill-down.
+
+- **Person watches** — full Jira assignee workload (`assignee = "…"` search), not limited to the projects selected in step 1.
+- **Custom query watches** — metrics come from the watch JQL as written (same scope you defined in Settings).
+- **Per-project contributor rows** on Project Metrics cards — only issues within that epic/preset (Jane’s 5 tasks in Epic A, not her 10 elsewhere).
 
 **Generate Report**  
 Choose an audience and click Generate:

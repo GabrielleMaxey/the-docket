@@ -1,7 +1,13 @@
 import { fetchIssueMetadataBulk, fetchJiraSearchAll, fetchLatestJiraCommentsBulk, saveIssueMetadata } from "../../services/jiraClient";
 import { parsePriorityFromComment } from "../../../shared/priorityFromComment.mjs";
 import { enrichRunWithParentDoneDates } from "../../utils/jiraIssueDoneDates.js";
-import { persistJqlRunsToStorage, mergeJqlRuns, partitionJqlRuns } from "../../utils/jqlRunPersistence.js";
+import { getConfiguredJqlSlotIndexes } from "../../utils/workWeekStorage.js";
+import {
+  isDrillDownDismissed,
+  persistJqlRunsToStorage,
+  mergeJqlRuns,
+  partitionJqlRuns,
+} from "../../utils/jqlRunPersistence.js";
 
 const errorMessage = (error, fallback) =>
   error instanceof Error ? error.message : fallback;
@@ -96,7 +102,6 @@ const applyDrillDownMetadata = async ({
  */
 export async function runJqlWorkflow({
   jqlInputs,
-  jqlCount,
   jqlLabels,
   jqlMaxResults,
   pullLatestComment,
@@ -110,11 +115,10 @@ export async function runJqlWorkflow({
   setPrioritySourceByKey,
   fieldMappingRows,
 }) {
-  const selected = jqlInputs.slice(0, jqlCount).map((item) => String(item || "").trim());
-  const nonEmpty = selected.filter(Boolean);
+  const configuredIndexes = getConfiguredJqlSlotIndexes(jqlInputs, jqlLabels);
 
-  if (nonEmpty.length === 0) {
-    setJqlError("Please enter at least one JQL.");
+  if (configuredIndexes.length === 0) {
+    setJqlError("Please enter at least one JQL with a label.");
     setJqlRuns([]);
     setShowRestoredJqlBanner(false);
     return;
@@ -126,21 +130,9 @@ export async function runJqlWorkflow({
 
   try {
     const runResults = await Promise.all(
-      selected.map(async (jql, idx) => {
-        const label = (jqlLabels[idx] || "").trim() || `JQL ${idx + 1}`;
-
-        if (!jql) {
-          return {
-            index: idx,
-            label,
-            jql,
-            issues: [],
-            total: 0,
-            loaded: 0,
-            loadComplete: true,
-            error: "No JQL entered for this slot.",
-          };
-        }
+      configuredIndexes.map(async (idx) => {
+        const jql = String(jqlInputs[idx] || "").trim();
+        const label = String(jqlLabels[idx] || "").trim();
 
         try {
           const data = await fetchJiraSearchAll({ jql, maxTotal: jqlMaxResults });
@@ -269,7 +261,8 @@ export async function runJqlWorkflow({
     const sortedRuns = [...enrichedRuns].sort((a, b) => a.index - b.index);
     setJqlRuns((prev) => {
       const { drillDown } = partitionJqlRuns(prev);
-      const next = mergeJqlRuns(drillDown, sortedRuns);
+      const activeDrillDown = drillDown.filter((run) => !isDrillDownDismissed(run.drillDownId));
+      const next = mergeJqlRuns(activeDrillDown, sortedRuns);
       persistJqlRunsToStorage(next);
       return next;
     });
@@ -313,11 +306,12 @@ export async function loadRemainingJqlIssues({
     const enriched = await enrichRunWithParentDoneDates(nextRun, fieldMappingRows);
     setJqlRuns((prev) => {
       const { drillDown, regular } = partitionJqlRuns(prev);
+      const activeDrillDown = drillDown.filter((run) => !isDrillDownDismissed(run.drillDownId));
       const nextRegular = regular.map((item, idx) => {
         const itemIndex = item.index ?? idx;
         return itemIndex === runIndex ? enriched : item;
       });
-      const next = mergeJqlRuns(drillDown, nextRegular);
+      const next = mergeJqlRuns(activeDrillDown, nextRegular);
       persistJqlRunsToStorage(next);
       return next;
     });
@@ -379,6 +373,10 @@ export async function loadDrillDownIssueByKey({
 }) {
   const normalized = String(issueKey || "").trim().toUpperCase();
   if (!normalized) {
+    return false;
+  }
+
+  if (isDrillDownDismissed(makeDrillDownId("issue", normalized))) {
     return false;
   }
 
@@ -472,6 +470,10 @@ export async function loadDrillDownIssuesByAssignee({
 }) {
   const assignee = String(assigneeName || "").trim();
   if (!assignee) {
+    return false;
+  }
+
+  if (isDrillDownDismissed(makeDrillDownId("assignee", assignee))) {
     return false;
   }
 

@@ -7,18 +7,15 @@ import {
   buildEpicPieStatusCounts,
   getWorkloadStatusCounts,
   pastDueBadgeLabel,
-  formatIssueTypeLabel,
 } from "../utils/dashboardMetricsUtils";
-import { isEpicIssueType } from "../../../../shared/dashboardMetrics.mjs";
 import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 import MetricBar from "./MetricBar";
+import ProjectContributorMetrics from "./ProjectContributorMetrics";
 
 const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePastDue }) => {
   const isJqlPreset = epic.epicKey === "JQL";
   const workloadStatuses = React.useMemo(() => getWorkloadStatusCounts(epic), [epic]);
-  const contributorMetrics = Array.isArray(epic.contributorMetrics)
-    ? epic.contributorMetrics.filter((row) => Number(row.totalIssues || 0) > 0)
-    : [];
+  const contributorMetrics = Array.isArray(epic.contributorMetrics) ? epic.contributorMetrics : [];
   const jiraUrl =
     !isJqlPreset && jiraBaseUrl
       ? `${jiraBaseUrl}/browse/${encodeURIComponent(epic.epicKey)}`
@@ -118,100 +115,14 @@ const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePas
             {!isJqlPreset && epic.projectEndDate ? <p>Project End Date: {epic.projectEndDate}</p> : null}
           </div>
 
-          {contributorMetrics.length > 0 ? (
-            <div className="dashboard-epic-contributors">
-              <p className="dashboard-epic-contributors-title">Individual contributors — {epic.label}</p>
-              <div className="dashboard-epic-contributor-list">
-                {contributorMetrics.map((person) => (
-                  <div key={person.name} className="dashboard-epic-contributor-row">
-                    <div className="dashboard-epic-contributor-head">
-                      <Link
-                        to={buildWorkWeekHref({ assignee: person.name })}
-                        className="dashboard-epic-contributor-name dashboard-work-week-link"
-                      >
-                        {person.name}
-                      </Link>
-                      <span className="dashboard-epic-contributor-stats">
-                        {person.openIssues} open · {person.resolvedIssues} resolved
-                        {person.overdueOpenIssues > 0 ? ` · ${person.overdueOpenIssues} overdue` : ""}
-                      </span>
-                    </div>
-                    {getTerminalIssueCount(person) > 0 ||
-                    Object.keys(person.openStatusCounts || {}).length > 0 ? (
-                      <div className="dashboard-epic-contributor-chart">
-                        <StatusPieChart
-                          statusCounts={buildEpicPieStatusCounts(person)}
-                          size={110}
-                          className="dashboard-pie-chart--compact"
-                          variant={chartVariant}
-                        />
-                      </div>
-                    ) : null}
-                    {person.openIssues > 0 ? (
-                      <div className="dashboard-epic-contributor-overdue-wrap">
-                        <div className="dashboard-progress" aria-hidden="true">
-                          <div
-                            className="dashboard-progress-fill"
-                            style={{
-                              width: `${Math.min(100, Math.max(0, Number(person.overduePercent) || 0))}%`,
-                            }}
-                          />
-                        </div>
-                        <span className="dashboard-epic-contributor-overdue-label">
-                          {formatPercent(person.overduePercent)} overdue of open
-                        </span>
-                      </div>
-                    ) : null}
-                    {includePastDue &&
-                    Array.isArray(person.overdueIssues) &&
-                    person.overdueIssues.length > 0 ? (
-                      <ul className="dashboard-epic-contributor-overdue-list">
-                        {person.overdueIssues.map((task) => (
-                          <li key={task.key} className="dashboard-epic-contributor-overdue-item">
-                            <Link
-                              to={buildWorkWeekHref({ key: task.key })}
-                              className="dashboard-epic-contributor-overdue-key dashboard-work-week-link"
-                            >
-                              {task.key}
-                            </Link>
-                            {jiraBaseUrl && task.key ? (
-                              <a
-                                href={`${jiraBaseUrl}/browse/${encodeURIComponent(task.key)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="dashboard-jira-external-link"
-                                title="Open in Jira"
-                                aria-label={`Open ${task.key} in Jira`}
-                              >
-                                ↗
-                              </a>
-                            ) : null}
-                            <span
-                              className={`dashboard-due-by-type-badge dashboard-epic-contributor-type-badge${
-                                isEpicIssueType(task.issueType)
-                                  ? " dashboard-due-by-type-badge--epic"
-                                  : ""
-                              }`}
-                            >
-                              {formatIssueTypeLabel(task.issueType)}
-                            </span>
-                            <span className="dashboard-epic-contributor-overdue-summary">
-                              {task.summary}
-                            </span>
-                            {task.dueDate ? (
-                              <span className="dashboard-epic-contributor-overdue-due">
-                                due {task.dueDate}
-                              </span>
-                            ) : null}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
+          <ProjectContributorMetrics
+            contributorMetrics={contributorMetrics}
+            title={`Individual contributors — ${epic.label}`}
+            jiraBaseUrl={jiraBaseUrl}
+            chartVariant={chartVariant}
+            dueByDate={dueByDate}
+            showOverdueList={includePastDue}
+          />
         </>
       ) : null}
     </div>

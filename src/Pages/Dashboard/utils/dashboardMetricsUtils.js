@@ -182,6 +182,8 @@ export const workloadCountsToPieData = (counts) => {
     "In Progress": Number(counts?.inProgress || 0),
     Backlog: Number(counts?.backlog || 0),
     "Ready for Verification": Number(counts?.readyForVerification || 0),
+    "Ready for Work": Number(counts?.readyForWork || 0),
+    Analyzing: Number(counts?.analyzing || 0),
   };
 
   const resolved =
@@ -213,12 +215,75 @@ export const getMonthLabel = (dateStr) =>
 export const UPCOMING_DUE_PRESET_OFF = "off";
 export const UPCOMING_DUE_PRESET_CUSTOM = "custom";
 
+export const DEFAULT_DASHBOARD_DUE_LOOKAHEAD_DAYS = 180;
+
 export const UPCOMING_DUE_DATE_PRESETS = [
   { id: "7d", days: 7, label: "Next 7 days" },
   { id: "14d", days: 14, label: "Next 2 weeks" },
   { id: "30d", days: 30, label: "Next 30 days" },
   { id: "90d", days: 90, label: "Next 90 days" },
+  { id: "6m", days: DEFAULT_DASHBOARD_DUE_LOOKAHEAD_DAYS, label: "Next 6 months" },
+  { id: "1y", days: 365, label: "Next year" },
 ];
+
+export const defaultDashboardDueByDate = () =>
+  addDaysFromToday(DEFAULT_DASHBOARD_DUE_LOOKAHEAD_DAYS);
+
+const DASHBOARD_REFRESH_SCOPES = new Set(["all", "projects", "contributors"]);
+
+export const resolveEffectiveRefreshScope = ({
+  hasEpicScope,
+  hasContributorScope,
+  requestedScope = "all",
+}) => {
+  const scope = DASHBOARD_REFRESH_SCOPES.has(requestedScope) ? requestedScope : "all";
+
+  if (scope === "projects" || scope === "contributors") {
+    return scope;
+  }
+
+  if (hasEpicScope && hasContributorScope) {
+    return "all";
+  }
+  if (hasEpicScope) {
+    return "projects";
+  }
+  if (hasContributorScope) {
+    return "contributors";
+  }
+
+  return "all";
+};
+
+export const getDashboardRefreshStatusHint = ({ hasEpicScope, hasContributorScope }) => {
+  const scope = resolveEffectiveRefreshScope({ hasEpicScope, hasContributorScope });
+
+  if (!hasEpicScope && !hasContributorScope) {
+    return "Select at least one project preset, Past Due Projects, or contributor to track.";
+  }
+  if (scope === "contributors") {
+    return "Pulls workload and overdue metrics for selected people and custom queries from Jira.";
+  }
+  if (scope === "projects") {
+    return "Pulls project resolution, workload, and due-date metrics from Jira.";
+  }
+
+  return "Pulls current resolution, workload, and overdue metrics from Jira for all selected filters.";
+};
+
+const DASHBOARD_REFRESH_TIMEOUT_MINUTES = 3;
+
+export const getDashboardRefreshTimeoutMs = (_scope = "all") =>
+  DASHBOARD_REFRESH_TIMEOUT_MINUTES * 60 * 1000;
+
+export const getDashboardRefreshTimeoutLabel = (_scope = "all") =>
+  `${DASHBOARD_REFRESH_TIMEOUT_MINUTES} min`;
+
+export const buildDashboardRefreshTimeoutMessage = (scope = "all") =>
+  `Refresh timed out after ${getDashboardRefreshTimeoutLabel(scope)}. Narrow your selection, click Cancel, and try again.`;
+
+export const getDashboardRefreshLoadingHint = (scope = "all") =>
+  `Still loading from Jira — times out after ${getDashboardRefreshTimeoutLabel(scope)}.`;
 
 export const formatDateInputValue = (date) => {
   const value = date instanceof Date ? date : new Date(date);

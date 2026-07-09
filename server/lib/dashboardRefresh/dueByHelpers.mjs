@@ -6,6 +6,62 @@ import {
   parseJiraDate,
   startOfToday,
 } from "../../../shared/dashboardMetrics.mjs";
+import { fetchEpicIssue } from "../jiraSearchHelpers.mjs";
+
+export const buildIssueEpicContext = async ({ issues, mappingsByRole, jiraRequest }) => {
+  const parentKeyToGroup = new Map();
+
+  for (const issue of issues || []) {
+    if (!isIssueOpen(issue)) {
+      continue;
+    }
+
+    const parentKey = String(issue.fields?.parent?.key || "").trim();
+    if (!parentKey) {
+      continue;
+    }
+
+    const parentIssuetype = String(
+      issue.fields?.parent?.fields?.issuetype?.name || ""
+    ).toLowerCase();
+
+    if (!parentKeyToGroup.has(parentKey)) {
+      parentKeyToGroup.set(parentKey, { issues: [], isEpic: parentIssuetype === "epic" });
+    }
+
+    parentKeyToGroup.get(parentKey).issues.push(issue);
+  }
+
+  const issueToEpicKey = new Map();
+  const epicKeys = new Set();
+
+  for (const [parentKey, { issues: groupIssues, isEpic }] of parentKeyToGroup.entries()) {
+    let resolvedEpicKey = parentKey;
+
+    if (!isEpic) {
+      const parentData = await fetchEpicIssue({ epicKey: parentKey, mappingsByRole, jiraRequest });
+      const grandparentKey = String(parentData?.fields?.parent?.key || "").trim();
+      if (grandparentKey) {
+        resolvedEpicKey = grandparentKey;
+      }
+    }
+
+    epicKeys.add(resolvedEpicKey);
+    for (const issue of groupIssues) {
+      issueToEpicKey.set(String(issue.key || ""), resolvedEpicKey);
+    }
+  }
+
+  const epicByKey = new Map();
+  for (const epicKey of epicKeys) {
+    const epicIssue = await fetchEpicIssue({ epicKey, mappingsByRole, jiraRequest });
+    if (epicIssue) {
+      epicByKey.set(epicKey, epicIssue);
+    }
+  }
+
+  return { issueToEpicKey, epicByKey };
+};
 
 export const resolveCandidateFieldIds = (dueByField, { dueFieldId, mrdFieldId, iddFieldId, pedFieldId }) => {
   if (dueByField === "due_date") {
