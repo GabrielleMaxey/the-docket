@@ -61,7 +61,12 @@
     "mac": {
       "icon": "build/icons/icon.icns",
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
       ],
       "category": "public.app-category.productivity"
     },
