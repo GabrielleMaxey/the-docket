@@ -652,7 +652,7 @@ Pages that consume it — `Dashboard/index.jsx`, `Chat.jsx`, `WorkWeekTasks.jsx`
 | `npm run seed:presets` | Seed shared Epic/JQL presets into local SQLite — see [pilot-presets.md](./pilot-presets.md) |
 | `npm run build` | Runs export guard (`prebuild`), then creates production Vite bundle → `dist/` |
 | `npm run desktop:dist` | Full build + electron-builder → `release/` |
-| `npm run desktop:dist:mac` | macOS `.dmg` |
+| `npm run desktop:dist:mac` | macOS universal `.dmg` (Intel + Apple Silicon) |
 | `npm run desktop:dist:win` | Windows NSIS installer |
 
 ---
@@ -692,7 +692,7 @@ npm run build
 ## GitHub Actions
 
 `.github/workflows/desktop-packaging.yml` — triggered on `workflow_dispatch` or tags matching `v*`.
-Produces artifacts: `desktop-macos` (`.dmg`) and `desktop-windows` (NSIS installer).
+Produces artifacts: `desktop-macos` (universal `.dmg` for Intel and Apple Silicon) and `desktop-windows` (NSIS installer).
 
 ---
 
