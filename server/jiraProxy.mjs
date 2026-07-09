@@ -15,6 +15,10 @@ import { registerIssueMetadataRoutes } from "./routes/issueMetadataRoutes.mjs";
 import { resolveJiraUser } from "./lib/jiraSearchHelpers.mjs";
 import { getJiraSearchFields } from "./lib/jiraSearchFields.mjs";
 import { createLogger } from "./lib/logger.mjs";
+import {
+  hasOnlyWorkfrontJiraErrors,
+  sanitizeJiraErrorData,
+} from "../shared/jiraErrorUtils.mjs";
 
 const log = createLogger("server");
 
@@ -169,9 +173,15 @@ const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
   try { data = text ? JSON.parse(text) : null; } catch { data = { message: text.slice(0, 500) }; }
 
   if (!response.ok) {
-    const detail = data?.errors || data?.errorMessages || data?.message;
+    const sanitized = sanitizeJiraErrorData(data);
+    if (hasOnlyWorkfrontJiraErrors(data)) {
+      log.warn(`${method} ${target} → ${response.status} (Workfront sync error suppressed)`);
+      return { ok: true, status: response.status, data: sanitized || {}, workfrontSuppressed: true };
+    }
+
+    const detail = sanitized?.errors || sanitized?.errorMessages || sanitized?.message;
     log.error(`${method} ${target} → ${response.status}`, detail ? JSON.stringify(detail) : "");
-    return { ok: false, status: response.status, data: data || {} };
+    return { ok: false, status: response.status, data: sanitized || {} };
   }
   log.debug(`${method} ${target} → ${response.status}`);
   return { ok: true, status: response.status, data };
