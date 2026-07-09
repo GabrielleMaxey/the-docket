@@ -34,3 +34,92 @@ When modifying logic, note what should be manually tested afterward.
 Don't write tests unless explicitly asked, but flag when a change seems risky enough to warrant one.
 
 
+## Error Handling
+Do not add generic try/catch blocks or swallow exceptions without
+explicit instruction. Error handling must be specific to the actual
+failure modes of the code. Never catch an exception just to log
+and re-throw it — that adds noise without value.
+
+## Naming
+Do not rename variables, methods, or classes unless the current
+name is factually wrong or directly conflicts with the task.
+Renaming working, understood code is scope creep.
+
+## Comments
+Do not add comments that describe what the code is doing —
+the code should speak for itself. Only add comments for:
+1. Why a non-obvious decision was made
+2. Known limitations or gotchas
+3. Explicit instruction to document
+
+## Testing
+Do not modify existing passing tests unless the task explicitly
+requires it. If a refactor breaks a passing test, that is a signal
+the refactor is wrong — not that the test needs updating.
+New tests must test behavior, not implementation details.
+
+## Dependencies
+Do not introduce new libraries, packages, or dependencies to solve
+a problem that can be reasonably solved with what already exists.
+Every new dependency must be explicitly approved.
+
+## Configuration & Environment
+Never hardcode values that belong in configuration or environment
+variables. Never modify existing config values unless directly
+required by the task.
+
+## Security
+Never log, print, or expose sensitive values (tokens, passwords,
+keys, PII) even in debug or error output. Do not add backdoors,
+debug endpoints, or temporary auth bypasses — even for testing.
+
+## Git / Change Hygiene
+Keep changes focused and atomic. Do not bundle unrelated fixes
+into the same change. If you notice something unrelated that
+should be fixed, flag it separately rather than fixing it in place.
+
+## When Stuck or Uncertain
+If the correct solution is unclear, ask before implementing.
+Do not produce speculative code and hope it fits. A wrong
+implementation costs more time to unwind than a clarifying
+question costs to ask.
+
+## Tone on Disagreement
+If you believe the requested approach is flawed, say so once
+with a specific reason. Then implement what was asked unless
+it is a clear security or correctness issue. Do not silently
+implement a different approach than what was requested.
+
+## Simplicity & Minimal Code
+Prefer the solution with the fewest lines that is still readable.
+Do not add wrapper methods, helper classes, or intermediate variables
+unless they are used more than once or dramatically aid readability.
+
+Never add code for future flexibility, anticipated use cases,
+or "this might be useful later." Only implement what is
+explicitly required right now.
+
+Before adding any new method, class, or utility: search the
+existing codebase for equivalent logic. If it exists, use or
+extend it. Never create a parallel implementation.
+
+After any refactor or new code: delete everything that isn't
+required. No speculative abstractions, no convenience wrappers
+without multiple callers, no duplicated logic, no extra parameters.
+The goal is the minimum correct implementation. Defend every line.
+
+Do not touch working code outside the scope of the current task.
+Every change to existing logic must answer: "what was wrong with
+this before?" If the answer is nothing — revert it.
+
+## Circular Refactor Prevention
+Before refactoring any existing working code, confirm:
+1. What is broken or insufficient about the current implementation?
+2. What measurable improvement does this change make?
+3. Does this change risk breaking anything that currently works?
+If question 1 has no concrete answer, do not make the change.
+
+If a fix reintroduces code or logic that was recently removed or
+changed, stop and flag it instead of proceeding. Do not silently
+cycle back to a previous state. Circular changes are a signal to
+ask for clarification, not to keep iterating.

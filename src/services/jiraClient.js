@@ -1,5 +1,6 @@
 import { buildApiUrl } from "./apiBase.js";
 import { getLocalTimestampPayload } from "../utils/localTimestamp.js";
+import { filterWorkfrontErrorMessages } from "../../shared/jiraErrorUtils.mjs";
 
 const formatErrorDetail = (value) => {
   if (value == null || value === "") {
@@ -20,7 +21,10 @@ const formatErrorDetail = (value) => {
 
 const extractJiraErrorMessage = (data, status) => {
   if (Array.isArray(data?.errorMessages) && data.errorMessages.length > 0) {
-    return data.errorMessages.map((item) => formatErrorDetail(item)).filter(Boolean).join(" ");
+    const messages = filterWorkfrontErrorMessages(data.errorMessages);
+    if (messages.length > 0) {
+      return messages.map((item) => formatErrorDetail(item)).filter(Boolean).join(" ");
+    }
   }
 
   if (Array.isArray(data?.errors) && data.errors.length > 0) {
