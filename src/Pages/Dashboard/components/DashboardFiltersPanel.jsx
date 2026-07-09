@@ -1,7 +1,11 @@
 import React from "react";
 import { Button, Message, Segment } from "semantic-ui-react";
 import EpicFilterPanel from "../../components/EpicFilterPanel";
+import DashboardRefreshActions from "./DashboardRefreshActions";
 import {
+  getDashboardRefreshLoadingHint,
+  getDashboardRefreshStatusHint,
+  resolveEffectiveRefreshScope,
   DEFAULT_DASHBOARD_VISIBLE_SECTIONS,
   inferUpcomingDuePreset,
   UPCOMING_DUE_DATE_PRESETS,
@@ -50,9 +54,11 @@ const DashboardFiltersPanel = ({
   chartVariant,
   setChartVariant,
   handleRefresh,
+  handleCancelRefresh,
   refreshLoading,
   canSubmit,
   hasEpicScope,
+  hasContributorScope,
   refreshFlash,
 }) => {
   const isInternalDuePresetUpdate = React.useRef(false);
@@ -135,112 +141,9 @@ const DashboardFiltersPanel = ({
       />
 
       <div className="dashboard-controls-divider" style={{ marginTop: "0.75rem" }} />
-      <div className="dashboard-people-section">
-        <p className="dashboard-watch-group-label">
-          2 — Contributor Metrics
-          {(selectedWatchedIds.length > 0 || assigneeNames.length > 0) ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedWatchedIds([]);
-                setAssigneeNames([]);
-                setAssigneeInput("");
-              }}
-              style={{
-                marginLeft: "0.6rem",
-                fontSize: "0.72rem",
-                fontWeight: 400,
-                textTransform: "none",
-                border: "1px solid #cbd5e1",
-                borderRadius: "999px",
-                padding: "0.1rem 0.5rem",
-                background: "#f1f5f9",
-                color: "#64748b",
-                cursor: "pointer",
-              }}
-            >
-              Clear all
-            </button>
-          ) : null}
-        </p>
-        <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "0 0 0.5rem" }}>
-          Optional — choose people or custom queries for the <strong>Individual Contributor Metrics</strong> section.
-          Metrics are calculated within the projects selected in step 1.
-          Use saved entries from Settings → <strong>Contributor Metrics</strong>, or type a display name directly.
-        </p>
-        {personWatches.length > 0 || jqlWatches.length > 0 ? (
-          <div className="dashboard-watched-chips">
-            {personWatches.map((person) => (
-              <Button
-                key={person.id}
-                size="mini"
-                primary={selectedWatchedIds.includes(person.id)}
-                basic={!selectedWatchedIds.includes(person.id)}
-                onClick={() => handleToggleWatched(person.id)}
-              >
-                {person.displayName}
-              </Button>
-            ))}
-            {jqlWatches.map((watch) => (
-              <Button
-                key={watch.id}
-                size="mini"
-                primary={selectedWatchedIds.includes(watch.id)}
-                basic={!selectedWatchedIds.includes(watch.id)}
-                onClick={() => handleToggleWatched(watch.id)}
-                title={watch.jql}
-              >
-                {watch.displayName}
-              </Button>
-            ))}
-          </div>
-        ) : null}
-        <div className="dashboard-assignee-input-row">
-          <input
-            type="text"
-            value={assigneeInput}
-            onChange={(event) => setAssigneeInput(event.target.value)}
-            placeholder="Add by display name, email, or pick from list"
-            list="dashboard-people-datalist"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                handleAddAssignee();
-              }
-            }}
-          />
-          <datalist id="dashboard-people-datalist">
-            {personWatches.map((person) => (
-              <option key={`w-${person.id}`} value={person.displayName} />
-            ))}
-          </datalist>
-          <Button size="small" onClick={handleAddAssignee} disabled={!assigneeInput.trim()}>
-            Add
-          </Button>
-        </div>
-        {assigneeNames.length > 0 ? (
-          <div className="dashboard-selected-names">
-            {assigneeNames.map((name) => (
-              <span key={name} className="dashboard-name-chip">
-                {name}
-                <button
-                  type="button"
-                  className="dashboard-name-chip-remove"
-                  onClick={() => handleRemoveAssignee(name)}
-                  aria-label={`Remove ${name}`}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="dashboard-controls-divider" />
 
       <div className="dashboard-filter-extra">
-        <p className="dashboard-optional-filters-label">Optional due-date views</p>
+        <p className="dashboard-optional-filters-label">2 — Optional due-date views</p>
 
         <div className="dashboard-due-by-field-row dashboard-due-by-field-row--inline">
           <span className="dashboard-due-by-field-label">Also include</span>
@@ -360,7 +263,115 @@ const DashboardFiltersPanel = ({
             <SelectorClear onClick={clearCompareAgainst} />
           </div>
         ) : null}
+      </div>
 
+      <div className="dashboard-controls-divider" />
+
+      <div className="dashboard-people-section">
+        <p className="dashboard-watch-group-label">
+          3 — Contributor Metrics
+          {(selectedWatchedIds.length > 0 || assigneeNames.length > 0) ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedWatchedIds([]);
+                setAssigneeNames([]);
+                setAssigneeInput("");
+              }}
+              style={{
+                marginLeft: "0.6rem",
+                fontSize: "0.72rem",
+                fontWeight: 400,
+                textTransform: "none",
+                border: "1px solid #cbd5e1",
+                borderRadius: "999px",
+                padding: "0.1rem 0.5rem",
+                background: "#f1f5f9",
+                color: "#64748b",
+                cursor: "pointer",
+              }}
+            >
+              Clear all
+            </button>
+          ) : null}
+        </p>
+        <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "0 0 0.5rem" }}>
+          Optional — choose people or custom JQL queries for the{" "}
+          <strong>Individual Contributor Metrics</strong> section. Person watches use full assignee
+          workload; JQL watches render as a project contributor card with per-person breakdown.
+        </p>
+        {personWatches.length > 0 || jqlWatches.length > 0 ? (
+          <div className="dashboard-watched-chips">
+            {personWatches.map((person) => (
+              <Button
+                key={person.id}
+                size="mini"
+                primary={selectedWatchedIds.includes(person.id)}
+                basic={!selectedWatchedIds.includes(person.id)}
+                onClick={() => handleToggleWatched(person.id)}
+              >
+                {person.displayName}
+              </Button>
+            ))}
+            {jqlWatches.map((watch) => (
+              <Button
+                key={watch.id}
+                size="mini"
+                primary={selectedWatchedIds.includes(watch.id)}
+                basic={!selectedWatchedIds.includes(watch.id)}
+                onClick={() => handleToggleWatched(watch.id)}
+                title={watch.jql}
+              >
+                {watch.displayName}
+              </Button>
+            ))}
+          </div>
+        ) : null}
+        <div className="dashboard-assignee-input-row">
+          <input
+            type="text"
+            value={assigneeInput}
+            onChange={(event) => setAssigneeInput(event.target.value)}
+            placeholder="Add by display name, email, or pick from list"
+            list="dashboard-people-datalist"
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                handleAddAssignee();
+              }
+            }}
+          />
+          <datalist id="dashboard-people-datalist">
+            {personWatches.map((person) => (
+              <option key={`w-${person.id}`} value={person.displayName} />
+            ))}
+          </datalist>
+          <Button size="small" onClick={handleAddAssignee} disabled={!assigneeInput.trim()}>
+            Add
+          </Button>
+        </div>
+        {assigneeNames.length > 0 ? (
+          <div className="dashboard-selected-names">
+            {assigneeNames.map((name) => (
+              <span key={name} className="dashboard-name-chip">
+                {name}
+                <button
+                  type="button"
+                  className="dashboard-name-chip-remove"
+                  onClick={() => handleRemoveAssignee(name)}
+                  aria-label={`Remove ${name}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="dashboard-controls-divider" />
+
+      <div className="dashboard-filter-extra dashboard-filter-extra--views">
         <div className="dashboard-section-toggle-row">
           <span className="dashboard-due-by-label">Views</span>
           {[
@@ -409,25 +420,20 @@ const DashboardFiltersPanel = ({
         </div>
       </div>
 
-      <div className="dashboard-submit-row">
-        <Button primary onClick={handleRefresh} loading={refreshLoading} disabled={!canSubmit}>
-          Refresh status
-        </Button>
-        {!hasEpicScope ? (
-          <span className="dashboard-submit-hint">
-            Select at least one project preset in step 1 first — people tracking alone cannot refresh.
-          </span>
-        ) : (
-          <span className="dashboard-submit-hint">
-            Pulls current resolution, workload, and overdue metrics from Jira. Optional filters above add due-date views.
-          </span>
+      <DashboardRefreshActions
+        onRefresh={handleRefresh}
+        onCancel={handleCancelRefresh}
+        loading={refreshLoading}
+        canSubmit={canSubmit}
+        submitLabel="Refresh status"
+        loadingHint={getDashboardRefreshLoadingHint(
+          hasEpicScope || hasContributorScope
+            ? resolveEffectiveRefreshScope({ hasEpicScope, hasContributorScope })
+            : "all"
         )}
-        {refreshFlash ? (
-          <Message positive size="mini" style={{ marginTop: "0.5rem" }}>
-            ✓ {refreshFlash}
-          </Message>
-        ) : null}
-      </div>
+        hint={getDashboardRefreshStatusHint({ hasEpicScope, hasContributorScope })}
+        flash={refreshFlash}
+      />
     </Segment>
   );
 };

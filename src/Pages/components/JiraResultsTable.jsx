@@ -3,6 +3,7 @@ import PriorityCell from "./cells/PriorityCell";
 import AssigneeCell from "./cells/AssigneeCell.jsx";
 import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
 import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js";
+import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
 
 const PAGE_SIZE = 30;
 const SORT_FIELDS = [
@@ -317,9 +318,34 @@ const JiraResultsTable = ({
     };
   }, [drillDownPending]);
 
-  const visibleRuns = React.useMemo(
-    () => (pendingDrillDownRun ? [pendingDrillDownRun, ...jqlRuns] : jqlRuns),
-    [jqlRuns, pendingDrillDownRun]
+  const visibleRuns = React.useMemo(() => {
+    const configuredRuns = (jqlRuns || []).filter(isConfiguredJqlRun);
+    return pendingDrillDownRun ? [pendingDrillDownRun, ...configuredRuns] : configuredRuns;
+  }, [jqlRuns, pendingDrillDownRun]);
+
+  const getJqlRunsIndex = React.useCallback(
+    (item) => {
+      if (!item || item.isPendingDrillDown) {
+        return null;
+      }
+
+      const directIdx = jqlRuns.indexOf(item);
+      if (directIdx >= 0) {
+        return directIdx;
+      }
+
+      if (item.isDrillDown) {
+        return jqlRuns.findIndex((run) => run.drillDownId && run.drillDownId === item.drillDownId);
+      }
+
+      return jqlRuns.findIndex(
+        (run) =>
+          !run.isDrillDown &&
+          (run.index ?? -1) === (item.index ?? -1) &&
+          String(run.jql || "").trim() === String(item.jql || "").trim()
+      );
+    },
+    [jqlRuns]
   );
 
   React.useEffect(() => {
@@ -357,7 +383,10 @@ const JiraResultsTable = ({
 
     setActiveTab(safeTargetTab);
     if (onActiveTabChange && !targetRun?.isPendingDrillDown) {
-      onActiveTabChange(pendingDrillDownRun ? safeTargetTab - 1 : safeTargetTab);
+      const runsIdx = getJqlRunsIndex(targetRun);
+      if (runsIdx !== null && runsIdx >= 0) {
+        onActiveTabChange(runsIdx);
+      }
     }
 
     if (key) {
@@ -367,7 +396,7 @@ const JiraResultsTable = ({
       setAssigneeFilterByRunIndex((prevFilters) => ({ ...prevFilters, [stateKey]: assignee }));
     }
     setPageByRunIndex((prevPages) => ({ ...prevPages, [stateKey]: 1 }));
-  }, [drillDownFilters, onActiveTabChange, pendingDrillDownRun, visibleRuns]);
+  }, [drillDownFilters, getJqlRunsIndex, onActiveTabChange, visibleRuns]);
 
   if (visibleRuns.length === 0) {
     return null;
@@ -406,7 +435,10 @@ const JiraResultsTable = ({
   const handleTabChange = (idx, item) => {
     setActiveTab(idx);
     if (onActiveTabChange && !item?.isPendingDrillDown) {
-      onActiveTabChange(pendingDrillDownRun ? idx - 1 : idx);
+      const runsIdx = getJqlRunsIndex(item);
+      if (runsIdx !== null && runsIdx >= 0) {
+        onActiveTabChange(runsIdx);
+      }
     }
   };
 

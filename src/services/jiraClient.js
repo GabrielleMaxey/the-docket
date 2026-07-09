@@ -23,6 +23,10 @@ const extractJiraErrorMessage = (data, status) => {
     return data.errorMessages.map((item) => formatErrorDetail(item)).filter(Boolean).join(" ");
   }
 
+  if (Array.isArray(data?.errors) && data.errors.length > 0) {
+    return data.errors.map((item) => formatErrorDetail(item)).filter(Boolean).join(" ");
+  }
+
   const errorDetail = formatErrorDetail(data?.error);
   if (errorDetail) {
     return errorDetail;
@@ -118,6 +122,13 @@ export const updateJiraIssueStatus = async ({ issueKey, targetStatus }) => {
     },
     body: JSON.stringify({ targetStatus }),
   });
+};
+
+export const JIRA_UNASSIGNED_ASSIGNEE = "__unassigned__";
+
+export const isJiraUnassignValue = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "unassigned" || normalized === JIRA_UNASSIGNED_ASSIGNEE;
 };
 
 export const updateJiraIssueAssignee = async ({ issueKey, assignee }) => {
@@ -316,13 +327,14 @@ export const fetchJiraFilters = async () => {
   return Array.isArray(data) ? data : [];
 };
 
-export const refreshDashboardMetrics = async (payload) => {
+export const refreshDashboardMetrics = async (payload, options = {}) => {
   const data = await requestJson("/api/dashboard/refresh", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload || {}),
+    signal: options.signal,
   });
 
   return data?.snapshot || null;
@@ -383,6 +395,27 @@ export const fetchJiraProjects = async () => {
 
 export const fetchJiraCreateMeta = async (projectKey) => {
   return requestJson(`/api/jira/projects/${encodeURIComponent(projectKey)}/createmeta`);
+};
+
+export const fetchJiraIssueSummary = async (issueKey) => {
+  return requestJson(`/api/jira/issues/${encodeURIComponent(String(issueKey || "").trim())}/summary`);
+};
+
+export const fetchEpicParentOptions = async (epicKey) => {
+  return requestJson(`/api/jira/epics/${encodeURIComponent(String(epicKey || "").trim())}/parent-options`);
+};
+
+export const fetchJiraParentCandidates = async ({ jql, maxTotal = 100 }) => {
+  return requestJson("/api/jira/issues/parent-candidates", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      jql: String(jql || "").trim(),
+      maxTotal,
+    }),
+  });
 };
 
 export const createJiraIssue = async (payload) => {

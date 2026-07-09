@@ -17,6 +17,7 @@ import {
   loadWeekPlanState,
   saveWeekPlanState,
 } from "../../utils/pageReportPersistence";
+import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
 
 const WEEKLY_PLAN_KEY = "ww-weekly-plan-open";
 
@@ -54,7 +55,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
     String(persistedPlan?.additionalContext || "")
   );
 
-  const hasRuns = jqlRuns.some((r) => r.issues?.length > 0);
+  const hasRuns = jqlRuns.some((r) => isConfiguredJqlRun(r) && r.issues?.length > 0);
 
   const applyPlan = React.useCallback((result) => {
     if (!result?.plan) return;
@@ -75,7 +76,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
     setError("");
 
     const projects = jqlRuns
-      .filter((r) => r.issues?.length > 0)
+      .filter((r) => isConfiguredJqlRun(r) && r.issues?.length > 0)
       .map((r) => ({
         label: r.label || `Run ${(r.index || 0) + 1}`,
         total: r.issues.length,

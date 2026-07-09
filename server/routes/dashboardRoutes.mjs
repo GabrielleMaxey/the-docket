@@ -120,9 +120,13 @@ export const registerDashboardRoutes = (
       overdue_open_count,
       total_open_count,
       overdue_issue_keys_json,
+      overdue_issues_json,
+      upcoming_due_issues_json,
+      contributor_metrics_json,
       query_type,
       jql,
-      workload_counts_json
+      workload_counts_json,
+      error_message
     ) VALUES (
       @snapshotId,
       @queryName,
@@ -132,9 +136,13 @@ export const registerDashboardRoutes = (
       @overdueOpenCount,
       @totalOpenCount,
       @overdueIssueKeysJson,
+      @overdueIssuesJson,
+      @upcomingDueIssuesJson,
+      @contributorMetricsJson,
       @queryType,
       @jql,
-      @workloadCountsJson
+      @workloadCountsJson,
+      @errorMessage
     )
   `);
 
@@ -181,6 +189,7 @@ export const registerDashboardRoutes = (
         mapWatchedAssigneeRow,
         db,
         persistStmts,
+        snapshotStmts,
         jiraRequest,
         runJiraSearchRequest,
       });

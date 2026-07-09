@@ -8,6 +8,7 @@ import {
 
 export {
   BACKGROUND_JOB_IDS,
+  cancelBackgroundJob,
   getBackgroundJob,
   runBackgroundJob,
   workWeekProjectReportJobId,

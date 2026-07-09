@@ -8,6 +8,7 @@ import {
   DEFAULT_DASHBOARD_VISIBLE_SECTIONS,
   normalizeVisibleSections,
   splitDueByIssues,
+  getDashboardRefreshLoadingHint,
 } from "./utils/dashboardMetricsUtils";
 import { useDashboardRefresh } from "./hooks/useDashboardRefresh";
 import CollapsibleSection from "../../Components/CollapsibleSection";
@@ -16,9 +17,11 @@ import ReportPanel from "./components/ReportPanel";
 import WeeklyDigestPanel from "./components/WeeklyDigestPanel";
 import OverallSummaryCard from "./components/OverallSummaryCard";
 import AssigneeMetricCard from "./components/AssigneeMetricCard";
+import JqlContributorMetricCard from "./components/JqlContributorMetricCard";
 import ProjectMetricsSection from "./components/ProjectMetricsSection";
 import PeriodSummary from "./components/PeriodSummary";
 import DueByHierarchicalList from "./components/DueByHierarchicalList";
+import DashboardRefreshActions from "./components/DashboardRefreshActions";
 import "../dashboard.css";
 
 const Dashboard = () => {
@@ -38,6 +41,8 @@ const Dashboard = () => {
     snapshot,
     metricsLoading,
     refreshLoading,
+    projectsRefreshLoading,
+    contributorsRefreshLoading,
     refreshError,
     jiraBaseUrl,
     assigneeNames,
@@ -53,8 +58,12 @@ const Dashboard = () => {
     pastDueLookbackYears,
     setPastDueLookbackYears,
     refreshFlash,
-    filtersStale,
+    projectFiltersStale,
+    contributorFiltersStale,
     handleRefresh,
+    handleRefreshProjects,
+    handleRefreshContributors,
+    handleCancelRefresh,
     handleAddAssignee,
     handleRemoveAssignee,
     handleToggleWatched,
@@ -65,7 +74,10 @@ const Dashboard = () => {
     assigneeMetrics,
     showOverall,
     hasEpicScope,
+    hasContributorScope,
     canSubmit,
+    canSubmitProjects,
+    canSubmitContributors,
     epicNameByKey,
     overallTotals,
   } = useDashboardRefresh({
@@ -111,7 +123,7 @@ const Dashboard = () => {
 
       <CollapsibleSection
         title="Filters &amp; Settings"
-        subtitle="Choose projects and people, then refresh status. Due-date filters below are optional."
+        subtitle="Choose projects, due-date views, and people — then refresh status."
         storageKey="dashboard-input-open"
         defaultOpen={true}
         className="app-collapsible--input"
@@ -150,9 +162,11 @@ const Dashboard = () => {
             chartVariant={chartVariant}
             setChartVariant={setChartVariant}
             handleRefresh={handleRefresh}
+            handleCancelRefresh={handleCancelRefresh}
             refreshLoading={refreshLoading}
             canSubmit={canSubmit}
             hasEpicScope={hasEpicScope}
+            hasContributorScope={hasContributorScope}
           refreshFlash={refreshFlash}
         />
       </CollapsibleSection>
@@ -176,8 +190,17 @@ const Dashboard = () => {
         </CollapsibleSection>
       ) : null}
 
-      {filtersStale ? (
-        <Message info>Filters changed — click <strong>Refresh status</strong> to update stored metrics.</Message>
+      {projectFiltersStale && hasEpicScope ? (
+        <Message info>
+          Project filters changed — click <strong>Refresh projects</strong> in Project Metrics or{" "}
+          <strong>Refresh status</strong> above to update.
+        </Message>
+      ) : null}
+      {contributorFiltersStale ? (
+        <Message info>
+          Contributor selection changed — click <strong>Refresh contributors</strong> in Individual
+          Contributor Metrics or <strong>Refresh status</strong> above to update.
+        </Message>
       ) : null}
       {refreshError ? (
         <Message negative>{refreshError}</Message>
@@ -250,6 +273,19 @@ const Dashboard = () => {
               className="app-collapsible--spaced"
               badge={`${displayEpics.length} project${displayEpics.length !== 1 ? "s" : ""}`}
             >
+              <DashboardRefreshActions
+                onRefresh={handleRefreshProjects}
+                onCancel={handleCancelRefresh}
+                loading={projectsRefreshLoading}
+                canSubmit={canSubmitProjects}
+                submitLabel="Refresh projects"
+                loadingHint={getDashboardRefreshLoadingHint("projects")}
+                hint={
+                  hasEpicScope
+                    ? "Updates project cards and per-project contributor metrics from Jira."
+                    : "Select at least one project preset or enable Past Due Projects in Filters."
+                }
+              />
               <ProjectMetricsSection
                 snapshot={snapshot}
                 displayEpics={displayEpics}
@@ -260,38 +296,6 @@ const Dashboard = () => {
                 dueByDate={dueByDate}
                 chartVariant={chartVariant}
               />
-            </CollapsibleSection>
-          ) : null}
-
-          {visibleSections.overdue &&
-          (assigneeMetrics.length > 0 ||
-            assigneeNames.length > 0 ||
-            selectedWatchedIds.length > 0) ? (
-            <CollapsibleSection
-              title="Individual Contributor Metrics"
-              subtitle="Per-person workload and overdue performance for your selected people and custom queries."
-              storageKey="overdue"
-              persistKeyPrefix="dashboard-collapse-"
-              className="app-collapsible--spaced"
-              defaultOpen={true}
-              badge={
-                assigneeMetrics.length > 0
-                  ? `${assigneeMetrics.length} tracked`
-                  : "Refresh to load"
-              }
-            >
-              {assigneeMetrics.length > 0 ? (
-                <div className="dashboard-assignee-grid">
-                  {assigneeMetrics.map((person) => (
-                    <AssigneeMetricCard key={person.id} person={person} />
-                  ))}
-                </div>
-              ) : (
-                <Message info size="small">
-                  People are selected above — click <strong>Refresh status</strong> to load their
-                  workload metrics for the projects in step 1.
-                </Message>
-              )}
             </CollapsibleSection>
           ) : null}
 
@@ -343,7 +347,7 @@ const Dashboard = () => {
                       {" "}
                       {dueByIssueSplit.pastDue.length} past-due task
                       {dueByIssueSplit.pastDue.length !== 1 ? "s are" : " is"} in the lookback —
-                      visible in the <strong>Past Due in lookback</strong> card below.
+                      visible in the <strong>Past Due in lookback</strong> section below.
                     </>
                   ) : null}
                 </Message>
@@ -388,6 +392,67 @@ const Dashboard = () => {
                   {snapshot.includePastDue
                     ? "No past due tasks in the current lookback window."
                     : "Past due rows are included only when Past Due Projects is enabled under Also include."}
+                </Message>
+              )}
+            </CollapsibleSection>
+          ) : null}
+
+          {visibleSections.overdue &&
+          (assigneeMetrics.length > 0 ||
+            assigneeNames.length > 0 ||
+            selectedWatchedIds.length > 0) ? (
+            <CollapsibleSection
+              title="Individual Contributor Metrics"
+              subtitle="Per-person workload and overdue performance for your selected people and custom queries."
+              storageKey="overdue"
+              persistKeyPrefix="dashboard-collapse-"
+              className="app-collapsible--spaced"
+              defaultOpen={true}
+              badge={
+                assigneeMetrics.length > 0
+                  ? `${assigneeMetrics.length} tracked`
+                  : "Refresh to load"
+              }
+            >
+              <DashboardRefreshActions
+                onRefresh={handleRefreshContributors}
+                onCancel={handleCancelRefresh}
+                loading={contributorsRefreshLoading}
+                canSubmit={canSubmitContributors}
+                submitLabel="Refresh contributors"
+                loadingHint={getDashboardRefreshLoadingHint("contributors")}
+                hint={
+                  hasContributorScope
+                    ? "Updates full-workload metrics for selected people and custom JQL watches."
+                    : "Select people or custom queries in Filters to refresh contributor metrics."
+                }
+              />
+              {assigneeMetrics.length > 0 ? (
+                <div className="dashboard-assignee-grid">
+                  {assigneeMetrics.map((person) =>
+                    person.queryType === "jql" ? (
+                      <JqlContributorMetricCard
+                        key={person.id}
+                        person={person}
+                        jiraBaseUrl={jiraBaseUrl}
+                        chartVariant={chartVariant}
+                        dueByDate={snapshot.dueByDate}
+                      />
+                    ) : (
+                      <AssigneeMetricCard
+                        key={person.id}
+                        person={person}
+                        jiraBaseUrl={jiraBaseUrl}
+                        chartVariant={chartVariant}
+                        dueByDate={snapshot.dueByDate}
+                      />
+                    )
+                  )}
+                </div>
+              ) : (
+                <Message info size="small">
+                  People are selected above — click <strong>Refresh contributors</strong> to load their
+                  full workload metrics (person watches use all assigned Jira issues).
                 </Message>
               )}
             </CollapsibleSection>

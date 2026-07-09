@@ -1,5 +1,10 @@
 import { normalizePastDueLookbackYears } from "../../../shared/dashboardMetrics.mjs";
 import { VALID_DUE_BY_FIELDS } from "./constants.mjs";
+import {
+  hasContributorRefreshScope,
+  hasProjectRefreshScope,
+  normalizeRefreshScope,
+} from "./snapshotMerge.mjs";
 
 export const parseDashboardRefreshInput = (body) => {
   const epicPresetIds = Array.isArray(body?.epicPresetIds)
@@ -29,12 +34,32 @@ export const parseDashboardRefreshInput = (body) => {
     dueByField,
     assigneeNames,
     watchedAssigneeIds,
+    refreshScope: normalizeRefreshScope(body?.refreshScope),
   };
 };
 
 export const validateDashboardRefreshInput = (input) => {
-  if (input.epicPresetIds.length === 0 && !input.includePastDue) {
-    return "Select at least one epic preset or Past Due Projects";
+  const hasProjects = hasProjectRefreshScope(input);
+  const hasContributors = hasContributorRefreshScope(input);
+  const scope = normalizeRefreshScope(input.refreshScope);
+
+  if (scope === "projects") {
+    if (!hasProjects) {
+      return "Select at least one project preset or enable Past Due Projects";
+    }
+    return null;
   }
+
+  if (scope === "contributors") {
+    if (!hasContributors) {
+      return "Select at least one person or custom query to refresh contributor metrics";
+    }
+    return null;
+  }
+
+  if (!hasProjects && !hasContributors) {
+    return "Select at least one project preset, Past Due Projects, or contributor to track";
+  }
+
   return null;
 };

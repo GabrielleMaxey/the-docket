@@ -100,11 +100,48 @@ This is the main screen for managing your open work.
    - **Pull most recent Jira comment** — overwrites each row's **Notes** box with that issue's latest Jira comment (useful for shared `PRIORITY P#` comments). Use **Clear** to reset to **Keep local notes**.
 4. **Run JQL** — loads fresh results from Jira, applies priority from latest comments when present, and saves results locally. Shortcut: **Ctrl+Enter** (Windows/Linux) or **⌘+Enter** (Mac).
 5. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes or priorities in the local database, or header reminders.
-6. **Create Issue** — opens a modal to create a new Jira issue in ODI. Fill in the epic/parent and title, then click **✦ AI Draft** (Lumen blue button next to the Description label) to generate a description and, for Stories, a suggested sub-task list — all following ODI Jira standards:
+6. **Create Issue** — opens a modal to create a new Jira issue in ODI. See [Create Issue](#create-issue) below for parent selection and ODI rules. In short: pick a preset or parent, enter a title, then click **✦ AI Draft** (Lumen blue button next to the Description label) to generate a description and, for Stories, a suggested sub-task list:
    - **Story**: AI rewrites the title into Job Story format ("When… I want… so I can…") if it isn't already, and generates a description that expands on the situation, motivation, and desired outcome. 2–5 suggested sub-tasks appear as editable checkboxes; uncheck any you don't want before clicking Create.
    - **Bug**: AI generates a structured description covering what is broken, steps to reproduce, expected vs actual, environment, and any known workaround. A suggested priority (Low / Medium / High / Critical) appears based on ODI severity definitions.
    - **Task**: AI generates a plain description.
-   - The **Create** button label updates to show "Create + N subtasks" when Story sub-tasks are selected. Sub-tasks are created as Task type under the new story immediately after it is created; the success message lists each with its issue key.
+   - The **Create** button label updates to show "Create + N subtasks" when Story sub-tasks are selected. Sub-tasks are created as **Task** type with the new story as parent (linked in the Task → Story → Epic chain); the success message lists each with its issue key and a link to open the new issue in Jira.
+
+### Create Issue
+
+Use **Create Issue** on Work Week when you want a new Story, Task, or Bug in ODI without leaving the app.
+
+**1. Choose a starting point (Epic preset dropdown)**
+
+| Option | What it does |
+|--------|----------------|
+| **Epic preset** | Loads that epic and its stories as parent choices. Story/Bug parents default to the epic; Task parents pick a story under the epic. |
+| **Saved query (JQL preset)** | Runs the preset's JQL (e.g. Dev Team, My Current Issues), lists matching issues, and derives parent chains (Task → Story → Epic). Pick an issue from the query, an epic/story parent, or enter a parent key manually. |
+| **Enter issue key manually** | Type an ODI key: Epic for Story/Bug, Story for Task. The app validates the key before unlocking the form. |
+
+The modal pre-selects a preset when you open it from an active Work Week JQL tab that matches a saved preset.
+
+**2. Parent rules (ODI)**
+
+| Issue type | Required parent |
+|------------|-----------------|
+| Story | Epic (including ODI types like **Epic (Feature)**) |
+| Bug | Epic only |
+| Task | Story |
+
+**3. Fill in details**
+
+- **Title** — required. Stories should use Job Story format; AI Draft can rewrite and ask 2–3 clarification questions if the ask/goal is unclear.
+- **Components**, **Vertical Components** — choose from the dropdown. **Components** must already exist on the ODI Jira project (free-text names are rejected).
+- **BUG Tracking** (Bug only) — pick a default or type a custom value.
+- **Description** — use **✦ AI Draft** or write your own. Description and goal validation errors (including “story not fully defined”) appear **below the Description field**, not at the top of the modal.
+- **Priority** (Bug only) — required on create.
+- **Assignee** — optional for Task/Bug. Stories stay unassigned; when AI Draft suggests sub-tasks, a **Subtask assignee** field appears and applies to all checked sub-tasks.
+
+**4. After create**
+
+On success, use **Add more detail in Jira** to open the new issue in your browser. Story sub-tasks you left checked are created under the new story (parent-linked as Task → Story → Epic) and listed in the success message.
+
+**If create fails:** fix errors shown in the modal — parent/title issues at the top; description/goal issues under Description — then click **Create** again. The button stays available after validation errors once a valid parent and title are set.
 
 > **Background work:** Dashboard refresh, report generation, week plan, project report, and **Run JQL** keep running if you switch pages. A yellow status pill in the top nav shows what's in progress. Return to the page when it finishes — results are saved automatically.
 
@@ -228,7 +265,11 @@ Green-accent card listing open tasks with due dates from **today through** your 
 Red-accent card listing open tasks that missed their deadline within the selected lookback (1–3 years). Populated only when **Past Due Projects** is enabled. Empty state explains how to enable it.
 
 **Individual Contributor Metrics**  
-One card per person or custom query configured in Settings → **Contributor Metrics** (or names you add directly in the Dashboard filter panel). The section appears as soon as people are selected — click **Refresh status** to load metrics. After refresh: open workload, overdue count, and status breakdown per person. Person names link to Work Week with an assignee drill-down. Metrics are scoped to the projects selected in step 1; a person with no open issues in that scope still appears with a “no open issues” message.
+One card per person or custom query configured in Settings → **Contributor Metrics** (or names you add directly in the Dashboard filter panel). The section appears as soon as people are selected — click **Refresh status** to load metrics. After refresh: open workload, overdue count, and status breakdown per person. Person names link to Work Week with an assignee drill-down.
+
+- **Person watches** — full Jira assignee workload (`assignee = "…"` search), not limited to the projects selected in step 1.
+- **Custom query watches** — metrics come from the watch JQL as written (same scope you defined in Settings).
+- **Per-project contributor rows** on Project Metrics cards — only issues within that epic/preset (Jane’s 5 tasks in Epic A, not her 10 elsewhere).
 
 **Generate Report**  
 Choose an audience and click Generate:
@@ -430,3 +471,12 @@ If the task has no MRD, the app inherits from parents up to the epic. **Run JQL*
 
 **Test Jira Connection fails**
 Check your network/VPN, then verify `.env` has correct `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN`. See [JIRA_SETUP.md](./JIRA_SETUP.md).
+
+**Create Issue says the parent must be an Epic or Story**
+Match the parent to the issue type: Story/Bug → Epic; Task → Story. For saved JQL presets, pick an issue from the query (parent chain is filled in), choose a parent from the dropdown, or enter a valid ODI key manually. ODI epic types such as **Epic (Feature)** are supported.
+
+**Create Issue failed but I fixed the form — Create is still greyed out**
+After a validation error, ensure **Title** is filled and a parent is selected. The Create button re-enables when those are set; you do not need to close the modal.
+
+**Story sub-tasks created but not linked to epic/story**
+Sub-tasks must be **Task** type with `parent` set to the story (not Jira’s separate Sub-task type). If older creates look orphaned, recreate them or set the story parent in Jira. New creates from this app link Task → Story → Epic automatically.

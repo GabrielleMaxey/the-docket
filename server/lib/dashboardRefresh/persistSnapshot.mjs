@@ -67,9 +67,13 @@ export const persistDashboardSnapshot = ({
         overdueOpenCount: assignee.overdueOpenCount,
         totalOpenCount: assignee.totalOpenCount,
         overdueIssueKeysJson: JSON.stringify(assignee.overdueIssueKeys || []),
+        overdueIssuesJson: JSON.stringify(assignee.overdueIssues || []),
+        upcomingDueIssuesJson: JSON.stringify(assignee.upcomingDueIssues || []),
+        contributorMetricsJson: JSON.stringify(assignee.contributorMetrics || []),
         queryType: assignee.queryType || "person",
         jql: assignee.jql || "",
         workloadCountsJson: JSON.stringify(assignee.workloadCounts || {}),
+        errorMessage: assignee.error || null,
       });
     }
 
