@@ -20,7 +20,7 @@ Before anything else works, your Jira credentials need to be in place.
 
 **Developers (browser or desktop dev):** copy `.env.example` to `.env` in the project folder and fill in Jira credentials — see [JIRA_SETUP.md](./JIRA_SETUP.md).
 
-**Packaged desktop app (Mac or Windows installer):** on first launch the app creates a template `.env` in your user data folder. Edit that file and restart:
+**Packaged desktop app (Mac or Windows installer):** on first launch the app creates a template `.env` in your user data folder. Edit that file and restart. The Mac `.dmg` is universal — one installer for Intel and Apple Silicon Macs; no need to pick a chip type.
 
 | OS | Open this file |
 |----|----------------|

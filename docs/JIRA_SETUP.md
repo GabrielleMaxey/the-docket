@@ -283,7 +283,7 @@ netstat -ano | findstr :8787
 
 ## Desktop app (packaged Electron)
 
-The **Task Manager** desktop installer (macOS `.dmg` or Windows NSIS) bundles the UI and starts the Express proxy automatically. No separate `npm run dev:all` step.
+The **Task Manager** desktop installer (macOS universal `.dmg` for Intel and Apple Silicon, or Windows NSIS) bundles the UI and starts the Express proxy automatically. No separate `npm run dev:all` step.
 
 ### First launch
 
@@ -300,7 +300,7 @@ The packaged app loads the UI from `http://127.0.0.1:8787` (same port as the pro
 
 ```bash
 npm run desktop:rebuild-native   # after npm install or Electron version change
-npm run desktop:dist:mac       # macOS .dmg → release/
+npm run desktop:dist:mac       # macOS universal .dmg (Intel + Apple Silicon) → release/
 npm run desktop:dist:win       # Windows NSIS → release/
 ```
 
