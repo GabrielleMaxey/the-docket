@@ -109,6 +109,8 @@ export const runDashboardRefresh = async ({
       watchedAssigneeIds: input.watchedAssigneeIds,
       dueFieldId: ctx.dueFieldId,
       overdueFieldIds: ctx.overdueFieldIds,
+      iddFieldId: ctx.iddFieldId,
+      mrdFieldId: ctx.mrdFieldId,
       dueByDate: ctx.dueByDate,
       dueByOptions: ctx.dueByOptions,
       mappingsByRole: ctx.mappingsByRole,

@@ -387,8 +387,21 @@
   border-top: 1px solid #e2e8f0;
 }
 
+.dashboard-page .dashboard-epic-breakdown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
 .dashboard-page .dashboard-epic-breakdown-title {
-  margin: 0 0 0.5rem;
+  margin: 0;
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -396,10 +409,34 @@
   color: #64748b;
 }
 
+.dashboard-page .dashboard-epic-breakdown-count-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+  background: #e2e8f0;
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  line-height: 1.4;
+}
+
+.dashboard-page .dashboard-epic-breakdown-chevron {
+  margin-left: auto;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 0.18s;
+}
+
+.dashboard-page .dashboard-epic-breakdown-chevron.is-open {
+  transform: rotate(-90deg);
+}
+
 .dashboard-page .dashboard-epic-breakdown-list {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
+  margin-top: 0.55rem;
 }
 
 .dashboard-page .dashboard-epic-breakdown-row {
