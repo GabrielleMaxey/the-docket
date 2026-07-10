@@ -9,6 +9,10 @@ import {
   normalizeVisibleSections,
   splitDueByIssues,
   getDashboardRefreshLoadingHint,
+  DASHBOARD_AUTO_REFRESH_OPTIONS,
+  DASHBOARD_AUTO_REFRESH_MANUAL,
+  normalizeDashboardAutoRefreshInterval,
+  getDashboardAutoRefreshHint,
 } from "./utils/dashboardMetricsUtils";
 import { useDashboardRefresh } from "./hooks/useDashboardRefresh";
 import CollapsibleSection from "../../Components/CollapsibleSection";
@@ -36,6 +40,12 @@ const Dashboard = () => {
     clearSelection,
     setSelectedPresetIds,
   } = useEpicFilters();
+
+  const [autoRefreshInterval, setAutoRefreshInterval] = usePersistedState(
+    "dashboard-auto-refresh-interval",
+    DASHBOARD_AUTO_REFRESH_MANUAL,
+    { sanitize: normalizeDashboardAutoRefreshInterval }
+  );
 
   const {
     snapshot,
@@ -85,6 +95,7 @@ const Dashboard = () => {
     includePastDue,
     setSelectedPresetIds,
     setIncludePastDue,
+    autoRefreshInterval,
   });
 
   const [visibleSections, setVisibleSections] = usePersistedState(
@@ -168,6 +179,8 @@ const Dashboard = () => {
             hasEpicScope={hasEpicScope}
             hasContributorScope={hasContributorScope}
           refreshFlash={refreshFlash}
+          autoRefreshInterval={autoRefreshInterval}
+          setAutoRefreshInterval={setAutoRefreshInterval}
         />
       </CollapsibleSection>
 

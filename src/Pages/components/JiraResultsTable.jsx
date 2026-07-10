@@ -2,7 +2,10 @@ import React from "react";
 import PriorityCell from "./cells/PriorityCell";
 import AssigneeCell from "./cells/AssigneeCell.jsx";
 import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
-import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js";
+import {
+  getEffectiveDueDateForIssue,
+  getMostRecentDoneDateForIssue,
+} from "../../utils/jiraIssueDoneDates.js";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
 
 const PAGE_SIZE = 30;
@@ -762,6 +765,9 @@ const JiraResultsTable = ({
                       </button>
                     </th>
                     <th>Updated</th>
+                    <th title="Jira due date, or inherited Most Recent Done Date when due date is unset">
+                      Due
+                    </th>
                     <th title="Most Recent Done Date">MRD</th>
                     <th>Parent</th>
                     <th aria-sort={getHeaderAriaSort("priority")}>
@@ -876,6 +882,14 @@ const JiraResultsTable = ({
                         />
 
                         <td>{updated}</td>
+
+                        <td>
+                          {getEffectiveDueDateForIssue(issue, {
+                            dueFieldId: run.dueFieldId,
+                            mrdFieldId: run.mrdFieldId,
+                            parentMostRecentDoneDateByKey: run.parentMostRecentDoneDateByKey,
+                          }) || <span style={{ color: "#94a3b8" }}>—</span>}
+                        </td>
 
                         <td>
                           {getMostRecentDoneDateForIssue(

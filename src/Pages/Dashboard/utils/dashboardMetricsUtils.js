@@ -440,3 +440,50 @@ export const groupIssuesByEpicAndAssignee = (issues) => {
 
   return epics;
 };
+
+export const DASHBOARD_AUTO_REFRESH_MANUAL = "manual";
+export const DASHBOARD_AUTO_REFRESH_6H = "6h";
+export const DASHBOARD_AUTO_REFRESH_24H = "24h";
+
+export const DASHBOARD_AUTO_REFRESH_OPTIONS = [
+  { value: DASHBOARD_AUTO_REFRESH_MANUAL, label: "Manual only" },
+  { value: DASHBOARD_AUTO_REFRESH_6H, label: "Every 6 hours" },
+  { value: DASHBOARD_AUTO_REFRESH_24H, label: "Every 24 hours" },
+];
+
+export const DASHBOARD_AUTO_REFRESH_MS = {
+  [DASHBOARD_AUTO_REFRESH_6H]: 6 * 60 * 60 * 1000,
+  [DASHBOARD_AUTO_REFRESH_24H]: 24 * 60 * 60 * 1000,
+};
+
+export const normalizeDashboardAutoRefreshInterval = (value) => {
+  if (value === DASHBOARD_AUTO_REFRESH_6H || value === DASHBOARD_AUTO_REFRESH_24H) {
+    return value;
+  }
+  return DASHBOARD_AUTO_REFRESH_MANUAL;
+};
+
+export const isDashboardSnapshotStaleForAutoRefresh = (refreshedAt, interval) => {
+  const maxAgeMs = DASHBOARD_AUTO_REFRESH_MS[interval];
+  if (!maxAgeMs) {
+    return false;
+  }
+  if (!refreshedAt) {
+    return true;
+  }
+  const refreshedMs = new Date(refreshedAt).getTime();
+  if (Number.isNaN(refreshedMs)) {
+    return true;
+  }
+  return Date.now() - refreshedMs >= maxAgeMs;
+};
+
+export const getDashboardAutoRefreshHint = (interval) => {
+  if (interval === DASHBOARD_AUTO_REFRESH_6H) {
+    return "While this page is open, metrics refresh automatically when the snapshot is older than 6 hours.";
+  }
+  if (interval === DASHBOARD_AUTO_REFRESH_24H) {
+    return "While this page is open, metrics refresh automatically when the snapshot is older than 24 hours.";
+  }
+  return "Refresh only when you click Refresh status (or section refresh buttons).";
+};
