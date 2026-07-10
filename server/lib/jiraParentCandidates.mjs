@@ -4,38 +4,10 @@ import {
   PARENT_CHAIN_MAX_DEPTH,
 } from "../../shared/jiraParentCandidates.mjs";
 import { getJiraSearchFields } from "./jiraSearchFields.mjs";
-import { searchAllIssues } from "./jiraSearchHelpers.mjs";
+import { fetchIssuesByKeys, searchAllIssues } from "./jiraSearchHelpers.mjs";
 
 const EPIC_LINK_FIELD = "customfield_10014";
 const PARENT_FETCH_FIELDS = ["summary", "issuetype", "parent", EPIC_LINK_FIELD];
-
-const fetchIssuesByKeys = async ({ keys, jiraRequest, fields = PARENT_FETCH_FIELDS }) => {
-  const uniqueKeys = [...new Set(keys.map((key) => String(key || "").trim()).filter(Boolean))];
-  if (uniqueKeys.length === 0) {
-    return [];
-  }
-
-  const jql = `key in (${uniqueKeys.join(",")}) ORDER BY key ASC`;
-  const result = await jiraRequest({
-    method: "POST",
-    pathWithQuery: "/rest/api/3/search/jql",
-    body: {
-      jql,
-      maxResults: uniqueKeys.length,
-      fields: PARENT_FETCH_FIELDS,
-    },
-  });
-
-  if (!result.ok) {
-    throw new Error(
-      result.data?.errorMessages?.join(" ") ||
-        result.data?.message ||
-        "Failed to load parent issues from Jira"
-    );
-  }
-
-  return Array.isArray(result.data?.issues) ? result.data.issues : [];
-};
 
 const enrichParentChains = async ({ issueByKey, jiraRequest }) => {
   for (let depth = 0; depth < PARENT_CHAIN_MAX_DEPTH; depth += 1) {
@@ -56,6 +28,7 @@ const enrichParentChains = async ({ issueByKey, jiraRequest }) => {
     const parentIssues = await fetchIssuesByKeys({
       keys: [...missing],
       jiraRequest,
+      fields: PARENT_FETCH_FIELDS,
     });
 
     if (parentIssues.length === 0) {

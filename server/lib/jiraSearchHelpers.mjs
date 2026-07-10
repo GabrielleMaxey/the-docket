@@ -1,3 +1,5 @@
+import { chunkValues, ISSUE_KEY_BATCH_SIZE } from "../../shared/jiraBatch.mjs";
+
 export const normalizeJiraUserQuery = (value) =>
   String(value || "")
     .trim()
@@ -174,20 +176,7 @@ export const searchAllIssues = async ({ jql, runJiraSearchRequest, batchSize = 1
 };
 
 export const fetchEpicIssue = async ({ epicKey, mappingsByRole, jiraRequest }) => {
-  const fieldIds = [
-    "summary",
-    "status",
-    "issuetype",
-    "parent",       // needed to walk up Story → Epic when fetching intermediate parents
-    "duedate",
-    mappingsByRole.get("initial_done_date")?.fieldId,
-    mappingsByRole.get("most_recent_done_date")?.fieldId,
-    mappingsByRole.get("project_end_date")?.fieldId,
-  ]
-    .map((value) => String(value || "").trim())
-    .filter(Boolean);
-
-  const uniqueFields = [...new Set(fieldIds)].join(",");
+  const uniqueFields = [...new Set(getEpicIssueFieldIds(mappingsByRole))].join(",");
   const result = await jiraRequest({
     pathWithQuery: `/rest/api/3/issue/${encodeURIComponent(epicKey)}?fields=${encodeURIComponent(uniqueFields)}`,
   });
@@ -197,4 +186,76 @@ export const fetchEpicIssue = async ({ epicKey, mappingsByRole, jiraRequest }) =
   }
 
   return result.data;
+};
+
+export const getEpicIssueFieldIds = (mappingsByRole) =>
+  [
+    "summary",
+    "status",
+    "issuetype",
+    "parent",
+    "duedate",
+    mappingsByRole.get("initial_done_date")?.fieldId,
+    mappingsByRole.get("most_recent_done_date")?.fieldId,
+    mappingsByRole.get("project_end_date")?.fieldId,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+export const fetchIssuesByKeys = async ({ keys, jiraRequest, fields }) => {
+  const uniqueKeys = [...new Set(keys.map((key) => String(key || "").trim()).filter(Boolean))];
+  if (uniqueKeys.length === 0) {
+    return [];
+  }
+
+  const fieldList = [...new Set(fields.map((field) => String(field || "").trim()).filter(Boolean))];
+  const issues = [];
+
+  for (const batch of chunkValues(uniqueKeys, ISSUE_KEY_BATCH_SIZE)) {
+    const result = await jiraRequest({
+      method: "POST",
+      pathWithQuery: "/rest/api/3/search/jql",
+      body: {
+        jql: `key in (${batch.join(",")}) ORDER BY key ASC`,
+        maxResults: batch.length,
+        fields: fieldList,
+      },
+    });
+
+    if (!result.ok) {
+      throw new Error(
+        result.data?.errorMessages?.join(" ") ||
+          result.data?.message ||
+          "Failed to load issues from Jira"
+      );
+    }
+
+    issues.push(...(Array.isArray(result.data?.issues) ? result.data.issues : []));
+  }
+
+  return issues;
+};
+
+export const loadIssuesIntoCache = async ({ keys, issueCache, jiraRequest, fields, replace = false }) => {
+  const uniqueKeys = [...new Set(keys.map((key) => String(key || "").trim()).filter(Boolean))];
+  const missingKeys = uniqueKeys.filter((key) => replace || !issueCache.has(key));
+  if (missingKeys.length === 0) {
+    return issueCache;
+  }
+
+  if (replace) {
+    for (const key of missingKeys) {
+      issueCache.delete(key);
+    }
+  }
+
+  const issues = await fetchIssuesByKeys({ keys: missingKeys, jiraRequest, fields });
+  for (const issue of issues) {
+    const issueKey = String(issue?.key || "").trim();
+    if (issueKey) {
+      issueCache.set(issueKey, issue);
+    }
+  }
+
+  return issueCache;
 };

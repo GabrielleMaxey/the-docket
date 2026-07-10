@@ -1,4 +1,5 @@
 import { fetchJiraSearch } from "../services/jiraClient.js";
+import { chunkValues } from "../../shared/jiraBatch.mjs";
 import { getFieldValue, formatDateOnly } from "../../shared/dashboardMetrics.mjs";
 import { resolveMappedFieldId } from "../../shared/odiFieldIds.mjs";
 
@@ -24,11 +25,16 @@ const fetchIssuesByKeys = async (keys) => {
     return [];
   }
 
-  const data = await fetchJiraSearch({
-    jql: `key in (${keys.join(",")})`,
-    maxResults: keys.length,
-  });
-  return data?.issues || [];
+  const issues = [];
+  for (const batch of chunkValues(keys)) {
+    const data = await fetchJiraSearch({
+      jql: `key in (${batch.join(",")})`,
+      maxResults: batch.length,
+    });
+    issues.push(...(data?.issues || []));
+  }
+
+  return issues;
 };
 
 export const getMostRecentDoneDateForIssue = (issue, mrdFieldId, parentDateByKey = {}) => {
