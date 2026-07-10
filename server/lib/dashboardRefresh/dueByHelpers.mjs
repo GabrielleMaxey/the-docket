@@ -21,7 +21,7 @@ const resolveGrandparentEpicKey = (grandparentKey, parentIssue, issueCache) => {
     return grandparentKey;
   }
 
-  return "";
+  return grandparentKey;
 };
 
 const resolveEpicKeyFromCache = (issue, issueCache) => {
@@ -45,7 +45,7 @@ const resolveEpicKeyFromCache = (issue, issueCache) => {
 
   const parentIssue = issueCache.get(parentKey);
   if (!parentIssue) {
-    return "";
+    return parentKey;
   }
 
   const parentType = String(parentIssue.fields?.issuetype?.name || "").toLowerCase();
@@ -58,7 +58,7 @@ const resolveEpicKeyFromCache = (issue, issueCache) => {
     return resolveGrandparentEpicKey(grandparentKey, parentIssue, issueCache);
   }
 
-  return "";
+  return parentKey;
 };
 
 const collectParentKeysNeedingFetch = (issues, issueCache) => {
@@ -158,6 +158,7 @@ export const buildJqlEpicContext = async ({ issues, mappingsByRole, jiraRequest 
     issueCache,
     jiraRequest,
     fields: epicFields,
+    replace: true,
   });
 
   return { epicKeyToIssues, issueCache };

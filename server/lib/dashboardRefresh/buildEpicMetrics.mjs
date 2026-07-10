@@ -175,17 +175,10 @@ const resolveJqlPresetDueByIssues = async ({
     issueCache = context.issueCache;
   }
 
-  if (preferEpicCompareForChildren) {
-    const epicMappedKeys = new Set();
-    for (const groupIssues of openEpicKeyToIssues.values()) {
-      for (const issue of groupIssues) {
-        epicMappedKeys.add(String(issue.key || ""));
-      }
-    }
-    jqlDueByIssues = jqlDueByIssues.filter((item) => !epicMappedKeys.has(item.key));
-  }
-
   const existingDueByKeys = new Set(jqlDueByIssues.map((i) => i.key));
+  const keysReplacedByEpicDueBy = new Set();
+  const epicDueByAdditions = [];
+
   for (const [epicKey, epicChildIssues] of openEpicKeyToIssues.entries()) {
     const epicIssue = issueCache?.get(epicKey) ||
       (await fetchEpicIssue({ epicKey, mappingsByRole, jiraRequest }));
@@ -205,13 +198,27 @@ const resolveJqlPresetDueByIssues = async ({
       includePastDueInList,
     });
 
+    if (epicLevelDueBy.length === 0) {
+      continue;
+    }
+
+    if (preferEpicCompareForChildren) {
+      for (const issue of epicChildIssues) {
+        keysReplacedByEpicDueBy.add(String(issue.key || ""));
+      }
+    }
+
     for (const item of epicLevelDueBy) {
       existingDueByKeys.add(item.key);
-      jqlDueByIssues.push(item);
+      epicDueByAdditions.push(item);
     }
   }
 
-  return jqlDueByIssues;
+  if (preferEpicCompareForChildren && keysReplacedByEpicDueBy.size > 0) {
+    jqlDueByIssues = jqlDueByIssues.filter((item) => !keysReplacedByEpicDueBy.has(item.key));
+  }
+
+  return [...jqlDueByIssues, ...epicDueByAdditions];
 };
 
 export const buildPastDueOnlyEpicMetrics = async ({
@@ -270,14 +277,11 @@ export const buildPastDueOnlyEpicMetrics = async ({
     const contributorDueByOptions = buildContributorDueContext(ctx, epicIssue);
 
     let childDueByForEpic = childMetrics.dueByIssues;
-    if (ctx.dueByOptions?.preferEpicCompareForChildren) {
-      const openChildKeys = new Set(
-        childMetrics.childIssues
-          .filter((issue) => isIssueOpen(issue))
-          .map((issue) => String(issue.key || ""))
-      );
-      childDueByForEpic = childMetrics.dueByIssues.filter((item) => !openChildKeys.has(item.key));
-    }
+    const openChildKeys = new Set(
+      childMetrics.childIssues
+        .filter((issue) => isIssueOpen(issue))
+        .map((issue) => String(issue.key || ""))
+    );
 
     const epicLevelDueBy = buildEpicLevelDueByIssues({
       epicIssue,
@@ -289,6 +293,10 @@ export const buildPastDueOnlyEpicMetrics = async ({
       pastDueFloor: ctx.pastDueFloor,
       includePastDueInList: ctx.includePastDue,
     });
+
+    if (ctx.dueByOptions?.preferEpicCompareForChildren && epicLevelDueBy.length > 0) {
+      childDueByForEpic = childMetrics.dueByIssues.filter((item) => !openChildKeys.has(item.key));
+    }
 
     const { combined, dueByOpenIssues } = combineDueByIssues(
       { ...childMetrics, dueByIssues: childDueByForEpic },
@@ -460,14 +468,11 @@ export const buildEpicMetricsFromPresets = async ({
     const contributorDueByOptions = buildContributorDueContext(ctx, epicIssue);
 
     let childDueByForEpic = childMetrics.dueByIssues;
-    if (ctx.dueByOptions?.preferEpicCompareForChildren) {
-      const openChildKeys = new Set(
-        childMetrics.childIssues
-          .filter((issue) => isIssueOpen(issue))
-          .map((issue) => String(issue.key || ""))
-      );
-      childDueByForEpic = childMetrics.dueByIssues.filter((item) => !openChildKeys.has(item.key));
-    }
+    const openChildKeys = new Set(
+      childMetrics.childIssues
+        .filter((issue) => isIssueOpen(issue))
+        .map((issue) => String(issue.key || ""))
+    );
 
     const epicLevelDueBy = buildEpicLevelDueByIssues({
       epicIssue,
@@ -479,6 +484,10 @@ export const buildEpicMetricsFromPresets = async ({
       pastDueFloor: ctx.pastDueFloor,
       includePastDueInList: ctx.includePastDue,
     });
+
+    if (ctx.dueByOptions?.preferEpicCompareForChildren && epicLevelDueBy.length > 0) {
+      childDueByForEpic = childMetrics.dueByIssues.filter((item) => !openChildKeys.has(item.key));
+    }
 
     const { combined, dueByOpenIssues } = combineDueByIssues(
       { ...childMetrics, dueByIssues: childDueByForEpic },
