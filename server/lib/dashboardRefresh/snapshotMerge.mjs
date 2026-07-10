@@ -57,6 +57,7 @@ export const snapshotEpicToPersist = (epic) => ({
   statusCounts: epic.statusCounts || {},
   openStatusCounts: epic.openStatusCounts || {},
   contributorMetrics: epic.contributorMetrics || [],
+  epicBreakdown: epic.epicBreakdown || [],
 });
 
 export const snapshotAssigneeToPersist = (assignee) => ({

@@ -249,13 +249,14 @@ These filters are optional. **Refresh status** always updates resolution, worklo
 Toggle each section under **Views** in Filters & Settings. Open/closed state is remembered per section.
 
 **Overall Status**  
-Summary cards — % tasks resolved, % in progress, % projects complete (when epics are selected), and % open tasks overdue.
+Summary cards — % tasks resolved, % in progress, % projects complete (epics with MRD/IDD set, including epics discovered inside JQL presets), and % open tasks overdue.
 
 **Project Metrics**  
 One card per epic/JQL preset showing:
 - Issue completion %, epic %, overdue %
+- **JQL presets** also show **Epics complete** (share of epics with MRD/IDD set) and an **Epics in scope** list with per-epic task completion and epic-done status
 - Status breakdown (pie or bar chart — toggle under **Chart style**)
-- Deadline dates (Initial Done Date, Most Recent Done Date, Project End Date)
+- Deadline dates (Initial Done Date, Most Recent Done Date, Project End Date) on epic presets
 - Past due badge when a deadline has been missed (when Past Due Projects is enabled)
 
 **Upcoming Due Dates** *(optional)*  

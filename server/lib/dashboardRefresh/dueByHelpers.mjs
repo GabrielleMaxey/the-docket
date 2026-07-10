@@ -6,13 +6,67 @@ import {
   parseJiraDate,
   startOfToday,
 } from "../../../shared/dashboardMetrics.mjs";
-import { fetchEpicIssue } from "../jiraSearchHelpers.mjs";
+import { getEpicIssueFieldIds, loadIssuesIntoCache } from "../jiraSearchHelpers.mjs";
 
-export const buildIssueEpicContext = async ({ issues, mappingsByRole, jiraRequest }) => {
-  const parentKeyToGroup = new Map();
+const resolveGrandparentEpicKey = (grandparentKey, parentIssue, issueCache) => {
+  const grandparentTypeFromParent = String(
+    parentIssue.fields?.parent?.fields?.issuetype?.name || ""
+  ).toLowerCase();
+  if (grandparentTypeFromParent === "epic") {
+    return grandparentKey;
+  }
 
-  for (const issue of issues || []) {
-    if (!isIssueOpen(issue)) {
+  const grandparentIssue = issueCache.get(grandparentKey);
+  if (String(grandparentIssue?.fields?.issuetype?.name || "").toLowerCase() === "epic") {
+    return grandparentKey;
+  }
+
+  return "";
+};
+
+const resolveEpicKeyFromCache = (issue, issueCache) => {
+  const issueKey = String(issue.key || "").trim();
+  const issueType = String(issue.fields?.issuetype?.name || "").toLowerCase();
+  if (issueType === "epic") {
+    return issueKey;
+  }
+
+  const parentKey = String(issue.fields?.parent?.key || "").trim();
+  if (!parentKey) {
+    return "";
+  }
+
+  const parentTypeFromSearch = String(
+    issue.fields?.parent?.fields?.issuetype?.name || ""
+  ).toLowerCase();
+  if (parentTypeFromSearch === "epic") {
+    return parentKey;
+  }
+
+  const parentIssue = issueCache.get(parentKey);
+  if (!parentIssue) {
+    return "";
+  }
+
+  const parentType = String(parentIssue.fields?.issuetype?.name || "").toLowerCase();
+  if (parentType === "epic") {
+    return parentKey;
+  }
+
+  const grandparentKey = String(parentIssue.fields?.parent?.key || "").trim();
+  if (grandparentKey) {
+    return resolveGrandparentEpicKey(grandparentKey, parentIssue, issueCache);
+  }
+
+  return "";
+};
+
+const collectParentKeysNeedingFetch = (issues, issueCache) => {
+  const keys = new Set();
+
+  for (const issue of issues) {
+    const issueType = String(issue.fields?.issuetype?.name || "").toLowerCase();
+    if (issueType === "epic") {
       continue;
     }
 
@@ -21,42 +75,124 @@ export const buildIssueEpicContext = async ({ issues, mappingsByRole, jiraReques
       continue;
     }
 
-    const parentIssuetype = String(
+    const parentTypeFromSearch = String(
       issue.fields?.parent?.fields?.issuetype?.name || ""
     ).toLowerCase();
-
-    if (!parentKeyToGroup.has(parentKey)) {
-      parentKeyToGroup.set(parentKey, { issues: [], isEpic: parentIssuetype === "epic" });
+    if (parentTypeFromSearch === "epic") {
+      continue;
     }
 
-    parentKeyToGroup.get(parentKey).issues.push(issue);
+    if (!issueCache.has(parentKey)) {
+      keys.add(parentKey);
+    }
   }
+
+  return keys;
+};
+
+const collectGrandparentKeysNeedingFetch = (parentKeys, issueCache) => {
+  const keys = new Set();
+
+  for (const parentKey of parentKeys) {
+    const parentIssue = issueCache.get(parentKey);
+    if (!parentIssue) {
+      continue;
+    }
+
+    if (String(parentIssue.fields?.issuetype?.name || "").toLowerCase() === "epic") {
+      continue;
+    }
+
+    const grandparentKey = String(parentIssue.fields?.parent?.key || "").trim();
+    if (grandparentKey && !issueCache.has(grandparentKey)) {
+      keys.add(grandparentKey);
+    }
+  }
+
+  return keys;
+};
+
+export const buildJqlEpicContext = async ({ issues, mappingsByRole, jiraRequest }) => {
+  const issueCache = new Map();
+  const epicFields = getEpicIssueFieldIds(mappingsByRole);
+  const parentFields = ["summary", "issuetype", "parent"];
+
+  for (const issue of issues) {
+    const issueKey = String(issue.key || "").trim();
+    if (issueKey) {
+      issueCache.set(issueKey, issue);
+    }
+  }
+
+  const parentKeys = collectParentKeysNeedingFetch(issues, issueCache);
+  await loadIssuesIntoCache({
+    keys: [...parentKeys],
+    issueCache,
+    jiraRequest,
+    fields: parentFields,
+  });
+
+  const grandparentKeys = collectGrandparentKeysNeedingFetch(parentKeys, issueCache);
+  await loadIssuesIntoCache({
+    keys: [...grandparentKeys],
+    issueCache,
+    jiraRequest,
+    fields: parentFields,
+  });
+
+  const epicKeyToIssues = new Map();
+  for (const issue of issues) {
+    const epicKey = resolveEpicKeyFromCache(issue, issueCache);
+    if (!epicKey) {
+      continue;
+    }
+
+    if (!epicKeyToIssues.has(epicKey)) {
+      epicKeyToIssues.set(epicKey, []);
+    }
+    epicKeyToIssues.get(epicKey).push(issue);
+  }
+
+  await loadIssuesIntoCache({
+    keys: [...epicKeyToIssues.keys()],
+    issueCache,
+    jiraRequest,
+    fields: epicFields,
+  });
+
+  return { epicKeyToIssues, issueCache };
+};
+
+export const filterEpicGroupsToOpenIssues = (epicKeyToIssues) => {
+  const filtered = new Map();
+  for (const [epicKey, groupIssues] of epicKeyToIssues.entries()) {
+    const openIssues = groupIssues.filter((issue) => isIssueOpen(issue));
+    if (openIssues.length > 0) {
+      filtered.set(epicKey, openIssues);
+    }
+  }
+  return filtered;
+};
+
+export const buildIssueEpicContext = async ({ issues, mappingsByRole, jiraRequest }) => {
+  const openIssues = (issues || []).filter((issue) => isIssueOpen(issue));
+  const { epicKeyToIssues, issueCache } = await buildJqlEpicContext({
+    issues: openIssues,
+    mappingsByRole,
+    jiraRequest,
+  });
 
   const issueToEpicKey = new Map();
-  const epicKeys = new Set();
-
-  for (const [parentKey, { issues: groupIssues, isEpic }] of parentKeyToGroup.entries()) {
-    let resolvedEpicKey = parentKey;
-
-    if (!isEpic) {
-      const parentData = await fetchEpicIssue({ epicKey: parentKey, mappingsByRole, jiraRequest });
-      const grandparentKey = String(parentData?.fields?.parent?.key || "").trim();
-      if (grandparentKey) {
-        resolvedEpicKey = grandparentKey;
-      }
-    }
-
-    epicKeys.add(resolvedEpicKey);
-    for (const issue of groupIssues) {
-      issueToEpicKey.set(String(issue.key || ""), resolvedEpicKey);
-    }
-  }
-
   const epicByKey = new Map();
-  for (const epicKey of epicKeys) {
-    const epicIssue = await fetchEpicIssue({ epicKey, mappingsByRole, jiraRequest });
+
+  for (const [epicKey, groupIssues] of epicKeyToIssues.entries()) {
+    const epicIssue = issueCache.get(epicKey);
     if (epicIssue) {
       epicByKey.set(epicKey, epicIssue);
+    }
+
+    for (const issue of groupIssues) {
+      issueToEpicKey.set(String(issue.key || ""), epicKey);
     }
   }
 

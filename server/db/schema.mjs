@@ -167,6 +167,7 @@ const migrateDatabase = (db) => {
     "UPDATE dashboard_snapshots SET past_due_lookback_years = 3 WHERE extended_past_due_history = 1 AND past_due_lookback_years = 1"
   ).run();
   ensureColumn(db, "dashboard_epic_metrics", "due_by_open_issues", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "dashboard_epic_metrics", "epic_breakdown_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "app_settings", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
 
   db.prepare(
@@ -333,6 +334,17 @@ export const mapDashboardEpicMetricRow = (row) => {
           : {},
       overdueIssues: Array.isArray(row?.overdueIssues) ? row.overdueIssues : [],
       upcomingDueIssues: Array.isArray(row?.upcomingDueIssues) ? row.upcomingDueIssues : [],
+    })),
+    epicBreakdown: parseJsonArray(row.epic_breakdown_json).map((item) => ({
+      epicKey: String(item?.epicKey || "").trim(),
+      epicName: String(item?.epicName || "").trim(),
+      issuePercent: Number(item?.issuePercent || 0),
+      epicPercent: Number(item?.epicPercent || 0),
+      totalIssues: Number(item?.totalIssues || 0),
+      completedIssues: Number(item?.completedIssues || 0),
+      openIssues: Number(item?.openIssues || 0),
+      initialDoneDate: item?.initialDoneDate || null,
+      mostRecentDoneDate: item?.mostRecentDoneDate || null,
     })),
   };
 };

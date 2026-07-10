@@ -1166,6 +1166,50 @@ export const computeJqlWatchMetrics = (
   };
 };
 
+export const rollupEpicPercentFromBreakdown = (breakdown) => {
+  const rows = Array.isArray(breakdown) ? breakdown : [];
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  const complete = rows.filter((row) => Number(row?.epicPercent || 0) >= 100).length;
+  return (complete / rows.length) * 100;
+};
+
+export const collectEpicCompletionCounts = (epicMetrics) => {
+  let epicsComplete = 0;
+  let epicCount = 0;
+
+  for (const epic of epicMetrics || []) {
+    const breakdown = Array.isArray(epic.epicBreakdown) ? epic.epicBreakdown : null;
+    if (breakdown && breakdown.length > 0) {
+      for (const row of breakdown) {
+        epicCount += 1;
+        if (Number(row.epicPercent || 0) >= 100) {
+          epicsComplete += 1;
+        }
+      }
+      continue;
+    }
+
+    if (String(epic.epicKey || "").trim() === "JQL") {
+      continue;
+    }
+
+    const epicKey = String(epic.epicKey || "").trim();
+    if (!epicKey) {
+      continue;
+    }
+
+    epicCount += 1;
+    if (Number(epic.epicPercent || 0) >= 100) {
+      epicsComplete += 1;
+    }
+  }
+
+  return { epicsComplete, epicCount };
+};
+
 export const computeOverallRollup = (epicMetrics) => {
   if (epicMetrics.length === 0) {
     return {
@@ -1178,19 +1222,16 @@ export const computeOverallRollup = (epicMetrics) => {
 
   let totalCompleted = 0;
   let totalIssues = 0;
-  let epicsComplete = 0;
   let totalOverdueOpen = 0;
   let totalOpen = 0;
   const statusCounts = {};
+  const { epicsComplete, epicCount } = collectEpicCompletionCounts(epicMetrics);
 
   for (const epic of epicMetrics) {
     totalCompleted += epic.completedIssues ?? 0;
     totalIssues += epic.totalIssues;
     totalOverdueOpen += epic.overdueOpenIssues;
     totalOpen += epic.openIssues;
-    if (epic.epicPercent >= 100) {
-      epicsComplete += 1;
-    }
 
     const counts = epic.statusCounts || {};
     for (const [status, count] of Object.entries(counts)) {
@@ -1200,7 +1241,7 @@ export const computeOverallRollup = (epicMetrics) => {
 
   return {
     overallIssuePercent: totalIssues > 0 ? (totalCompleted / totalIssues) * 100 : 0,
-    overallEpicPercent: (epicsComplete / epicMetrics.length) * 100,
+    overallEpicPercent: epicCount > 0 ? (epicsComplete / epicCount) * 100 : 0,
     overallOverduePercent: totalOpen > 0 ? (totalOverdueOpen / totalOpen) * 100 : 0,
     statusCounts,
   };

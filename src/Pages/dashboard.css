@@ -381,6 +381,79 @@
   background: #f8fafc;
 }
 
+.dashboard-page .dashboard-epic-breakdown {
+  margin: 0.75rem 0 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.dashboard-page .dashboard-epic-breakdown-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.dashboard-page .dashboard-epic-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.dashboard-page .dashboard-epic-breakdown-row {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.dashboard-page .dashboard-epic-breakdown-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.dashboard-page .dashboard-epic-breakdown-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.dashboard-page .dashboard-epic-breakdown-name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.dashboard-page .dashboard-epic-breakdown-name a:hover {
+  color: #2563eb;
+}
+
+.dashboard-page .dashboard-epic-breakdown-key {
+  font-size: 0.75rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.dashboard-page .dashboard-epic-breakdown-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.dashboard-page .dashboard-epic-breakdown-count {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
 .dashboard-page .dashboard-epic-metrics-totals {
   min-width: 180px;
 }
