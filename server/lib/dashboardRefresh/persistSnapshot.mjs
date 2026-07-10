@@ -54,6 +54,7 @@ export const persistDashboardSnapshot = ({
         statusCountsJson: JSON.stringify(epic.statusCounts || {}),
         openStatusCountsJson: JSON.stringify(epic.openStatusCounts || {}),
         contributorMetricsJson: JSON.stringify(epic.contributorMetrics || []),
+        epicBreakdownJson: JSON.stringify(epic.epicBreakdown || []),
       });
     }
 

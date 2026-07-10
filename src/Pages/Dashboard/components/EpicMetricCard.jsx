@@ -1,8 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { formatPercent } from "../../../utils/format";
 import StatusPieChart from "../../../Components/StatusPieChart";
-import { getTerminalIssueCount } from "../../../../shared/dashboardMetrics.mjs";
+import { collectEpicCompletionCounts, getTerminalIssueCount } from "../../../../shared/dashboardMetrics.mjs";
 import {
   buildEpicPieStatusCounts,
   getWorkloadStatusCounts,
@@ -11,9 +10,19 @@ import {
 import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 import MetricBar from "./MetricBar";
 import ProjectContributorMetrics from "./ProjectContributorMetrics";
+import EpicBreakdownList from "./EpicBreakdownList";
 
 const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePastDue }) => {
   const isJqlPreset = epic.epicKey === "JQL";
+  const epicBreakdown = Array.isArray(epic.epicBreakdown) ? epic.epicBreakdown : [];
+  const hasEpicBreakdown = isJqlPreset && epicBreakdown.length > 0;
+  const { epicsComplete, epicCount } = React.useMemo(
+    () =>
+      hasEpicBreakdown
+        ? collectEpicCompletionCounts([epic])
+        : { epicsComplete: epic.epicPercent >= 100 ? 1 : 0, epicCount: isJqlPreset ? 0 : 1 },
+    [epic, hasEpicBreakdown, isJqlPreset]
+  );
   const workloadStatuses = React.useMemo(() => getWorkloadStatusCounts(epic), [epic]);
   const contributorMetrics = Array.isArray(epic.contributorMetrics) ? epic.contributorMetrics : [];
   const jiraUrl =
@@ -89,7 +98,15 @@ const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePas
               value={epic.totalIssues > 0 ? (workloadStatuses.inProgress / epic.totalIssues) * 100 : 0}
             />
           ) : null}
-          {!isJqlPreset ? <MetricBar label="Project complete" value={epic.epicPercent} /> : null}
+          {!isJqlPreset ? (
+            <MetricBar label="Project complete" value={epic.epicPercent} />
+          ) : hasEpicBreakdown ? (
+            <MetricBar
+              label="Epics complete"
+              value={epic.epicPercent}
+              count={`${epicsComplete} of ${epicCount}`}
+            />
+          ) : null}
           <MetricBar label="Open tasks past due" value={epic.overduePercent} />
 
           {epic.totalIssues === 0 ? (
@@ -114,6 +131,10 @@ const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePas
             ) : null}
             {!isJqlPreset && epic.projectEndDate ? <p>Project End Date: {epic.projectEndDate}</p> : null}
           </div>
+
+          {hasEpicBreakdown ? (
+            <EpicBreakdownList breakdown={epicBreakdown} jiraBaseUrl={jiraBaseUrl} />
+          ) : null}
 
           <ProjectContributorMetrics
             contributorMetrics={contributorMetrics}

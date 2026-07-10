@@ -85,7 +85,8 @@ export const registerDashboardRoutes = (
       past_due_reason,
       status_counts_json,
       open_status_counts_json,
-      contributor_metrics_json
+      contributor_metrics_json,
+      epic_breakdown_json
     ) VALUES (
       @snapshotId,
       @epicPresetId,
@@ -106,7 +107,8 @@ export const registerDashboardRoutes = (
       @pastDueReason,
       @statusCountsJson,
       @openStatusCountsJson,
-      @contributorMetricsJson
+      @contributorMetricsJson,
+      @epicBreakdownJson
     )
   `);
 

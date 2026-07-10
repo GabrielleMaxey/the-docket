@@ -14,7 +14,7 @@ import {
   useAttachBackgroundJob,
   useBackgroundJobRunning,
 } from "../../../hooks/useBackgroundJobs.js";
-import { getTerminalIssueCount, normalizePastDueLookbackYears } from "../../../../shared/dashboardMetrics.mjs";
+import { collectEpicCompletionCounts, getTerminalIssueCount, normalizePastDueLookbackYears } from "../../../../shared/dashboardMetrics.mjs";
 import {
   sameNumberSet,
   sameStringSet,
@@ -356,8 +356,7 @@ export const useDashboardRefresh = ({
     let openIssues = 0;
     let overdueOpenIssues = 0;
     let inProgressIssues = 0;
-    let completeEpics = 0;
-    const epicTypePresets = epics.filter((epic) => epic.epicKey && epic.epicKey !== "JQL");
+    const { epicsComplete, epicCount } = collectEpicCompletionCounts(epics);
 
     for (const epic of epics) {
       totalIssues += Number(epic.totalIssues || 0);
@@ -368,20 +367,14 @@ export const useDashboardRefresh = ({
       inProgressIssues += workload.inProgress;
     }
 
-    for (const epic of epicTypePresets) {
-      if (Number(epic.epicPercent || 0) >= 100) {
-        completeEpics += 1;
-      }
-    }
-
     return {
       totalIssues,
       resolvedIssues,
       openIssues,
       overdueOpenIssues,
       inProgressIssues,
-      completeEpics,
-      epicCount: epicTypePresets.length,
+      completeEpics: epicsComplete,
+      epicCount,
     };
   }, [snapshot?.epics]);
 
