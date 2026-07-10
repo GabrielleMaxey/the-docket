@@ -959,6 +959,13 @@
   white-space: nowrap;
 }
 
+.dashboard-page .dashboard-auto-refresh-hint {
+  margin: 0.35rem 0 0.85rem;
+  font-size: 0.78rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
 .dashboard-page .dashboard-due-by-input {
   border: 1px solid #cbd5e1;
   border-radius: 8px;

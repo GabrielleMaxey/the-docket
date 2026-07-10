@@ -157,9 +157,23 @@ export const runsNeedParentMrddEnrich = (runs) =>
       (!run.mrdFieldId || run.parentMostRecentDoneDateByKey === undefined)
   );
 
+export const getEffectiveDueDateForIssue = (
+  issue,
+  { dueFieldId, mrdFieldId, parentMostRecentDoneDateByKey } = {}
+) => {
+  const dueId = String(dueFieldId || "duedate").trim() || "duedate";
+  const taskDue = formatDateOnly(getFieldValue(issue, dueId));
+  if (taskDue) {
+    return taskDue;
+  }
+
+  return getMostRecentDoneDateForIssue(issue, mrdFieldId, parentMostRecentDoneDateByKey);
+};
+
 export const enrichRunWithParentDoneDates = async (run, fieldMappingRows) => {
   const mappingsByRole = resolveFieldMappingRows(fieldMappingRows);
   const mrdFieldId = resolveMappedFieldId(mappingsByRole, "most_recent_done_date");
+  const dueFieldId = resolveMappedFieldId(mappingsByRole, "due_date") || "duedate";
   const parentMostRecentDoneDateByKey = await buildParentMostRecentDoneDateMap(
     run.issues || [],
     mrdFieldId
@@ -168,6 +182,7 @@ export const enrichRunWithParentDoneDates = async (run, fieldMappingRows) => {
   return {
     ...run,
     mrdFieldId,
+    dueFieldId,
     parentMostRecentDoneDateByKey,
   };
 };

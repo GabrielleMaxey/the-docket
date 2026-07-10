@@ -12,6 +12,8 @@ import {
   UPCOMING_DUE_PRESET_CUSTOM,
   UPCOMING_DUE_PRESET_OFF,
   upcomingDueDateForPreset,
+  DASHBOARD_AUTO_REFRESH_OPTIONS,
+  getDashboardAutoRefreshHint,
 } from "../utils/dashboardMetricsUtils";
 
 const SelectorClear = ({ onClick, label = "Clear" }) => (
@@ -60,6 +62,8 @@ const DashboardFiltersPanel = ({
   hasEpicScope,
   hasContributorScope,
   refreshFlash,
+  autoRefreshInterval,
+  setAutoRefreshInterval,
 }) => {
   const isInternalDuePresetUpdate = React.useRef(false);
   const [upcomingPresetMode, setUpcomingPresetMode] = React.useState(() =>
@@ -419,6 +423,23 @@ const DashboardFiltersPanel = ({
           <SelectorClear onClick={clearChartStyle} />
         </div>
       </div>
+
+      <div className="dashboard-section-toggle-row">
+        <span className="dashboard-due-by-label">Auto-refresh</span>
+        {DASHBOARD_AUTO_REFRESH_OPTIONS.map(({ value, label }) => (
+          <label key={value} className="dashboard-section-toggle-label">
+            <input
+              type="radio"
+              name="dashboardAutoRefresh"
+              value={value}
+              checked={autoRefreshInterval === value}
+              onChange={() => setAutoRefreshInterval(value)}
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+      <p className="dashboard-auto-refresh-hint">{getDashboardAutoRefreshHint(autoRefreshInterval)}</p>
 
       <DashboardRefreshActions
         onRefresh={handleRefresh}

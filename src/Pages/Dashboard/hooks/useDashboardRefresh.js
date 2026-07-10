@@ -24,6 +24,9 @@ import {
   getDashboardRefreshTimeoutMs,
   resolveEffectiveRefreshScope,
   getDashboardRefreshStatusHint,
+  isDashboardSnapshotStaleForAutoRefresh,
+  normalizeDashboardAutoRefreshInterval,
+  DASHBOARD_AUTO_REFRESH_MANUAL,
 } from "../utils/dashboardMetricsUtils";
 
 const buildRefreshPayload = ({
@@ -66,6 +69,7 @@ export const useDashboardRefresh = ({
   includePastDue,
   setSelectedPresetIds,
   setIncludePastDue,
+  autoRefreshInterval = "manual",
 }) => {
   const [snapshot, setSnapshot] = React.useState(null);
   const [metricsLoading, setMetricsLoading] = React.useState(true);
@@ -377,6 +381,43 @@ export const useDashboardRefresh = ({
       epicCount,
     };
   }, [snapshot?.epics]);
+
+  const handleRefreshRef = React.useRef(handleRefresh);
+  handleRefreshRef.current = handleRefresh;
+
+  React.useEffect(() => {
+    const interval = normalizeDashboardAutoRefreshInterval(autoRefreshInterval);
+    if (interval === DASHBOARD_AUTO_REFRESH_MANUAL) {
+      return undefined;
+    }
+
+    const tick = () => {
+      if (metricsLoading || refreshLoading) {
+        return;
+      }
+      if (!hasEpicScope && !hasContributorScope) {
+        return;
+      }
+      if (!isDashboardSnapshotStaleForAutoRefresh(snapshot?.refreshedAt, interval)) {
+        return;
+      }
+      handleRefreshRef.current();
+    };
+
+    const initialDelayId = setTimeout(tick, 2500);
+    const intervalId = setInterval(tick, 15 * 60 * 1000);
+    return () => {
+      clearTimeout(initialDelayId);
+      clearInterval(intervalId);
+    };
+  }, [
+    autoRefreshInterval,
+    metricsLoading,
+    refreshLoading,
+    hasEpicScope,
+    hasContributorScope,
+    snapshot?.refreshedAt,
+  ]);
 
   return {
     snapshot,
