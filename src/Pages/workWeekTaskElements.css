@@ -1533,7 +1533,7 @@
   min-width: 75px;
 }
 
-/* MRD (Most Recent Done Date) */
+/* Due (task due date or inherited MRD) */
 .work-week-page .ww-results-table th:nth-child(7),
 .work-week-page .ww-results-table td:nth-child(7) {
   width: 6%;
@@ -1541,7 +1541,7 @@
   white-space: nowrap;
 }
 
-/* Parent */
+/* MRD (Most Recent Done Date) */
 .work-week-page .ww-results-table th:nth-child(8),
 .work-week-page .ww-results-table td:nth-child(8) {
   width: 6%;
@@ -1549,23 +1549,31 @@
   white-space: nowrap;
 }
 
-/* Priority */
+/* Parent */
 .work-week-page .ww-results-table th:nth-child(9),
 .work-week-page .ww-results-table td:nth-child(9) {
+  width: 6%;
+  min-width: 85px;
+  white-space: nowrap;
+}
+
+/* Priority */
+.work-week-page .ww-results-table th:nth-child(10),
+.work-week-page .ww-results-table td:nth-child(10) {
   width: 6%;
   min-width: 80px;
 }
 
 /* Notes */
-.work-week-page .ww-results-table th:nth-child(10),
-.work-week-page .ww-results-table td:nth-child(10) {
+.work-week-page .ww-results-table th:nth-child(11),
+.work-week-page .ww-results-table td:nth-child(11) {
   width: 20%;
   min-width: 280px;
 }
 
 /* Push to Jira */
-.work-week-page .ww-results-table th:nth-child(11),
-.work-week-page .ww-results-table td:nth-child(11) {
+.work-week-page .ww-results-table th:nth-child(12),
+.work-week-page .ww-results-table td:nth-child(12) {
   width: 10%;
   min-width: 150px;
 }
