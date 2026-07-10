@@ -246,7 +246,7 @@ const Dashboard = () => {
                 {overallTotals.epicCount > 0 ? (
                   <OverallSummaryCard
                     label="Projects complete"
-                    description="Percentage of individual Jira epics where every child task is resolved."
+                    description="Percentage of epics with Initial Done Date or Most Recent Done Date set (MRD/IDD)."
                     percent={snapshot.overallEpicPercent}
                     numerator={overallTotals.completeEpics}
                     denominator={overallTotals.epicCount}

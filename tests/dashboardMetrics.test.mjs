@@ -9,6 +9,8 @@ import {
   computeEpicPastDue,
   computeEpicPercent,
   computeOverallRollup,
+  collectEpicCompletionCounts,
+  rollupEpicPercentFromBreakdown,
   computePastDueFloorDate,
   formatDateOnly,
   getIssueDueByDate,
@@ -437,10 +439,43 @@ describe("computeEpicPercent", () => {
   });
 });
 
+describe("rollupEpicPercentFromBreakdown", () => {
+  it("returns percent of epics with MRD/IDD complete", () => {
+    assert.equal(
+      rollupEpicPercentFromBreakdown([
+        { epicPercent: 100 },
+        { epicPercent: 0 },
+        { epicPercent: 100 },
+      ]),
+      (2 / 3) * 100
+    );
+    assert.equal(rollupEpicPercentFromBreakdown([]), 0);
+  });
+});
+
+describe("collectEpicCompletionCounts", () => {
+  it("counts epic presets and JQL breakdown rows", () => {
+    const counts = collectEpicCompletionCounts([
+      { epicKey: "EPIC-1", epicPercent: 100 },
+      {
+        epicKey: "JQL",
+        epicPercent: 50,
+        epicBreakdown: [
+          { epicKey: "EPIC-2", epicPercent: 100 },
+          { epicKey: "EPIC-3", epicPercent: 0 },
+        ],
+      },
+    ]);
+
+    assert.deepEqual(counts, { epicsComplete: 2, epicCount: 3 });
+  });
+});
+
 describe("computeOverallRollup", () => {
   it("rolls up percentages and status counts", () => {
     const rollup = computeOverallRollup([
       {
+        epicKey: "EPIC-1",
         completedIssues: 2,
         totalIssues: 4,
         openIssues: 2,
@@ -449,6 +484,7 @@ describe("computeOverallRollup", () => {
         statusCounts: { Done: 2, "In Progress": 2 },
       },
       {
+        epicKey: "EPIC-2",
         completedIssues: 0,
         totalIssues: 2,
         openIssues: 2,

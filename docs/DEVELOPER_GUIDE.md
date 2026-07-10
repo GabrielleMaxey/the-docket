@@ -297,16 +297,24 @@ These are mapped in Settings → Jira field mapping and synced via `POST /api/ji
 - When **Compare against = MRD**: `[MRD]`
 - When **Compare against = IDD**: `[IDD]`
 
-**Three-step parent walk for JQL presets (`buildEpicMetrics.mjs → resolveJqlPresetDueByIssues`):**
+**Epic parent resolution for JQL presets (`dueByHelpers.mjs → buildJqlEpicContext`):**
 
-JQL presets return tasks/sub-tasks, not epics. Dates live only on epics. The pipeline walks up:
+JQL presets return tasks/sub-tasks, not epics. Epic-level dates and JQL epic breakdown both need a resolved epic key per issue:
 
-1. Group open issues by their immediate parent key (from `issue.fields.parent.key`)
-2. For each parent that isn’t already an epic, call `fetchEpicIssue(parentKey)` to get the Story and read its `fields.parent.key` — the Epic key
-3. Call `fetchEpicIssue(epicKey)` to get the Epic with its date fields
-4. Pass the epic to `buildEpicLevelDueByIssues` — which picks the earliest date from `candidateFieldIds` within the cutoff window and maps all open child issues to that date
+1. Seed a cache from the JQL search results.
+2. Batch-fetch missing parent issues (`key in (...)` in chunks of 50 via `shared/jiraBatch.mjs`).
+3. Walk Story → Epic using cached `parent` fields; fall back to parent/grandparent keys when issuetype metadata is missing.
+4. Batch-fetch epic issues with full date fields (`getEpicIssueFieldIds`) before due-by lists or epic breakdown metrics run.
 
-**`fetchEpicIssue` always requests `parent`** in its field list — required for step 2 above. Without it the Story fetch returns no `parent`, the grandparent Epic key is never found, and no issues appear in the due-by list.
+`buildEpicMetrics.mjs` calls `buildJqlEpicContext` once per JQL preset and reuses the result for epic breakdown and `resolveJqlPresetDueByIssues`.
+
+**Due-by list population (`resolveJqlPresetDueByIssues`):**
+
+1. Group open issues by resolved epic key from the shared context above.
+2. Pass each epic to `buildEpicLevelDueByIssues` — picks the earliest date from `candidateFieldIds` within the cutoff window and maps open child issues to that date.
+3. When **Compare against = MRD/IDD**, child task rows are replaced by epic-level rows only when epic-level rows are actually produced.
+
+**`fetchEpicIssue` / `getEpicIssueFieldIds`** always request `parent` plus MRD/IDD/PED — required for the Story → Epic walk. Without `parent` on the Story fetch, the grandparent Epic key is never found and due-by lists stay empty.
 
 Info-level logging throughout this pipeline (tag `[dashboard]`) traces the walk at each step: Story → Epic resolution, resolved date per epic, and how many issues were added. Set `LOG_LEVEL=info` to see it.
 

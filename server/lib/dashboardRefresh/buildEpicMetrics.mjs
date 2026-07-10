@@ -7,6 +7,7 @@ import {
   formatDateOnly,
   getFieldValue,
   isIssueOpen,
+  rollupEpicPercentFromBreakdown,
 } from "../../../shared/dashboardMetrics.mjs";
 import {
   buildDashboardMetricsJql,
@@ -14,7 +15,11 @@ import {
   resolvePresetJql,
 } from "../epicFilterJql.mjs";
 import { fetchEpicIssue, resolveJiraUser, searchAllIssues } from "../jiraSearchHelpers.mjs";
-import { buildEpicLevelDueByIssues } from "./dueByHelpers.mjs";
+import {
+  buildEpicLevelDueByIssues,
+  buildJqlEpicContext,
+  filterEpicGroupsToOpenIssues,
+} from "./dueByHelpers.mjs";
 import { createLogger } from "../../lib/logger.mjs";
 
 const log = createLogger("dashboard");
@@ -107,8 +112,42 @@ const buildEpicMetricRecord = ({
   childIssues: childMetrics.childIssues,
 });
 
+const buildJqlEpicBreakdownFromContext = ({ epicKeyToIssues, issueCache, ctx }) => {
+  const breakdown = [];
+
+  for (const [epicKey, groupIssues] of epicKeyToIssues.entries()) {
+    const epicIssue = issueCache.get(epicKey);
+    const epicName = String(epicIssue?.fields?.summary || epicKey).trim() || epicKey;
+    const childMetrics = computeChildIssueMetrics(
+      groupIssues,
+      epicKey,
+      ctx.dueFieldId,
+      null,
+      ctx.overdueFieldIds,
+      null
+    );
+
+    breakdown.push({
+      epicKey,
+      epicName,
+      issuePercent: childMetrics.issuePercent,
+      epicPercent: computeEpicPercent(epicIssue, ctx.mappingsByRole),
+      totalIssues: childMetrics.totalIssues,
+      completedIssues: childMetrics.completedIssues,
+      openIssues: childMetrics.openIssues,
+      initialDoneDate: formatDateOnly(getFieldValue(epicIssue, ctx.iddFieldId)),
+      mostRecentDoneDate: formatDateOnly(getFieldValue(epicIssue, ctx.mrdFieldId)),
+    });
+  }
+
+  breakdown.sort((left, right) => left.epicKey.localeCompare(right.epicKey));
+  return breakdown;
+};
+
 const resolveJqlPresetDueByIssues = async ({
   childMetrics,
+  epicKeyToIssues = null,
+  issueCache = null,
   dueByDate,
   candidateFieldIds,
   mappingsByRole,
@@ -122,43 +161,23 @@ const resolveJqlPresetDueByIssues = async ({
     return jqlDueByIssues;
   }
 
-  const parentKeyToGroup = new Map();
-  for (const issue of childMetrics.childIssues) {
-    if (!isIssueOpen(issue)) {
-      continue;
-    }
-    const parentKey = String(issue.fields?.parent?.key || "").trim();
-    if (!parentKey) {
-      continue;
-    }
-    const parentIssuetype = String(
-      issue.fields?.parent?.fields?.issuetype?.name || ""
-    ).toLowerCase();
-    if (!parentKeyToGroup.has(parentKey)) {
-      parentKeyToGroup.set(parentKey, { issues: [], isEpic: parentIssuetype === "epic" });
-    }
-    parentKeyToGroup.get(parentKey).issues.push(issue);
-  }
+  let openEpicKeyToIssues = epicKeyToIssues
+    ? filterEpicGroupsToOpenIssues(epicKeyToIssues)
+    : null;
 
-  const epicKeyToIssues = new Map();
-  for (const [parentKey, { issues: groupIssues, isEpic }] of parentKeyToGroup.entries()) {
-    let resolvedEpicKey = parentKey;
-    if (!isEpic) {
-      const parentData = await fetchEpicIssue({ epicKey: parentKey, mappingsByRole, jiraRequest });
-      const grandparentKey = String(parentData?.fields?.parent?.key || "").trim();
-      if (grandparentKey) {
-        resolvedEpicKey = grandparentKey;
-      }
-    }
-    if (!epicKeyToIssues.has(resolvedEpicKey)) {
-      epicKeyToIssues.set(resolvedEpicKey, []);
-    }
-    epicKeyToIssues.get(resolvedEpicKey).push(...groupIssues);
+  if (!openEpicKeyToIssues) {
+    const context = await buildJqlEpicContext({
+      issues: childMetrics.childIssues.filter((issue) => isIssueOpen(issue)),
+      mappingsByRole,
+      jiraRequest,
+    });
+    openEpicKeyToIssues = filterEpicGroupsToOpenIssues(context.epicKeyToIssues);
+    issueCache = context.issueCache;
   }
 
   if (preferEpicCompareForChildren) {
     const epicMappedKeys = new Set();
-    for (const groupIssues of epicKeyToIssues.values()) {
+    for (const groupIssues of openEpicKeyToIssues.values()) {
       for (const issue of groupIssues) {
         epicMappedKeys.add(String(issue.key || ""));
       }
@@ -167,8 +186,9 @@ const resolveJqlPresetDueByIssues = async ({
   }
 
   const existingDueByKeys = new Set(jqlDueByIssues.map((i) => i.key));
-  for (const [epicKey, epicChildIssues] of epicKeyToIssues.entries()) {
-    const epicIssue = await fetchEpicIssue({ epicKey, mappingsByRole, jiraRequest });
+  for (const [epicKey, epicChildIssues] of openEpicKeyToIssues.entries()) {
+    const epicIssue = issueCache?.get(epicKey) ||
+      (await fetchEpicIssue({ epicKey, mappingsByRole, jiraRequest }));
     if (!epicIssue) {
       log.warn(`due-by: skipping ${epicKey} — could not fetch epic`);
       continue;
@@ -269,6 +289,7 @@ export const buildPastDueOnlyEpicMetrics = async ({
       pastDueFloor: ctx.pastDueFloor,
       includePastDueInList: ctx.includePastDue,
     });
+
     const { combined, dueByOpenIssues } = combineDueByIssues(
       { ...childMetrics, dueByIssues: childDueByForEpic },
       epicLevelDueBy
@@ -355,8 +376,22 @@ export const buildEpicMetricsFromPresets = async ({
       );
       childMetrics.dueFieldId = ctx.dueFieldId;
 
+      const jqlEpicContext = await buildJqlEpicContext({
+        issues,
+        mappingsByRole: ctx.mappingsByRole,
+        jiraRequest,
+      });
+      const epicBreakdown = buildJqlEpicBreakdownFromContext({
+        epicKeyToIssues: jqlEpicContext.epicKeyToIssues,
+        issueCache: jqlEpicContext.issueCache,
+        ctx,
+      });
+      const epicPercent = rollupEpicPercentFromBreakdown(epicBreakdown);
+
       const jqlDueByIssues = await resolveJqlPresetDueByIssues({
         childMetrics,
+        epicKeyToIssues: jqlEpicContext.epicKeyToIssues,
+        issueCache: jqlEpicContext.issueCache,
         dueByDate: ctx.dueByDate,
         candidateFieldIds: ctx.candidateFieldIds,
         mappingsByRole: ctx.mappingsByRole,
@@ -371,7 +406,8 @@ export const buildEpicMetricsFromPresets = async ({
         epicKey: preset.epicKey,
         epicName: preset.epicName,
         issuePercent: childMetrics.issuePercent,
-        epicPercent: 0,
+        epicPercent,
+        epicBreakdown,
         overduePercent: childMetrics.overduePercent,
         totalIssues: childMetrics.totalIssues,
         completedIssues: childMetrics.completedIssues,
@@ -443,6 +479,7 @@ export const buildEpicMetricsFromPresets = async ({
       pastDueFloor: ctx.pastDueFloor,
       includePastDueInList: ctx.includePastDue,
     });
+
     const { combined, dueByOpenIssues } = combineDueByIssues(
       { ...childMetrics, dueByIssues: childDueByForEpic },
       epicLevelDueBy
