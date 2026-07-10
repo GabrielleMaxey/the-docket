@@ -73,6 +73,7 @@ export const snapshotAssigneeToPersist = (assignee) => ({
   overdueIssues: assignee.overdueIssues || [],
   upcomingDueIssues: assignee.upcomingDueIssues || [],
   contributorMetrics: assignee.contributorMetrics || [],
+  epicBreakdown: assignee.epicBreakdown || [],
   workloadCounts: assignee.workloadCounts || {},
   error: assignee.error || null,
 });

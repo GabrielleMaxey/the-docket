@@ -71,6 +71,7 @@ export const persistDashboardSnapshot = ({
         overdueIssuesJson: JSON.stringify(assignee.overdueIssues || []),
         upcomingDueIssuesJson: JSON.stringify(assignee.upcomingDueIssues || []),
         contributorMetricsJson: JSON.stringify(assignee.contributorMetrics || []),
+        epicBreakdownJson: JSON.stringify(assignee.epicBreakdown || []),
         queryType: assignee.queryType || "person",
         jql: assignee.jql || "",
         workloadCountsJson: JSON.stringify(assignee.workloadCounts || {}),

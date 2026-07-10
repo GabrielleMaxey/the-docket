@@ -4,6 +4,7 @@ import { formatPercent } from "../../../utils/format";
 import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 import AssigneeWorkloadChart from "./AssigneeWorkloadChart";
 import ContributorDueTasksSection from "./ContributorDueTasksSection";
+import EpicBreakdownList from "./EpicBreakdownList";
 
 const getAssigneeStatusMessage = (person) => {
   if (person.totalOpenCount === 0) {
@@ -26,6 +27,7 @@ const AssigneeMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", dueByDa
       ? person.overdueIssues
       : (person.overdueIssueKeys || []).map((key) => ({ key, summary: "", dueDate: null, issueType: "" }));
   const upcomingTasks = person.upcomingDueIssues || [];
+  const epicBreakdown = Array.isArray(person.epicBreakdown) ? person.epicBreakdown : [];
 
   return (
     <div className="dashboard-assignee-card">
@@ -66,6 +68,7 @@ const AssigneeMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", dueByDa
         jiraBaseUrl={jiraBaseUrl}
         variant="upcoming"
       />
+      <EpicBreakdownList breakdown={epicBreakdown} jiraBaseUrl={jiraBaseUrl} />
     </div>
   );
 };
