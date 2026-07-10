@@ -5,7 +5,7 @@ import {
 } from "../../../shared/dashboardMetrics.mjs";
 import { buildDashboardMetricsJql } from "../epicFilterJql.mjs";
 import { resolveJiraUser, searchAllIssues } from "../jiraSearchHelpers.mjs";
-import { buildIssueEpicContext } from "./dueByHelpers.mjs";
+import { buildEpicBreakdownForIssues, buildIssueEpicContext } from "./dueByHelpers.mjs";
 
 const escapeJqlString = (value) =>
   String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -54,6 +54,8 @@ const buildPersonWatchMetric = async ({
   dueByDate,
   dueByOptions,
   mappingsByRole,
+  iddFieldId,
+  mrdFieldId,
   jiraRequest,
   runJiraSearchRequest,
 }) => {
@@ -78,6 +80,15 @@ const buildPersonWatchMetric = async ({
     overdueFieldIds,
     dueContext
   );
+  const epicBreakdown = await buildEpicBreakdownForIssues({
+    issues,
+    mappingsByRole,
+    jiraRequest,
+    dueFieldId,
+    overdueFieldIds,
+    iddFieldId,
+    mrdFieldId,
+  });
 
   return {
     queryType: "person",
@@ -86,6 +97,7 @@ const buildPersonWatchMetric = async ({
     resolvedDisplayName: assigneeLabel,
     resolvedAccountId: resolvedAccountId || "",
     contributorMetrics: [],
+    epicBreakdown,
     ...metrics,
   };
 };
@@ -114,6 +126,7 @@ const emptyPersonWatchMetric = (queryName, error) => ({
   overdueIssues: [],
   upcomingDueIssues: [],
   contributorMetrics: [],
+  epicBreakdown: [],
   workloadCounts: emptyWorkloadCounts(),
   ...(error ? { error } : {}),
 });
@@ -131,6 +144,7 @@ const emptyJqlWatchMetric = (watched, error) => ({
   overdueIssues: [],
   upcomingDueIssues: [],
   contributorMetrics: [],
+  epicBreakdown: [],
   workloadCounts: emptyWorkloadCounts(),
   ...(error ? { error } : {}),
 });
@@ -140,6 +154,8 @@ export const buildAssigneeMetricsForRefresh = async ({
   watchedAssigneeIds,
   dueFieldId,
   overdueFieldIds = [],
+  iddFieldId,
+  mrdFieldId,
   dueByDate,
   dueByOptions,
   mappingsByRole,
@@ -163,6 +179,8 @@ export const buildAssigneeMetricsForRefresh = async ({
           dueByDate,
           dueByOptions,
           mappingsByRole,
+          iddFieldId,
+          mrdFieldId,
           jiraRequest,
           runJiraSearchRequest,
         })
@@ -213,6 +231,7 @@ export const buildAssigneeMetricsForRefresh = async ({
           resolvedDisplayName: watched.displayName,
           resolvedAccountId: "",
           contributorMetrics,
+          epicBreakdown: [],
           ...metrics,
         });
       } catch (error) {
@@ -238,6 +257,8 @@ export const buildAssigneeMetricsForRefresh = async ({
           dueByDate,
           dueByOptions,
           mappingsByRole,
+          iddFieldId,
+          mrdFieldId,
           jiraRequest,
           runJiraSearchRequest,
         })
