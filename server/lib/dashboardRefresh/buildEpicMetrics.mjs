@@ -16,6 +16,7 @@ import {
 } from "../epicFilterJql.mjs";
 import { fetchEpicIssue, resolveJiraUser, searchAllIssues } from "../jiraSearchHelpers.mjs";
 import {
+  buildEpicBreakdownFromContext,
   buildEpicLevelDueByIssues,
   buildJqlEpicContext,
   filterEpicGroupsToOpenIssues,
@@ -111,38 +112,6 @@ const buildEpicMetricRecord = ({
   ),
   childIssues: childMetrics.childIssues,
 });
-
-const buildJqlEpicBreakdownFromContext = ({ epicKeyToIssues, issueCache, ctx }) => {
-  const breakdown = [];
-
-  for (const [epicKey, groupIssues] of epicKeyToIssues.entries()) {
-    const epicIssue = issueCache.get(epicKey);
-    const epicName = String(epicIssue?.fields?.summary || epicKey).trim() || epicKey;
-    const childMetrics = computeChildIssueMetrics(
-      groupIssues,
-      epicKey,
-      ctx.dueFieldId,
-      null,
-      ctx.overdueFieldIds,
-      null
-    );
-
-    breakdown.push({
-      epicKey,
-      epicName,
-      issuePercent: childMetrics.issuePercent,
-      epicPercent: computeEpicPercent(epicIssue, ctx.mappingsByRole),
-      totalIssues: childMetrics.totalIssues,
-      completedIssues: childMetrics.completedIssues,
-      openIssues: childMetrics.openIssues,
-      initialDoneDate: formatDateOnly(getFieldValue(epicIssue, ctx.iddFieldId)),
-      mostRecentDoneDate: formatDateOnly(getFieldValue(epicIssue, ctx.mrdFieldId)),
-    });
-  }
-
-  breakdown.sort((left, right) => left.epicKey.localeCompare(right.epicKey));
-  return breakdown;
-};
 
 const resolveJqlPresetDueByIssues = async ({
   childMetrics,
@@ -389,7 +358,7 @@ export const buildEpicMetricsFromPresets = async ({
         mappingsByRole: ctx.mappingsByRole,
         jiraRequest,
       });
-      const epicBreakdown = buildJqlEpicBreakdownFromContext({
+      const epicBreakdown = buildEpicBreakdownFromContext({
         epicKeyToIssues: jqlEpicContext.epicKeyToIssues,
         issueCache: jqlEpicContext.issueCache,
         ctx,
