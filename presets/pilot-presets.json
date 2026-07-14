@@ -2,23 +2,33 @@
   "presets": [
     {
       "presetType": "jql",
+      "label": "Reporter's Current Issues",
+      "jql": "reporter = currentUser() AND resolution = Unresolved ORDER BY priority DESC, updated DESC"
+    },
+    {
+      "presetType": "jql",
+      "label": "My Current Issues",
+      "jql": "assignee = currentUser() AND resolution = Unresolved ORDER BY priority DESC, updated DESC"
+    },
+    {
+      "presetType": "jql",
       "label": "Dev Team",
-      "jql": "project = ODI AND assignee IN (5daa26bfa627f40c2f3c43be, 601874f6332cbe007003de62, 61e84c64b134e8007020f01a, 5f10a041b545e20015b0081d, 629e6166d442e600684096a7, 5fcf989e6ca3ba0075575415, 712020:d230216f-5197-4712-b088-0983a3d72404, 712020:d2dacb79-9bb4-41a2-a89c-996288f1fd23, 5d922aa356bb950dd648a1f1, currentUser(), 5d715a231d7bfa0d9cf263af, 712020:04cc999c-6147-454c-bb2d-20ecf5e34fc1, 611552c6b704b400687ee651, 712020:b5670baa-3192-4606-903a-8fa037076b6f, 5e275bbcbf04010e70c392d6) AND status NOT IN (Closed, Resolved) ORDER BY created DESC"
+      "jql": "project = ODI AND assignee IN (5daa26bfa627f40c2f3c43be, 601874f6332cbe007003de62, 61e84c64b134e8007020f01a, 5f10a041b545e20015b0081d, 629e6166d442e600684096a7, 5fcf989e6ca3ba0075575415, 712020:d230216f-5197-4712-b088-0983a3d72404, 712020:d2dacb79-9bb4-41a2-a89c-996288f1fd23, 5d922aa356bb950dd648a1f1, currentUser(), 5d715a231d7bfa0d9cf263af, 712020:04cc999c-6147-454c-bb2d-20ecf5e34fc1, 611552c6b704b400687ee651, 712020:b5670baa-3192-4606-903a-8fa037076b6f, 712020:3b36de2d-de38-4e98-9fe8-b2818cc0af7a, 5e20d4c62538f60cab4cd7af, 712020:953cb68c-37f5-4571-8610-7434322af725) AND status NOT IN (Closed, Resolved) ORDER BY created DESC"
     },
     {
       "presetType": "jql",
       "label": "MCP - Ask Greg",
-      "jql": "issuekey = ODI-23066 OR parent = ODI-23066 OR (parent = ODI-23066 AND issuetype in (Task, Bug, Story)) OR (issuekey = ODI-18520 AND issuetype in (Task, Bug, Story)) ORDER BY created DESC"
+      "jql": "issuekey ~ \"ODI-*\" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), \"Sub-task\") AND summary ~ \"(AskGreg OR MCP)\" OR parent IN (ODI-23066) ORDER BY key DESC, parent ASC, status ASC, rank"
     },
     {
       "presetType": "jql",
-      "label": "SeaTool",
-      "jql": "issuekey = ODI-22128 OR parent = ODI-22128 OR (parent = ODI-22128 AND issuetype in (Task, Bug, Story)) OR (issuekey = ODI-22128 AND issuetype in (Task, Bug, Story)) ORDER BY created DESC"
+      "label": "ODI-Dev WGA Epic",
+      "jql": "issuekey ~ \"ODI-*\" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), \"Sub-task\") AND parent IN (ODI-343) AND NOT status IN (closed, resolved) ORDER BY key DESC, parent ASC, status ASC, rank"
     },
     {
       "presetType": "jql",
       "label": "Kronos",
-      "jql": "issuekey = ODI-22128 OR parent = ODI-22128 OR (parent = ODI-22128 AND issuetype in (Task, Bug, Story)) OR (issuekey = ODI-3480 AND issuetype in (Task, Bug, Story)) ORDER BY created DESC"
+      "jql": "parent IN (ODI-22128) AND issuetype IN (subtaskIssueTypes(), standardIssueTypes(), \"Sub-task\") OR summary ~ \"\\[Cipher-Kronos\\]\" AND issuekey ~ \"ODI-*\" ORDER BY key DESC, parent ASC, status ASC, rank"
     },
     {
       "presetType": "jql",
@@ -33,7 +43,7 @@
     {
       "presetType": "jql",
       "label": "GAM",
-      "jql": "issuekey ~ \"ODI-*\" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), \"Sub-task\") AND summary ~ \"(Fiber_GCR_Clean_Service_Impact_Automation)\" OR parent IN (ODI-22288) ORDER BY key DESC, parent ASC, status ASC, rank"
+      "jql": "parent IN (ODI-22288) AND issuekey ~ \"ODI-*\" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), \"Sub-task\") OR summary ~ \"(Fiber_GCR_Clean_Service_Impact_Automation)\"  ORDER BY key DESC, parent ASC, status ASC, rank"
     },
     {
       "presetType": "jql",
@@ -42,13 +52,8 @@
     },
     {
       "presetType": "jql",
-      "label": "Reporter's Current Issues",
-      "jql": "reporter = currentUser() AND resolution = Unresolved ORDER BY priority DESC, updated DESC"
-    },
-    {
-      "presetType": "jql",
-      "label": "My Current Issues",
-      "jql": "assignee = currentUser() AND resolution = Unresolved ORDER BY priority DESC, updated DESC"
+      "label": "Monkey Wrench",
+      "jql": "parent IN (ODI-3480) AND issuetype IN (subtaskIssueTypes(), standardIssueTypes(), \"Sub-task\") AND issuekey ~ \"ODI-*\" ORDER BY key DESC, parent ASC, status ASC, rank"
     }
   ]
 }
