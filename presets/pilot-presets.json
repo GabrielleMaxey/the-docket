@@ -23,7 +23,7 @@
     {
       "presetType": "jql",
       "label": "ODI-Dev WGA Epic",
-      "jql": "issuekey ~ \"ODI-*\" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), \"Sub-task\") AND parent IN (ODI-343) AND NOT status IN (closed, resolved) ORDER BY key DESC, parent ASC, status ASC, rank"
+      "jql": "issuekey ~ \"ODI-*\" AND issue type IN (subTaskIssueTypes(), standardIssueTypes(), \"Sub-task\") AND parent IN (ODI-343) AND NOT status IN (closed, resolved) ORDER BY key DESC, parent ASC, status ASC, rank"
     },
     {
       "presetType": "jql",
