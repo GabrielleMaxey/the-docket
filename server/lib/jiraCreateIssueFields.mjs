@@ -170,12 +170,10 @@ export const resolveIssueTypeMeta = ({
     return null;
   }
 
-  // ODI story-backed work uses Task issuetype + parent field (not Jira Sub-task).
-  if (
-    wantsStoryParent({ issueTypeName, parentRole, isSubtask }) &&
-    requested.fields?.parent
-  ) {
-    return requested;
+  // ODI: Story children are Jira Sub-tasks. Task issuetype parents to Epic only —
+  // createmeta still exposes parent on Task, so do not keep Task for story parents.
+  if (wantsStoryParent({ issueTypeName, parentRole, isSubtask })) {
+    return findSubtaskIssueTypeMeta(project) || requested;
   }
 
   if (!needsParent || requested.fields?.parent) {
@@ -385,6 +383,12 @@ export const applyParentLinkFields = ({
     return { ok: true, linkMode: "parent" };
   }
 
+  // Prefer unified parent field (Epic Link / Parent Link are deprecated on create).
+  if (issueTypeFields?.parent) {
+    fields.parent = { key: parentKey };
+    return { ok: true, linkMode: "parent" };
+  }
+
   if (useEpicParent) {
     for (const [fieldKey, meta] of Object.entries(issueTypeFields || {})) {
       if (isEpicLinkField(meta)) {
@@ -394,14 +398,10 @@ export const applyParentLinkFields = ({
     }
   }
 
-  if (issueTypeFields?.parent) {
-    fields.parent = { key: parentKey };
-    return { ok: true, linkMode: "parent" };
-  }
-
+  // Never set Portfolio Parent Link for story parents; avoid it when parent works.
   for (const [fieldKey, meta] of Object.entries(issueTypeFields || {})) {
     if (isParentLinkField(meta)) {
-      fields[fieldKey] = { key: parentKey };
+      fields[fieldKey] = parentKey;
       return { ok: true, linkMode: "parentLink", fieldKey };
     }
   }
