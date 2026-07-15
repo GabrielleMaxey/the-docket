@@ -401,11 +401,11 @@ Preset preload from the active Work Week tab uses `resolveCreateIssueDefaults` i
 
 | Create | Issue type sent | Jira issuetype used | Parent link |
 |--------|-----------------|---------------------|-------------|
-| Story / Bug under Epic | Story / Bug | Same | Epic Link preferred; `parent` fallback |
-| Task / sub-task under Story | Task (`isSubtask: true` for story flow) | **Task** (not Sub-task) when Task createmeta has `parent` | `fields.parent = { key: storyKey }` |
-| Standalone Task under Story | Task | Task | `fields.parent = { key: storyKey }` |
+| Story / Bug under Epic | Story / Bug | Same | `parent` preferred; Epic Link fallback |
+| Task / sub-task under Story | Task (`isSubtask: true` for story flow) | **Sub-task** (ODI Task parents to Epic only) | `fields.parent = { key: storyKey }` |
+| Standalone Task under Story | Task | **Sub-task** | `fields.parent = { key: storyKey }` |
 
-Story-backed work uses **Task + parent**, matching how `jiraParentCandidates.mjs` walks chains (`Task → Story → Epic`). Jira **Sub-task** issuetype is only a fallback when Task’s create screen has no `parent` field. Portfolio **Parent Link** (`customfield_10018`) is not used for story parents.
+Story-backed work must use Jira **Sub-task** under a Story. ODI **Task** issues parent to Epics (`Epic (Feature)`), not Stories — forcing Task + Story parent produces Parent Link / parentId validation errors. Portfolio **Parent Link** (`customfield_10018`) is not used for story parents.
 
 **Components:** `loadProjectComponents` fetches `/rest/api/3/project/{key}/components`; unknown component names are rejected before the Jira API call.
 
