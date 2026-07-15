@@ -93,7 +93,7 @@ describe("applyParentLinkFields", () => {
     assert.equal(result.linkMode, "parent");
   });
 
-  it("prefers epic link over parent field for stories", () => {
+  it("prefers parent field over epic link for stories", () => {
     const fields = {};
     const result = applyParentLinkFields({
       fields,
@@ -110,9 +110,9 @@ describe("applyParentLinkFields", () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(fields.customfield_10014, "ODI-10");
-    assert.equal(fields.parent, undefined);
-    assert.equal(result.linkMode, "epicLink");
+    assert.deepEqual(fields.parent, { key: "ODI-10" });
+    assert.equal(fields.customfield_10014, undefined);
+    assert.equal(result.linkMode, "parent");
   });
 });
 
@@ -125,7 +125,7 @@ describe("resolveIssueTypeMeta", () => {
     ],
   };
 
-  it("keeps Task issuetype for ODI story-backed subtasks", () => {
+  it("uses Sub-task issuetype for story-backed work even when Task has parent", () => {
     const meta = resolveIssueTypeMeta({
       project,
       issueTypeName: "Task",
@@ -134,25 +134,31 @@ describe("resolveIssueTypeMeta", () => {
       isSubtask: true,
     });
 
-    assert.equal(meta?.name, "Task");
+    assert.equal(meta?.name, "Sub-task");
   });
 
-  it("falls back to Sub-task only when Task lacks parent on create screen", () => {
-    const noParentProject = {
-      issuetypes: [
-        { name: "Task", id: "1", fields: {} },
-        { name: "Sub-task", id: "2", subtask: true, fields: { parent: { name: "Parent" } } },
-      ],
-    };
+  it("uses Sub-task for standalone Task create under a Story", () => {
     const meta = resolveIssueTypeMeta({
-      project: noParentProject,
+      project,
       issueTypeName: "Task",
       needsParent: true,
       parentRole: "story",
-      isSubtask: true,
+      isSubtask: false,
     });
 
     assert.equal(meta?.name, "Sub-task");
+  });
+
+  it("keeps Task issuetype when not story-backed", () => {
+    const meta = resolveIssueTypeMeta({
+      project,
+      issueTypeName: "Task",
+      needsParent: true,
+      parentRole: "epic",
+      isSubtask: false,
+    });
+
+    assert.equal(meta?.name, "Task");
   });
 });
 
