@@ -417,28 +417,28 @@ export const buildPeriodSummary = (issues, dueByDate) => {
   };
 };
 
-export const groupIssuesByEpicAndAssignee = (issues) => {
-  const epics = new Map();
+export const groupIssuesByAssigneeAndEpic = (issues) => {
+  const assignees = new Map();
 
   for (const issue of issues) {
-    const epicKey = issue.epicKey || "";
     const assignee = issue.assignee || "Unassigned";
+    const epicKey = issue.epicKey || "";
 
-    if (!epics.has(epicKey)) {
-      epics.set(epicKey, { epicKey, assignees: new Map(), total: 0 });
+    if (!assignees.has(assignee)) {
+      assignees.set(assignee, { assignee, epics: new Map(), total: 0 });
     }
 
-    const epicGroup = epics.get(epicKey);
-    epicGroup.total += 1;
+    const assigneeGroup = assignees.get(assignee);
+    assigneeGroup.total += 1;
 
-    if (!epicGroup.assignees.has(assignee)) {
-      epicGroup.assignees.set(assignee, []);
+    if (!assigneeGroup.epics.has(epicKey)) {
+      assigneeGroup.epics.set(epicKey, []);
     }
 
-    epicGroup.assignees.get(assignee).push(issue);
+    assigneeGroup.epics.get(epicKey).push(issue);
   }
 
-  return epics;
+  return assignees;
 };
 
 export const DASHBOARD_AUTO_REFRESH_MANUAL = "manual";

@@ -112,12 +112,23 @@ describe("due date checks", () => {
     assert.equal(isTaskDueOrOverdue(past, "duedate", "2099-12-31"), true);
   });
 
-  it("normalizePastDueLookbackYears accepts 1, 2, or 3 only", () => {
+  it("normalizePastDueLookbackYears accepts 0.5, 1, 2, or 3 only", () => {
+    assert.equal(normalizePastDueLookbackYears(0.5), 0.5);
     assert.equal(normalizePastDueLookbackYears(1), 1);
     assert.equal(normalizePastDueLookbackYears(2), 2);
     assert.equal(normalizePastDueLookbackYears(3), 3);
     assert.equal(normalizePastDueLookbackYears(5), 1);
     assert.equal(normalizePastDueLookbackYears(null), 1);
+  });
+
+  it("computePastDueFloorDate supports a 6-month lookback", () => {
+    const sixMonthFloor = computePastDueFloorDate(0.5);
+    const oneYearFloor = computePastDueFloorDate(1);
+    const expectedSixMonth = new Date();
+    expectedSixMonth.setHours(0, 0, 0, 0);
+    expectedSixMonth.setMonth(expectedSixMonth.getMonth() - 6);
+    assert.equal(sixMonthFloor.toISOString().slice(0, 10), expectedSixMonth.toISOString().slice(0, 10));
+    assert.ok(sixMonthFloor.getTime() > oneYearFloor.getTime());
   });
 
   it("isDueDateInDueByWindow includes upcoming and recent past due only", () => {

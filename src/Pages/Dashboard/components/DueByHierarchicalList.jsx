@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { getDueBrowseUrl, groupIssuesByEpicAndAssignee, formatIssueTypeLabel } from "../utils/dashboardMetricsUtils";
+import { getDueBrowseUrl, groupIssuesByAssigneeAndEpic, formatIssueTypeLabel } from "../utils/dashboardMetricsUtils";
 import { isEpicIssueType } from "../../../../shared/dashboardMetrics.mjs";
 import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 
@@ -10,58 +10,64 @@ const DueByHierarchicalList = ({
   jiraBaseUrl,
   showTimingBadge = true,
 }) => {
-  const epicGroups = React.useMemo(
-    () => groupIssuesByEpicAndAssignee(issues),
-    [issues]
-  );
+  const assigneeGroups = React.useMemo(() => {
+    const groups = groupIssuesByAssigneeAndEpic(issues);
+    return [...groups.entries()].sort(([left], [right]) => {
+      if (left === "Unassigned") return 1;
+      if (right === "Unassigned") return -1;
+      return left.localeCompare(right, undefined, { sensitivity: "base" });
+    });
+  }, [issues]);
 
   return (
     <div className="dashboard-due-by-hierarchy">
-      {[...epicGroups.entries()].map(([epicKey, { assignees, total }]) => {
-        const epicName = epicNameByKey[epicKey] || epicKey || "Issues";
-        const epicUrl =
-          epicKey && jiraBaseUrl
-            ? `${jiraBaseUrl}/browse/${encodeURIComponent(epicKey)}`
-            : null;
+      {assigneeGroups.map(([assignee, { epics, total }]) => (
+        <div key={assignee} className="dashboard-due-by-epic-group">
+          <div className="dashboard-due-by-epic-header">
+            <span className="dashboard-due-by-epic-name">
+              <Link to={buildWorkWeekHref({ assignee })} className="dashboard-work-week-link">
+                {assignee}
+              </Link>
+            </span>
+            <span className="dashboard-due-by-epic-count">
+              {total} item{total !== 1 ? "s" : ""}
+            </span>
+          </div>
 
-        return (
-          <div key={epicKey || "no-epic"} className="dashboard-due-by-epic-group">
-            <div className="dashboard-due-by-epic-header">
-              <span className="dashboard-due-by-epic-name">
-                {epicUrl ? (
-                  <a href={epicUrl} target="_blank" rel="noreferrer">
-                    {epicName}
-                  </a>
-                ) : (
-                  epicName
-                )}
-                {epicKey ? (
-                  <Link
-                    to={buildWorkWeekHref({ key: epicKey })}
-                    className="dashboard-work-week-link"
-                    title="Open in Work Week"
-                  >
-                    Work Week
-                  </Link>
-                ) : null}
-              </span>
-              <span className="dashboard-due-by-epic-count">
-                {total} item{total !== 1 ? "s" : ""}
-              </span>
-            </div>
+          {[...epics.entries()].map(([epicKey, epicIssues]) => {
+            const epicName = epicNameByKey[epicKey] || epicKey || "Issues";
+            const epicUrl =
+              epicKey && jiraBaseUrl
+                ? `${jiraBaseUrl}/browse/${encodeURIComponent(epicKey)}`
+                : null;
 
-            {[...assignees.entries()].map(([assignee, assigneeIssues]) => (
-              <div key={assignee} className="dashboard-due-by-assignee-group">
+            return (
+              <div key={epicKey || "no-epic"} className="dashboard-due-by-assignee-group">
                 <div className="dashboard-due-by-assignee-header">
-                  <Link to={buildWorkWeekHref({ assignee })} className="dashboard-work-week-link">
-                    {assignee}
-                  </Link>
+                  <span>
+                    {epicUrl ? (
+                      <a href={epicUrl} target="_blank" rel="noreferrer">
+                        {epicName}
+                      </a>
+                    ) : (
+                      epicName
+                    )}
+                    {epicKey ? (
+                      <Link
+                        to={buildWorkWeekHref({ key: epicKey })}
+                        className="dashboard-work-week-link"
+                        title="Open in Work Week"
+                      >
+                        Work Week
+                      </Link>
+                    ) : null}
+                  </span>
                   <span className="dashboard-due-by-assignee-count">
-                    {assigneeIssues.length} item{assigneeIssues.length !== 1 ? "s" : ""}
+                    {epicIssues.length} item{epicIssues.length !== 1 ? "s" : ""}
                   </span>
                 </div>
                 <ul className="dashboard-due-by-task-list">
-                  {assigneeIssues.map((issue) => {
+                  {epicIssues.map((issue) => {
                     const url = getDueBrowseUrl(issue, jiraBaseUrl);
                     const typeLabel = formatIssueTypeLabel(issue.issueType);
                     const isEpic = isEpicIssueType(issue.issueType);
@@ -116,10 +122,10 @@ const DueByHierarchicalList = ({
                   })}
                 </ul>
               </div>
-            ))}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 };
