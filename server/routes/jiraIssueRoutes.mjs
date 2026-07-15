@@ -7,6 +7,7 @@ import {
   buildEpicStoriesJql,
   buildJiraCreatePayload,
   formatJiraApiError,
+  loadCreateFieldOptions,
 } from "../lib/jiraCreateIssueFields.mjs";
 import { descriptionTextToAdf } from "../../shared/jiraDescriptionAdf.mjs";
 import { isEpicIssueType } from "../../shared/dashboardMetrics.mjs";
@@ -222,6 +223,33 @@ export const registerJiraIssueRoutes = (
     }
   });
 
+  app.get("/api/jira/projects/:key/create-field-options", async (req, res) => {
+    if (!ensureEnvOrRespond(res)) {
+      return;
+    }
+
+    const projectKey = String(req.params.key || "").trim();
+    if (!projectKey) {
+      return res.status(400).json({ error: "Project key is required" });
+    }
+
+    const issueTypeName = String(req.query.issueType || "Story").trim() || "Story";
+
+    try {
+      const options = await loadCreateFieldOptions({
+        projectKey,
+        issueTypeName,
+        jiraRequest,
+      });
+      return res.json({ projectKey, issueType: issueTypeName, ...options });
+    } catch (error) {
+      return res.status(500).json({
+        error: "Failed to load create field options",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   app.get("/api/jira/issues/:issueKey/summary", async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
@@ -342,6 +370,7 @@ export const registerJiraIssueRoutes = (
     const component = String(req.body?.component || "").trim();
     const verticalComponent = String(req.body?.verticalComponent || "").trim();
     const bugTracking = String(req.body?.bugTracking || "").trim();
+    const overrideDescriptionStandards = Boolean(req.body?.overrideDescriptionStandards);
 
     if (!summary) {
       return res.status(400).json({ error: "Summary is required" });
@@ -363,15 +392,24 @@ export const registerJiraIssueRoutes = (
       isSubtask,
       parentRole,
       priority: priority || "",
+      skipDescriptionStandards: overrideDescriptionStandards,
     });
     if (!standardsCheck.valid) {
       log.warn(`create ${issueType} rejected: ODI standards`, {
         epicKey,
+        overrideDescriptionStandards,
         errors: standardsCheck.errors,
       });
       return res.status(400).json({
         error: "Issue does not meet ODI Jira standards",
         errors: standardsCheck.errors,
+      });
+    }
+
+    if (overrideDescriptionStandards) {
+      log.warn(`create ${issueType}: ODI description standards overridden`, {
+        epicKey,
+        summary,
       });
     }
 

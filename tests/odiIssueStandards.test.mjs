@@ -4,6 +4,7 @@ import {
   isJobStorySummary,
   isImperativeSubtaskTitle,
   isStoryIssueTypeName,
+  partitionOdiStandardsErrors,
   validateBugDescription,
   validateOdiIssueCreate,
 } from "../shared/odiIssueStandards.mjs";
@@ -141,5 +142,32 @@ describe("validateOdiIssueCreate", () => {
 
     assert.equal(result.valid, false);
     assert.ok(result.errors.some((item) => item.includes("Story parent")));
+  });
+
+  it("allows skipping description standards while keeping hard checks", () => {
+    const result = validateOdiIssueCreate({
+      issueType: "Bug",
+      summary: "Login fails",
+      description: "too short",
+      epicKey: "ODI-3000",
+      parentRole: "epic",
+      priority: "High",
+      skipDescriptionStandards: true,
+    });
+
+    assert.equal(result.valid, true);
+    assert.deepEqual(result.errors, []);
+  });
+
+  it("partitions description errors from hard standards errors", () => {
+    const { descriptionErrors, hardErrors } = partitionOdiStandardsErrors([
+      "Bug description is too short. Include what is broken, reproduction steps, and expected vs actual behavior.",
+      "Bug priority is required (Low, Medium, High, or Critical).",
+    ]);
+
+    assert.equal(descriptionErrors.length, 1);
+    assert.equal(hardErrors.length, 1);
+    assert.match(descriptionErrors[0], /description/i);
+    assert.match(hardErrors[0], /priority/i);
   });
 });

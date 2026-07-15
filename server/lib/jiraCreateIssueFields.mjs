@@ -61,6 +61,61 @@ export const loadProjectComponents = async ({ projectKey, jiraRequest }) => {
   return components;
 };
 
+const collectAllowedOptionLabels = (meta) => {
+  const allowed = Array.isArray(meta?.allowedValues) ? meta.allowedValues : [];
+  const labels = [];
+  for (const item of allowed) {
+    const label = String(item?.value ?? item?.name ?? "").trim();
+    if (label) {
+      labels.push(label);
+    }
+  }
+  return labels;
+};
+
+const uniqueSortedLabels = (labels) =>
+  [...new Set((labels || []).map((item) => String(item || "").trim()).filter(Boolean))].sort(
+    (left, right) => left.localeCompare(right, undefined, { sensitivity: "base" })
+  );
+
+/** Live dropdown labels for Create Issue (project components + createmeta allowedValues). */
+export const loadCreateFieldOptions = async ({
+  projectKey,
+  issueTypeName = "Story",
+  jiraRequest,
+}) => {
+  const [projectComponents, createMeta] = await Promise.all([
+    loadProjectComponents({ projectKey, jiraRequest }),
+    loadProjectCreateMeta({ projectKey, jiraRequest }),
+  ]);
+
+  const componentNames = uniqueSortedLabels(
+    (projectComponents || []).map((item) => item?.name)
+  );
+
+  const issueTypeFields =
+    resolveIssueTypeMeta({
+      project: createMeta?.ok ? createMeta.project : null,
+      issueTypeName,
+      needsParent: false,
+    })?.fields || {};
+
+  const verticalMatch = findCreateMetaField(issueTypeFields, isVerticalComponentsField);
+  const bugTrackingMatch = findCreateMetaField(issueTypeFields, isBugTrackingField);
+  const componentsMetaMatch = findCreateMetaField(issueTypeFields, isComponentsField);
+
+  // Prefer project component registry; fall back to createmeta allowedValues when empty.
+  const componentsFromMeta = uniqueSortedLabels(
+    collectAllowedOptionLabels(componentsMetaMatch?.meta)
+  );
+
+  return {
+    components: componentNames.length > 0 ? componentNames : componentsFromMeta,
+    verticalComponents: uniqueSortedLabels(collectAllowedOptionLabels(verticalMatch?.meta)),
+    bugTracking: uniqueSortedLabels(collectAllowedOptionLabels(bugTrackingMatch?.meta)),
+  };
+};
+
 const resolveProjectComponentName = ({ requestedName, meta, projectComponents }) => {
   const normalized = String(requestedName || "").trim();
   if (!normalized) {
