@@ -14,6 +14,7 @@ import {
   normalizeDashboardAutoRefreshInterval,
   getDashboardAutoRefreshHint,
 } from "./utils/dashboardMetricsUtils";
+import { formatPastDueLookbackPhrase } from "../../../shared/dashboardMetrics.mjs";
 import { useDashboardRefresh } from "./hooks/useDashboardRefresh";
 import CollapsibleSection from "../../Components/CollapsibleSection";
 import DashboardFiltersPanel from "./components/DashboardFiltersPanel";
@@ -373,7 +374,7 @@ const Dashboard = () => {
               title="Past due in lookback"
               subtitle={
                 snapshot.includePastDue
-                  ? `Missed deadlines within the past ${snapshot.pastDueLookbackYears || 1} year lookback.`
+                  ? `Missed deadlines within the past ${formatPastDueLookbackPhrase(snapshot.pastDueLookbackYears)} lookback.`
                   : "Enable Also include → Past Due Projects and refresh to populate this list."
               }
               storageKey="dueByPastDue"

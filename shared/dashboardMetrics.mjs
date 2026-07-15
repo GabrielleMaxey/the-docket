@@ -80,14 +80,30 @@ export const startOfToday = () => {
   return today;
 };
 
-export const PAST_DUE_LOOKBACK_YEAR_OPTIONS = [1, 2, 3];
+export const PAST_DUE_LOOKBACK_YEAR_OPTIONS = [0.5, 1, 2, 3];
 
 export const normalizePastDueLookbackYears = (value) => {
   const years = Number(value);
-  if (years === 2 || years === 3) {
+  if (years === 0.5 || years === 2 || years === 3) {
     return years;
   }
   return 1;
+};
+
+export const formatPastDueLookbackLabel = (lookbackYears) => {
+  const years = normalizePastDueLookbackYears(lookbackYears);
+  if (years === 0.5) {
+    return "Last 6 months";
+  }
+  return `Last ${years} year${years !== 1 ? "s" : ""}`;
+};
+
+export const formatPastDueLookbackPhrase = (lookbackYears) => {
+  const years = normalizePastDueLookbackYears(lookbackYears);
+  if (years === 0.5) {
+    return "6 months";
+  }
+  return `${years} year${years !== 1 ? "s" : ""}`;
 };
 
 export const computePastDueFloorDate = (lookbackYears = 1) => {

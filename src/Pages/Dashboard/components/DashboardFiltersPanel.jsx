@@ -15,6 +15,10 @@ import {
   DASHBOARD_AUTO_REFRESH_OPTIONS,
   getDashboardAutoRefreshHint,
 } from "../utils/dashboardMetricsUtils";
+import {
+  PAST_DUE_LOOKBACK_YEAR_OPTIONS,
+  formatPastDueLookbackLabel,
+} from "../../../../shared/dashboardMetrics.mjs";
 
 const SelectorClear = ({ onClick, label = "Clear" }) => (
   <button type="button" className="dashboard-selector-clear" onClick={onClick}>
@@ -161,7 +165,7 @@ const DashboardFiltersPanel = ({
               Past Due Projects
             </label>
             <span className="dashboard-due-by-inline-separator">Show past due</span>
-            {[1, 2, 3].map((years) => (
+            {PAST_DUE_LOOKBACK_YEAR_OPTIONS.map((years) => (
               <label key={years} className="dashboard-due-by-field-option">
                 <input
                   type="radio"
@@ -171,7 +175,7 @@ const DashboardFiltersPanel = ({
                   disabled={!includePastDue}
                   onChange={() => setPastDueLookbackYears(years)}
                 />
-                Last {years} year{years !== 1 ? "s" : ""}
+                {formatPastDueLookbackLabel(years)}
               </label>
             ))}
             <SelectorClear onClick={clearPastDueOptions} />
