@@ -401,6 +401,13 @@ export const fetchJiraCreateMeta = async (projectKey) => {
   return requestJson(`/api/jira/projects/${encodeURIComponent(projectKey)}/createmeta`);
 };
 
+export const fetchJiraCreateFieldOptions = async (projectKey, issueType = "Story") => {
+  const type = encodeURIComponent(String(issueType || "Story").trim() || "Story");
+  return requestJson(
+    `/api/jira/projects/${encodeURIComponent(projectKey)}/create-field-options?issueType=${type}`
+  );
+};
+
 export const fetchJiraIssueSummary = async (issueKey) => {
   return requestJson(`/api/jira/issues/${encodeURIComponent(String(issueKey || "").trim())}/summary`);
 };

@@ -84,6 +84,32 @@ export const validateStoryDescription = (description) => {
   return null;
 };
 
+export const isOdiDescriptionStandardsError = (message) => {
+  const text = String(message || "").trim().toLowerCase();
+  if (!text) {
+    return false;
+  }
+  return (
+    text.includes("description") ||
+    text.includes("reproduction") ||
+    text.includes("expected vs actual") ||
+    text.includes("goal outcome")
+  );
+};
+
+export const partitionOdiStandardsErrors = (errors) => {
+  const descriptionErrors = [];
+  const hardErrors = [];
+  for (const item of Array.isArray(errors) ? errors : []) {
+    if (isOdiDescriptionStandardsError(item)) {
+      descriptionErrors.push(item);
+    } else {
+      hardErrors.push(item);
+    }
+  }
+  return { descriptionErrors, hardErrors };
+};
+
 /**
  * @param {{
  *   issueType: string,
@@ -94,6 +120,7 @@ export const validateStoryDescription = (description) => {
  *   isSubtask?: boolean,
  *   parentRole?: "epic" | "story",
  *   priority?: string,
+ *   skipDescriptionStandards?: boolean,
  * }} input
  * @returns {{ valid: boolean, errors: string[] }}
  */
@@ -106,6 +133,7 @@ export const validateOdiIssueCreate = ({
   isSubtask = false,
   parentRole = "",
   priority = "",
+  skipDescriptionStandards = false,
 }) => {
   const type = String(issueType || "").trim();
   const parentKey = String(epicKey || "").trim();
@@ -131,9 +159,11 @@ export const validateOdiIssueCreate = ({
     if (parentRole && parentRole !== "epic") {
       errors.push("Stories must be created under an Epic, not a Story.");
     }
-    const storyDescError = validateStoryDescription(description);
-    if (storyDescError) {
-      errors.push(storyDescError);
+    if (!skipDescriptionStandards) {
+      const storyDescError = validateStoryDescription(description);
+      if (storyDescError) {
+        errors.push(storyDescError);
+      }
     }
   } else if (type === "Bug") {
     if (parentRole && parentRole !== "epic") {
@@ -142,9 +172,11 @@ export const validateOdiIssueCreate = ({
     if (!normalizeOdiBugPriority(priority)) {
       errors.push("Bug priority is required (Low, Medium, High, or Critical).");
     }
-    const bugDescError = validateBugDescription(description);
-    if (bugDescError) {
-      errors.push(bugDescError);
+    if (!skipDescriptionStandards) {
+      const bugDescError = validateBugDescription(description);
+      if (bugDescError) {
+        errors.push(bugDescError);
+      }
     }
   } else if (type === "Task") {
     if (parentRole && parentRole !== "story") {

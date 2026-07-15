@@ -3,6 +3,7 @@ import { Button, Dropdown, Form, Modal, Message } from "semantic-ui-react";
 import {
   createJiraIssue,
   fetchEpicParentOptions,
+  fetchJiraCreateFieldOptions,
   fetchJiraCreateMeta,
   fetchJiraHealth,
   fetchJiraParentCandidates,
@@ -11,6 +12,7 @@ import {
 } from "../../services/jiraClient";
 import {
   ODI_BUG_PRIORITIES,
+  partitionOdiStandardsErrors,
   validateOdiIssueCreate,
 } from "../../../shared/odiIssueStandards.mjs";
 import {
@@ -39,6 +41,15 @@ const COMPONENT_OPTIONS = toCreateIssueDropdownOptions(ODI_COMPONENT_OPTIONS);
 const VERTICAL_COMPONENT_OPTIONS = toCreateIssueDropdownOptions(ODI_VERTICAL_COMPONENT_OPTIONS);
 const BUG_TRACKING_OPTIONS = toCreateIssueDropdownOptions(ODI_BUG_TRACKING_OPTIONS);
 
+const mergeDropdownOptions = (options, value) => {
+  const list = Array.isArray(options) ? [...options] : [];
+  const current = String(value || "").trim();
+  if (current && !list.some((item) => item.value === current)) {
+    list.push({ key: current, text: current, value: current });
+  }
+  return list;
+};
+
 const ComboDropdownField = ({
   label,
   value,
@@ -47,27 +58,35 @@ const ComboDropdownField = ({
   onChange,
   placeholder,
   required = false,
-}) => (
-  <Form.Field required={required}>
-    <label>{label}</label>
-    <Dropdown
-      fluid
-      search
-      selection
-      allowAdditions
-      additionLabel="Use custom: "
-      placeholder={placeholder}
-      options={options}
-      value={value || null}
-      disabled={disabled}
-      onAddItem={(_e, { value: newValue }) => onChange(String(newValue || ""))}
-      onChange={(_e, { value: nextValue }) => onChange(String(nextValue || ""))}
-    />
-    <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.25rem" }}>
-      Choose a default option. Components must already exist in the Jira project.
-    </p>
-  </Form.Field>
-);
+  hint = "Choose an option from the list, or type a value that already exists in Jira.",
+}) => {
+  const mergedOptions = React.useMemo(
+    () => mergeDropdownOptions(options, value),
+    [options, value]
+  );
+
+  return (
+    <Form.Field required={required}>
+      <label>{label}</label>
+      <Dropdown
+        fluid
+        search
+        selection
+        allowAdditions
+        additionLabel="Use custom: "
+        placeholder={placeholder}
+        options={mergedOptions}
+        value={value || null}
+        disabled={disabled}
+        onAddItem={(_e, { value: newValue }) => onChange(String(newValue || ""))}
+        onChange={(_e, { value: nextValue }) => onChange(String(nextValue || ""))}
+      />
+      {hint ? (
+        <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.25rem" }}>{hint}</p>
+      ) : null}
+    </Form.Field>
+  );
+};
 
 const ISSUE_TYPE_OPTIONS = [
   { key: "Story", text: "Story", value: "Story" },
@@ -155,6 +174,8 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
   const [descriptionError, setDescriptionError] = React.useState("");
+  const [standardsOverrideAvailable, setStandardsOverrideAvailable] = React.useState(false);
+  const [overrideDescriptionStandards, setOverrideDescriptionStandards] = React.useState(false);
   const [success, setSuccess] = React.useState("");
   const [createdIssueKey, setCreatedIssueKey] = React.useState("");
   const [jiraBaseUrl, setJiraBaseUrl] = React.useState("");
@@ -176,6 +197,11 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   const [bugPriority, setBugPriority] = React.useState("");
   const [componentValue, setComponentValue] = React.useState("");
   const [verticalComponentValue, setVerticalComponentValue] = React.useState("");
+  const [componentOptions, setComponentOptions] = React.useState(COMPONENT_OPTIONS);
+  const [verticalComponentOptions, setVerticalComponentOptions] = React.useState(
+    VERTICAL_COMPONENT_OPTIONS
+  );
+  const [bugTrackingOptions, setBugTrackingOptions] = React.useState(BUG_TRACKING_OPTIONS);
   const [bugTrackingValue, setBugTrackingValue] = React.useState("");
   const [clarificationQuestions, setClarificationQuestions] = React.useState([]);
   const [needsClarification, setNeedsClarification] = React.useState(false);
@@ -334,6 +360,8 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     setAssignee("");
     setError("");
     setDescriptionError("");
+    setStandardsOverrideAvailable(false);
+    setOverrideDescriptionStandards(false);
     setSuccess("");
     setCreatedIssueKey("");
     setSuggestedSubtasks([]);
@@ -386,6 +414,43 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     };
     void load();
     return () => { cancelled = true; };
+  }, [open, projectKey, issueType]);
+
+  React.useEffect(() => {
+    if (!open || !projectKey) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const data = await fetchJiraCreateFieldOptions(projectKey, issueType);
+        if (cancelled) return;
+        const components = Array.isArray(data?.components) ? data.components : [];
+        const vertical = Array.isArray(data?.verticalComponents) ? data.verticalComponents : [];
+        const bugTracking = Array.isArray(data?.bugTracking) ? data.bugTracking : [];
+        setComponentOptions(
+          toCreateIssueDropdownOptions(components.length > 0 ? components : ODI_COMPONENT_OPTIONS)
+        );
+        setVerticalComponentOptions(
+          toCreateIssueDropdownOptions(
+            vertical.length > 0 ? vertical : ODI_VERTICAL_COMPONENT_OPTIONS
+          )
+        );
+        setBugTrackingOptions(
+          toCreateIssueDropdownOptions(
+            bugTracking.length > 0 ? bugTracking : ODI_BUG_TRACKING_OPTIONS
+          )
+        );
+      } catch {
+        if (!cancelled) {
+          setComponentOptions(COMPONENT_OPTIONS);
+          setVerticalComponentOptions(VERTICAL_COMPONENT_OPTIONS);
+          setBugTrackingOptions(BUG_TRACKING_OPTIONS);
+        }
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [open, projectKey, issueType]);
 
   React.useEffect(() => {
@@ -735,8 +800,11 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       setError("Summary is required.");
       return;
     }
-    if (issueType === "Story" && needsClarification) {
+
+    const allowDescriptionOverride = Boolean(overrideDescriptionStandards);
+    if (issueType === "Story" && needsClarification && !allowDescriptionOverride) {
       setDescriptionError(STORY_NOT_DEFINED_ERROR);
+      setStandardsOverrideAvailable(true);
       return;
     }
 
@@ -749,8 +817,21 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       isSubtask: false,
       parentRole,
       priority: bugPriority,
+      skipDescriptionStandards: allowDescriptionOverride,
     });
     if (!standardsCheck.valid) {
+      const { descriptionErrors, hardErrors } = partitionOdiStandardsErrors(standardsCheck.errors);
+      if (hardErrors.length > 0) {
+        setStandardsOverrideAvailable(false);
+        setOverrideDescriptionStandards(false);
+        applyValidationErrors(standardsCheck.errors);
+        return;
+      }
+      if (descriptionErrors.length > 0 && !allowDescriptionOverride) {
+        applyValidationErrors(descriptionErrors);
+        setStandardsOverrideAvailable(true);
+        return;
+      }
       applyValidationErrors(standardsCheck.errors);
       return;
     }
@@ -770,6 +851,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
         component: componentValue.trim(),
         verticalComponent: verticalComponentValue.trim(),
         bugTracking: issueType === "Bug" ? bugTrackingValue.trim() : "",
+        overrideDescriptionStandards: allowDescriptionOverride,
       });
       createdParentKey = result?.issueKey || "";
       setCreatedIssueKey(createdParentKey);
@@ -1057,29 +1139,32 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
           <ComboDropdownField
             label="Components"
             value={componentValue}
-            options={COMPONENT_OPTIONS}
+            options={componentOptions}
             disabled={!canEditIssueFields}
             placeholder="Select or type a component"
             onChange={setComponentValue}
+            hint="Loaded from the Jira project. Names must already exist as project components."
           />
 
           <ComboDropdownField
             label="Vertical Components"
             value={verticalComponentValue}
-            options={VERTICAL_COMPONENT_OPTIONS}
+            options={verticalComponentOptions}
             disabled={!canEditIssueFields}
             placeholder="Select or type a vertical component"
             onChange={setVerticalComponentValue}
+            hint="Options come from the Vertical Components field on this issue type."
           />
 
           {issueType === "Bug" ? (
             <ComboDropdownField
               label="BUG Tracking"
               value={bugTrackingValue}
-              options={BUG_TRACKING_OPTIONS}
+              options={bugTrackingOptions}
               disabled={!canEditIssueFields}
               placeholder="Select or type a bug tracking category"
               onChange={setBugTrackingValue}
+              hint="Options come from the BUG Tracking field on Bugs."
             />
           ) : null}
 
@@ -1115,6 +1200,10 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
               onChange={(e) => {
                 setDescription(e.target.value);
                 if (descriptionError) setDescriptionError("");
+                if (standardsOverrideAvailable) {
+                  setStandardsOverrideAvailable(false);
+                  setOverrideDescriptionStandards(false);
+                }
               }}
               placeholder={issueType === "Story"
                 ? "Short overview, then bulleted development steps. Use AI Draft for ODI formatting."
@@ -1125,6 +1214,26 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             {descriptionError ? (
               <Message negative size="small" style={{ marginTop: "0.35rem", whiteSpace: "pre-wrap" }}>
                 {descriptionError}
+              </Message>
+            ) : null}
+            {standardsOverrideAvailable ? (
+              <Message warning size="small" style={{ marginTop: "0.5rem" }}>
+                <p style={{ margin: "0 0 0.45rem" }}>
+                  This description does not meet current ODI criteria. You can still create the issue
+                  after acknowledging the warning.
+                </p>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: "0.45rem", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={overrideDescriptionStandards}
+                    onChange={(e) => setOverrideDescriptionStandards(e.target.checked)}
+                    style={{ marginTop: "0.2rem" }}
+                  />
+                  <span>
+                    Override ODI description standards and create anyway. I understand this description
+                    does not meet current ODI criteria.
+                  </span>
+                </label>
               </Message>
             ) : null}
           </Form.Field>
@@ -1232,9 +1341,18 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             Add more detail in Jira
           </Button>
         ) : (
-          <Button primary loading={submitting || creatingSubtasks} disabled={!canSubmit}
-            onClick={handleSubmit}>
-            Create{suggestedSubtasks.filter((s) => s.checked).length > 0
+          <Button
+            primary
+            loading={submitting || creatingSubtasks}
+            disabled={
+              !canSubmit || (standardsOverrideAvailable && !overrideDescriptionStandards)
+            }
+            onClick={handleSubmit}
+          >
+            {standardsOverrideAvailable && overrideDescriptionStandards
+              ? "Create anyway"
+              : "Create"}
+            {suggestedSubtasks.filter((s) => s.checked).length > 0
               ? ` + ${suggestedSubtasks.filter((s) => s.checked).length} subtask${suggestedSubtasks.filter((s) => s.checked).length !== 1 ? "s" : ""}`
               : ""}
           </Button>
