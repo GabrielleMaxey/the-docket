@@ -38,7 +38,6 @@ builder-effective-config.yaml
 # Local misc notes (folder name varies by machine)
 MiscFiles/
 MiscFIles/
-docs/PR_WriteUps
 
 # Editor directories and files
 .vscode/*
