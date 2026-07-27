@@ -117,11 +117,7 @@ const ReportList = ({
                 primary={selectedId === item.id}
                 onClick={() => onSelect(item)}
               >
-                {selectedId === item.id
-                  ? "Selected"
-                  : /\.md$/i.test(String(item.filename || item.label || ""))
-                    ? "Preview"
-                    : "View"}
+                {selectedId === item.id ? "Selected" : "View"}
               </Button>
               {isCoworkFileItem(item) && onSaveToArchive ? (
                 <Button
@@ -335,12 +331,6 @@ const ReportArchivePanel = ({
         >
           <ReportOutput
             report={reportForClipboard}
-            filename={
-              selectedReport.filename ||
-              selectedReport.meta?.filename ||
-              selectedReport.label ||
-              ""
-            }
             hideTitle
             copied={copied}
             onCopy={handleCopy}
