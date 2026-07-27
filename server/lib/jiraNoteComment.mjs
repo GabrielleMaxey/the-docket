@@ -51,6 +51,9 @@ export const pushNoteCommentWithImages = async ({
     });
 
     if (!uploadResult.ok) {
+      // Any attachments already uploaded in this loop (ids collected above) are
+      // orphaned on the Jira issue — no comment references them, but they are
+      // not rolled back here.
       return { ok: false, status: uploadResult.status, data: uploadResult.data };
     }
 

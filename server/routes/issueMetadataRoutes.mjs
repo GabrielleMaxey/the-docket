@@ -7,6 +7,9 @@ import { createLogger } from "../lib/logger.mjs";
 import {
   NOTE_IMAGE_MAX_BYTES,
   NOTE_IMAGE_MAX_COUNT,
+  NOTE_IMAGE_BAD_MIME_MESSAGE,
+  NOTE_IMAGE_TOO_LARGE_MESSAGE,
+  NOTE_IMAGE_TOO_MANY_MESSAGE,
   isAllowedNoteImageMime,
 } from "../../shared/noteImageLimits.mjs";
 const log = createLogger("metadata");
@@ -14,8 +17,33 @@ const log = createLogger("metadata");
 const uploadNoteImages = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: NOTE_IMAGE_MAX_BYTES, files: NOTE_IMAGE_MAX_COUNT },
-  fileFilter: (_req, file, cb) => cb(null, isAllowedNoteImageMime(file.mimetype)),
+  fileFilter: (_req, file, cb) => {
+    if (!isAllowedNoteImageMime(file.mimetype)) {
+      return cb(new Error(NOTE_IMAGE_BAD_MIME_MESSAGE));
+    }
+    cb(null, true);
+  },
 });
+
+// Handles multer upload errors (oversize file, too many files, bad mime from
+// fileFilter) so they return JSON 400 instead of an unhandled 500/HTML error.
+const handleNoteImageUploadError = (err, _req, res, next) => {
+  if (!err) {
+    return next();
+  }
+
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ error: NOTE_IMAGE_TOO_LARGE_MESSAGE });
+    }
+    if (err.code === "LIMIT_FILE_COUNT" || err.code === "LIMIT_UNEXPECTED_FILE") {
+      return res.status(400).json({ error: NOTE_IMAGE_TOO_MANY_MESSAGE });
+    }
+    return res.status(400).json({ error: err.message });
+  }
+
+  return res.status(400).json({ error: err.message || NOTE_IMAGE_BAD_MIME_MESSAGE });
+};
 
 export const registerIssueMetadataRoutes = (
   app,
@@ -50,6 +78,7 @@ export const registerIssueMetadataRoutes = (
   app.post(
     "/api/jira/issues/:issueKey/comment",
     uploadNoteImages.array("images", NOTE_IMAGE_MAX_COUNT),
+    handleNoteImageUploadError,
     async (req, res) => {
       if (!ensureEnvOrRespond(res)) {
         return;

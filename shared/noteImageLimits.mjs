@@ -10,17 +10,23 @@ const ALLOWED_NOTE_IMAGE_MIMES = new Set([
 
 export const isAllowedNoteImageMime = (mime) => ALLOWED_NOTE_IMAGE_MIMES.has(mime);
 
+export const NOTE_IMAGE_TOO_MANY_MESSAGE = `You can add up to ${NOTE_IMAGE_MAX_COUNT} images.`;
+export const NOTE_IMAGE_BAD_MIME_MESSAGE = "Choose a PNG, JPEG, GIF, or WebP image.";
+export const NOTE_IMAGE_TOO_LARGE_MESSAGE = `Each image must be ${
+  NOTE_IMAGE_MAX_BYTES / (1024 * 1024)
+} MB or smaller.`;
+
 export const validateNoteImageFile = (file, currentCount) => {
   if (currentCount >= NOTE_IMAGE_MAX_COUNT) {
-    return { ok: false, error: `You can add up to ${NOTE_IMAGE_MAX_COUNT} images.` };
+    return { ok: false, error: NOTE_IMAGE_TOO_MANY_MESSAGE };
   }
 
   if (!isAllowedNoteImageMime(file?.type)) {
-    return { ok: false, error: "Choose a PNG, JPEG, GIF, or WebP image." };
+    return { ok: false, error: NOTE_IMAGE_BAD_MIME_MESSAGE };
   }
 
   if (file.size > NOTE_IMAGE_MAX_BYTES) {
-    return { ok: false, error: "Each image must be 5 MB or smaller." };
+    return { ok: false, error: NOTE_IMAGE_TOO_LARGE_MESSAGE };
   }
 
   return { ok: true };
