@@ -45,6 +45,7 @@ const applyDrillDownMetadata = async ({
   setJiraRowPriorities,
   setPrioritySourceByKey,
   setJiraNotes,
+  hydrateNoteImages,
 }) => {
   if (issueKeys.length === 0) {
     return;
@@ -87,6 +88,9 @@ const applyDrillDownMetadata = async ({
     if (item.priority !== undefined && priorityFromComment[key] === undefined) {
       nextPriorities[key] = clampPriority(item.priority);
     }
+    if (hydrateNoteImages) {
+      hydrateNoteImages(key, { keepNoteImages: item.keepNoteImages, images: item.images });
+    }
   });
   if (!pullLatestComment && Object.keys(nextNotes).length > 0) {
     setJiraNotes((prev) => mergeIssueMapsPreferExisting(prev, nextNotes));
@@ -113,6 +117,7 @@ export async function runJqlWorkflow({
   setJiraNotes,
   setJiraRowPriorities,
   setPrioritySourceByKey,
+  hydrateNoteImages,
   fieldMappingRows,
 }) {
   const configuredIndexes = getConfiguredJqlSlotIndexes(jqlInputs, jqlLabels);
@@ -241,6 +246,9 @@ export async function runJqlWorkflow({
           if (item.priority !== undefined && priorityFromComment[issueKey] === undefined) {
             nextPriorities[issueKey] = clampPriority(item.priority);
           }
+          if (hydrateNoteImages) {
+            hydrateNoteImages(issueKey, { keepNoteImages: item.keepNoteImages, images: item.images });
+          }
         });
 
         if (!pullLatestComment && Object.keys(nextNotes).length > 0) {
@@ -368,6 +376,7 @@ export async function loadDrillDownIssueByKey({
   setPrioritySourceByKey,
   setJiraNotes,
   setJqlError,
+  hydrateNoteImages,
   fieldMappingRows,
   isStale = () => false,
 }) {
@@ -425,6 +434,7 @@ export async function loadDrillDownIssueByKey({
         setJiraRowPriorities,
         setPrioritySourceByKey,
         setJiraNotes,
+        hydrateNoteImages,
       });
     } catch (error) {
       console.error("Failed to enrich drill-down issue", error);
@@ -465,6 +475,7 @@ export async function loadDrillDownIssuesByAssignee({
   setPrioritySourceByKey,
   setJiraNotes,
   setJqlError,
+  hydrateNoteImages,
   fieldMappingRows,
   isStale = () => false,
 }) {
@@ -524,6 +535,7 @@ export async function loadDrillDownIssuesByAssignee({
         setJiraRowPriorities,
         setPrioritySourceByKey,
         setJiraNotes,
+        hydrateNoteImages,
       });
     } catch (error) {
       console.error("Failed to enrich assignee drill-down issues", error);

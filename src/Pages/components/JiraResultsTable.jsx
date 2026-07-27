@@ -269,6 +269,8 @@ const JiraResultsTable = ({
   jiraNotes,
   noteImagesByKey,
   noteImageErrorsByKey,
+  keepNoteImagesByKey,
+  noteImageKeepPendingByKey,
   lastPushedJiraNoteByKey,
   statusOptions,
   isClosedLikeStatus,
@@ -287,6 +289,7 @@ const JiraResultsTable = ({
   handleNoteChange,
   handleNoteImagesAdd,
   handleNoteImageRemove,
+  handleKeepNoteImagesToggle,
   handleSelectForPush,
   handlePushNote,
   onActiveTabChange,
@@ -940,6 +943,9 @@ const JiraResultsTable = ({
                               error={noteImageErrorsByKey[issueKey]}
                               onAddFiles={(files) => handleNoteImagesAdd(issueKey, files)}
                               onRemove={(localId) => handleNoteImageRemove(issueKey, localId)}
+                              keepOnMachine={keepNoteImagesByKey[issueKey]}
+                              keepPending={Boolean(noteImageKeepPendingByKey[issueKey])}
+                              onKeepChange={(checked) => handleKeepNoteImagesToggle(issueKey, checked)}
                             >
                               <textarea
                                 className={`ww-note-textarea${

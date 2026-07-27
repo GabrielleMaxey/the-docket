@@ -119,6 +119,7 @@ const dbDir = userDataRoot
   : path.resolve(projectRoot, "data");
 fs.mkdirSync(dbDir, { recursive: true });
 const dbPath = path.resolve(dbDir, "workweek.sqlite");
+const noteImagesDir = path.resolve(dbDir, "note-images");
 
 let db;
 try {
@@ -286,6 +287,7 @@ const routeCtx = {
   ensureEnvOrRespond,
   runJiraSearchRequest,
   resolveJiraUser,
+  noteImagesDir,
 };
 
 registerJiraCoreRoutes(app, routeCtx);

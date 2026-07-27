@@ -1,8 +1,15 @@
 // Issue mutations (comment, status, assignee) and SQLite note/priority metadata.
 
+import fs from "fs";
 import multer from "multer";
 import { fetchLatestCommentTextBulk } from "../lib/jiraCommentText.mjs";
 import { pushNoteCommentWithImages } from "../lib/jiraNoteComment.mjs";
+import {
+  listNoteImages,
+  getNoteImageFile,
+  replaceNoteImages,
+  deleteAllNoteImages,
+} from "../lib/noteImageStore.mjs";
 import { createLogger } from "../lib/logger.mjs";
 import {
   NOTE_IMAGE_MAX_BYTES,
@@ -47,7 +54,7 @@ const handleNoteImageUploadError = (err, _req, res, next) => {
 
 export const registerIssueMetadataRoutes = (
   app,
-  { db, jiraRequest, jiraMultipartRequest, ensureEnvOrRespond, resolveJiraUser }
+  { db, jiraRequest, jiraMultipartRequest, ensureEnvOrRespond, resolveJiraUser, noteImagesDir }
 ) => {
   const selectIssueMetadataStmt = db.prepare(
     "SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key = ?"
@@ -58,6 +65,13 @@ export const registerIssueMetadataRoutes = (
     ON CONFLICT(issue_key) DO UPDATE SET
       note = excluded.note,
       priority = excluded.priority,
+      updated_at = CURRENT_TIMESTAMP
+  `);
+  const setKeepNoteImagesStmt = db.prepare(`
+    INSERT INTO issue_metadata (issue_key, keep_note_images, updated_at)
+    VALUES (@issueKey, @keepNoteImages, CURRENT_TIMESTAMP)
+    ON CONFLICT(issue_key) DO UPDATE SET
+      keep_note_images = excluded.keep_note_images,
       updated_at = CURRENT_TIMESTAMP
   `);
 
@@ -112,6 +126,12 @@ export const registerIssueMetadataRoutes = (
         if (!result.ok) {
           return res.status(result.status).json(result.data);
         }
+
+        // A successful push means Jira now holds the images inline — kept
+        // local copies (if any) are no longer needed, regardless of whether
+        // Keep was toggled on for this push.
+        deleteAllNoteImages(db, noteImagesDir, issueKey);
+        setKeepNoteImagesStmt.run({ issueKey, keepNoteImages: 0 });
 
         log.info(`comment pushed to ${issueKey}${images.length ? ` with ${images.length} image(s)` : ""}`);
         return res.json(result.data);
@@ -328,19 +348,85 @@ export const registerIssueMetadataRoutes = (
     const placeholders = issueKeys.map(() => "?").join(",");
     const rows = db
       .prepare(
-        `SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key IN (${placeholders})`
+        `SELECT issue_key, note, priority, keep_note_images FROM issue_metadata WHERE issue_key IN (${placeholders})`
       )
       .all(...issueKeys);
 
     const items = rows.reduce((acc, row) => {
+      const keepNoteImages = Boolean(row.keep_note_images);
       acc[row.issue_key] = {
         note: String(row.note || ""),
         priority: clampDbPriority(row.priority),
+        keepNoteImages,
+        images: keepNoteImages ? listNoteImages(db, row.issue_key) : [],
       };
       return acc;
     }, {});
 
     return res.json({ items });
+  });
+
+  app.get("/api/jira/issue-metadata/:issueKey/images/:id", (req, res) => {
+    const issueKey = String(req.params.issueKey || "").trim();
+    const id = Number(req.params.id);
+
+    if (!issueKey || !Number.isInteger(id)) {
+      return res.status(400).json({ error: "Missing issue key or image id" });
+    }
+
+    const image = getNoteImageFile(db, issueKey, id);
+    if (!image) {
+      return res.status(404).json({ error: "Image not found" });
+    }
+
+    res.setHeader("Content-Type", image.mimeType);
+    res.setHeader("Content-Length", String(image.byteSize));
+    fs.createReadStream(image.storagePath).pipe(res);
+  });
+
+  app.post(
+    "/api/jira/issue-metadata/:issueKey/images",
+    uploadNoteImages.array("images", NOTE_IMAGE_MAX_COUNT),
+    handleNoteImageUploadError,
+    (req, res) => {
+      const issueKey = String(req.params.issueKey || "").trim();
+      if (!issueKey) {
+        return res.status(400).json({ error: "Missing issue key" });
+      }
+
+      const files = req.files || [];
+      if (files.length === 0) {
+        return res.status(400).json({ error: "No images to keep" });
+      }
+
+      const images = replaceNoteImages(
+        db,
+        noteImagesDir,
+        issueKey,
+        files.map((file) => ({
+          buffer: file.buffer,
+          mimeType: file.mimetype,
+          filename: file.originalname,
+        }))
+      );
+      setKeepNoteImagesStmt.run({ issueKey, keepNoteImages: 1 });
+
+      log.info(`kept ${images.length} note image(s) on this machine for ${issueKey}`);
+      return res.json({ ok: true, issueKey, images });
+    }
+  );
+
+  app.delete("/api/jira/issue-metadata/:issueKey/images", (req, res) => {
+    const issueKey = String(req.params.issueKey || "").trim();
+    if (!issueKey) {
+      return res.status(400).json({ error: "Missing issue key" });
+    }
+
+    deleteAllNoteImages(db, noteImagesDir, issueKey);
+    setKeepNoteImagesStmt.run({ issueKey, keepNoteImages: 0 });
+
+    log.info(`deleted kept note images for ${issueKey}`);
+    return res.json({ ok: true, issueKey });
   });
 
   app.put("/api/jira/issue-metadata/:issueKey", (req, res) => {

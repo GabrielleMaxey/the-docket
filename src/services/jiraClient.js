@@ -132,6 +132,32 @@ export const pushJiraIssueNote = async ({ issueKey, note, images = [] }) => {
   });
 };
 
+export const saveKeptNoteImages = async ({ issueKey, images = [] }) => {
+  const formData = new FormData();
+  images.forEach((image) => formData.append("images", image.file, image.filename));
+
+  return requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/images`, {
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const deleteKeptNoteImages = async (issueKey) => {
+  return requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/images`, {
+    method: "DELETE",
+  });
+};
+
+export const fetchKeptNoteImageBlob = async (issueKey, imageId) => {
+  const response = await fetch(
+    buildApiUrl(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/images/${encodeURIComponent(imageId)}`)
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to load kept image ${imageId} for ${issueKey}`);
+  }
+  return response.blob();
+};
+
 export const updateJiraIssueStatus = async ({ issueKey, targetStatus }) => {
   return requestJson(`/api/jira/issues/${encodeURIComponent(issueKey)}/status`, {
     method: "POST",
