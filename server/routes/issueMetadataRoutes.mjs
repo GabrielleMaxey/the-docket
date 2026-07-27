@@ -381,7 +381,18 @@ export const registerIssueMetadataRoutes = (
 
     res.setHeader("Content-Type", image.mimeType);
     res.setHeader("Content-Length", String(image.byteSize));
-    fs.createReadStream(image.storagePath).pipe(res);
+    const stream = fs.createReadStream(image.storagePath);
+    stream.on("error", (error) => {
+      if (res.headersSent) {
+        res.destroy(error);
+        return;
+      }
+
+      res.removeHeader("Content-Type");
+      res.removeHeader("Content-Length");
+      res.status(404).json({ error: "Image not found" });
+    });
+    stream.pipe(res);
   });
 
   app.post(
@@ -395,10 +406,6 @@ export const registerIssueMetadataRoutes = (
       }
 
       const files = req.files || [];
-      if (files.length === 0) {
-        return res.status(400).json({ error: "No images to keep" });
-      }
-
       const images = replaceNoteImages(
         db,
         noteImagesDir,

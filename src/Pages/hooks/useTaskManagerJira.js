@@ -275,10 +275,28 @@ export const useTaskManagerJira = () => {
   const enrichSeqRef = React.useRef(0);
   const noteImagesRef = React.useRef({});
   const hydratedNoteImageKeysRef = React.useRef(new Set());
+  const pendingNoteImageKeepSyncKeysRef = React.useRef(new Set());
 
   React.useEffect(() => {
     noteImagesRef.current = noteImagesByKey;
   }, [noteImagesByKey]);
+
+  React.useEffect(() => {
+    const issueKeys = [...pendingNoteImageKeepSyncKeysRef.current];
+    pendingNoteImageKeepSyncKeysRef.current.clear();
+
+    issueKeys.forEach((issueKey) => {
+      if (!keepNoteImagesByKey[issueKey]) {
+        return;
+      }
+
+      saveKeptNoteImages({ issueKey, images: noteImagesByKey[issueKey] || [] }).catch((error) => {
+        setNoteImageErrorsByKey((prev) =>
+          patchIssueKeyed(prev, issueKey, errorMessage(error, "Failed to keep note images."))
+        );
+      });
+    });
+  }, [keepNoteImagesByKey, noteImagesByKey]);
 
   React.useEffect(
     () => () => {
@@ -544,6 +562,10 @@ export const useTaskManagerJira = () => {
         byteSize: file.size,
       }));
 
+      if (keepNoteImagesByKey[issueKey]) {
+        pendingNoteImageKeepSyncKeysRef.current.add(issueKey);
+      }
+
       return patchIssueKeyed(prev, issueKey, [...existing, ...added]);
     });
 
@@ -567,6 +589,10 @@ export const useTaskManagerJira = () => {
       const next = existing.filter((item) => item.localId !== localId);
       if (next.length === existing.length) {
         return prev;
+      }
+
+      if (keepNoteImagesByKey[issueKey]) {
+        pendingNoteImageKeepSyncKeysRef.current.add(issueKey);
       }
 
       return next.length === 0
