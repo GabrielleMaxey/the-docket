@@ -282,6 +282,7 @@ app.get("/api/health", (_req, res) => {
 
 const routeCtx = {
   db,
+  dataDir: dbDir,
   jiraRequest,
   jiraMultipartRequest,
   ensureEnvOrRespond,
