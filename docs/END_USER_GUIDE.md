@@ -43,6 +43,7 @@ With the site open: **File → Add to Dock** (label may vary by macOS version).
 
 - The installed window still needs **`npm run dev:all` running** in a terminal. If you quit that process, the app cannot reach Jira or save notes.
 - Prefer Chrome or Edge for “Install as app.” The install dialog shows the name **Task Manager** and the app icon (not “localhost”).
+- For packaged DMG/NSIS that warn on first open (unsigned builds), see [unsigned-installs.md](./unsigned-installs.md).
 
 ---
 
