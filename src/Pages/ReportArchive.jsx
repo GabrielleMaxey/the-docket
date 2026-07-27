@@ -58,12 +58,6 @@ const getArchivedChartProps = (report) => {
   };
 };
 
-const mergeWorkWeekItems = (archived, coworkFiles) => {
-  const merged = [...(coworkFiles || []), ...(archived || [])];
-  merged.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-  return merged;
-};
-
 const ReportList = ({
   items,
   loading,
@@ -142,7 +136,6 @@ const ReportArchivePanel = ({
   source,
   title,
   emptyMessage,
-  includeCoworkFiles = false,
   coworkOnly = false,
 }) => {
   const [items, setItems] = React.useState([]);
@@ -173,18 +166,9 @@ const ReportArchivePanel = ({
       setSaveMessage("");
 
       try {
-        let nextItems;
-        if (coworkOnly) {
-          nextItems = await fetchCoworkWeeklyPlans();
-        } else {
-          const archived = await fetchArchivedReports({ source });
-          if (includeCoworkFiles) {
-            const files = await fetchCoworkWeeklyPlans();
-            nextItems = mergeWorkWeekItems(archived, files);
-          } else {
-            nextItems = archived;
-          }
-        }
+        const nextItems = coworkOnly
+          ? await fetchCoworkWeeklyPlans()
+          : await fetchArchivedReports({ source });
         if (!cancelled) {
           setItems(nextItems);
         }
@@ -205,7 +189,7 @@ const ReportArchivePanel = ({
     return () => {
       cancelled = true;
     };
-  }, [source, includeCoworkFiles, coworkOnly]);
+  }, [source, coworkOnly]);
 
   const reloadList = React.useCallback(async () => {
     setLoading(true);
@@ -215,15 +199,8 @@ const ReportArchivePanel = ({
     try {
       if (coworkOnly) {
         setItems(await fetchCoworkWeeklyPlans());
-        return;
-      }
-
-      const archived = await fetchArchivedReports({ source });
-      if (includeCoworkFiles) {
-        const files = await fetchCoworkWeeklyPlans();
-        setItems(mergeWorkWeekItems(archived, files));
       } else {
-        setItems(archived);
+        setItems(await fetchArchivedReports({ source }));
       }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load reports");
@@ -231,7 +208,7 @@ const ReportArchivePanel = ({
     } finally {
       setLoading(false);
     }
-  }, [source, includeCoworkFiles, coworkOnly]);
+  }, [source, coworkOnly]);
 
   const handleSelect = React.useCallback(async (item) => {
     const id = item?.id ?? item;
@@ -283,16 +260,14 @@ const ReportArchivePanel = ({
           filename: item.filename,
         });
         setSaveMessage(`Saved “${item.label || item.filename}” to Work Week archive.`);
-        if (!coworkOnly) {
-          await reloadList();
-        }
+        await reloadList();
       } catch (saveError) {
         setDetailError(saveError instanceof Error ? saveError.message : "Failed to save to archive");
       } finally {
         setSavingId(null);
       }
     },
-    [selectedId, selectedReport, coworkOnly, reloadList]
+    [selectedId, selectedReport, reloadList]
   );
 
   return (
@@ -305,7 +280,7 @@ const ReportArchivePanel = ({
         error={error}
         selectedId={selectedId}
         onSelect={handleSelect}
-        onSaveToArchive={includeCoworkFiles || coworkOnly ? handleSaveToArchive : undefined}
+        onSaveToArchive={coworkOnly ? handleSaveToArchive : undefined}
         savingId={savingId}
         emptyMessage={emptyMessage}
       />
@@ -360,11 +335,7 @@ const ReportArchive = () => {
       menuItem: "Work Week",
       render: () => (
         <Tab.Pane attached={false}>
-          <ReportArchivePanel
-            source="work_week"
-            title="My Work Week reports"
-            includeCoworkFiles
-          />
+          <ReportArchivePanel source="work_week" title="My Work Week reports" />
         </Tab.Pane>
       ),
     },
@@ -407,8 +378,7 @@ const ReportArchive = () => {
       <Header as="h2" className="report-archive-heading">Past reports</Header>
       <p className="report-archive-intro">
         Every generated report and week plan is saved on this machine. Browse previous Work Week, Dashboard,
-        and ad-hoc Chat responses below. CoWork weekly plan files from the data folder appear under Files
-        and Work Week.
+        and ad-hoc Chat responses below. CoWork weekly plan files from the data folder appear under Files.
       </p>
       <Tab menu={{ secondary: true, pointing: true }} panes={panes} />
     </Container>
