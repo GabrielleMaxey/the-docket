@@ -158,7 +158,7 @@ Appears after you Run JQL and get results. Shows:
 
 ### Help me plan my week
 
-Click **🗓️ Help me plan my week** to expand. Answer four questions:
+Click **🗓️ Help me plan my week** to expand. Answer a few questions:
 
 | # | Question | Example answer |
 |---|----------|---------------|
@@ -166,6 +166,9 @@ Click **🗓️ Help me plan my week** to expand. Answer four questions:
 | 2 | How many hours available? | 32 |
 | 3 | Fixed commitments or blockers? | "Deployment Thursday" |
 | 4 | Any other context? | "Need to prep for Friday review" |
+| 5 | Include a prior CoWork weekly plan? (optional) | Pick a `weekly-plan-*.md` from the data folder, or **None** |
+
+Question 5 lists CoWork files already in the app data folder (same as **Past Reports → Files**). If you pick one, its content is sent as prior-plan context so the new plan can refine it against your current JQL tasks.
 
 Click **Continue →**, then **Generate week plan**. The result is a Monday–Friday plan using your actual issue keys. Copy, download, **Clear report** (removes the plan text from this page only), or **Start over** to reset the questions.
 
@@ -294,11 +297,14 @@ Snapshot-based stand-up brief — overdue/upcoming highlights, contributor load,
 
 | Tab | Contents |
 |-----|----------|
-| **Work Week** | Project reports and week plans (saved automatically when you click Generate) |
+| **Work Week** | Project reports and week plans (saved automatically when you click Generate), plus CoWork `weekly-plan-*.md` files from the app data folder |
 | **Dashboard** | Executive / PM / Developer audience reports (saved automatically on Generate) |
 | **Ad-hoc** | Chat assistant replies you explicitly saved with **Save to Past Reports** |
+| **Files** | Live list of CoWork `weekly-plan-*.md` files in the data folder (read from disk; optional **Save to archive**) |
 
 For each tab: pick a row → **View** → expand the report to read, copy, or download. Dashboard archived reports may include the status chart that was shown at generation time.
+
+**CoWork weekly plans:** When Claude CoWork writes `weekly-plan-<date>.md` into the Task Manager `data/` folder, those files show under **Files** and **Work Week**. Content is read live from disk until you click **Save to archive**, which copies it into the local Past Reports database as a week plan (so it remains after the file is moved or deleted).
 
 **Clear report** on Work Week or Dashboard removes the on-page copy and browser cache only — it does **not** delete items already listed here.
 

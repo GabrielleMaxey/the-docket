@@ -497,3 +497,29 @@ export const saveAdHocReport = async ({ content, label, userPrompt, provider }) 
     body: JSON.stringify({ content, label, userPrompt, provider, ...getLocalTimestampPayload() }),
   });
 };
+
+export const fetchCoworkWeeklyPlans = async () => {
+  const data = await requestJson("/api/reports/cowork-files");
+  return data?.items || [];
+};
+
+export const fetchCoworkWeeklyPlanByFilename = async (filename) => {
+  const data = await requestJson(`/api/reports/cowork-files/${encodeURIComponent(filename)}`);
+  return data?.item || null;
+};
+
+export const saveCoworkWeeklyPlanToArchive = async ({ content, label, filename }) => {
+  return requestJson("/api/reports/archive", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      content,
+      label,
+      filename,
+      fromCoworkFile: true,
+      ...getLocalTimestampPayload(),
+    }),
+  });
+};
