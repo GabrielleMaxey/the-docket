@@ -8,6 +8,10 @@ import {
   listGeneratedReports,
   REPORT_SOURCES,
 } from "../lib/reportArchive.mjs";
+import {
+  listCoworkWeeklyPlans,
+  readCoworkWeeklyPlan,
+} from "../lib/coworkWeeklyPlans.mjs";
 import { createLogger } from "../lib/logger.mjs";
 
 const log = createLogger("report");
@@ -171,7 +175,7 @@ const callLLMForReport = async ({ systemPrompt, context, label = "report" }) => 
   });
 };
 
-export const registerReportRoutes = (app, { db }) => {
+export const registerReportRoutes = (app, { db, dataDir }) => {
   const getLatestSnapshotStmt = db.prepare(
     "SELECT * FROM dashboard_snapshots ORDER BY refreshed_at DESC LIMIT 1"
   );
@@ -447,6 +451,35 @@ Rules:
     }
   });
 
+  app.get("/api/reports/cowork-files", (_req, res) => {
+    try {
+      const items = listCoworkWeeklyPlans(dataDir);
+      return res.json({ items });
+    } catch (error) {
+      log.error("cowork files list failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to list CoWork weekly plans",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.get("/api/reports/cowork-files/:filename", (req, res) => {
+    try {
+      const result = readCoworkWeeklyPlan(dataDir, req.params.filename);
+      if (!result.ok) {
+        return res.status(result.status || 400).json({ error: result.error });
+      }
+      return res.json({ item: result.item });
+    } catch (error) {
+      log.error("cowork file read failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to read CoWork weekly plan",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   app.get("/api/reports/archive", (req, res) => {
     const source = String(req.query?.source || "").trim();
     const limit = Math.min(200, Math.max(1, Number(req.query?.limit) || 100));
@@ -467,6 +500,36 @@ Rules:
     const content = String(req.body?.content || "").trim();
     if (!content) {
       return res.status(400).json({ error: "Missing report content" });
+    }
+
+    const fromCoworkFile = Boolean(req.body?.fromCoworkFile);
+    const filename = String(req.body?.filename || "").trim();
+
+    if (fromCoworkFile) {
+      const labelRaw = String(req.body?.label || "").trim();
+      const label = labelRaw || filename || "Week plan";
+
+      try {
+        const archiveId = insertGeneratedReport(db, {
+          source: REPORT_SOURCES.WORK_WEEK,
+          reportType: "week_plan",
+          label,
+          content,
+          createdAt: getClientArchiveTimestamp(req),
+          meta: {
+            fromCoworkFile: true,
+            ...(filename ? { filename } : {}),
+            ...getClientArchiveMeta(req),
+          },
+        });
+        return res.json({ ok: true, archiveId, label });
+      } catch (error) {
+        log.error("cowork archive save failed", error instanceof Error ? error.message : error);
+        return res.status(500).json({
+          error: "Failed to save report",
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
     }
 
     const labelRaw = String(req.body?.label || "").trim();
