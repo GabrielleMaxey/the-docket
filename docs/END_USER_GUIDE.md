@@ -4,6 +4,48 @@ This guide covers how to use the app day-to-day. No programming knowledge needed
 
 ---
 
+## Using Task Manager in the browser (when the desktop app is unavailable)
+
+If the packaged desktop app or Electron window is blocked (for example by macOS or work security software), use the **browser UI** instead. You get the same pages; only the window chrome is different.
+
+### Start the app
+
+From the project folder, in a terminal:
+
+```bash
+npm run dev:all
+```
+
+Leave that terminal open. Then open **http://localhost:5173** in Chrome or Edge.
+
+### Install as its own application window
+
+Chrome and Edge can open the site in a standalone window (similar to Microsoft 365 as an app), with a Dock / taskbar icon:
+
+**Google Chrome**
+
+1. Open **http://localhost:5173** while `npm run dev:all` is running.
+2. Menu (**⋮**) → **Cast, save, and share** → **Install page as app…**  
+   (wording may vary slightly by Chrome version; look for **Install app** / **Install Task Manager**).
+3. Confirm. A separate window opens; you can pin it to the Dock.
+
+**Microsoft Edge**
+
+1. Open **http://localhost:5173**.
+2. Menu (**⋯**) → **Apps** → **Install this site as an app**.
+3. Name it **Task Manager** if prompted, then install.
+
+**Safari (macOS)**
+
+With the site open: **File → Add to Dock** (label may vary by macOS version).
+
+### Important
+
+- The installed window still needs **`npm run dev:all` running** in a terminal. If you quit that process, the app cannot reach Jira or save notes.
+- Prefer Chrome or Edge for “Install as app.” After the PWA manifest is in place, the install dialog should show the name **Task Manager** and the app icon instead of “localhost.”
+
+---
+
 ## The five pages
 
 ```

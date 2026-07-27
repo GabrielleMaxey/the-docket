@@ -181,6 +181,10 @@ Unchanged in v1: pull overwrites **note text** only. Does not clear ephemeral or
 
 Install-as-app still needs `npm run dev:all` (or hosted API) for data; it replaces Electron UI chrome, not the backend.
 
+### B.4 End-user documentation
+
+Update [`docs/END_USER_GUIDE.md`](../../END_USER_GUIDE.md) with a clear section: **Using Task Manager in the browser (when the desktop app is unavailable)** — how to run `npm run dev:all`, open localhost, and **Install as app** in Chrome/Edge (and Safari Add to Dock). Note that the terminal process must stay running.
+
 ---
 
 ## Testing (manual)
