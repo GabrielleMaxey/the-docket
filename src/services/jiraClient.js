@@ -108,14 +108,54 @@ export const fetchJiraSearchAll = async ({ jql, maxTotal = 200 }) => {
   });
 };
 
-export const pushJiraIssueNote = async ({ issueKey, note }) => {
-  return requestJson(`/api/jira/issues/${encodeURIComponent(issueKey)}/comment`, {
+export const pushJiraIssueNote = async ({ issueKey, note, images = [] }) => {
+  const path = `/api/jira/issues/${encodeURIComponent(issueKey)}/comment`;
+
+  if (images.length === 0) {
+    return requestJson(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ note }),
+    });
+  }
+
+  const formData = new FormData();
+  formData.append("note", note || "");
+  images.forEach((image) => formData.append("images", image.file, image.filename));
+
+  // Omit Content-Type so the browser sets the multipart boundary itself.
+  return requestJson(path, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ note }),
+    body: formData,
   });
+};
+
+export const saveKeptNoteImages = async ({ issueKey, images = [] }) => {
+  const formData = new FormData();
+  images.forEach((image) => formData.append("images", image.file, image.filename));
+
+  return requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/images`, {
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const deleteKeptNoteImages = async (issueKey) => {
+  return requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/images`, {
+    method: "DELETE",
+  });
+};
+
+export const fetchKeptNoteImageBlob = async (issueKey, imageId) => {
+  const response = await fetch(
+    buildApiUrl(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/images/${encodeURIComponent(imageId)}`)
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to load kept image ${imageId} for ${issueKey}`);
+  }
+  return response.blob();
 };
 
 export const updateJiraIssueStatus = async ({ issueKey, targetStatus }) => {

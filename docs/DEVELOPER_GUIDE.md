@@ -168,6 +168,15 @@ taskManager/
 │       ├── workWeekNavigation.js  # buildWorkWeekHref({ key, assignee }) for drill-down
 │       └── format.js              # formatPercent, formatTimestamp
 ├── docs/                     # ← you are here
+│   ├── END_USER_GUIDE.md     # Day-to-day usage (incl. browser-as-app)
+│   ├── DEVELOPER_GUIDE.md    # Architecture / API / schema
+│   ├── JIRA_SETUP.md         # Credentials and Jira config
+│   ├── unsigned-installs.md  # Unsigned DMG/NSIS + Electron blocked
+│   ├── PR_WriteUps/          # Per-PR summaries for review
+│   ├── specs/                # Feature specs (e.g. team priority sync)
+│   ├── superpowers/          # Agent design specs + implementation plans
+│   ├── canvases/             # Cursor docs-canvas mirror
+│   └── examples/             # Sample reports / prompts
 ├── data/                     # workweek.sqlite (auto-created, git-ignored)
 ├── .env                      # Credentials — never commit
 └── vite.config.js
