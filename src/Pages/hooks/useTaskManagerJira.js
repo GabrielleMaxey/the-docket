@@ -473,13 +473,12 @@ export const useTaskManagerJira = () => {
     try {
       await pushJiraIssueNote({ issueKey, note, images });
       setJiraNotes((prev) => patchIssueKeyed(prev, issueKey, note));
-      clearNoteImagesForIssue(issueKey);
-      // Server deletes any kept copies for this issue after a successful push.
-      setKeepNoteImagesByKey((prev) => removeIssueKeyed(prev, issueKey));
-      // Images are cleared on push, so the stored fingerprint must reflect the
-      // post-clear state (note + no images) or the re-push guard never matches.
+      if (images.length > 0) {
+        clearNoteImagesForIssue(issueKey);
+        setKeepNoteImagesByKey((prev) => removeIssueKeyed(prev, issueKey));
+      }
       setLastPushedJiraNoteByKey((prev) =>
-        patchIssueKeyed(prev, issueKey, buildNotePushFingerprint({ note, images: [] }))
+        patchIssueKeyed(prev, issueKey, buildNotePushFingerprint({ note, images }))
       );
       setPushState((prev) => ({
         ...prev,

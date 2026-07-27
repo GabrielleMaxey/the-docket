@@ -940,6 +940,7 @@ const JiraResultsTable = ({
                           ) : (
                             <NoteImagesStrip
                               images={noteImagesByKey[issueKey]}
+                              disabled={push.loading || isClosedOrResolved}
                               error={noteImageErrorsByKey[issueKey]}
                               onAddFiles={(files) => handleNoteImagesAdd(issueKey, files)}
                               onRemove={(localId) => handleNoteImageRemove(issueKey, localId)}
