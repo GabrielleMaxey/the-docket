@@ -449,8 +449,12 @@ export const useTaskManagerJira = () => {
     try {
       await pushJiraIssueNote({ issueKey, note, images });
       setJiraNotes((prev) => patchIssueKeyed(prev, issueKey, note));
-      setLastPushedJiraNoteByKey((prev) => patchIssueKeyed(prev, issueKey, fingerprint));
       clearNoteImagesForIssue(issueKey);
+      // Images are cleared on push, so the stored fingerprint must reflect the
+      // post-clear state (note + no images) or the re-push guard never matches.
+      setLastPushedJiraNoteByKey((prev) =>
+        patchIssueKeyed(prev, issueKey, buildNotePushFingerprint({ note, images: [] }))
+      );
       setPushState((prev) => ({
         ...prev,
         [issueKey]: { loading: false, error: "", success: "Pushed to Jira." },
