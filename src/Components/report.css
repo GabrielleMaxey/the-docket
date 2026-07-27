@@ -93,15 +93,3 @@
 .app-report-markdown .report-list li {
   margin-bottom: 0.2rem;
 }
-
-.app-report-source {
-  margin: 0;
-  padding: 1rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: #334155;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: #fff;
-}
