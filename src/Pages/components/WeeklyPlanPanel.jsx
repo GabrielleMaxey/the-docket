@@ -3,7 +3,11 @@ import { Button } from "semantic-ui-react";
 import CollapsibleSection from "../../Components/CollapsibleSection";
 import ReportOutput from "../../Components/ReportOutput";
 import { useReportClipboard } from "../../hooks/useReportClipboard";
-import { generateWeekPlan } from "../../services/jiraClient";
+import {
+  fetchCoworkWeeklyPlanByFilename,
+  fetchCoworkWeeklyPlans,
+  generateWeekPlan,
+} from "../../services/jiraClient";
 import { saveChatSessionArtifact } from "../../utils/chatSessionContext";
 import {
   BACKGROUND_JOB_IDS,
@@ -33,6 +37,20 @@ const isIssueOpen = (issue) => {
   return !/(closed|resolved|done)/.test(status);
 };
 
+const buildWeekPlanContext = ({ fixedCommitments, additionalContext, coworkFilename, coworkContent }) => {
+  const notes = [fixedCommitments.trim(), additionalContext.trim()].filter(Boolean).join(" | ");
+  const parts = [];
+  if (notes) {
+    parts.push(notes);
+  }
+  if (coworkFilename && coworkContent) {
+    parts.push(
+      `Prior CoWork weekly plan (${coworkFilename}) — refine and update based on current Jira tasks; do not ignore live task data:\n${coworkContent}`
+    );
+  }
+  return parts.join("\n\n");
+};
+
 const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
   const persistedPlan = loadWeekPlanState();
 
@@ -54,8 +72,35 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
   const [additionalContext, setAdditionalContext] = React.useState(
     String(persistedPlan?.additionalContext || "")
   );
+  const [coworkFiles, setCoworkFiles] = React.useState([]);
+  const [selectedCoworkFilename, setSelectedCoworkFilename] = React.useState(
+    String(persistedPlan?.selectedCoworkFilename || "")
+  );
 
   const hasRuns = jqlRuns.some((r) => isConfiguredJqlRun(r) && r.issues?.length > 0);
+
+  React.useEffect(() => {
+    if (!hasRuns) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    void fetchCoworkWeeklyPlans()
+      .then((items) => {
+        if (!cancelled) {
+          setCoworkFiles(Array.isArray(items) ? items : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCoworkFiles([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasRuns]);
 
   const applyPlan = React.useCallback((result) => {
     if (!result?.plan) return;
@@ -94,11 +139,28 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
             isOverdue: Boolean(i.isOverdue),
           })),
       }));
-    const combined = [fixedCommitments.trim(), additionalContext.trim()].filter(Boolean).join(" | ");
+
+    const coworkFilename = selectedCoworkFilename.trim();
 
     runBackgroundJob(BACKGROUND_JOB_IDS.WORK_WEEK_WEEK_PLAN, {
       label: "Generating week plan",
       run: async () => {
+        let coworkContent = "";
+        if (coworkFilename) {
+          const fileItem = await fetchCoworkWeeklyPlanByFilename(coworkFilename);
+          coworkContent = String(fileItem?.content || "").trim();
+          if (!coworkContent) {
+            throw new Error(`Could not read CoWork plan “${coworkFilename}”`);
+          }
+        }
+
+        const combined = buildWeekPlanContext({
+          fixedCommitments,
+          additionalContext,
+          coworkFilename,
+          coworkContent,
+        });
+
         const result = await generateWeekPlan({
           projects,
           focusStyle,
@@ -112,12 +174,17 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
           capacityHours,
           fixedCommitments,
           additionalContext,
+          selectedCoworkFilename: coworkFilename,
         });
         saveChatSessionArtifact({
           type: "week_plan",
           label: "Week plan",
           content: result.plan,
-          meta: { focusStyle, capacityHours: Number(capacityHours) || 40 },
+          meta: {
+            focusStyle,
+            capacityHours: Number(capacityHours) || 40,
+            ...(coworkFilename ? { coworkFilename } : {}),
+          },
         });
         return result;
       },
@@ -143,6 +210,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
     setCapacityHours("40");
     setFixedCommitments("");
     setAdditionalContext("");
+    setSelectedCoworkFilename("");
     clearWeekPlanState();
   };
 
@@ -188,6 +256,30 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
                 placeholder="e.g. Prep for Friday stakeholder review..."
                 value={additionalContext} onChange={(e) => setAdditionalContext(e.target.value)} />
             </div>
+            <div className="ww-plan-question-block">
+              <label className="ww-plan-question-label" htmlFor="ww-cowork-plan">
+                5. Include a prior CoWork weekly plan?
+                <span className="ww-plan-optional"> (optional)</span>
+              </label>
+              <select
+                id="ww-cowork-plan"
+                className="ww-plan-text-input"
+                value={selectedCoworkFilename}
+                onChange={(e) => setSelectedCoworkFilename(e.target.value)}
+              >
+                <option value="">None</option>
+                {coworkFiles.map((file) => (
+                  <option key={file.id || file.filename} value={file.filename}>
+                    {file.label || file.filename}
+                  </option>
+                ))}
+              </select>
+              {coworkFiles.length === 0 ? (
+                <p className="ww-plan-optional" style={{ margin: "0.35rem 0 0" }}>
+                  No weekly-plan-*.md files in the data folder yet.
+                </p>
+              ) : null}
+            </div>
             <div>
               <Button primary size="small" onClick={() => setStep("ready")}>Continue →</Button>
             </div>
@@ -198,6 +290,9 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
               <span className="ww-run-metric-chip">{FOCUS_OPTIONS.find((o) => o.value === focusStyle)?.label || focusStyle}</span>
               <span className="ww-run-metric-chip">{capacityHours}h available</span>
               {(fixedCommitments || additionalContext) ? <span className="ww-run-metric-chip">+ notes</span> : null}
+              {selectedCoworkFilename ? (
+                <span className="ww-run-metric-chip">+ {selectedCoworkFilename}</span>
+              ) : null}
               <button type="button" className="ww-plan-edit-btn" onClick={handleReset}>✎ Edit</button>
             </div>
             <div className="ww-weekly-plan-controls">

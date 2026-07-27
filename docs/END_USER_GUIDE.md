@@ -158,7 +158,7 @@ Appears after you Run JQL and get results. Shows:
 
 ### Help me plan my week
 
-Click **🗓️ Help me plan my week** to expand. Answer four questions:
+Click **🗓️ Help me plan my week** to expand. Answer a few questions:
 
 | # | Question | Example answer |
 |---|----------|---------------|
@@ -166,6 +166,9 @@ Click **🗓️ Help me plan my week** to expand. Answer four questions:
 | 2 | How many hours available? | 32 |
 | 3 | Fixed commitments or blockers? | "Deployment Thursday" |
 | 4 | Any other context? | "Need to prep for Friday review" |
+| 5 | Include a prior CoWork weekly plan? (optional) | Pick a `weekly-plan-*.md` from the data folder, or **None** |
+
+Question 5 lists CoWork files already in the app data folder (same as **Past Reports → Files**). If you pick one, its content is sent as prior-plan context so the new plan can refine it against your current JQL tasks.
 
 Click **Continue →**, then **Generate week plan**. The result is a Monday–Friday plan using your actual issue keys. Copy, download, **Clear report** (removes the plan text from this page only), or **Start over** to reset the questions.
 
