@@ -25,3 +25,19 @@ export const validateNoteImageFile = (file, currentCount) => {
 
   return { ok: true };
 };
+
+export const partitionNoteImageFiles = (existingCount, files) => {
+  const accepted = [];
+  let error = "";
+
+  for (const file of files || []) {
+    const result = validateNoteImageFile(file, existingCount + accepted.length);
+    if (!result.ok) {
+      error = result.error;
+      continue;
+    }
+    accepted.push(file);
+  }
+
+  return { accepted, error };
+};

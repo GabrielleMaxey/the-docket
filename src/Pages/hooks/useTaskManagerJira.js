@@ -37,7 +37,7 @@ import {
   normalizeJqlCount,
   normalizeJqlSlotValues,
 } from "../../utils/workWeekStorage.js";
-import { validateNoteImageFile } from "../../../shared/noteImageLimits.mjs";
+import { partitionNoteImageFiles } from "../../../shared/noteImageLimits.mjs";
 
 export const STATUS_OPTIONS = [
   "Backlog",
@@ -507,35 +507,34 @@ export const useTaskManagerJira = () => {
 
   const handleNoteImagesAdd = (issueKey, files) => {
     const nextFiles = Array.from(files || []);
-    const existing = noteImagesRef.current[issueKey] || [];
-    const added = [];
-    let error = "";
+    let validationError = "";
 
-    nextFiles.forEach((file) => {
-      const result = validateNoteImageFile(file, existing.length + added.length);
-      if (!result.ok) {
-        error = result.error;
-        return;
+    setNoteImagesByKey((prev) => {
+      const existing = prev[issueKey] || [];
+      const { accepted, error } = partitionNoteImageFiles(existing.length, nextFiles);
+      validationError = error;
+
+      if (accepted.length === 0) {
+        return prev;
       }
 
-      added.push({
+      const added = accepted.map((file) => ({
         localId: crypto.randomUUID(),
         file,
         previewUrl: URL.createObjectURL(file),
         mimeType: file.type,
         filename: file.name,
         byteSize: file.size,
-      });
+      }));
+
+      return patchIssueKeyed(prev, issueKey, [...existing, ...added]);
     });
 
     setNoteImageErrorsByKey((prev) =>
-      error ? patchIssueKeyed(prev, issueKey, error) : removeIssueKeyed(prev, issueKey)
+      validationError
+        ? patchIssueKeyed(prev, issueKey, validationError)
+        : removeIssueKeyed(prev, issueKey)
     );
-    if (added.length > 0) {
-      setNoteImagesByKey((prev) =>
-        patchIssueKeyed(prev, issueKey, [...(prev[issueKey] || []), ...added])
-      );
-    }
   };
 
   const handleNoteImageRemove = (issueKey, localId) => {

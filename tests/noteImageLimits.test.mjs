@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   NOTE_IMAGE_MAX_COUNT,
+  partitionNoteImageFiles,
   validateNoteImageFile,
 } from "../shared/noteImageLimits.mjs";
 
@@ -22,5 +23,20 @@ describe("validateNoteImageFile", () => {
   it("accepts png under size limit", () => {
     const result = validateNoteImageFile({ type: "image/png", size: 1024 }, 0);
     assert.equal(result.ok, true);
+  });
+});
+
+describe("partitionNoteImageFiles", () => {
+  const png = () => ({ type: "image/png", size: 100 });
+
+  it("caps sequential batches at max count", () => {
+    let count = 0;
+    const first = partitionNoteImageFiles(count, [png(), png(), png()]);
+    count += first.accepted.length;
+    assert.equal(first.accepted.length, 3);
+
+    const second = partitionNoteImageFiles(count, [png(), png(), png()]);
+    assert.equal(second.accepted.length, 2);
+    assert.equal(second.error, `You can add up to ${NOTE_IMAGE_MAX_COUNT} images.`);
   });
 });
