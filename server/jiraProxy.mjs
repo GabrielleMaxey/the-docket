@@ -187,6 +187,34 @@ const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
   return { ok: true, status: response.status, data };
 };
 
+// Multipart variant of jiraRequest — used for attachment uploads. Jira requires
+// X-Atlassian-Token: no-check for uploads, and the multipart boundary must come
+// from fetch itself, so Content-Type is intentionally omitted.
+const jiraMultipartRequest = async ({ method = "POST", pathWithQuery, formData }) => {
+  const target = `${process.env.JIRA_BASE_URL}${pathWithQuery}`;
+  const response = await fetch(target, {
+    method,
+    headers: {
+      Accept: "application/json",
+      Authorization: getAuthHeader(),
+      "X-Atlassian-Token": "no-check",
+    },
+    body: formData,
+  });
+
+  const text = await response.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = { message: text.slice(0, 500) }; }
+
+  if (!response.ok) {
+    const sanitized = sanitizeJiraErrorData(data);
+    log.error(`${method} ${target} → ${response.status}`);
+    return { ok: false, status: response.status, data: sanitized || {} };
+  }
+  log.debug(`${method} ${target} → ${response.status}`);
+  return { ok: true, status: response.status, data };
+};
+
 // Shared JQL search (used by route modules).
 // Supports both call styles currently present in the codebase:
 // 1) runJiraSearchRequest({ jql, maxResults, fields, nextPageToken, res })
@@ -254,6 +282,7 @@ app.get("/api/health", (_req, res) => {
 const routeCtx = {
   db,
   jiraRequest,
+  jiraMultipartRequest,
   ensureEnvOrRespond,
   runJiraSearchRequest,
   resolveJiraUser,

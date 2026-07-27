@@ -1,13 +1,25 @@
 // Issue mutations (comment, status, assignee) and SQLite note/priority metadata.
 
+import multer from "multer";
 import { fetchLatestCommentTextBulk } from "../lib/jiraCommentText.mjs";
+import { pushNoteCommentWithImages } from "../lib/jiraNoteComment.mjs";
 import { createLogger } from "../lib/logger.mjs";
+import {
+  NOTE_IMAGE_MAX_BYTES,
+  NOTE_IMAGE_MAX_COUNT,
+  isAllowedNoteImageMime,
+} from "../../shared/noteImageLimits.mjs";
 const log = createLogger("metadata");
 
+const uploadNoteImages = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: NOTE_IMAGE_MAX_BYTES, files: NOTE_IMAGE_MAX_COUNT },
+  fileFilter: (_req, file, cb) => cb(null, isAllowedNoteImageMime(file.mimetype)),
+});
 
 export const registerIssueMetadataRoutes = (
   app,
-  { db, jiraRequest, ensureEnvOrRespond, resolveJiraUser }
+  { db, jiraRequest, jiraMultipartRequest, ensureEnvOrRespond, resolveJiraUser }
 ) => {
   const selectIssueMetadataStmt = db.prepare(
     "SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key = ?"
@@ -35,61 +47,54 @@ export const registerIssueMetadataRoutes = (
     return normalized === "unassigned" || normalized === "__unassigned__";
   };
 
-  app.post("/api/jira/issues/:issueKey/comment", async (req, res) => {
-    if (!ensureEnvOrRespond(res)) {
-      return;
-    }
-
-    const issueKey = String(req.params.issueKey || "").trim();
-    const note = String(req.body?.note || "").trim();
-
-    if (!issueKey) {
-      return res.status(400).json({ error: "Missing issue key" });
-    }
-
-    if (!note) {
-      return res.status(400).json({ error: "Missing note" });
-    }
-
-    const body = {
-      body: {
-        type: "doc",
-        version: 1,
-        content: [
-          {
-            type: "paragraph",
-            content: [
-              {
-                type: "text",
-                text: note,
-              },
-            ],
-          },
-        ],
-      },
-    };
-
-    try {
-      const result = await jiraRequest({
-        method: "POST",
-        pathWithQuery: `/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`,
-        body,
-      });
-
-      if (!result.ok) {
-        return res.status(result.status).json(result.data);
+  app.post(
+    "/api/jira/issues/:issueKey/comment",
+    uploadNoteImages.array("images", NOTE_IMAGE_MAX_COUNT),
+    async (req, res) => {
+      if (!ensureEnvOrRespond(res)) {
+        return;
       }
 
-      log.info(`comment pushed to ${issueKey}`);
-      return res.json(result.data);
-    } catch (error) {
-      log.error(`comment push failed for ${issueKey}`, error instanceof Error ? error.message : error);
-      return res.status(500).json({
-        error: "Failed to push comment to Jira",
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
+      const issueKey = String(req.params.issueKey || "").trim();
+      const note = String(req.body?.note || "").trim();
+      const images = req.files || [];
+
+      if (!issueKey) {
+        return res.status(400).json({ error: "Missing issue key" });
+      }
+
+      if (!note && images.length === 0) {
+        return res.status(400).json({ error: "Missing note" });
+      }
+
+      try {
+        const result = await pushNoteCommentWithImages({
+          issueKey,
+          noteText: note,
+          imageBuffers: images.map((file) => ({
+            buffer: file.buffer,
+            filename: file.originalname,
+            mimeType: file.mimetype,
+          })),
+          jiraRequest,
+          jiraMultipartRequest,
+        });
+
+        if (!result.ok) {
+          return res.status(result.status).json(result.data);
+        }
+
+        log.info(`comment pushed to ${issueKey}${images.length ? ` with ${images.length} image(s)` : ""}`);
+        return res.json(result.data);
+      } catch (error) {
+        log.error(`comment push failed for ${issueKey}`, error instanceof Error ? error.message : error);
+        return res.status(500).json({
+          error: "Failed to push comment to Jira",
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
     }
-  });
+  );
 
   app.post("/api/jira/issues/:issueKey/status", async (req, res) => {
     if (!ensureEnvOrRespond(res)) {

@@ -8,6 +8,7 @@ import {
   getMostRecentDoneDateForIssue,
 } from "../../utils/jiraIssueDoneDates.js";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
+import { buildNotePushFingerprint } from "../../utils/notePushFingerprint.js";
 
 const PAGE_SIZE = 30;
 const SORT_FIELDS = [
@@ -184,10 +185,8 @@ const getIssueBrowseUrl = (issue) => {
   return "";
 };
 
-const noteMatchesLastJiraPush = (noteDraft, lastPushed) =>
-  typeof lastPushed === "string" &&
-  lastPushed.trim().length > 0 &&
-  String(noteDraft || "").trim() === lastPushed.trim();
+const noteMatchesLastJiraPush = (fingerprint, lastPushed) =>
+  typeof lastPushed === "string" && lastPushed.length > 0 && fingerprint === lastPushed;
 
 const ResultsPagerBar = ({
   placement,
@@ -825,7 +824,11 @@ const JiraResultsTable = ({
                     const isClosedOrResolved = isClosedLikeStatus(status);
                     const noteDraft = jiraNotes[issueKey] || "";
                     const pushedNoteSnapshot = lastPushedJiraNoteByKey[issueKey];
-                    const isNoteAlreadyPushed = noteMatchesLastJiraPush(noteDraft, pushedNoteSnapshot);
+                    const noteFingerprint = buildNotePushFingerprint({
+                      note: noteDraft,
+                      images: noteImagesByKey[issueKey],
+                    });
+                    const isNoteAlreadyPushed = noteMatchesLastJiraPush(noteFingerprint, pushedNoteSnapshot);
 
                     return (
                       <tr
@@ -949,7 +952,7 @@ const JiraResultsTable = ({
                                 placeholder="Add notes here"
                                 title={
                                   isNoteAlreadyPushed
-                                    ? "This note was pushed to Jira. Change the text to add a new note before pushing again."
+                                    ? "This note was pushed to Jira. Change the text or images before pushing again."
                                     : undefined
                                 }
                               />

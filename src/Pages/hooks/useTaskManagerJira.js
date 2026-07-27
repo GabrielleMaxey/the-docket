@@ -38,6 +38,7 @@ import {
   normalizeJqlSlotValues,
 } from "../../utils/workWeekStorage.js";
 import { partitionNoteImageFiles } from "../../../shared/noteImageLimits.mjs";
+import { buildNotePushFingerprint } from "../../utils/notePushFingerprint.js";
 
 export const STATUS_OPTIONS = [
   "Backlog",
@@ -416,22 +417,25 @@ export const useTaskManagerJira = () => {
 
   const handlePushNote = async (issueKey) => {
     const note = String(jiraNotes[issueKey] || "").trim();
-    if (!note) {
+    const images = noteImagesByKey[issueKey] || [];
+
+    if (!note && images.length === 0) {
       setPushState((prev) => ({
         ...prev,
-        [issueKey]: { loading: false, error: "Enter a note before pushing.", success: "" },
+        [issueKey]: { loading: false, error: "Enter a note or add an image before pushing.", success: "" },
       }));
       return;
     }
 
-    const lastPushedSnapshot = lastPushedJiraNoteByKey[issueKey];
-    if (typeof lastPushedSnapshot === "string" && lastPushedSnapshot.trim() && note === lastPushedSnapshot.trim()) {
+    const fingerprint = buildNotePushFingerprint({ note, images });
+    const lastPushedFingerprint = lastPushedJiraNoteByKey[issueKey];
+    if (lastPushedFingerprint && fingerprint === lastPushedFingerprint) {
       setPushState((prev) => ({
         ...prev,
         [issueKey]: {
           loading: false,
           error: "",
-          success: "Already pushed — edit the note to push again.",
+          success: "Already pushed — edit the note or images to push again.",
         },
       }));
       return;
@@ -443,9 +447,10 @@ export const useTaskManagerJira = () => {
     }));
 
     try {
-      await pushJiraIssueNote({ issueKey, note });
+      await pushJiraIssueNote({ issueKey, note, images });
       setJiraNotes((prev) => patchIssueKeyed(prev, issueKey, note));
-      setLastPushedJiraNoteByKey((prev) => patchIssueKeyed(prev, issueKey, note));
+      setLastPushedJiraNoteByKey((prev) => patchIssueKeyed(prev, issueKey, fingerprint));
+      clearNoteImagesForIssue(issueKey);
       setPushState((prev) => ({
         ...prev,
         [issueKey]: { loading: false, error: "", success: "Pushed to Jira." },
@@ -556,6 +561,12 @@ export const useTaskManagerJira = () => {
         ? removeIssueKeyed(prev, issueKey)
         : patchIssueKeyed(prev, issueKey, next);
     });
+    setNoteImageErrorsByKey((prev) => removeIssueKeyed(prev, issueKey));
+  };
+
+  const clearNoteImagesForIssue = (issueKey) => {
+    (noteImagesRef.current[issueKey] || []).forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    setNoteImagesByKey((prev) => removeIssueKeyed(prev, issueKey));
     setNoteImageErrorsByKey((prev) => removeIssueKeyed(prev, issueKey));
   };
 

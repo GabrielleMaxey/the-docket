@@ -108,13 +108,27 @@ export const fetchJiraSearchAll = async ({ jql, maxTotal = 200 }) => {
   });
 };
 
-export const pushJiraIssueNote = async ({ issueKey, note }) => {
-  return requestJson(`/api/jira/issues/${encodeURIComponent(issueKey)}/comment`, {
+export const pushJiraIssueNote = async ({ issueKey, note, images = [] }) => {
+  const path = `/api/jira/issues/${encodeURIComponent(issueKey)}/comment`;
+
+  if (images.length === 0) {
+    return requestJson(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ note }),
+    });
+  }
+
+  const formData = new FormData();
+  formData.append("note", note || "");
+  images.forEach((image) => formData.append("images", image.file, image.filename));
+
+  // Omit Content-Type so the browser sets the multipart boundary itself.
+  return requestJson(path, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ note }),
+    body: formData,
   });
 };
 
