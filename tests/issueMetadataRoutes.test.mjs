@@ -17,14 +17,15 @@ describe("issue metadata image routes", () => {
 
   beforeEach(async () => {
     app = express();
+    app.use(express.json());
     db = new Database(":memory:");
     initDatabase(db);
     baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "metadata-images-test-"));
     registerIssueMetadataRoutes(app, {
       db,
       noteImagesDir: baseDir,
-      jiraRequest: async () => ({}),
-      jiraMultipartRequest: async () => ({}),
+      jiraRequest: async () => ({ ok: true, status: 201, data: {} }),
+      jiraMultipartRequest: async () => ({ ok: true, status: 201, data: {} }),
       ensureEnvOrRespond: () => true,
       resolveJiraUser: async () => ({}),
     });
@@ -69,5 +70,26 @@ describe("issue metadata image routes", () => {
 
     assert.equal(response.status, 200);
     assert.equal(listNoteImages(db, "ABC-1").length, 0);
+  });
+
+  it("preserves kept images after a text-only comment push", async () => {
+    replaceNoteImages(db, baseDir, "ABC-1", [
+      { buffer: Buffer.from("image"), mimeType: "image/png", filename: "image.png" },
+    ]);
+    db.prepare("INSERT INTO issue_metadata (issue_key, keep_note_images) VALUES (?, 1)").run("ABC-1");
+
+    const response = await request("/api/jira/issues/ABC-1/comment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note: "Text only" }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(listNoteImages(db, "ABC-1").length, 1);
+    assert.equal(
+      db.prepare("SELECT keep_note_images FROM issue_metadata WHERE issue_key = ?").get("ABC-1")
+        .keep_note_images,
+      1
+    );
   });
 });

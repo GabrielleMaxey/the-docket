@@ -127,11 +127,10 @@ export const registerIssueMetadataRoutes = (
           return res.status(result.status).json(result.data);
         }
 
-        // A successful push means Jira now holds the images inline — kept
-        // local copies (if any) are no longer needed, regardless of whether
-        // Keep was toggled on for this push.
-        deleteAllNoteImages(db, noteImagesDir, issueKey);
-        setKeepNoteImagesStmt.run({ issueKey, keepNoteImages: 0 });
+        if (images.length > 0) {
+          deleteAllNoteImages(db, noteImagesDir, issueKey);
+          setKeepNoteImagesStmt.run({ issueKey, keepNoteImages: 0 });
+        }
 
         log.info(`comment pushed to ${issueKey}${images.length ? ` with ${images.length} image(s)` : ""}`);
         return res.json(result.data);
