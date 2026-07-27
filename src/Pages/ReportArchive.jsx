@@ -4,20 +4,36 @@ import CollapsibleSection from "../Components/CollapsibleSection";
 import ReportOutput from "../Components/ReportOutput";
 import StatusPieChart from "../Components/StatusPieChart";
 import { useReportClipboard } from "../hooks/useReportClipboard";
-import { fetchArchivedReportById, fetchArchivedReports } from "../services/jiraClient";
+import {
+  fetchArchivedReportById,
+  fetchArchivedReports,
+  fetchCoworkWeeklyPlanByFilename,
+  fetchCoworkWeeklyPlans,
+  saveCoworkWeeklyPlanToArchive,
+} from "../services/jiraClient";
 import { formatTimestamp } from "../utils/format";
 import "./reportArchive.css";
 
 const REPORT_TYPE_LABELS = {
   work_week_project_report: "Project report",
   week_plan: "Week plan",
+  cowork_weekly_plan: "CoWork file",
   dashboard_report: "Dashboard report",
   chat_response: "Chat response",
 };
 
+const isCoworkFileItem = (item) =>
+  item?.kind === "cowork_file" || String(item?.id || "").startsWith("file:");
+
 const formatReportType = (item) => {
   if (!item) {
     return "";
+  }
+  if (isCoworkFileItem(item) || item.reportType === "cowork_weekly_plan") {
+    return "CoWork file";
+  }
+  if (item.reportType === "week_plan" && item.meta?.fromCoworkFile) {
+    return "Week plan (from CoWork)";
   }
   if (item.reportType === "dashboard_report" && item.meta?.audience) {
     return String(item.meta.audience).replace(/_/g, " ");
@@ -42,7 +58,22 @@ const getArchivedChartProps = (report) => {
   };
 };
 
-const ReportList = ({ items, loading, error, selectedId, onSelect, emptyMessage }) => {
+const mergeWorkWeekItems = (archived, coworkFiles) => {
+  const merged = [...(coworkFiles || []), ...(archived || [])];
+  merged.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  return merged;
+};
+
+const ReportList = ({
+  items,
+  loading,
+  error,
+  selectedId,
+  onSelect,
+  onSaveToArchive,
+  savingId,
+  emptyMessage,
+}) => {
   if (loading) {
     return <Message info size="small">Loading archived reports…</Message>;
   }
@@ -84,10 +115,21 @@ const ReportList = ({ items, loading, error, selectedId, onSelect, emptyMessage 
               <Button
                 size="mini"
                 primary={selectedId === item.id}
-                onClick={() => onSelect(item.id)}
+                onClick={() => onSelect(item)}
               >
                 {selectedId === item.id ? "Selected" : "View"}
               </Button>
+              {isCoworkFileItem(item) && onSaveToArchive ? (
+                <Button
+                  size="mini"
+                  style={{ marginLeft: "0.35rem" }}
+                  loading={savingId === item.id}
+                  disabled={savingId === item.id}
+                  onClick={() => onSaveToArchive(item)}
+                >
+                  Save to archive
+                </Button>
+              ) : null}
             </Table.Cell>
           </Table.Row>
         ))}
@@ -96,7 +138,13 @@ const ReportList = ({ items, loading, error, selectedId, onSelect, emptyMessage 
   );
 };
 
-const ReportArchivePanel = ({ source, title, emptyMessage }) => {
+const ReportArchivePanel = ({
+  source,
+  title,
+  emptyMessage,
+  includeCoworkFiles = false,
+  coworkOnly = false,
+}) => {
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
@@ -104,6 +152,8 @@ const ReportArchivePanel = ({ source, title, emptyMessage }) => {
   const [selectedReport, setSelectedReport] = React.useState(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
   const [detailError, setDetailError] = React.useState("");
+  const [savingId, setSavingId] = React.useState(null);
+  const [saveMessage, setSaveMessage] = React.useState("");
 
   const reportForClipboard = selectedReport
     ? { report: selectedReport.content, label: selectedReport.label }
@@ -120,9 +170,21 @@ const ReportArchivePanel = ({ source, title, emptyMessage }) => {
       setSelectedId(null);
       setSelectedReport(null);
       setDetailError("");
+      setSaveMessage("");
 
       try {
-        const nextItems = await fetchArchivedReports({ source });
+        let nextItems;
+        if (coworkOnly) {
+          nextItems = await fetchCoworkWeeklyPlans();
+        } else {
+          const archived = await fetchArchivedReports({ source });
+          if (includeCoworkFiles) {
+            const files = await fetchCoworkWeeklyPlans();
+            nextItems = mergeWorkWeekItems(archived, files);
+          } else {
+            nextItems = archived;
+          }
+        }
         if (!cancelled) {
           setItems(nextItems);
         }
@@ -143,17 +205,51 @@ const ReportArchivePanel = ({ source, title, emptyMessage }) => {
     return () => {
       cancelled = true;
     };
-  }, [source]);
+  }, [source, includeCoworkFiles, coworkOnly]);
 
-  const handleSelect = React.useCallback(async (id) => {
+  const reloadList = React.useCallback(async () => {
+    setLoading(true);
+    setError("");
+    setSaveMessage("");
+
+    try {
+      if (coworkOnly) {
+        setItems(await fetchCoworkWeeklyPlans());
+        return;
+      }
+
+      const archived = await fetchArchivedReports({ source });
+      if (includeCoworkFiles) {
+        const files = await fetchCoworkWeeklyPlans();
+        setItems(mergeWorkWeekItems(archived, files));
+      } else {
+        setItems(archived);
+      }
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load reports");
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [source, includeCoworkFiles, coworkOnly]);
+
+  const handleSelect = React.useCallback(async (item) => {
+    const id = item?.id ?? item;
     setSelectedId(id);
     setDetailLoading(true);
     setDetailError("");
     setSelectedReport(null);
+    setSaveMessage("");
 
     try {
-      const item = await fetchArchivedReportById(id);
-      setSelectedReport(item);
+      if (isCoworkFileItem(item) || (typeof id === "string" && id.startsWith("file:"))) {
+        const filename = item?.filename || String(id).slice("file:".length);
+        const fileItem = await fetchCoworkWeeklyPlanByFilename(filename);
+        setSelectedReport(fileItem);
+      } else {
+        const archived = await fetchArchivedReportById(id);
+        setSelectedReport(archived);
+      }
     } catch (loadError) {
       setDetailError(loadError instanceof Error ? loadError.message : "Failed to load report");
     } finally {
@@ -161,15 +257,56 @@ const ReportArchivePanel = ({ source, title, emptyMessage }) => {
     }
   }, []);
 
+  const handleSaveToArchive = React.useCallback(
+    async (item) => {
+      if (!isCoworkFileItem(item)) {
+        return;
+      }
+
+      setSavingId(item.id);
+      setSaveMessage("");
+      setDetailError("");
+
+      try {
+        let content = selectedReport?.content;
+        if (selectedId !== item.id || !content) {
+          const fileItem = await fetchCoworkWeeklyPlanByFilename(item.filename);
+          content = fileItem?.content;
+        }
+        if (!content) {
+          throw new Error("Could not read weekly plan content");
+        }
+
+        await saveCoworkWeeklyPlanToArchive({
+          content,
+          label: item.label || item.filename,
+          filename: item.filename,
+        });
+        setSaveMessage(`Saved “${item.label || item.filename}” to Work Week archive.`);
+        if (!coworkOnly) {
+          await reloadList();
+        }
+      } catch (saveError) {
+        setDetailError(saveError instanceof Error ? saveError.message : "Failed to save to archive");
+      } finally {
+        setSavingId(null);
+      }
+    },
+    [selectedId, selectedReport, coworkOnly, reloadList]
+  );
+
   return (
     <div className="report-archive-panel">
       <Header as="h3" className="report-archive-subtitle">{title}</Header>
+      {saveMessage ? <Message positive size="small">{saveMessage}</Message> : null}
       <ReportList
         items={items}
         loading={loading}
         error={error}
         selectedId={selectedId}
         onSelect={handleSelect}
+        onSaveToArchive={includeCoworkFiles || coworkOnly ? handleSaveToArchive : undefined}
+        savingId={savingId}
         emptyMessage={emptyMessage}
       />
       {detailLoading ? <Message info size="small">Loading report…</Message> : null}
@@ -223,7 +360,11 @@ const ReportArchive = () => {
       menuItem: "Work Week",
       render: () => (
         <Tab.Pane attached={false}>
-          <ReportArchivePanel source="work_week" title="My Work Week reports" />
+          <ReportArchivePanel
+            source="work_week"
+            title="My Work Week reports"
+            includeCoworkFiles
+          />
         </Tab.Pane>
       ),
     },
@@ -247,6 +388,18 @@ const ReportArchive = () => {
         </Tab.Pane>
       ),
     },
+    {
+      menuItem: "Files",
+      render: () => (
+        <Tab.Pane attached={false}>
+          <ReportArchivePanel
+            coworkOnly
+            title="CoWork weekly plan files"
+            emptyMessage="No weekly-plan-*.md files in the data folder yet."
+          />
+        </Tab.Pane>
+      ),
+    },
   ];
 
   return (
@@ -254,7 +407,8 @@ const ReportArchive = () => {
       <Header as="h2" className="report-archive-heading">Past reports</Header>
       <p className="report-archive-intro">
         Every generated report and week plan is saved on this machine. Browse previous Work Week, Dashboard,
-        and ad-hoc Chat responses below.
+        and ad-hoc Chat responses below. CoWork weekly plan files from the data folder appear under Files
+        and Work Week.
       </p>
       <Tab menu={{ secondary: true, pointing: true }} panes={panes} />
     </Container>
