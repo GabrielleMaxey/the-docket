@@ -1,8 +1,8 @@
 # Note Images + PWA Manifest — Design Spec
 
 **Date:** 2026-07-27  
-**Last updated:** 2026-07-27 (ephemeral images + Keep toggle)  
-**Status:** Approved direction — storage model revised; pending user review of this file  
+**Last updated:** 2026-07-27 (Task 5 — docs + implementation complete)  
+**Status:** Implemented  
 **Scope:** Attach images to Work Week notes (ephemeral draft by default, optional keep-on-machine; inline Jira comment on push); add a PWA web manifest so browser “Install app” shows Task Manager name/icon.
 
 ---
