@@ -297,14 +297,14 @@ Snapshot-based stand-up brief — overdue/upcoming highlights, contributor load,
 
 | Tab | Contents |
 |-----|----------|
-| **Work Week** | Project reports and week plans (saved automatically when you click Generate), plus CoWork `weekly-plan-*.md` files from the app data folder |
+| **Work Week** | Project reports and week plans (saved automatically when you click Generate) |
 | **Dashboard** | Executive / PM / Developer audience reports (saved automatically on Generate) |
 | **Ad-hoc** | Chat assistant replies you explicitly saved with **Save to Past Reports** |
 | **Files** | Live list of CoWork `weekly-plan-*.md` files in the data folder (read from disk; optional **Save to archive**) |
 
 For each tab: pick a row → **View** → expand the report to read, copy, or download. Dashboard archived reports may include the status chart that was shown at generation time.
 
-**CoWork weekly plans:** When Claude CoWork writes `weekly-plan-<date>.md` into the Task Manager `data/` folder, those files show under **Files** and **Work Week**. Content is read live from disk until you click **Save to archive**, which copies it into the local Past Reports database as a week plan (so it remains after the file is moved or deleted).
+**CoWork weekly plans:** When Claude CoWork writes `weekly-plan-<date>.md` into the Task Manager `data/` folder, those files show under **Files**. Content is read live from disk until you click **Save to archive**, which copies it into the local Past Reports database as a week plan (so it remains after the file is moved or deleted).
 
 **Clear report** on Work Week or Dashboard removes the on-page copy and browser cache only — it does **not** delete items already listed here.
 
