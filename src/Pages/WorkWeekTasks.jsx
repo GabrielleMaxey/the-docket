@@ -86,7 +86,8 @@ const WorkWeekTasks = () => {
     showRestoredJqlBanner, jqlError, jqlMaxResults, pullLatestComment, assigneeRefreshNotice,
     jiraNotes, jiraRowPriorities, prioritySourceByKey, selectedForPush,
     lastPushedJiraNoteByKey, pushState, saveState,
-    statusDrafts, assigneeDrafts, rowUpdateState,
+    statusDrafts, assigneeDrafts, rowUpdateState, noteImagesByKey, noteImageErrorsByKey,
+    keepNoteImagesByKey, noteImageKeepPendingByKey,
     isClosedLikeStatus, clampPriority, getPriorityClass,
     getPriorityRowClass, formatDate, filtersLoading,
     setJqlCount, setJqlMaxResults, setPullLatestComment,
@@ -94,7 +95,9 @@ const WorkWeekTasks = () => {
     handleResetSavedQueries, handleRunJql, handleLoadRemainingJql, handleDrillDownToKey, handleDrillDownToAssignee, clearDrillDownRun, handlePushSelected,
     handleSaveMetadata, handleSelectAll, handleStatusDraftChange,
     handleStatusUpdate, handleAssigneeDraftChange, handleAssigneeUpdate,
-    handleRowPriorityChange, handleNoteChange, handleSelectForPush, handlePushNote,
+    handleRowPriorityChange, handleNoteChange, handleNoteImagesAdd, handleNoteImageRemove,
+    handleKeepNoteImagesToggle,
+    handleSelectForPush, handlePushNote,
   } = useTaskManagerJira();
 
   const [activeRunIndex, setActiveRunIndex] = React.useState(0);
@@ -421,6 +424,8 @@ const WorkWeekTasks = () => {
           assigneeDrafts={assigneeDrafts} jiraRowPriorities={jiraRowPriorities}
           prioritySourceByKey={prioritySourceByKey}
           jiraNotes={jiraNotes} statusOptions={STATUS_OPTIONS}
+          noteImagesByKey={noteImagesByKey} noteImageErrorsByKey={noteImageErrorsByKey}
+          keepNoteImagesByKey={keepNoteImagesByKey} noteImageKeepPendingByKey={noteImageKeepPendingByKey}
           isClosedLikeStatus={isClosedLikeStatus} clampPriority={clampPriority}
           getPriorityClass={getPriorityClass} getPriorityRowClass={getPriorityRowClass}
           formatDate={formatDate} handlePushSelected={handlePushSelected}
@@ -428,6 +433,8 @@ const WorkWeekTasks = () => {
           handleStatusDraftChange={handleStatusDraftChange} handleStatusUpdate={handleStatusUpdate}
           handleAssigneeDraftChange={handleAssigneeDraftChange} handleAssigneeUpdate={handleAssigneeUpdate}
           handleRowPriorityChange={handleRowPriorityChange} handleNoteChange={handleNoteChange}
+          handleNoteImagesAdd={handleNoteImagesAdd} handleNoteImageRemove={handleNoteImageRemove}
+          handleKeepNoteImagesToggle={handleKeepNoteImagesToggle}
           handleSelectForPush={handleSelectForPush} handlePushNote={handlePushNote}
           onActiveTabChange={setActiveRunIndex}
           onLoadRemaining={handleLoadRemainingJql}
