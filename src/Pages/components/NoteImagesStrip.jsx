@@ -4,7 +4,17 @@ const IMAGE_TYPES = "image/png,image/jpeg,image/gif,image/webp";
 
 const formatByteSize = (byteSize) => `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
 
-const NoteImagesStrip = ({ children, images, disabled, error, onAddFiles, onRemove }) => {
+const NoteImagesStrip = ({
+  children,
+  images,
+  disabled,
+  error,
+  onAddFiles,
+  onRemove,
+  keepOnMachine,
+  keepPending,
+  onKeepChange,
+}) => {
   const fileInputRef = React.useRef(null);
 
   const addFiles = (files) => {
@@ -75,6 +85,17 @@ const NoteImagesStrip = ({ children, images, disabled, error, onAddFiles, onRemo
       >
         Add image
       </button>
+      {onKeepChange ? (
+        <label className="ww-note-image-keep">
+          <input
+            type="checkbox"
+            checked={Boolean(keepOnMachine)}
+            onChange={(event) => onKeepChange(event.target.checked)}
+            disabled={disabled || keepPending}
+          />
+          Keep on this machine
+        </label>
+      ) : null}
       {error ? <p className="ww-inline-error">{error}</p> : null}
     </div>
   );

@@ -1674,6 +1674,15 @@
   cursor: pointer;
 }
 
+.work-week-page .ww-note-image-keep {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: #475569;
+  cursor: pointer;
+}
+
 /* ── push to jira per-row controls ── */
 .work-week-page .ww-th-push {
   display: flex;
