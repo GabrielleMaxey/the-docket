@@ -1609,6 +1609,71 @@
   color: #94a3b8;
 }
 
+.work-week-page .ww-note-images-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.work-week-page .ww-note-images-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.work-week-page .ww-note-image-thumb {
+  position: relative;
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.68rem;
+  color: #64748b;
+}
+
+.work-week-page .ww-note-image-thumb img {
+  display: block;
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+}
+
+.work-week-page .ww-note-image-remove {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #b91c1c;
+  color: white;
+  cursor: pointer;
+}
+
+.work-week-page .ww-note-image-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.work-week-page .ww-note-image-add {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #94a3b8;
+  border-radius: 5px;
+  background: white;
+  color: #334155;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
 /* ── push to jira per-row controls ── */
 .work-week-page .ww-th-push {
   display: flex;

@@ -37,6 +37,7 @@ import {
   normalizeJqlCount,
   normalizeJqlSlotValues,
 } from "../../utils/workWeekStorage.js";
+import { validateNoteImageFile } from "../../../shared/noteImageLimits.mjs";
 
 export const STATUS_OPTIONS = [
   "Backlog",
@@ -260,10 +261,26 @@ export const useTaskManagerJira = () => {
   const [assigneeDrafts, setAssigneeDrafts] = React.useState({});
   const [assigneeAccountIds, setAssigneeAccountIds] = React.useState({});
   const [rowUpdateState, setRowUpdateState] = React.useState({});
+  const [noteImagesByKey, setNoteImagesByKey] = React.useState({});
+  const [noteImageErrorsByKey, setNoteImageErrorsByKey] = React.useState({});
   const [assigneeRefreshNotice, flashJqlRefreshNotice] = useFlash(5000);
   const [fieldMappingRows, setFieldMappingRows] = React.useState([]);
   const [fieldMappingsLoading, setFieldMappingsLoading] = React.useState(true);
   const enrichSeqRef = React.useRef(0);
+  const noteImagesRef = React.useRef({});
+
+  React.useEffect(() => {
+    noteImagesRef.current = noteImagesByKey;
+  }, [noteImagesByKey]);
+
+  React.useEffect(
+    () => () => {
+      Object.values(noteImagesRef.current)
+        .flat()
+        .forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    },
+    []
+  );
 
   useAttachBackgroundJob(BACKGROUND_JOB_IDS.WORK_WEEK_JQL, {
     onFinally: () => setJqlPending(false),
@@ -486,6 +503,61 @@ export const useTaskManagerJira = () => {
     saveIssueMetadata({ issueKey, note }).catch((error) => {
       console.error("Failed to persist note", issueKey, error);
     });
+  };
+
+  const handleNoteImagesAdd = (issueKey, files) => {
+    const nextFiles = Array.from(files || []);
+    const existing = noteImagesRef.current[issueKey] || [];
+    const added = [];
+    let error = "";
+
+    nextFiles.forEach((file) => {
+      const result = validateNoteImageFile(file, existing.length + added.length);
+      if (!result.ok) {
+        error = result.error;
+        return;
+      }
+
+      added.push({
+        localId: crypto.randomUUID(),
+        file,
+        previewUrl: URL.createObjectURL(file),
+        mimeType: file.type,
+        filename: file.name,
+        byteSize: file.size,
+      });
+    });
+
+    setNoteImageErrorsByKey((prev) =>
+      error ? patchIssueKeyed(prev, issueKey, error) : removeIssueKeyed(prev, issueKey)
+    );
+    if (added.length > 0) {
+      setNoteImagesByKey((prev) =>
+        patchIssueKeyed(prev, issueKey, [...(prev[issueKey] || []), ...added])
+      );
+    }
+  };
+
+  const handleNoteImageRemove = (issueKey, localId) => {
+    const image = (noteImagesRef.current[issueKey] || []).find(
+      (item) => item.localId === localId
+    );
+    if (image) {
+      URL.revokeObjectURL(image.previewUrl);
+    }
+
+    setNoteImagesByKey((prev) => {
+      const existing = prev[issueKey] || [];
+      const next = existing.filter((item) => item.localId !== localId);
+      if (next.length === existing.length) {
+        return prev;
+      }
+
+      return next.length === 0
+        ? removeIssueKeyed(prev, issueKey)
+        : patchIssueKeyed(prev, issueKey, next);
+    });
+    setNoteImageErrorsByKey((prev) => removeIssueKeyed(prev, issueKey));
   };
 
   const handleRowPriorityChange = (issueKey, value) => {
@@ -803,6 +875,8 @@ export const useTaskManagerJira = () => {
     statusDrafts,
     assigneeDrafts,
     rowUpdateState,
+    noteImagesByKey,
+    noteImageErrorsByKey,
     isClosedLikeStatus,
     clampPriority,
     getPriorityClass,
@@ -830,6 +904,8 @@ export const useTaskManagerJira = () => {
     handleAssigneeUpdate,
     handleRowPriorityChange,
     handleNoteChange,
+    handleNoteImagesAdd,
+    handleNoteImageRemove,
     handleSelectForPush,
     handlePushNote,
   };

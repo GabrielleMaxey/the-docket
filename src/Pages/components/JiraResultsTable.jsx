@@ -1,6 +1,7 @@
 import React from "react";
 import PriorityCell from "./cells/PriorityCell";
 import AssigneeCell from "./cells/AssigneeCell.jsx";
+import NoteImagesStrip from "./NoteImagesStrip.jsx";
 import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
 import {
   getEffectiveDueDateForIssue,
@@ -267,6 +268,8 @@ const JiraResultsTable = ({
   assigneeDrafts,
   jiraRowPriorities,
   jiraNotes,
+  noteImagesByKey,
+  noteImageErrorsByKey,
   lastPushedJiraNoteByKey,
   statusOptions,
   isClosedLikeStatus,
@@ -283,6 +286,8 @@ const JiraResultsTable = ({
   handleAssigneeUpdate,
   handleRowPriorityChange,
   handleNoteChange,
+  handleNoteImagesAdd,
+  handleNoteImageRemove,
   handleSelectForPush,
   handlePushNote,
   onActiveTabChange,
@@ -927,21 +932,28 @@ const JiraResultsTable = ({
                           {isClosedOrResolved ? (
                             <span>-</span>
                           ) : (
-                            <textarea
-                              className={`ww-note-textarea${
-                                isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
-                              }`}
-                              value={noteDraft}
-                              onChange={(event) =>
-                                handleNoteChange(issueKey, event.target.value)
-                              }
-                              placeholder="Add notes here"
-                              title={
-                                isNoteAlreadyPushed
-                                  ? "This note was pushed to Jira. Change the text to add a new note before pushing again."
-                                  : undefined
-                              }
-                            />
+                            <NoteImagesStrip
+                              images={noteImagesByKey[issueKey]}
+                              error={noteImageErrorsByKey[issueKey]}
+                              onAddFiles={(files) => handleNoteImagesAdd(issueKey, files)}
+                              onRemove={(localId) => handleNoteImageRemove(issueKey, localId)}
+                            >
+                              <textarea
+                                className={`ww-note-textarea${
+                                  isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
+                                }`}
+                                value={noteDraft}
+                                onChange={(event) =>
+                                  handleNoteChange(issueKey, event.target.value)
+                                }
+                                placeholder="Add notes here"
+                                title={
+                                  isNoteAlreadyPushed
+                                    ? "This note was pushed to Jira. Change the text to add a new note before pushing again."
+                                    : undefined
+                                }
+                              />
+                            </NoteImagesStrip>
                           )}
                         </td>
 
