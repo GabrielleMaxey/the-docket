@@ -119,7 +119,7 @@ const Settings = () => {
 
       <WorkWeekHeaderSection headerPrefs={headerPrefs} setHeaderPrefs={setHeaderPrefs} />
 
-      <TeamPriorityImportSection onError={setError} />
+      <TeamPriorityImportSection />
 
       <ChatAssistantSection settings={settings} setSettings={setSettings} chatStatus={chatStatus} onError={setError} />
     </Container>
