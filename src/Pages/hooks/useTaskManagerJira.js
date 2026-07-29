@@ -3,6 +3,9 @@ import {
   fetchFieldMappings,
   pushJiraIssueNote,
   saveIssueMetadata,
+  saveKeptNoteImages,
+  deleteKeptNoteImages,
+  fetchKeptNoteImageBlob,
   updateJiraIssueAssignee,
   updateJiraIssueStatus,
   JIRA_UNASSIGNED_ASSIGNEE,
@@ -37,6 +40,8 @@ import {
   normalizeJqlCount,
   normalizeJqlSlotValues,
 } from "../../utils/workWeekStorage.js";
+import { partitionNoteImageFiles } from "../../../shared/noteImageLimits.mjs";
+import { buildNotePushFingerprint } from "../../utils/notePushFingerprint.js";
 
 export const STATUS_OPTIONS = [
   "Backlog",
@@ -260,10 +265,47 @@ export const useTaskManagerJira = () => {
   const [assigneeDrafts, setAssigneeDrafts] = React.useState({});
   const [assigneeAccountIds, setAssigneeAccountIds] = React.useState({});
   const [rowUpdateState, setRowUpdateState] = React.useState({});
+  const [noteImagesByKey, setNoteImagesByKey] = React.useState({});
+  const [noteImageErrorsByKey, setNoteImageErrorsByKey] = React.useState({});
+  const [keepNoteImagesByKey, setKeepNoteImagesByKey] = React.useState({});
+  const [noteImageKeepPendingByKey, setNoteImageKeepPendingByKey] = React.useState({});
   const [assigneeRefreshNotice, flashJqlRefreshNotice] = useFlash(5000);
   const [fieldMappingRows, setFieldMappingRows] = React.useState([]);
   const [fieldMappingsLoading, setFieldMappingsLoading] = React.useState(true);
   const enrichSeqRef = React.useRef(0);
+  const noteImagesRef = React.useRef({});
+  const hydratedNoteImageKeysRef = React.useRef(new Set());
+  const pendingNoteImageKeepSyncKeysRef = React.useRef(new Set());
+
+  React.useEffect(() => {
+    noteImagesRef.current = noteImagesByKey;
+  }, [noteImagesByKey]);
+
+  React.useEffect(() => {
+    const issueKeys = [...pendingNoteImageKeepSyncKeysRef.current];
+    pendingNoteImageKeepSyncKeysRef.current.clear();
+
+    issueKeys.forEach((issueKey) => {
+      if (!keepNoteImagesByKey[issueKey]) {
+        return;
+      }
+
+      saveKeptNoteImages({ issueKey, images: noteImagesByKey[issueKey] || [] }).catch((error) => {
+        setNoteImageErrorsByKey((prev) =>
+          patchIssueKeyed(prev, issueKey, errorMessage(error, "Failed to keep note images."))
+        );
+      });
+    });
+  }, [keepNoteImagesByKey, noteImagesByKey]);
+
+  React.useEffect(
+    () => () => {
+      Object.values(noteImagesRef.current)
+        .flat()
+        .forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    },
+    []
+  );
 
   useAttachBackgroundJob(BACKGROUND_JOB_IDS.WORK_WEEK_JQL, {
     onFinally: () => setJqlPending(false),
@@ -399,22 +441,25 @@ export const useTaskManagerJira = () => {
 
   const handlePushNote = async (issueKey) => {
     const note = String(jiraNotes[issueKey] || "").trim();
-    if (!note) {
+    const images = noteImagesByKey[issueKey] || [];
+
+    if (!note && images.length === 0) {
       setPushState((prev) => ({
         ...prev,
-        [issueKey]: { loading: false, error: "Enter a note before pushing.", success: "" },
+        [issueKey]: { loading: false, error: "Enter a note or add an image before pushing.", success: "" },
       }));
       return;
     }
 
-    const lastPushedSnapshot = lastPushedJiraNoteByKey[issueKey];
-    if (typeof lastPushedSnapshot === "string" && lastPushedSnapshot.trim() && note === lastPushedSnapshot.trim()) {
+    const fingerprint = buildNotePushFingerprint({ note, images });
+    const lastPushedFingerprint = lastPushedJiraNoteByKey[issueKey];
+    if (lastPushedFingerprint && fingerprint === lastPushedFingerprint) {
       setPushState((prev) => ({
         ...prev,
         [issueKey]: {
           loading: false,
           error: "",
-          success: "Already pushed — edit the note to push again.",
+          success: "Already pushed — edit the note or images to push again.",
         },
       }));
       return;
@@ -426,9 +471,15 @@ export const useTaskManagerJira = () => {
     }));
 
     try {
-      await pushJiraIssueNote({ issueKey, note });
+      await pushJiraIssueNote({ issueKey, note, images });
       setJiraNotes((prev) => patchIssueKeyed(prev, issueKey, note));
-      setLastPushedJiraNoteByKey((prev) => patchIssueKeyed(prev, issueKey, note));
+      if (images.length > 0) {
+        clearNoteImagesForIssue(issueKey);
+        setKeepNoteImagesByKey((prev) => removeIssueKeyed(prev, issueKey));
+      }
+      setLastPushedJiraNoteByKey((prev) =>
+        patchIssueKeyed(prev, issueKey, buildNotePushFingerprint({ note, images }))
+      );
       setPushState((prev) => ({
         ...prev,
         [issueKey]: { loading: false, error: "", success: "Pushed to Jira." },
@@ -486,6 +537,144 @@ export const useTaskManagerJira = () => {
     saveIssueMetadata({ issueKey, note }).catch((error) => {
       console.error("Failed to persist note", issueKey, error);
     });
+  };
+
+  const handleNoteImagesAdd = (issueKey, files) => {
+    const nextFiles = Array.from(files || []);
+    let validationError = "";
+
+    setNoteImagesByKey((prev) => {
+      const existing = prev[issueKey] || [];
+      const { accepted, error } = partitionNoteImageFiles(existing.length, nextFiles);
+      validationError = error;
+
+      if (accepted.length === 0) {
+        return prev;
+      }
+
+      const added = accepted.map((file) => ({
+        localId: crypto.randomUUID(),
+        file,
+        previewUrl: URL.createObjectURL(file),
+        mimeType: file.type,
+        filename: file.name,
+        byteSize: file.size,
+      }));
+
+      if (keepNoteImagesByKey[issueKey]) {
+        pendingNoteImageKeepSyncKeysRef.current.add(issueKey);
+      }
+
+      return patchIssueKeyed(prev, issueKey, [...existing, ...added]);
+    });
+
+    setNoteImageErrorsByKey((prev) =>
+      validationError
+        ? patchIssueKeyed(prev, issueKey, validationError)
+        : removeIssueKeyed(prev, issueKey)
+    );
+  };
+
+  const handleNoteImageRemove = (issueKey, localId) => {
+    const image = (noteImagesRef.current[issueKey] || []).find(
+      (item) => item.localId === localId
+    );
+    if (image) {
+      URL.revokeObjectURL(image.previewUrl);
+    }
+
+    setNoteImagesByKey((prev) => {
+      const existing = prev[issueKey] || [];
+      const next = existing.filter((item) => item.localId !== localId);
+      if (next.length === existing.length) {
+        return prev;
+      }
+
+      if (keepNoteImagesByKey[issueKey]) {
+        pendingNoteImageKeepSyncKeysRef.current.add(issueKey);
+      }
+
+      return next.length === 0
+        ? removeIssueKeyed(prev, issueKey)
+        : patchIssueKeyed(prev, issueKey, next);
+    });
+    setNoteImageErrorsByKey((prev) => removeIssueKeyed(prev, issueKey));
+  };
+
+  const clearNoteImagesForIssue = (issueKey) => {
+    (noteImagesRef.current[issueKey] || []).forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    setNoteImagesByKey((prev) => removeIssueKeyed(prev, issueKey));
+    setNoteImageErrorsByKey((prev) => removeIssueKeyed(prev, issueKey));
+  };
+
+  // Restores images that were kept on this machine (disk + SQLite) into the
+  // same ephemeral shape as picked/pasted images, so push works unchanged.
+  // Runs at most once per issueKey per session — later bulk-metadata refreshes
+  // shouldn't clobber images the user has since edited locally.
+  const hydrateKeptNoteImages = React.useCallback((issueKey, { keepNoteImages, images } = {}) => {
+    setKeepNoteImagesByKey((prev) => patchIssueKeyed(prev, issueKey, Boolean(keepNoteImages)));
+
+    if (
+      !keepNoteImages ||
+      !Array.isArray(images) ||
+      images.length === 0 ||
+      hydratedNoteImageKeysRef.current.has(issueKey) ||
+      (noteImagesRef.current[issueKey] || []).length > 0
+    ) {
+      return;
+    }
+
+    hydratedNoteImageKeysRef.current.add(issueKey);
+
+    Promise.all(
+      images.map(async (image) => {
+        const blob = await fetchKeptNoteImageBlob(issueKey, image.id);
+        const file = new File([blob], image.filename, { type: image.mimeType });
+        return {
+          localId: crypto.randomUUID(),
+          file,
+          previewUrl: URL.createObjectURL(file),
+          mimeType: image.mimeType,
+          filename: image.filename,
+          byteSize: image.byteSize,
+        };
+      })
+    )
+      .then((hydrated) => {
+        setNoteImagesByKey((prev) =>
+          (prev[issueKey] || []).length > 0 ? prev : patchIssueKeyed(prev, issueKey, hydrated)
+        );
+      })
+      .catch((error) => {
+        console.error("Failed to load kept note images", issueKey, error);
+      });
+  }, []);
+
+  const handleKeepNoteImagesToggle = async (issueKey, checked) => {
+    if (checked && (noteImagesRef.current[issueKey] || []).length === 0) {
+      setNoteImageErrorsByKey((prev) =>
+        patchIssueKeyed(prev, issueKey, "Add an image before turning on Keep on this machine.")
+      );
+      return;
+    }
+
+    setNoteImageKeepPendingByKey((prev) => patchIssueKeyed(prev, issueKey, true));
+
+    try {
+      if (checked) {
+        await saveKeptNoteImages({ issueKey, images: noteImagesRef.current[issueKey] || [] });
+      } else {
+        await deleteKeptNoteImages(issueKey);
+      }
+      setKeepNoteImagesByKey((prev) => patchIssueKeyed(prev, issueKey, checked));
+      setNoteImageErrorsByKey((prev) => removeIssueKeyed(prev, issueKey));
+    } catch (error) {
+      setNoteImageErrorsByKey((prev) =>
+        patchIssueKeyed(prev, issueKey, errorMessage(error, "Failed to update Keep on this machine."))
+      );
+    } finally {
+      setNoteImageKeepPendingByKey((prev) => removeIssueKeyed(prev, issueKey));
+    }
   };
 
   const handleRowPriorityChange = (issueKey, value) => {
@@ -664,6 +853,7 @@ export const useTaskManagerJira = () => {
           setJiraNotes,
           setJiraRowPriorities,
           setPrioritySourceByKey,
+          hydrateNoteImages: hydrateKeptNoteImages,
           fieldMappingRows,
         }),
     }).finally(() => setJqlPending(false));
@@ -716,6 +906,7 @@ export const useTaskManagerJira = () => {
         setPrioritySourceByKey,
         setJiraNotes,
         setJqlError,
+        hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
         isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
       });
@@ -742,6 +933,7 @@ export const useTaskManagerJira = () => {
         setPrioritySourceByKey,
         setJiraNotes,
         setJqlError,
+        hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
         isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
       });
@@ -803,6 +995,10 @@ export const useTaskManagerJira = () => {
     statusDrafts,
     assigneeDrafts,
     rowUpdateState,
+    noteImagesByKey,
+    noteImageErrorsByKey,
+    keepNoteImagesByKey,
+    noteImageKeepPendingByKey,
     isClosedLikeStatus,
     clampPriority,
     getPriorityClass,
@@ -830,6 +1026,9 @@ export const useTaskManagerJira = () => {
     handleAssigneeUpdate,
     handleRowPriorityChange,
     handleNoteChange,
+    handleNoteImagesAdd,
+    handleNoteImageRemove,
+    handleKeepNoteImagesToggle,
     handleSelectForPush,
     handlePushNote,
   };

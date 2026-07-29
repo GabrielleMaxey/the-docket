@@ -15,6 +15,8 @@ If you use **Cursor** with the Docs Canvas plugin, an optional navigable summary
 
 See [`docs/canvases/README.md`](./canvases/README.md) for the one-line install note. Edit this guide for long-form changes; update the canvas mirror when pages, data model, or architecture change materially.
 
+**PR write-ups:** Cursor agents follow [`.cursor/rules/pr-writeups.mdc`](../.cursor/rules/pr-writeups.mdc). Human process and template → [§ PR write-ups](#pr-write-ups) below.
+
 ---
 
 ## Stack
@@ -166,6 +168,15 @@ taskManager/
 │       ├── workWeekNavigation.js  # buildWorkWeekHref({ key, assignee }) for drill-down
 │       └── format.js              # formatPercent, formatTimestamp
 ├── docs/                     # ← you are here
+│   ├── END_USER_GUIDE.md     # Day-to-day usage (incl. browser-as-app)
+│   ├── DEVELOPER_GUIDE.md    # Architecture / API / schema
+│   ├── JIRA_SETUP.md         # Credentials and Jira config
+│   ├── unsigned-installs.md  # Unsigned DMG/NSIS + Electron blocked
+│   ├── PR_WriteUps/          # Per-PR summaries for review
+│   ├── specs/                # Feature specs (e.g. team priority sync)
+│   ├── superpowers/          # Agent design specs + implementation plans
+│   ├── canvases/             # Cursor docs-canvas mirror
+│   └── examples/             # Sample reports / prompts
 ├── data/                     # workweek.sqlite (auto-created, git-ignored)
 ├── .env                      # Credentials — never commit
 └── vite.config.js
@@ -742,6 +753,54 @@ npm run build
 #    - Packaged desktop: edit userData `.env`, confirm Test Jira Connection
 #    - Create Issue modal: epic preset, JQL preset parent chains, manual parent key, AI Draft, Bug priority, post-create Jira link; resubmit after validation error
 ```
+
+---
+
+## PR write-ups
+
+Feature and fix branches should include a short write-up under [`docs/PR_WriteUps/`](./PR_WriteUps/). These files are **tracked in git** and are the preferred source for GitHub PR descriptions.
+
+| | |
+|--|--|
+| **When** | Multi-commit or reviewable change sets (features, non-trivial bug fixes). Skip for typo-only / formatting-only commits unless you want a record. |
+| **Where** | `docs/PR_WriteUps/PR_<TOPIC>.md` (`SCREAMING_SNAKE_CASE`) |
+| **Cursor** | [`.cursor/rules/pr-writeups.mdc`](../.cursor/rules/pr-writeups.mdc) (`alwaysApply`) — agents create/update the write-up when committing, pushing, or opening a PR for substantive work |
+| **Examples** | [`PR_CREATE_ISSUE_FIXES.md`](./PR_WriteUps/PR_CREATE_ISSUE_FIXES.md), [`PR_DASHBOARD_JQL_EPIC_METRICS.md`](./PR_WriteUps/PR_DASHBOARD_JQL_EPIC_METRICS.md) |
+
+### Template
+
+```markdown
+# PR: <short title>
+
+## Summary
+<1–3 sentences: what and why>
+
+## Problem
+| Symptom | Root cause |
+|---------|------------|
+| … | … |
+
+## Changes
+### <Area or path>
+- …
+
+## Test plan
+- [ ] …
+
+## Files touched
+| Area | Path |
+|------|------|
+| … | … |
+```
+
+### Workflow
+
+1. Create or update the write-up as the branch’s scope settles (don’t leave claims about UI/behavior that no longer match the tip).
+2. Commit it with the feature commits on that branch.
+3. When opening the PR (`gh pr create` or the GitHub UI), paste or adapt the write-up for **Summary** and **Test plan**.
+4. If the PR grows after review, update the same file rather than starting a second write-up for the same topic.
+
+Ensure `docs/PR_WriteUps` is **not** listed in `.gitignore` so write-ups are shared with the PR and review history.
 
 ---
 

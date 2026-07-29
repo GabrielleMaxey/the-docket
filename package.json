@@ -85,6 +85,7 @@
     "better-sqlite3": "^12.11.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "multer": "^2.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-icons": "^4.8.0",
