@@ -234,6 +234,16 @@ export const saveIssueMetadata = async ({ issueKey, note, priority }) => {
   });
 };
 
+export const importIssueMetadataCsv = async (csvText) => {
+  return requestJson("/api/jira/issue-metadata/import", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ csvText }),
+  });
+};
+
 export const fetchEpicPresets = async () => {
   const data = await requestJson("/api/epic-presets");
   return data?.items || [];
