@@ -83,8 +83,14 @@ const TeamPriorityImportSection = () => {
       applyImportToLocalStorage(data?.items);
       setResult(data);
       if (!data?.updatedPriorities) {
+        const skipHints = Array.isArray(data?.errors) && data.errors.length
+          ? ` First skips: ${data.errors
+              .slice(0, 3)
+              .map((err) => `row ${err.row} ${err.reason}`)
+              .join("; ")}.`
+          : "";
         setLocalError(
-          "Import finished but no priorities were updated. Check that the CSV has Priority and ODI columns with values like P1–P10 or 1–10."
+          `Import finished but no priorities were updated. Need ranked rows with Priority + ODI (blank priority and “Completed” section rows are skipped). Ranks above 10 import as P10.${skipHints}`
         );
       }
     } catch (err) {
@@ -100,11 +106,10 @@ const TeamPriorityImportSection = () => {
       description="Load NORA rankings from the shared Excel tracker (CSV)"
     >
       <p style={{ marginTop: 0, color: "#475569", fontSize: "0.9rem" }}>
-        Export the NORA tracker from Excel as <strong>CSV (UTF-8)</strong>. Required columns:{" "}
-        <code>Priority</code>, <code>ODI</code>. Optional: <code>notes</code>.{" "}
-        <code>Developer</code> and <code>Jira Status</code> are ignored. Comma, semicolon, or tab
-        delimited files are supported. Re-import when rankings change — matching issues overwrite
-        priority; notes fill only when local notes are empty.
+        Export the NORA tracker from Excel as <strong>CSV UTF-8</strong> (not the
+        .xlsx workbook). Required columns include Priority and ODI (names like
+        “Priority Ranking” / “ODI Key” also work). Optional: notes. Developer and
+        Jira Status are ignored.
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
         <input type="file" accept=".csv,text/csv,.txt" onChange={handleFileChange} />
