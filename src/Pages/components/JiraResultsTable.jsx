@@ -1,12 +1,14 @@
 import React from "react";
 import PriorityCell from "./cells/PriorityCell";
 import AssigneeCell from "./cells/AssigneeCell.jsx";
+import NoteImagesStrip from "./NoteImagesStrip.jsx";
 import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
 import {
   getEffectiveDueDateForIssue,
   getMostRecentDoneDateForIssue,
 } from "../../utils/jiraIssueDoneDates.js";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
+import { buildNotePushFingerprint } from "../../utils/notePushFingerprint.js";
 
 const PAGE_SIZE = 30;
 const SORT_FIELDS = [
@@ -183,10 +185,8 @@ const getIssueBrowseUrl = (issue) => {
   return "";
 };
 
-const noteMatchesLastJiraPush = (noteDraft, lastPushed) =>
-  typeof lastPushed === "string" &&
-  lastPushed.trim().length > 0 &&
-  String(noteDraft || "").trim() === lastPushed.trim();
+const noteMatchesLastJiraPush = (fingerprint, lastPushed) =>
+  typeof lastPushed === "string" && lastPushed.length > 0 && fingerprint === lastPushed;
 
 const ResultsPagerBar = ({
   placement,
@@ -267,6 +267,10 @@ const JiraResultsTable = ({
   assigneeDrafts,
   jiraRowPriorities,
   jiraNotes,
+  noteImagesByKey,
+  noteImageErrorsByKey,
+  keepNoteImagesByKey,
+  noteImageKeepPendingByKey,
   lastPushedJiraNoteByKey,
   statusOptions,
   isClosedLikeStatus,
@@ -283,6 +287,9 @@ const JiraResultsTable = ({
   handleAssigneeUpdate,
   handleRowPriorityChange,
   handleNoteChange,
+  handleNoteImagesAdd,
+  handleNoteImageRemove,
+  handleKeepNoteImagesToggle,
   handleSelectForPush,
   handlePushNote,
   onActiveTabChange,
@@ -820,7 +827,11 @@ const JiraResultsTable = ({
                     const isClosedOrResolved = isClosedLikeStatus(status);
                     const noteDraft = jiraNotes[issueKey] || "";
                     const pushedNoteSnapshot = lastPushedJiraNoteByKey[issueKey];
-                    const isNoteAlreadyPushed = noteMatchesLastJiraPush(noteDraft, pushedNoteSnapshot);
+                    const noteFingerprint = buildNotePushFingerprint({
+                      note: noteDraft,
+                      images: noteImagesByKey[issueKey],
+                    });
+                    const isNoteAlreadyPushed = noteMatchesLastJiraPush(noteFingerprint, pushedNoteSnapshot);
 
                     return (
                       <tr
@@ -927,21 +938,32 @@ const JiraResultsTable = ({
                           {isClosedOrResolved ? (
                             <span>-</span>
                           ) : (
-                            <textarea
-                              className={`ww-note-textarea${
-                                isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
-                              }`}
-                              value={noteDraft}
-                              onChange={(event) =>
-                                handleNoteChange(issueKey, event.target.value)
-                              }
-                              placeholder="Add notes here"
-                              title={
-                                isNoteAlreadyPushed
-                                  ? "This note was pushed to Jira. Change the text to add a new note before pushing again."
-                                  : undefined
-                              }
-                            />
+                            <NoteImagesStrip
+                              images={noteImagesByKey[issueKey]}
+                              disabled={push.loading || isClosedOrResolved}
+                              error={noteImageErrorsByKey[issueKey]}
+                              onAddFiles={(files) => handleNoteImagesAdd(issueKey, files)}
+                              onRemove={(localId) => handleNoteImageRemove(issueKey, localId)}
+                              keepOnMachine={keepNoteImagesByKey[issueKey]}
+                              keepPending={Boolean(noteImageKeepPendingByKey[issueKey])}
+                              onKeepChange={(checked) => handleKeepNoteImagesToggle(issueKey, checked)}
+                            >
+                              <textarea
+                                className={`ww-note-textarea${
+                                  isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
+                                }`}
+                                value={noteDraft}
+                                onChange={(event) =>
+                                  handleNoteChange(issueKey, event.target.value)
+                                }
+                                placeholder="Add notes here"
+                                title={
+                                  isNoteAlreadyPushed
+                                    ? "This note was pushed to Jira. Change the text or images before pushing again."
+                                    : undefined
+                                }
+                              />
+                            </NoteImagesStrip>
                           )}
                         </td>
 

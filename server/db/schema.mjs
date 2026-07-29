@@ -127,6 +127,19 @@ export const initDatabase = (db) => {
 
     CREATE INDEX IF NOT EXISTS idx_generated_reports_source_created
       ON generated_reports (source, created_at);
+
+    CREATE TABLE IF NOT EXISTS issue_note_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      issue_key TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      mime_type TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      storage_path TEXT NOT NULL,
+      byte_size INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_issue_note_images_issue_key ON issue_note_images(issue_key);
   `);
 
   // Run schema migrations before seed inserts so legacy DBs gain required
@@ -170,6 +183,7 @@ const migrateDatabase = (db) => {
   ensureColumn(db, "dashboard_epic_metrics", "epic_breakdown_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "dashboard_assignee_metrics", "epic_breakdown_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "app_settings", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
+  ensureColumn(db, "issue_metadata", "keep_note_images", "INTEGER NOT NULL DEFAULT 0");
 
   db.prepare(
     "UPDATE jira_field_mappings SET field_id = 'customfield_10008' WHERE role = 'initial_done_date' AND TRIM(field_id) = ''"

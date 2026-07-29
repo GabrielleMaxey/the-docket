@@ -119,6 +119,7 @@ const dbDir = userDataRoot
   : path.resolve(projectRoot, "data");
 fs.mkdirSync(dbDir, { recursive: true });
 const dbPath = path.resolve(dbDir, "workweek.sqlite");
+const noteImagesDir = path.resolve(dbDir, "note-images");
 
 let db;
 try {
@@ -181,6 +182,34 @@ const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
 
     const detail = sanitized?.errors || sanitized?.errorMessages || sanitized?.message;
     log.error(`${method} ${target} → ${response.status}`, detail ? JSON.stringify(detail) : "");
+    return { ok: false, status: response.status, data: sanitized || {} };
+  }
+  log.debug(`${method} ${target} → ${response.status}`);
+  return { ok: true, status: response.status, data };
+};
+
+// Multipart variant of jiraRequest — used for attachment uploads. Jira requires
+// X-Atlassian-Token: no-check for uploads, and the multipart boundary must come
+// from fetch itself, so Content-Type is intentionally omitted.
+const jiraMultipartRequest = async ({ method = "POST", pathWithQuery, formData }) => {
+  const target = `${process.env.JIRA_BASE_URL}${pathWithQuery}`;
+  const response = await fetch(target, {
+    method,
+    headers: {
+      Accept: "application/json",
+      Authorization: getAuthHeader(),
+      "X-Atlassian-Token": "no-check",
+    },
+    body: formData,
+  });
+
+  const text = await response.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = { message: text.slice(0, 500) }; }
+
+  if (!response.ok) {
+    const sanitized = sanitizeJiraErrorData(data);
+    log.error(`${method} ${target} → ${response.status}`);
     return { ok: false, status: response.status, data: sanitized || {} };
   }
   log.debug(`${method} ${target} → ${response.status}`);
@@ -255,9 +284,11 @@ const routeCtx = {
   db,
   dataDir: dbDir,
   jiraRequest,
+  jiraMultipartRequest,
   ensureEnvOrRespond,
   runJiraSearchRequest,
   resolveJiraUser,
+  noteImagesDir,
 };
 
 registerJiraCoreRoutes(app, routeCtx);
