@@ -1,7 +1,7 @@
 # NORA Spreadsheet Priority Import — Design Spec
 
 **Date:** 2026-07-29  
-**Status:** Approved for planning  
+**Status:** Implemented (CSV v1)  
 **Scope:** Import team priorities (and selective notes) from the existing NORA Excel tracker CSV into local `issue_metadata`, as a bridge until remote team-priority DB sync exists.
 
 ---
@@ -72,10 +72,10 @@ Malformed rows (missing `ODI`, unparseable priority) are skipped and counted in 
 
 ## API
 
-### `POST /api/issue-metadata/import`
+### `POST /api/jira/issue-metadata/import`
 
-- **Content-Type:** `multipart/form-data` with file field, **or** `text/csv` / JSON `{ csvText }` — prefer one clear option in implementation (recommend multipart file upload from Settings).
-- **Body:** CSV file contents.
+- **Content-Type:** `application/json` with `{ csvText }` (file read in the browser).
+- **Body:** CSV file contents as a string.
 - **Response (200):**
 
 ```json
@@ -84,13 +84,14 @@ Malformed rows (missing `ODI`, unparseable priority) are skipped and counted in 
   "updatedPriorities": 42,
   "filledNotes": 8,
   "skipped": 3,
-  "errors": [{ "row": 12, "reason": "Invalid priority" }]
+  "errors": [{ "row": 12, "reason": "Invalid priority" }],
+  "items": { "ODI-1": { "priority": 2, "note": "..." } }
 }
 ```
 
-- **Errors:** `400` if missing file / unreadable CSV / missing required header columns (`ODI`, `Priority`).
+- **Errors:** `400` if missing `csvText` / unreadable CSV / missing required header columns (`ODI`, `Priority`).
 
-Implementation writes via existing SQLite upsert patterns in `issueMetadataRoutes` / `issue_metadata` table. Prefer a **transaction** for the bulk apply.
+Implementation writes via existing SQLite upsert patterns in `issueMetadataRoutes` / `issue_metadata` table in a **transaction**. The Settings client also merges returned `items` into Work Week `localStorage` so open sessions pick up priorities after reload.
 
 ---
 
