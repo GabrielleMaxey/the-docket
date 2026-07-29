@@ -370,6 +370,76 @@ export const registerIssueMetadataRoutes = (
     return res.json({ items });
   });
 
+  app.post("/api/jira/issue-metadata/import", (req, res) => {
+    const csvText = String(req.body?.csvText || "");
+    if (!csvText.trim()) {
+      return res.status(400).json({ error: "Missing csvText" });
+    }
+
+    const parsed = parseIssueMetadataCsv(csvText);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: parsed.error || "Invalid CSV" });
+    }
+
+    try {
+      const issueKeys = [
+        ...new Set(
+          parsed.rows
+            .map((row) => normalizeImportIssueKey(row.odi))
+            .filter((key) => key.length > 0)
+        ),
+      ];
+
+      const existingByKey = {};
+      if (issueKeys.length > 0) {
+        const placeholders = issueKeys.map(() => "?").join(",");
+        const existingRows = db
+          .prepare(
+            `SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key IN (${placeholders})`
+          )
+          .all(...issueKeys);
+        for (const row of existingRows) {
+          existingByKey[row.issue_key] = {
+            note: String(row.note || ""),
+            priority: clampDbPriority(row.priority),
+          };
+        }
+      }
+
+      const plan = planIssueMetadataImport(parsed.rows, existingByKey);
+      const apply = db.transaction((upserts) => {
+        for (const item of upserts) {
+          upsertIssueMetadataStmt.run({
+            issueKey: item.issueKey,
+            note: item.note,
+            priority: item.priority,
+          });
+        }
+      });
+      apply(plan.upserts);
+
+      const items = {};
+      for (const item of plan.upserts) {
+        items[item.issueKey] = { priority: item.priority, note: item.note };
+      }
+
+      return res.json({
+        ok: true,
+        updatedPriorities: plan.updatedPriorities,
+        filledNotes: plan.filledNotes,
+        skipped: plan.skipped,
+        errors: plan.errors,
+        items,
+      });
+    } catch (error) {
+      log.error("issue metadata import failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to import issue metadata",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   app.get("/api/jira/issue-metadata/:issueKey/images/:id", (req, res) => {
     const issueKey = String(req.params.issueKey || "").trim();
     const id = Number(req.params.id);
@@ -471,75 +541,5 @@ export const registerIssueMetadataRoutes = (
       note: nextNote,
       priority: nextPriority,
     });
-  });
-
-  app.post("/api/jira/issue-metadata/import", (req, res) => {
-    const csvText = String(req.body?.csvText || "");
-    if (!csvText.trim()) {
-      return res.status(400).json({ error: "Missing csvText" });
-    }
-
-    const parsed = parseIssueMetadataCsv(csvText);
-    if (!parsed.ok) {
-      return res.status(400).json({ error: parsed.error || "Invalid CSV" });
-    }
-
-    try {
-      const issueKeys = [
-        ...new Set(
-          parsed.rows
-            .map((row) => normalizeImportIssueKey(row.odi))
-            .filter((key) => key.length > 0)
-        ),
-      ];
-
-      const existingByKey = {};
-      if (issueKeys.length > 0) {
-        const placeholders = issueKeys.map(() => "?").join(",");
-        const existingRows = db
-          .prepare(
-            `SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key IN (${placeholders})`
-          )
-          .all(...issueKeys);
-        for (const row of existingRows) {
-          existingByKey[row.issue_key] = {
-            note: String(row.note || ""),
-            priority: clampDbPriority(row.priority),
-          };
-        }
-      }
-
-      const plan = planIssueMetadataImport(parsed.rows, existingByKey);
-      const apply = db.transaction((upserts) => {
-        for (const item of upserts) {
-          upsertIssueMetadataStmt.run({
-            issueKey: item.issueKey,
-            note: item.note,
-            priority: item.priority,
-          });
-        }
-      });
-      apply(plan.upserts);
-
-      const items = {};
-      for (const item of plan.upserts) {
-        items[item.issueKey] = { priority: item.priority, note: item.note };
-      }
-
-      return res.json({
-        ok: true,
-        updatedPriorities: plan.updatedPriorities,
-        filledNotes: plan.filledNotes,
-        skipped: plan.skipped,
-        errors: plan.errors,
-        items,
-      });
-    } catch (error) {
-      log.error("issue metadata import failed", error instanceof Error ? error.message : error);
-      return res.status(500).json({
-        error: "Failed to import issue metadata",
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
   });
 };

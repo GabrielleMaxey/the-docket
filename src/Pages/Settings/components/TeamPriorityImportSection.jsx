@@ -47,15 +47,17 @@ const applyImportToLocalStorage = (items) => {
   window.localStorage.setItem(WORK_WEEK_STORAGE_KEYS.jiraNotes, JSON.stringify(nextNotes));
 };
 
-const TeamPriorityImportSection = ({ onError }) => {
+const TeamPriorityImportSection = () => {
   const [fileName, setFileName] = React.useState("");
   const [csvText, setCsvText] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [result, setResult] = React.useState(null);
+  const [localError, setLocalError] = React.useState("");
 
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0];
     setResult(null);
+    setLocalError("");
     if (!file) {
       setFileName("");
       setCsvText("");
@@ -69,19 +71,24 @@ const TeamPriorityImportSection = ({ onError }) => {
 
   const handleImport = async () => {
     if (!csvText.trim()) {
-      onError?.("Choose a CSV file first");
+      setLocalError("Choose a CSV file first");
       return;
     }
 
     setLoading(true);
     setResult(null);
-    onError?.("");
+    setLocalError("");
     try {
       const data = await importIssueMetadataCsv(csvText);
       applyImportToLocalStorage(data?.items);
       setResult(data);
+      if (!data?.updatedPriorities) {
+        setLocalError(
+          "Import finished but no priorities were updated. Check that the CSV has Priority and ODI columns with values like P1–P10 or 1–10."
+        );
+      }
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : "Import failed");
+      setLocalError(err instanceof Error ? err.message : "Import failed");
     } finally {
       setLoading(false);
     }
@@ -95,22 +102,28 @@ const TeamPriorityImportSection = ({ onError }) => {
       <p style={{ marginTop: 0, color: "#475569", fontSize: "0.9rem" }}>
         Export the NORA tracker from Excel as <strong>CSV (UTF-8)</strong>. Required columns:{" "}
         <code>Priority</code>, <code>ODI</code>. Optional: <code>notes</code>.{" "}
-        <code>Developer</code> and <code>Jira Status</code> are ignored. Re-import when rankings
-        change — matching issues overwrite priority; notes fill only when local notes are empty.
+        <code>Developer</code> and <code>Jira Status</code> are ignored. Comma, semicolon, or tab
+        delimited files are supported. Re-import when rankings change — matching issues overwrite
+        priority; notes fill only when local notes are empty.
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
-        <input type="file" accept=".csv,text/csv" onChange={handleFileChange} />
+        <input type="file" accept=".csv,text/csv,.txt" onChange={handleFileChange} />
         <Button primary size="small" onClick={handleImport} loading={loading} disabled={loading || !csvText}>
           Import CSV
         </Button>
         {fileName ? <span style={{ color: "#64748b", fontSize: "0.85rem" }}>{fileName}</span> : null}
       </div>
-      {result?.ok ? (
+      {localError ? (
+        <Message negative size="small" style={{ marginTop: "0.85rem" }}>
+          {localError}
+        </Message>
+      ) : null}
+      {result?.ok && result.updatedPriorities > 0 ? (
         <Message positive size="small" style={{ marginTop: "0.85rem" }}>
           Updated {result.updatedPriorities} priorities
           {result.filledNotes ? `, filled ${result.filledNotes} notes` : ""}
-          {result.skipped ? `, skipped ${result.skipped}` : ""}. Reload Work Week (or re-run JQL) if
-          rows are already open.
+          {result.skipped ? `, skipped ${result.skipped}` : ""}. Open Work Week again (or re-run JQL)
+          to see the new priorities.
         </Message>
       ) : null}
       {Array.isArray(result?.errors) && result.errors.length > 0 ? (

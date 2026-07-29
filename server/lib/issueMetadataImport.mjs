@@ -1,6 +1,17 @@
 const ISSUE_KEY_RE = /^[A-Z][A-Z0-9]+-\d+$/i;
+const ISSUE_KEY_FIND_RE = /\b([A-Z][A-Z0-9]+-\d+)\b/i;
 
-export const normalizeImportIssueKey = (value) => String(value || "").trim().toUpperCase();
+export const normalizeImportIssueKey = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (ISSUE_KEY_RE.test(raw)) {
+    return raw.toUpperCase();
+  }
+  const found = raw.match(ISSUE_KEY_FIND_RE);
+  return found ? found[1].toUpperCase() : raw.toUpperCase();
+};
 
 export const parseImportPriority = (value) => {
   const raw = String(value || "").trim();
@@ -8,21 +19,35 @@ export const parseImportPriority = (value) => {
     return null;
   }
 
-  const prefixed = raw.match(/^(?:PRIORITY\s+)?P(\d{1,2})$/i);
+  const prefixed = raw.match(/^(?:PRIORITY\s+)?P(\d{1,2})\b/i);
   if (prefixed) {
     const priority = Number(prefixed[1]);
     return Number.isFinite(priority) && priority >= 1 && priority <= 10 ? priority : null;
   }
 
-  const numeric = Number(raw);
-  if (!Number.isFinite(numeric)) {
-    return null;
+  const leadingNumber = raw.match(/^(\d{1,2})\b/);
+  if (leadingNumber) {
+    const priority = Number(leadingNumber[1]);
+    return Number.isFinite(priority) && priority >= 1 && priority <= 10 ? priority : null;
   }
-  const rounded = Math.round(numeric);
-  return rounded >= 1 && rounded <= 10 ? rounded : null;
+
+  return null;
 };
 
-const parseCsvLine = (line) => {
+const detectDelimiter = (headerLine) => {
+  const comma = (headerLine.match(/,/g) || []).length;
+  const semicolon = (headerLine.match(/;/g) || []).length;
+  const tab = (headerLine.match(/\t/g) || []).length;
+  if (tab > comma && tab > semicolon) {
+    return "\t";
+  }
+  if (semicolon > comma) {
+    return ";";
+  }
+  return ",";
+};
+
+const parseCsvLine = (line, delimiter = ",") => {
   const cells = [];
   let current = "";
   let inQuotes = false;
@@ -40,7 +65,7 @@ const parseCsvLine = (line) => {
       }
     } else if (ch === '"') {
       inQuotes = true;
-    } else if (ch === ",") {
+    } else if (ch === delimiter) {
       cells.push(current);
       current = "";
     } else {
@@ -59,9 +84,20 @@ const splitCsvLines = (text) =>
 
 const normalizeHeader = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 
+const findHeaderIndex = (headers, candidates) => {
+  for (const candidate of candidates) {
+    const index = headers.indexOf(candidate);
+    if (index >= 0) {
+      return index;
+    }
+  }
+  return -1;
+};
+
 /**
  * Parse NORA tracker CSV into row objects.
- * Required headers: ODI, Priority. Optional: notes.
+ * Required headers: ODI (or issue key), Priority. Optional: notes.
+ * Supports comma, semicolon, and tab-delimited Excel exports.
  */
 export const parseIssueMetadataCsv = (csvText) => {
   const lines = splitCsvLines(csvText);
@@ -69,18 +105,22 @@ export const parseIssueMetadataCsv = (csvText) => {
     return { ok: false, error: "CSV is empty" };
   }
 
-  const headers = parseCsvLine(lines[0]).map(normalizeHeader);
-  const odiIndex = headers.indexOf("odi");
-  const priorityIndex = headers.indexOf("priority");
-  const notesIndex = headers.indexOf("notes");
+  const delimiter = detectDelimiter(lines[0]);
+  const headers = parseCsvLine(lines[0], delimiter).map(normalizeHeader);
+  const odiIndex = findHeaderIndex(headers, ["odi", "issue key", "issue", "key", "odi key"]);
+  const priorityIndex = findHeaderIndex(headers, ["priority", "prio", "rank"]);
+  const notesIndex = findHeaderIndex(headers, ["notes", "note", "comments", "comment"]);
 
   if (odiIndex < 0 || priorityIndex < 0) {
-    return { ok: false, error: "CSV must include ODI and Priority columns" };
+    return {
+      ok: false,
+      error: `CSV must include ODI and Priority columns (found: ${headers.filter(Boolean).join(", ") || "none"})`,
+    };
   }
 
   const rows = [];
   for (let i = 1; i < lines.length; i += 1) {
-    const cells = parseCsvLine(lines[i]);
+    const cells = parseCsvLine(lines[i], delimiter);
     rows.push({
       rowNumber: i + 1,
       odi: cells[odiIndex] ?? "",
@@ -89,7 +129,7 @@ export const parseIssueMetadataCsv = (csvText) => {
     });
   }
 
-  return { ok: true, rows };
+  return { ok: true, rows, delimiter };
 };
 
 /**

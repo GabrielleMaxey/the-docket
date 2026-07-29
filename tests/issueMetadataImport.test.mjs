@@ -11,6 +11,7 @@ describe("issueMetadataImport", () => {
     assert.equal(parseImportPriority("2"), 2);
     assert.equal(parseImportPriority("P3"), 3);
     assert.equal(parseImportPriority("PRIORITY P4"), 4);
+    assert.equal(parseImportPriority("1 - Critical"), 1);
     assert.equal(parseImportPriority("11"), null);
     assert.equal(parseImportPriority(""), null);
   });
@@ -33,6 +34,28 @@ describe("issueMetadataImport", () => {
     assert.equal(parsed.rows.length, 3);
     assert.equal(parsed.rows[0].odi, "ODI-100");
     assert.equal(parsed.rows[1].notes, "Quoted, note");
+  });
+
+  it("parses semicolon and tab Excel exports", () => {
+    const semi = parseIssueMetadataCsv("Priority;ODI;notes\nP2;ODI-9;hello\n");
+    assert.equal(semi.ok, true);
+    assert.equal(semi.delimiter, ";");
+    assert.equal(semi.rows[0].odi, "ODI-9");
+
+    const tab = parseIssueMetadataCsv("Priority\tODI\tnotes\n3\tODI-8\tx\n");
+    assert.equal(tab.ok, true);
+    assert.equal(tab.delimiter, "\t");
+    assert.equal(tab.rows[0].odi, "ODI-8");
+  });
+
+  it("extracts issue keys embedded in ODI cells", () => {
+    const parsed = parseIssueMetadataCsv(
+      "Priority,ODI,notes\n2,See ODI-25789 for details,n\n"
+    );
+    assert.equal(parsed.ok, true);
+    const plan = planIssueMetadataImport(parsed.rows, {});
+    assert.equal(plan.updatedPriorities, 1);
+    assert.equal(plan.upserts[0].issueKey, "ODI-25789");
   });
 
   it("overwrites priority and fills empty notes only", () => {
