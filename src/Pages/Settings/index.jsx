@@ -16,6 +16,7 @@ import DateFieldsSection from "./components/DateFieldsSection";
 import MetricTargetsSection from "./components/MetricTargetsSection";
 import WorkWeekHeaderSection from "./components/WorkWeekHeaderSection";
 import ChatAssistantSection from "./components/ChatAssistantSection";
+import TeamPriorityImportSection from "./components/TeamPriorityImportSection";
 
 const Settings = () => {
   // Presets come from the shared context — mutations call reloadPresets so
@@ -117,6 +118,8 @@ const Settings = () => {
       <MetricTargetsSection watchedAssignees={watchedAssignees} setWatchedAssignees={setWatchedAssignees} onError={setError} />
 
       <WorkWeekHeaderSection headerPrefs={headerPrefs} setHeaderPrefs={setHeaderPrefs} />
+
+      <TeamPriorityImportSection onError={setError} />
 
       <ChatAssistantSection settings={settings} setSettings={setSettings} chatStatus={chatStatus} onError={setError} />
     </Container>

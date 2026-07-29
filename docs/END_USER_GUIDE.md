@@ -409,6 +409,15 @@ PRIORITY P2 — Blocked on vendor response. Target fix by Friday.
 
 **Personal work:** On issues only you track, use local notes and priority without pushing, or push comments without the `PRIORITY` prefix if the note is informational only.
 
+### Bootstrap from the NORA Excel tracker (no Jira comments)
+
+Until shared DB sync exists, PMs can keep rankings in the existing NORA spreadsheet and share a **CSV** export:
+
+1. In Excel: **File → Save As → CSV UTF-8** (columns: `Priority`, `ODI`, `Developer`, `Jira Status`, `notes`).
+2. In Task Manager: **Settings → Import team priorities** → choose the CSV → **Import CSV**.
+3. Matching `ODI` keys overwrite local **Priority**. **Notes** from the sheet fill in only when your local note is empty. Other issues on your machine are unchanged.
+4. Re-import whenever the spreadsheet rankings change. Reload Work Week (or re-run JQL) if you already have that page open.
+
 **Developers:** Manual export/backup of SQLite is documented in [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) — that is for backup or handoff, not live multi-user editing.
 
 ---
