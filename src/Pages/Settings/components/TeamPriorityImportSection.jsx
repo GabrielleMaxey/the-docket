@@ -48,29 +48,22 @@ const applyImportToLocalStorage = (items) => {
 };
 
 const TeamPriorityImportSection = () => {
+  const inputRef = React.useRef(null);
   const [fileName, setFileName] = React.useState("");
-  const [csvText, setCsvText] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [result, setResult] = React.useState(null);
   const [localError, setLocalError] = React.useState("");
 
-  const handleFileChange = async (event) => {
+  const handleFileChange = (event) => {
     const file = event.target.files?.[0];
     setResult(null);
     setLocalError("");
-    if (!file) {
-      setFileName("");
-      setCsvText("");
-      return;
-    }
-
-    setFileName(file.name);
-    const text = await file.text();
-    setCsvText(text);
+    setFileName(file?.name || "");
   };
 
   const handleImport = async () => {
-    if (!csvText.trim()) {
+    const file = inputRef.current?.files?.[0];
+    if (!file) {
       setLocalError("Choose a CSV file first");
       return;
     }
@@ -79,18 +72,19 @@ const TeamPriorityImportSection = () => {
     setResult(null);
     setLocalError("");
     try {
+      const csvText = await file.text();
       const data = await importIssueMetadataCsv(csvText);
-      applyImportToLocalStorage(data?.items);
+      applyImportToLocalStorage(data.items);
       setResult(data);
-      if (!data?.updatedPriorities) {
-        const skipHints = Array.isArray(data?.errors) && data.errors.length
+      if (!data.updatedPriorities) {
+        const skipHints = Array.isArray(data.errors) && data.errors.length
           ? ` First skips: ${data.errors
               .slice(0, 3)
               .map((err) => `row ${err.row} ${err.reason}`)
               .join("; ")}.`
           : "";
         setLocalError(
-          `Import finished but no priorities were updated. Need ranked rows with Priority + ODI (blank priority and “Completed” section rows are skipped). Ranks above 10 import as P10.${skipHints}`
+          `Import finished but no priorities were updated (skipped ${data.skipped || 0}). Blank Priority and “Completed” rows are skipped; ranks above 10 import as P10.${skipHints}`
         );
       }
     } catch (err) {
@@ -107,13 +101,17 @@ const TeamPriorityImportSection = () => {
     >
       <p style={{ marginTop: 0, color: "#475569", fontSize: "0.9rem" }}>
         Export the NORA tracker from Excel as <strong>CSV UTF-8</strong> (not the
-        .xlsx workbook). Required columns include Priority and ODI (names like
-        “Priority Ranking” / “ODI Key” also work). Optional: notes. Developer and
-        Jira Status are ignored.
+        .xlsx workbook). Required columns: Priority, ODI. Optional: Notes. After changing
+        import code, restart <code>npm run dev:all</code> so the API loads new routes.
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
-        <input type="file" accept=".csv,text/csv,.txt" onChange={handleFileChange} />
-        <Button primary size="small" onClick={handleImport} loading={loading} disabled={loading || !csvText}>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv,text/csv,.txt"
+          onChange={handleFileChange}
+        />
+        <Button type="button" primary size="small" onClick={handleImport} loading={loading} disabled={loading || !fileName}>
           Import CSV
         </Button>
         {fileName ? <span style={{ color: "#64748b", fontSize: "0.85rem" }}>{fileName}</span> : null}
