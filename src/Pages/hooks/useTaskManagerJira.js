@@ -1,8 +1,19 @@
 import React from "react";
 import {
+  DEFAULT_JQL_COUNT,
+  DEFAULT_JQL_LABELS,
+  DEFAULT_JQL_SHARED_PROGRAM_IDS,
+  DEFAULT_JQLS,
+  WORK_WEEK_STORAGE_KEYS,
+  isConfiguredJqlRun,
+  normalizeJqlCount,
+  normalizeJqlSlotValues,
+} from "../../utils/workWeekStorage.js";
+import {
   fetchFieldMappings,
   pushJiraIssueNote,
   saveIssueMetadata,
+  saveTeamPriority,
   saveKeptNoteImages,
   deleteKeptNoteImages,
   fetchKeptNoteImageBlob,
@@ -31,16 +42,11 @@ import {
   useAttachBackgroundJob,
   useBackgroundJobRunning,
 } from "../../hooks/useBackgroundJobs.js";
-import {
-  DEFAULT_JQL_COUNT,
-  DEFAULT_JQL_LABELS,
-  DEFAULT_JQLS,
-  WORK_WEEK_STORAGE_KEYS,
-  isConfiguredJqlRun,
-  normalizeJqlCount,
-  normalizeJqlSlotValues,
-} from "../../utils/workWeekStorage.js";
 import { partitionNoteImageFiles } from "../../../shared/noteImageLimits.mjs";
+import {
+  MAX_ISSUE_PRIORITY,
+  clampIssuePriority as clampPriority,
+} from "../../../shared/issuePriority.mjs";
 import { buildNotePushFingerprint } from "../../utils/notePushFingerprint.js";
 
 export const STATUS_OPTIONS = [
@@ -61,6 +67,7 @@ const loadStoredPreferences = () => {
       jqlCount: DEFAULT_JQL_COUNT,
       jqlInputs: DEFAULT_JQLS,
       jqlLabels: DEFAULT_JQL_LABELS,
+      jqlSharedProgramIds: DEFAULT_JQL_SHARED_PROGRAM_IDS,
       pullLatestComment: false,
     };
   }
@@ -72,6 +79,7 @@ const loadStoredPreferences = () => {
         jqlCount: DEFAULT_JQL_COUNT,
         jqlInputs: DEFAULT_JQLS,
         jqlLabels: DEFAULT_JQL_LABELS,
+        jqlSharedProgramIds: DEFAULT_JQL_SHARED_PROGRAM_IDS,
         pullLatestComment: false,
       };
     }
@@ -81,6 +89,10 @@ const loadStoredPreferences = () => {
       jqlCount: normalizeJqlCount(parsed?.jqlCount),
       jqlInputs: normalizeJqlSlotValues(parsed?.jqlInputs, DEFAULT_JQLS),
       jqlLabels: normalizeJqlSlotValues(parsed?.jqlLabels, DEFAULT_JQL_LABELS),
+      jqlSharedProgramIds: normalizeJqlSlotValues(
+        parsed?.jqlSharedProgramIds,
+        DEFAULT_JQL_SHARED_PROGRAM_IDS
+      ),
       pullLatestComment: parsed?.pullLatestComment === true,
     };
   } catch {
@@ -88,6 +100,7 @@ const loadStoredPreferences = () => {
       jqlCount: DEFAULT_JQL_COUNT,
       jqlInputs: DEFAULT_JQLS,
       jqlLabels: DEFAULT_JQL_LABELS,
+      jqlSharedProgramIds: DEFAULT_JQL_SHARED_PROGRAM_IDS,
       pullLatestComment: false,
     };
   }
@@ -147,20 +160,11 @@ const loadStoredJqlRuns = () => {
 const loadInitialJqlRuns = () =>
   mergeJqlRuns(loadDrillDownRunsFromSessionStorage(), loadStoredJqlRuns());
 
-const clampPriority = (value) => {
-  const num = Number(value);
-  if (Number.isNaN(num)) {
-    return 0;
-  }
-
-  return Math.min(20, Math.max(0, num));
-};
-
 const isClosedLikeStatus = (status) => /^(closed|resolved|done)$/i.test(String(status || ""));
 
 const priorityTierClass = (prefix, value) => {
   const clamped = clampPriority(value);
-  if (clamped < 1 || clamped > 20) {
+  if (clamped < 1 || clamped > MAX_ISSUE_PRIORITY) {
     return `${prefix}-neutral`;
   }
 
@@ -243,6 +247,9 @@ export const useTaskManagerJira = () => {
   const [jqlCount, setJqlCount] = React.useState(stored.jqlCount);
   const [jqlInputs, setJqlInputs] = React.useState(stored.jqlInputs);
   const [jqlLabels, setJqlLabels] = React.useState(stored.jqlLabels);
+  const [jqlSharedProgramIds, setJqlSharedProgramIds] = React.useState(
+    stored.jqlSharedProgramIds || DEFAULT_JQL_SHARED_PROGRAM_IDS
+  );
   const [jqlLoadingLocal, setJqlLoadingLocal] = React.useState(false);
   const [jqlPending, setJqlPending] = React.useState(false);
   const bgJqlRunning = useBackgroundJobRunning(BACKGROUND_JOB_IDS.WORK_WEEK_JQL);
@@ -356,6 +363,7 @@ export const useTaskManagerJira = () => {
         jqlCount,
         jqlInputs,
         jqlLabels,
+        jqlSharedProgramIds,
         pullLatestComment,
       })
     );
@@ -364,7 +372,15 @@ export const useTaskManagerJira = () => {
       WORK_WEEK_STORAGE_KEYS.jiraRowPriorities,
       JSON.stringify(jiraRowPriorities)
     );
-  }, [jqlCount, jqlInputs, jqlLabels, pullLatestComment, jiraNotes, jiraRowPriorities]);
+  }, [
+    jqlCount,
+    jqlInputs,
+    jqlLabels,
+    jqlSharedProgramIds,
+    pullLatestComment,
+    jiraNotes,
+    jiraRowPriorities,
+  ]);
 
   React.useEffect(() => {
     setJqlRuns((prev) => {
@@ -404,10 +420,15 @@ export const useTaskManagerJira = () => {
     setJqlLabels((prev) => patchIndexedArray(prev, index, value));
   };
 
+  const handleJqlSharedProgramChange = (index, value) => {
+    setJqlSharedProgramIds((prev) => patchIndexedArray(prev, index, String(value || "")));
+  };
+
   const handleResetSavedQueries = () => {
     setJqlCount(DEFAULT_JQL_COUNT);
     setJqlInputs(DEFAULT_JQLS);
     setJqlLabels(DEFAULT_JQL_LABELS);
+    setJqlSharedProgramIds(DEFAULT_JQL_SHARED_PROGRAM_IDS);
     setJqlRuns([]);
     setShowRestoredJqlBanner(false);
     setJqlError("");
@@ -677,12 +698,33 @@ export const useTaskManagerJira = () => {
     }
   };
 
-  const handleRowPriorityChange = (issueKey, value) => {
+  const handleRowPriorityChange = (issueKey, value, options = {}) => {
     const priority = clampPriority(value);
+    const sharedProgramId = String(options.sharedProgramId || "").trim();
+    const alreadyTeam =
+      prioritySourceByKey?.[issueKey]?.source === "team-db" ||
+      Boolean(options.forceTeam);
 
     setJiraRowPriorities((prev) => patchIssueKeyed(prev, issueKey, priority));
-    setPrioritySourceByKey((prev) => removeIssueKeyed(prev, issueKey));
+    if (sharedProgramId || alreadyTeam) {
+      setPrioritySourceByKey((prev) =>
+        patchIssueKeyed(prev, issueKey, {
+          source: "team-db",
+          author: "Team",
+        })
+      );
+      saveTeamPriority({ issueKey, priority }).catch((error) => {
+        console.error("Failed to persist team priority", issueKey, error);
+        setJqlError(
+          `Failed to save team priority for ${issueKey}: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      });
+      return;
+    }
 
+    setPrioritySourceByKey((prev) => removeIssueKeyed(prev, issueKey));
     saveIssueMetadata({ issueKey, priority }).catch((error) => {
       console.error("Failed to persist priority", issueKey, error);
     });
@@ -843,6 +885,7 @@ export const useTaskManagerJira = () => {
         runJqlWorkflow({
           jqlInputs,
           jqlLabels,
+          jqlSharedProgramIds,
           jqlMaxResults,
           pullLatestComment,
           clampPriority,
@@ -978,6 +1021,7 @@ export const useTaskManagerJira = () => {
     jqlCount,
     jqlInputs,
     jqlLabels,
+    jqlSharedProgramIds,
     jqlLoading,
     jqlRuns,
     showRestoredJqlBanner,
@@ -1010,6 +1054,7 @@ export const useTaskManagerJira = () => {
     setPullLatestComment,
     handleJqlChange,
     handleJqlLabelChange,
+    handleJqlSharedProgramChange,
     handleResetSavedQueries,
     handleRunJql,
     handleLoadRemainingJql,

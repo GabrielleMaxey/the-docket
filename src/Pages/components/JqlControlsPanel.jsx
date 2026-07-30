@@ -13,9 +13,12 @@ const JqlControlsPanel = ({
   jqlCount,
   jqlInputs,
   jqlLabels,
+  jqlSharedProgramIds,
+  sharedPrograms,
   onJqlCountChange,
   onJqlChange,
   onJqlLabelChange,
+  onJqlSharedProgramChange,
   quickPickValueBySlot,
   onQuickPickSelect,
   onImportSlot,
@@ -133,6 +136,23 @@ const JqlControlsPanel = ({
           onChange={(event) => onJqlChange(index, event.target.value)}
           placeholder="project = ABC ORDER BY updated DESC"
         />
+        {Array.isArray(sharedPrograms) && sharedPrograms.length > 0 ? (
+          <div className="ww-jql-row-inline" style={{ marginTop: "0.4rem" }}>
+            <label htmlFor={`jql-shared-program-${index}`}>Shared program:</label>
+            <select
+              id={`jql-shared-program-${index}`}
+              value={jqlSharedProgramIds?.[index] || ""}
+              onChange={(event) => onJqlSharedProgramChange?.(index, event.target.value)}
+            >
+              <option value="">None (personal)</option>
+              {sharedPrograms.map((program) => (
+                <option key={`sp-${index}-${program.slug}`} value={program.slug}>
+                  {program.displayName || program.slug}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
       </div>
     ))}
 

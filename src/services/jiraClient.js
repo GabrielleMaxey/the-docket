@@ -259,6 +259,62 @@ export const importIssueMetadataCsv = async (csvText) => {
   return data;
 };
 
+export const fetchTeamPriorityHealth = async () => {
+  return requestJson("/api/team-priority/health");
+};
+
+export const seedTeamPriorityPrograms = async () => {
+  return requestJson("/api/team-priority/seed", { method: "POST" });
+};
+
+export const importTeamPriorityCsv = async (csvText) => {
+  const data = await requestJson("/api/team-priority/import-csv", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ csvText }),
+  });
+  if (!data || data.ok !== true || typeof data.updatedPriorities !== "number") {
+    throw new Error("Team priority CSV import failed or returned an incomplete response.");
+  }
+  return data;
+};
+
+export const syncLocalPrioritiesToTeam = async () => {
+  const data = await requestJson("/api/team-priority/sync-local", { method: "POST" });
+  if (!data || data.ok !== true || typeof data.updatedPriorities !== "number") {
+    throw new Error("Local → Atlas priority sync failed or returned an incomplete response.");
+  }
+  return data;
+};
+
+export const fetchSharedPrograms = async () => {
+  const data = await requestJson("/api/shared-programs");
+  return data?.items || [];
+};
+
+export const fetchTeamPriorityBulk = async (issueKeys) => {
+  const data = await requestJson("/api/team-priority/bulk", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ issueKeys }),
+  });
+  return data?.items || {};
+};
+
+export const saveTeamPriority = async ({ issueKey, priority }) => {
+  return requestJson(`/api/team-priority/${encodeURIComponent(issueKey)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ priority }),
+  });
+};
+
 export const fetchEpicPresets = async () => {
   const data = await requestJson("/api/epic-presets");
   return data?.items || [];

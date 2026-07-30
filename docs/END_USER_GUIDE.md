@@ -140,8 +140,8 @@ This is the main screen for managing your open work.
 2. **Max results** — first page size per query. The app can load **all** matching issues (up to a safe cap) — see Results table below.
 3. **Notes on run** — choose how row notes are filled when you **Run JQL** or refresh:
    - **Keep local notes** (default) — notes come from your local database for issues in the result set.
-   - **Pull most recent Jira comment** — overwrites each row's **Notes** text with that issue's latest Jira comment (useful for shared `PRIORITY P#` comments). Attached images are not changed. Use **Clear** to reset to **Keep local notes**.
-4. **Run JQL** — loads fresh results from Jira, applies priority from latest comments when present, and saves results locally. Shortcut: **Ctrl+Enter** (Windows/Linux) or **⌘+Enter** (Mac).
+   - **Pull most recent Jira comment** — overwrites each row's **Notes** text with that issue's latest Jira comment. Attached images are not changed. Use **Clear** to reset to **Keep local notes**.
+4. **Run JQL** — loads fresh results from Jira, merges local (or shared-program) priorities, and saves results locally. Shortcut: **Ctrl+Enter** (Windows/Linux) or **⌘+Enter** (Mac).
 5. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes or priorities in the local database, or header reminders.
 6. **Create Issue** — opens a modal to create a new Jira issue in ODI. See [Create Issue](#create-issue) below for parent selection and ODI rules. In short: pick a preset or parent, enter a title, then click **✦ AI Draft** (Lumen blue button next to the Description label) to generate a description and, for Stories, a suggested sub-task list:
    - **Story**: AI rewrites the title into Job Story format ("When… I want… so I can…") if it isn't already, and generates a description that expands on the situation, motivation, and desired outcome. 2–5 suggested sub-tasks appear as editable checkboxes; uncheck any you don't want before clicking Create.
@@ -243,7 +243,7 @@ A green banner confirms the active drill-down. Use **Clear filter** to remove th
 
 **MRD column:** The header shows **MRD** (hover for “Most Recent Done Date”). It displays the issue’s automated Most Recent Done Date when that field is set on the task. When the task has no MRD, the app walks the **parent chain** (for example Story → Epic) and shows the first ancestor that has an MRD. This uses the same ODI field mapping as Dashboard (`customfield_10009` by default). Standard Jira **Due date** is not shown in the table; it is still used behind the scenes for My Metrics past-due/upcoming counts and Chat context.
 
-On **shared projects** where several people track the same issues, local priority does not sync between users. PMs and managers should use the **`PRIORITY P#` prefix** when pushing notes — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
+On **shared projects**, link a Work Week slot to a **Shared program** (when the Atlas demo or future MySQL team DB is configured) so priorities sync across machines. Otherwise use local priority + NORA CSV import — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
 
 **Closed/resolved issues are read-only** — you can read them but not edit them.
 
@@ -413,7 +413,7 @@ Check readiness: `GET /api/chat/status` returns `provider`, `ready`, and for Rov
 
 ## Shared projects — notes and priority (PMs and managers)
 
-Some teams use a shared Excel tracker so everyone sees the same notes and ranking. In Task Manager, **notes and P1–P10 priority are stored on each person's machine** (`data/workweek.sqlite`). They do **not** sync automatically between users the way a shared spreadsheet does.
+Some teams used a shared Excel tracker so everyone sees the same ranking. In Task Manager:
 
 | What | Shared across the team? |
 |------|-------------------------|
@@ -421,48 +421,31 @@ Some teams use a shared Excel tracker so everyone sees the same notes and rankin
 | Notes you **push** as Jira comments | Yes — visible on the issue in Jira (text and inline images) |
 | Local **Notes** box (before push) | No — your machine only |
 | Note **images** (before push) | No — your machine only unless **Keep on this machine** is on |
-| Local **Priority** dropdown (P1–P10) | No — your machine only |
+| **Priority** on a personal Work Week slot | No — local SQLite on this machine |
+| **Priority** on a slot linked to a **Shared program** | Yes — Atlas demo today (Team badge); MySQL long-term |
 
-For shared projects, treat **Jira issue comments** as the team source of truth for ranking and status notes until a future sync feature exists.
+### Shared-program slots (recommended for team ranking)
 
-### Convention: `PRIORITY P#` at the start of pushed notes
+1. Configure the team priority demo (`TEAM_PRIORITY_MONGODB_URI`) or wait for production MySQL sync.
+2. In Settings, seed shared programs if needed; optionally **Import team priorities** with target **Atlas (demo)** or **Seed from local priorities**.
+3. On Work Week, set the slot’s **Shared program** (e.g. NORA).
+4. Change **Priority** as usual — it saves to the shared store immediately. Rows show a **Team** badge when priority comes from that store.
+5. **Run JQL** on that slot loads priorities from the shared store (not from Jira comments).
 
-When a PM, manager, or tech lead updates team priority on a shared issue, **push a Jira comment** that starts with a clear priority prefix, then the note text:
+Personal slots (Shared program = None) keep using local SQLite only.
 
-```
-PRIORITY P2 — Blocked on vendor response. Target fix by Friday.
-```
+### Notes vs priority
 
-| Prefix | Meaning |
-|--------|---------|
-| `PRIORITY P1` | Most urgent (matches the app's P1) |
-| `PRIORITY P2` … `PRIORITY P10` | Lower urgency through P10 |
-| No `PRIORITY` prefix | Personal/local note only — do not use for team ranking |
+Push notes as Jira comments when the team needs the text in Jira. Priority is **not** parsed from comment text anymore — use a shared-program slot (or local/CSV import) for ranking.
 
-**Rules for people pushing updates (PMs / managers):**
+### Bootstrap from the NORA Excel tracker
 
-1. Start the **final** comment text with `PRIORITY P#` (P1–P10) when the ranking matters to the team.
-2. Keep the rest of the comment short and actionable — same role as a row in the old Excel tracker.
-3. When priority changes, push a **new** comment with the updated `PRIORITY P#` prefix (do not rely on others seeing edits to an old comment).
-4. Use **Push note** in Task Manager, or paste the same text as a comment directly in Jira.
-
-**Rules for everyone else on the team:**
-
-1. **Run JQL** on Work Week — the app reads the **latest Jira comment** on each issue and, when it starts with `PRIORITY P1` … `P10`, sets your local **Priority** dropdown automatically (look for the **Jira** badge on the row).
-2. Change priority manually anytime; that clears the Jira badge until the next **Run JQL** picks up a new comment.
-3. Optionally enable **Pull most recent Jira comment** to copy the full comment text into your local **Notes** box.
-4. Read the issue in Jira if you need the full thread or history beyond the latest comment.
-
-**Personal work:** On issues only you track, use local notes and priority without pushing, or push comments without the `PRIORITY` prefix if the note is informational only.
-
-### Bootstrap from the NORA Excel tracker (no Jira comments)
-
-Until shared DB sync exists, PMs can keep rankings in the existing NORA spreadsheet and share a **CSV** export:
+PMs can keep rankings in the NORA spreadsheet and share a **CSV** export:
 
 1. In Excel: **File → Save As → CSV UTF-8** (columns: `Priority`, `ODI`, `Developer`, `Jira Status`, `notes`).
-2. In Task Manager: **Settings → Import team priorities** → choose the CSV → **Import CSV**.
-3. Matching `ODI` keys overwrite local **Priority**. **Notes** from the sheet fill in only when your local note is empty. Other issues on your machine are unchanged.
-4. Re-import whenever the spreadsheet rankings change. Reload Work Week (or re-run JQL) if you already have that page open.
+2. In Task Manager: **Settings → Import team priorities** → choose target (**This machine** or **Atlas (demo)** when connected) → **Import CSV**.
+3. Matching `ODI` keys overwrite priority for that target. **Notes** fill in only when importing to this machine and the local note is empty.
+4. Re-import when spreadsheet rankings change. Reload Work Week (or re-run JQL) if that page is already open.
 
 **Developers:** Manual export/backup of SQLite is documented in [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) — that is for backup or handoff, not live multi-user editing.
 
@@ -479,12 +462,12 @@ Until shared DB sync exists, PMs can keep rankings in the existing NORA spreadsh
 | Chat session artifacts (for Chat context) | This browser only (`localStorage`) | No |
 | Desktop app credentials + DB (packaged) | `%APPDATA%\Task Manager\` (Windows) or `~/Library/Application Support/Task Manager/` (Mac) | No |
 | Header reminders | This browser only | No |
-| Issue notes + priorities (P1–P10) | Local file (`data/workweek.sqlite`) | No — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) for team workflow |
+| Issue notes + priorities (P1–P20) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL | No for personal slots — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) |
 | Note images (**Keep on this machine**) | Local file (`data/note-images/` + SQLite) | No — cleared after a successful **Push note** |
 | Epic/JQL preset team pack (export/import) | JSON file you save/share | No |
 | Dashboard metrics snapshot | Local file (`data/workweek.sqlite`) | No |
 | Status/assignee changes | Jira | Yes |
-| Notes you push as comments (with `PRIORITY P#` prefix) | Jira | Yes — ICs sync local priority on **Run JQL** from the latest comment |
+| Notes you push as comments | Jira | Yes — text/images only; priority is not read from comments |
 
 ---
 
@@ -503,10 +486,10 @@ One person exports a **team pack** from Settings; others **Import team pack** (m
 That's normal — the table was restored from the last time you ran JQL. Click **Run JQL** to get fresh data.
 
 **My notes disappeared on another computer**
-Expected. Notes are stored in a local file on the machine you started the app on. Use one machine, or ask a developer about exporting the SQLite file. For **shared projects**, use pushed Jira comments with the `PRIORITY P#` prefix — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
+Expected. Notes are stored in a local file on the machine you started the app on. Use one machine, or ask a developer about exporting the SQLite file. For **shared ranking**, link a Work Week slot to a Shared program (or import CSV to Atlas) — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
 
 **How do we share priority on a project like we did in Excel?**
-Task Manager does not sync priority between users automatically. PMs/managers push comments starting with `PRIORITY P#` (e.g. `PRIORITY P2 — …`). ICs **Run JQL** to auto-apply priority from the latest comment. See [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
+Link the Work Week slot to a **Shared program** so priority reads/writes the team store (Atlas demo today). Or **Settings → Import team priorities** from the NORA CSV (local or Atlas). See [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
 
 **The Push note button is greyed out**
 You've already pushed that exact note (text and images) as a comment. Edit the note or change attached images and the button will re-enable.
