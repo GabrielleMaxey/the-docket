@@ -1,5 +1,9 @@
-import { fetchIssueMetadataBulk, fetchJiraSearchAll, fetchLatestJiraCommentsBulk, saveIssueMetadata } from "../../services/jiraClient";
-import { parsePriorityFromComment } from "../../../shared/priorityFromComment.mjs";
+import {
+  fetchIssueMetadataBulk,
+  fetchJiraSearchAll,
+  fetchLatestJiraCommentsBulk,
+  fetchTeamPriorityBulk,
+} from "../../services/jiraClient";
 import { enrichRunWithParentDoneDates } from "../../utils/jiraIssueDoneDates.js";
 import { getConfiguredJqlSlotIndexes } from "../../utils/workWeekStorage.js";
 import {
@@ -38,12 +42,56 @@ const readCommentEntry = (entry) => {
 const escapeJqlString = (value) =>
   String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
+const applyTeamPriorityState = async ({
+  issueKeys,
+  clampPriority,
+  setJiraRowPriorities,
+  setPrioritySourceByKey,
+}) => {
+  const keys = [
+    ...new Set(
+      (Array.isArray(issueKeys) ? issueKeys : [])
+        .map((key) => String(key || "").trim())
+        .filter(Boolean)
+    ),
+  ];
+  if (keys.length === 0) {
+    return;
+  }
+
+  try {
+    const teamItems = await fetchTeamPriorityBulk(keys);
+    const teamPriorities = {};
+    const teamSource = {};
+    keys.forEach((issueKey) => {
+      teamSource[issueKey] = { source: "team-db", author: "Team" };
+    });
+    Object.entries(teamItems || {}).forEach(([issueKey, item]) => {
+      if (!item || item.priority === undefined) {
+        return;
+      }
+      teamPriorities[issueKey] = clampPriority(item.priority);
+      teamSource[issueKey] = {
+        source: "team-db",
+        author: String(item.updatedBy || "Team"),
+      };
+    });
+    if (Object.keys(teamPriorities).length > 0) {
+      setJiraRowPriorities((prev) => ({ ...prev, ...teamPriorities }));
+    }
+    if (setPrioritySourceByKey && Object.keys(teamSource).length > 0) {
+      setPrioritySourceByKey((prev) => ({ ...prev, ...teamSource }));
+    }
+  } catch (error) {
+    console.error("Failed to fetch team priorities", error);
+  }
+};
+
 const applyDrillDownMetadata = async ({
   issueKeys,
   pullLatestComment,
   clampPriority,
   setJiraRowPriorities,
-  setPrioritySourceByKey,
   setJiraNotes,
   hydrateNoteImages,
 }) => {
@@ -51,26 +99,21 @@ const applyDrillDownMetadata = async ({
     return;
   }
 
-  const latestComments = await fetchLatestJiraCommentsBulk(issueKeys);
-  const priorityFromComment = {};
-  const prioritySource = {};
-
-  issueKeys.forEach((key) => {
-    const { text, author } = readCommentEntry(latestComments?.[key]);
-    const parsed = parsePriorityFromComment(text);
-    if (parsed) {
-      priorityFromComment[key] = clampPriority(parsed.priority);
-      prioritySource[key] = { source: "jira-comment", author: author || "Jira" };
-    }
-    if (pullLatestComment && text) {
-      setJiraNotes((prev) => ({ ...prev, [key]: text }));
-    }
-  });
-
-  if (Object.keys(priorityFromComment).length > 0) {
-    setJiraRowPriorities((prev) => ({ ...prev, ...priorityFromComment }));
-    if (setPrioritySourceByKey) {
-      setPrioritySourceByKey((prev) => ({ ...prev, ...prioritySource }));
+  if (pullLatestComment) {
+    try {
+      const latestComments = await fetchLatestJiraCommentsBulk(issueKeys);
+      const commentNotes = {};
+      issueKeys.forEach((key) => {
+        const { text } = readCommentEntry(latestComments?.[key]);
+        if (text) {
+          commentNotes[key] = text;
+        }
+      });
+      if (Object.keys(commentNotes).length > 0) {
+        setJiraNotes((prev) => ({ ...prev, ...commentNotes }));
+      }
+    } catch (error) {
+      console.error("Failed to fetch latest Jira comments", error);
     }
   }
 
@@ -85,7 +128,7 @@ const applyDrillDownMetadata = async ({
     if (!pullLatestComment && typeof item.note === "string") {
       nextNotes[key] = item.note;
     }
-    if (item.priority !== undefined && priorityFromComment[key] === undefined) {
+    if (item.priority !== undefined) {
       nextPriorities[key] = clampPriority(item.priority);
     }
     if (hydrateNoteImages) {
@@ -100,13 +143,10 @@ const applyDrillDownMetadata = async ({
   }
 };
 
-/**
- * Runs JQL slot(s), merges persisted notes/priorities from the proxy DB for returned keys,
- * syncs PRIORITY P# from latest Jira comments, and updates React state via the provided setters.
- */
 export async function runJqlWorkflow({
   jqlInputs,
   jqlLabels,
+  jqlSharedProgramIds = [],
   jqlMaxResults,
   pullLatestComment,
   clampPriority,
@@ -138,6 +178,7 @@ export async function runJqlWorkflow({
       configuredIndexes.map(async (idx) => {
         const jql = String(jqlInputs[idx] || "").trim();
         const label = String(jqlLabels[idx] || "").trim();
+        const sharedProgramId = String(jqlSharedProgramIds[idx] || "").trim();
 
         try {
           const data = await fetchJiraSearchAll({ jql, maxTotal: jqlMaxResults });
@@ -145,6 +186,7 @@ export async function runJqlWorkflow({
             index: idx,
             label,
             jql,
+            sharedProgramId,
             issues: data?.issues || [],
             total: Number(data?.total || 0),
             loaded: Number(data?.loaded || (data?.issues || []).length),
@@ -156,6 +198,7 @@ export async function runJqlWorkflow({
             index: idx,
             label,
             jql,
+            sharedProgramId,
             issues: [],
             total: 0,
             loaded: 0,
@@ -166,75 +209,52 @@ export async function runJqlWorkflow({
       })
     );
 
-    const allIssueKeys = Array.from(
-      new Set(
-        runResults.flatMap((run) =>
-          (run.issues || []).map((issue) => String(issue.key || "").trim())
-        )
-      )
-    ).filter((key) => key.length > 0);
-
-    if (allIssueKeys.length > 0) {
-      let latestComments = {};
-
-      try {
-        latestComments = await fetchLatestJiraCommentsBulk(allIssueKeys);
-      } catch (error) {
-        console.error("Failed to fetch latest Jira comments", error);
+    const teamIssueKeys = new Set();
+    const localIssueKeys = new Set();
+    runResults.forEach((run) => {
+      const keys = (run.issues || [])
+        .map((issue) => String(issue.key || "").trim().toUpperCase())
+        .filter(Boolean);
+      if (run.sharedProgramId) {
+        keys.forEach((key) => teamIssueKeys.add(key));
+      } else {
+        keys.forEach((key) => localIssueKeys.add(key));
       }
+    });
 
-      const priorityFromComment = {};
-      const prioritySource = {};
-      const commentNotes = {};
+    // Prefer team mode when an issue appears in both a team and local slot.
+    localIssueKeys.forEach((key) => {
+      if (teamIssueKeys.has(key)) {
+        localIssueKeys.delete(key);
+      }
+    });
 
-      allIssueKeys.forEach((issueKey) => {
-        const { text, author } = readCommentEntry(latestComments?.[issueKey]);
-        if (!text) {
-          return;
-        }
-
-        if (pullLatestComment) {
-          commentNotes[issueKey] = text;
-        }
-
-        const parsed = parsePriorityFromComment(text);
-        if (parsed) {
-          priorityFromComment[issueKey] = clampPriority(parsed.priority);
-          prioritySource[issueKey] = {
-            source: "jira-comment",
-            author: author || "Jira",
-          };
-          if (parsed.noteSnippet && pullLatestComment) {
-            commentNotes[issueKey] = text;
+    const localKeys = [...localIssueKeys];
+    if (localKeys.length > 0) {
+      if (pullLatestComment) {
+        try {
+          const latestComments = await fetchLatestJiraCommentsBulk(localKeys);
+          const commentNotes = {};
+          localKeys.forEach((issueKey) => {
+            const { text } = readCommentEntry(latestComments?.[issueKey]);
+            if (text) {
+              commentNotes[issueKey] = text;
+            }
+          });
+          if (Object.keys(commentNotes).length > 0) {
+            setJiraNotes((prev) => ({ ...prev, ...commentNotes }));
           }
+        } catch (error) {
+          console.error("Failed to fetch latest Jira comments", error);
         }
-      });
-
-      if (pullLatestComment && Object.keys(commentNotes).length > 0) {
-        setJiraNotes((prev) => ({ ...prev, ...commentNotes }));
-      }
-
-      if (Object.keys(priorityFromComment).length > 0) {
-        setJiraRowPriorities((prev) => ({ ...prev, ...priorityFromComment }));
-        if (setPrioritySourceByKey) {
-          setPrioritySourceByKey((prev) => ({ ...prev, ...prioritySource }));
-        }
-
-        await Promise.all(
-          Object.entries(priorityFromComment).map(([issueKey, priority]) =>
-            saveIssueMetadata({ issueKey, priority }).catch((error) => {
-              console.error("Failed to persist priority from Jira comment", issueKey, error);
-            })
-          )
-        );
       }
 
       try {
-        const persisted = await fetchIssueMetadataBulk(allIssueKeys);
+        const persisted = await fetchIssueMetadataBulk(localKeys);
         const nextNotes = {};
         const nextPriorities = {};
 
-        allIssueKeys.forEach((issueKey) => {
+        localKeys.forEach((issueKey) => {
           const item = persisted?.[issueKey];
           if (!item) {
             return;
@@ -243,7 +263,7 @@ export async function runJqlWorkflow({
           if (!pullLatestComment && typeof item.note === "string") {
             nextNotes[issueKey] = item.note;
           }
-          if (item.priority !== undefined && priorityFromComment[issueKey] === undefined) {
+          if (item.priority !== undefined) {
             nextPriorities[issueKey] = clampPriority(item.priority);
           }
           if (hydrateNoteImages) {
@@ -261,6 +281,37 @@ export async function runJqlWorkflow({
         console.error("Failed to fetch persisted issue metadata", error);
       }
     }
+
+    if (teamIssueKeys.size > 0) {
+      try {
+        const persisted = await fetchIssueMetadataBulk([...teamIssueKeys]);
+        const nextNotes = {};
+        [...teamIssueKeys].forEach((issueKey) => {
+          const item = persisted?.[issueKey];
+          if (!item) {
+            return;
+          }
+          if (!pullLatestComment && typeof item.note === "string") {
+            nextNotes[issueKey] = item.note;
+          }
+          if (hydrateNoteImages) {
+            hydrateNoteImages(issueKey, { keepNoteImages: item.keepNoteImages, images: item.images });
+          }
+        });
+        if (!pullLatestComment && Object.keys(nextNotes).length > 0) {
+          setJiraNotes((prev) => mergeIssueMapsPreferExisting(prev, nextNotes));
+        }
+      } catch (error) {
+        console.error("Failed to fetch notes for team-slot issues", error);
+      }
+    }
+
+    await applyTeamPriorityState({
+      issueKeys: [...teamIssueKeys],
+      clampPriority,
+      setJiraRowPriorities,
+      setPrioritySourceByKey,
+    });
 
     const enrichedRuns = await Promise.all(
       runResults.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows))
@@ -299,6 +350,7 @@ export async function loadRemainingJqlIssues({
 
   const jiraTotal = Number(run.total || 0);
   const targetMax = Math.min(5000, Math.max(jqlMaxResults, jiraTotal || jqlMaxResults));
+  const sharedProgramId = String(run.sharedProgramId || "").trim();
 
   setJqlLoading(true);
   try {
@@ -332,27 +384,44 @@ export async function loadRemainingJqlIssues({
       return;
     }
 
-    const latestComments = await fetchLatestJiraCommentsBulk(issueKeys);
-    const priorityFromComment = {};
-    const prioritySource = {};
+    if (sharedProgramId) {
+      await applyTeamPriorityState({
+        issueKeys,
+        clampPriority,
+        setJiraRowPriorities,
+        setPrioritySourceByKey,
+      });
+      return;
+    }
 
-    issueKeys.forEach((issueKey) => {
-      const { text, author } = readCommentEntry(latestComments?.[issueKey]);
-      const parsed = parsePriorityFromComment(text);
-      if (parsed) {
-        priorityFromComment[issueKey] = clampPriority(parsed.priority);
-        prioritySource[issueKey] = { source: "jira-comment", author: author || "Jira" };
+    if (pullLatestComment) {
+      try {
+        const latestComments = await fetchLatestJiraCommentsBulk(issueKeys);
+        issueKeys.forEach((issueKey) => {
+          const { text } = readCommentEntry(latestComments?.[issueKey]);
+          if (text) {
+            setJiraNotes((prev) => ({ ...prev, [issueKey]: text }));
+          }
+        });
+      } catch (error) {
+        console.error("Failed to fetch latest Jira comments", error);
       }
-      if (pullLatestComment && text) {
-        setJiraNotes((prev) => ({ ...prev, [issueKey]: text }));
-      }
-    });
+    }
 
-    if (Object.keys(priorityFromComment).length > 0) {
-      setJiraRowPriorities((prev) => ({ ...prev, ...priorityFromComment }));
-      if (setPrioritySourceByKey) {
-        setPrioritySourceByKey((prev) => ({ ...prev, ...prioritySource }));
+    try {
+      const persisted = await fetchIssueMetadataBulk(issueKeys);
+      const nextPriorities = {};
+      issueKeys.forEach((issueKey) => {
+        const item = persisted?.[issueKey];
+        if (item?.priority !== undefined) {
+          nextPriorities[issueKey] = clampPriority(item.priority);
+        }
+      });
+      if (Object.keys(nextPriorities).length > 0) {
+        setJiraRowPriorities((prev) => mergeIssueMapsPreferExisting(prev, nextPriorities));
       }
+    } catch (error) {
+      console.error("Failed to fetch persisted issue metadata", error);
     }
   } catch (error) {
     console.error("Failed to load remaining JQL issues", error);
@@ -432,7 +501,6 @@ export async function loadDrillDownIssueByKey({
         pullLatestComment,
         clampPriority,
         setJiraRowPriorities,
-        setPrioritySourceByKey,
         setJiraNotes,
         hydrateNoteImages,
       });
@@ -533,7 +601,6 @@ export async function loadDrillDownIssuesByAssignee({
         pullLatestComment,
         clampPriority,
         setJiraRowPriorities,
-        setPrioritySourceByKey,
         setJiraNotes,
         hydrateNoteImages,
       });

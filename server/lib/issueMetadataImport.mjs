@@ -1,3 +1,5 @@
+import { clampIssuePriority } from "../../shared/issuePriority.mjs";
+
 const ISSUE_KEY_RE = /^[A-Z][A-Z0-9]+-\d+$/i;
 const ISSUE_KEY_FIND_RE = /\b([A-Z][A-Z0-9]+-\d+)\b/i;
 const DEFAULT_PROJECT_KEY = "ODI";
@@ -32,7 +34,6 @@ export const parseImportPriority = (value) => {
     return null;
   }
 
-  // Section labels like "Completed" are not priorities.
   if (/^[A-Za-z]/.test(raw) && !/^(?:PRIORITY\s+)?P\d/i.test(raw)) {
     return null;
   }
@@ -43,18 +44,16 @@ export const parseImportPriority = (value) => {
     if (!Number.isFinite(priority) || priority < 1) {
       return null;
     }
-    // App stores P1–P20; spreadsheet stack ranks may go past 20.
-    return Math.min(20, Math.round(priority));
+    return clampIssuePriority(priority);
   }
 
-  // Stack rank from Excel: "1", "13", "1.0", "1 - Critical"
   const leadingNumber = raw.match(/^(\d{1,3})(?:[.,]\d+)?\b/);
   if (leadingNumber) {
     const priority = Number(leadingNumber[1]);
     if (!Number.isFinite(priority) || priority < 1) {
       return null;
     }
-    return Math.min(20, Math.round(priority));
+    return clampIssuePriority(priority);
   }
 
   return null;
@@ -172,12 +171,6 @@ export const looksLikeBinarySpreadsheet = (text) => {
   return weird >= 4;
 };
 
-/**
- * Parse NORA tracker CSV into row objects.
- * Required headers: ODI (or issue key), Priority. Optional: notes.
- * Supports comma, semicolon, and tab-delimited Excel exports.
- * Skips title rows above the real header.
- */
 export const parseIssueMetadataCsv = (csvText) => {
   if (looksLikeBinarySpreadsheet(csvText)) {
     return {
@@ -247,10 +240,6 @@ export const parseIssueMetadataCsv = (csvText) => {
   };
 };
 
-/**
- * Plan upserts from parsed CSV rows and existing metadata map.
- * existingByKey: { [issueKey]: { note, priority } }
- */
 export const planIssueMetadataImport = (rows, existingByKey = {}) => {
   const upserts = [];
   const errors = [];
@@ -262,7 +251,6 @@ export const planIssueMetadataImport = (rows, existingByKey = {}) => {
     const issueKey = normalizeImportIssueKey(row.odi);
     const priorityRaw = String(row.priority || "").trim();
 
-    // Unranked rows (blank priority) and section headers — skip quietly.
     if (!priorityRaw || isSectionLabel(priorityRaw)) {
       skipped += 1;
       continue;

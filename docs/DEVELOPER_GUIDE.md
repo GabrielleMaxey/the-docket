@@ -89,7 +89,7 @@ taskManager/
 │   ├── createIssueParentUtils.mjs # Manual key validation + query-issue parent resolution
 │   ├── jiraParentCandidates.mjs   # Parent chain walk + dropdown builders (shared UI/server)
 │   ├── jiraDescriptionAdf.mjs     # Plain-text description → Jira ADF
-│   ├── priorityFromComment.mjs # Parse PRIORITY P1–P10 from Jira comment text
+│   ├── issuePriority.mjs          # MAX_ISSUE_PRIORITY + clampIssuePriority (P0–P20)
 │   └── chatSessionPrompt.mjs  # Formats Chat session context for LLM prompts
 ├── tests/
 │   ├── dashboardMetrics.test.mjs
@@ -99,7 +99,7 @@ taskManager/
 │   ├── jiraParentCandidates.test.mjs
 │   ├── createIssuePresetUtils.test.mjs
 │   ├── chatSessionPrompt.test.mjs
-│   └── priorityFromComment.test.mjs
+│   └── issuePriority.test.mjs
 ├── src/
 │   ├── context/
 │   │   └── EpicFiltersContext.jsx  # Shared preset + selection state (provider + hook)
@@ -192,14 +192,14 @@ taskManager/
 |--------|------|-------|
 | `issue_key` | TEXT PK | e.g. `ODI-1234` |
 | `note` | TEXT | Local draft note |
-| `priority` | INTEGER | 0–10; 0 = unranked, 1 = highest |
+| `priority` | INTEGER | 0–20; 0 = unranked, 1 = highest |
 | `updated_at` | TEXT | ISO 8601 |
 
-**Multi-user / shared projects (today):** `issue_metadata` is **per machine**. Team-visible ranking uses Jira comments with `PRIORITY P#` (see below).
+**Multi-user / shared projects (today):** `issue_metadata` is **per machine** for personal slots. Slots linked to a shared program use Atlas (`TEAM_PRIORITY_MONGODB_URI`) for priority; production target is MySQL (see below).
 
-**Planned — team priority DB:** Shared program priority in team-owned Postgres/MySQL via a team API. Epic-root scope on writes; Work Week slots **link explicitly** to a shared program for team mode — all other slots (assignee, custom ODI JQL) stay local-only. Spec → **[specs/team-priority-sync.md](./specs/team-priority-sync.md)**.
+**Planned — team priority DB:** Shared program priority in team **MySQL**. Prefer **`jiraProxy` → MySQL** when a connection is available; optional Team Priority API only if DB access cannot be granted. Epic-root scope on writes; Work Week slots **link explicitly** to a shared program for team mode — all other slots stay local-only. Priority range **1–20**. Spec → **[specs/team-priority-sync.md](./specs/team-priority-sync.md)**; DDL → **[specs/team-priority-sync-mysql.sql](./specs/team-priority-sync-mysql.sql)**.
 
-**Current workaround until team DB ships:** PMs push Jira comments prefixed with `PRIORITY P#` (P1–P10). On **Run JQL**, `shared/priorityFromComment.mjs` parses the latest comment per issue; matching priorities are written to SQLite and shown with a **Jira** badge in the UI (`prioritySourceByKey`). Manual priority changes clear the badge. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
+**Current priority sources:** Local SQLite (`issue_metadata`) for personal Work Week slots; Atlas team DB for slots linked to a shared program. Jira comment text is **not** parsed for priority. NORA CSV import seeds local and/or Atlas. Clamp helper: `shared/issuePriority.mjs`. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
 
 **`epic_presets`** — saved JQL/epic presets
 
@@ -259,7 +259,7 @@ Created automatically in `server/db/schema.mjs` on first API start. WAL mode ena
 
 ### Export / backup
 
-For **single-user backup** or handoff — not live collaboration. Shared-project teams should use the `PRIORITY P#` Jira comment convention (see END_USER_GUIDE).
+For **single-user backup** or handoff — not live collaboration. Shared ranking uses shared-program slots (Atlas demo / future MySQL); see END_USER_GUIDE.
 
 ```bash
 # Full backup
@@ -351,11 +351,11 @@ Display logic in `getMostRecentDoneDateForIssue`:
 
 `POST /api/jira/search/all` (`server/lib/jiraSearchHelpers.mjs` → `searchAllIssues`) paginates with Jira `nextPageToken` until all matches are loaded or `maxTotal` is reached (cap **5000**). Work Week **Run JQL** calls `fetchJiraSearchAll` per slot (`jiraJqlRunWorkflow.js`). Each run stores `total`, `loaded`, and `loadComplete`; the UI shows **Load remaining** when incomplete. `persistJqlRunsToStorage()` writes results when a run finishes so navigation mid-JQL does not lose the table.
 
-### Priority from Jira comments
+### Work Week notes from Jira comments
 
 On each **Run JQL** (and **Load remaining**), when **Pull most recent Jira comment** is off, local SQLite notes merge into row Notes as before. When it is on (`pullLatestComment` in `workWeekTasksJiraPreferences`), `fetchLatestJiraCommentsBulk` overwrites Notes from Jira and skips local note merge for those keys.
 
-Separately, the latest comment text is always scanned for team priority: `parsePriorityFromComment()` in `shared/priorityFromComment.mjs` matches `PRIORITY P1` … `P10` at the start of the comment. Parsed values update `jiraRowPriorities`, `prioritySourceByKey`, and `saveIssueMetadata` (SQLite). `PriorityCell` shows a **Jira** badge when `prioritySourceByKey[issueKey].source === "jira-comment"`. Manual `handleRowPriorityChange` clears the source entry.
+Priority is **not** read from comment text. Shared-program slots load priority via `fetchTeamPriorityBulk` / `applyTeamPriorityState` in `jiraJqlRunWorkflow.js`. `PriorityCell` shows a **Team** badge when `prioritySourceByKey[issueKey].source === "team-db"`.
 
 ### Assignee updates (Jira user search)
 
@@ -715,7 +715,7 @@ Pages that consume it — `Dashboard/index.jsx`, `Chat.jsx`, `WorkWeekTasks.jsx`
 | `npm run desktop:doctor` | Rebuilds `better-sqlite3` native module, then starts desktop dev |
 | `npm run desktop:rebuild-native` | Rebuilds native modules for current Electron version |
 | `npm run check:jira-client-exports` | Verifies every imported `jiraClient` symbol is exported (prevents runtime blank-screen import failures) |
-| `npm test` | Unit tests: `dashboardMetrics.mjs`, `epicFilterJql.mjs`, `chatSessionPrompt.mjs`, `priorityFromComment.mjs` |
+| `npm test` | Unit tests: `dashboardMetrics.mjs`, `epicFilterJql.mjs`, `chatSessionPrompt.mjs`, `issuePriority.mjs`, … |
 | `npm run seed:presets` | Seed shared Epic/JQL presets into local SQLite — see [pilot-presets.md](./pilot-presets.md) |
 | `npm run build` | Runs export guard (`prebuild`), then creates production Vite bundle → `dist/` |
 | `npm run desktop:dist` | Full build + electron-builder → `release/` |
@@ -739,7 +739,7 @@ npm run build
 
 # 4. Smoke test (with a real Jira test site):
 #    - Run JQL on Work Week; confirm Loaded X of Y and Load remaining when needed
-#    - Confirm PRIORITY P# in latest Jira comment sets row priority + Jira badge
+#    - Confirm shared-program slot priority loads from Atlas (Team badge); personal slot stays local
 #    - Generate a project report; navigate away and back while it runs
 #    - Generate a week plan
 #    - Dashboard refresh + weekly digest + Generate Report; drill-down link to Work Week (?key=, ?assignee=)
