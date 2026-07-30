@@ -115,16 +115,25 @@ const splitCsvLines = (text) =>
 
 const normalizeHeader = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 
+const headerMatches = (header, match) => {
+  if (!header) {
+    return false;
+  }
+  if (typeof match !== "string") {
+    return match.test(header);
+  }
+  return header === match || header.startsWith(`${match} `) || header.endsWith(` ${match}`);
+};
+
 const scoreHeaderRow = (headers) => {
-  const joined = headers.join(" | ");
   let score = 0;
-  if (headers.some((h) => h === "odi" || h.includes("odi") || h.includes("issue key") || h === "key" || h === "issue")) {
+  if (headers.some((h) => headerMatches(h, "odi") || headerMatches(h, "issue key") || headerMatches(h, "key") || headerMatches(h, "issue"))) {
     score += 2;
   }
-  if (headers.some((h) => h === "priority" || h.startsWith("priority") || h === "prio" || h === "rank" || h.includes("rank"))) {
+  if (headers.some((h) => headerMatches(h, "priority") || headerMatches(h, "prio") || headerMatches(h, "rank") || /priorit/.test(h))) {
     score += 2;
   }
-  if (joined.includes("developer") || joined.includes("status") || joined.includes("note")) {
+  if (headers.some((h) => h.includes("developer") || h.includes("status") || h.includes("note"))) {
     score += 1;
   }
   return score;
@@ -133,22 +142,14 @@ const scoreHeaderRow = (headers) => {
 const findHeaderIndex = (headers, matchers) => {
   for (let i = 0; i < headers.length; i += 1) {
     const header = headers[i];
-    if (!header) {
-      continue;
-    }
     for (const match of matchers) {
-      if (typeof match === "string") {
-        if (header === match || header.startsWith(`${match} `) || header.includes(match)) {
-          return i;
-        }
-      } else if (match.test(header)) {
+      if (headerMatches(header, match)) {
         return i;
       }
     }
   }
   return -1;
 };
-
 export const looksLikeBinarySpreadsheet = (text) => {
   const sample = String(text || "").slice(0, 16);
   if (!sample) {
