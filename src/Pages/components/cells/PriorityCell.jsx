@@ -1,4 +1,5 @@
 import React from "react";
+import { MAX_ISSUE_PRIORITY } from "../../../../shared/issuePriority.mjs";
 
 const PriorityCell = ({
   issueKey,
@@ -10,9 +11,10 @@ const PriorityCell = ({
 }) => {
   const sourceMeta = prioritySource?.[issueKey];
   const sourceTitle =
-    sourceMeta?.source === "jira-comment"
-      ? `Priority from latest Jira comment${sourceMeta.author ? ` by ${sourceMeta.author}` : ""}`
+    sourceMeta?.source === "team-db"
+      ? `Team priority${sourceMeta.author ? ` (${sourceMeta.author})` : ""}`
       : undefined;
+  const sourceBadgeLabel = sourceMeta?.source === "team-db" ? "Team" : null;
 
   return (
     <td>
@@ -26,15 +28,15 @@ const PriorityCell = ({
             onChange={(event) => onChange(issueKey, event.target.value)}
             title={sourceTitle}
           >
-            {Array.from({ length: 21 }).map((_, i) => (
+            {Array.from({ length: MAX_ISSUE_PRIORITY + 1 }).map((_, i) => (
               <option key={"row-priority-" + issueKey + "-" + i} value={i}>
                 {"P" + i}
               </option>
             ))}
           </select>
-          {sourceMeta?.source === "jira-comment" ? (
+          {sourceBadgeLabel ? (
             <span className="ww-priority-source-badge" title={sourceTitle}>
-              Jira
+              {sourceBadgeLabel}
             </span>
           ) : null}
         </div>

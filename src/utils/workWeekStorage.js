@@ -19,6 +19,7 @@ export const DEFAULT_JQLS = [
   "",
 ];
 export const DEFAULT_JQL_LABELS = ["My Work", "In Progress", "Blocked", "", ""];
+export const DEFAULT_JQL_SHARED_PROGRAM_IDS = ["", "", "", "", ""];
 
 export const normalizeJqlCount = (value) => {
   const count = Number(value);

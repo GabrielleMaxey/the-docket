@@ -294,6 +294,7 @@ const JiraResultsTable = ({
   handlePushNote,
   onActiveTabChange,
   prioritySourceByKey,
+  jqlSharedProgramIds,
   onLoadRemaining,
   onClearDrillDownRun,
   onClearDrillDownFilter,
@@ -931,7 +932,15 @@ const JiraResultsTable = ({
                           rowPriority={rowPriority}
                           priorityClassName={getPriorityClass(rowPriority)}
                           prioritySource={prioritySourceByKey}
-                          onChange={handleRowPriorityChange}
+                          onChange={(key, value) =>
+                            handleRowPriorityChange(key, value, {
+                              sharedProgramId: String(
+                                run.sharedProgramId ||
+                                  jqlSharedProgramIds?.[runSlotIndex] ||
+                                  ""
+                              ).trim(),
+                            })
+                          }
                         />
 
                         <td>
