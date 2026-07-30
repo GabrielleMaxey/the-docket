@@ -65,10 +65,12 @@ const requestJson = async (path, options = {}) => {
 
   const text = await response.text();
   let data = {};
+  let parsedJson = false;
 
   if (text) {
     try {
       data = JSON.parse(text);
+      parsedJson = true;
     } catch {
       data = { message: text };
     }
@@ -76,6 +78,13 @@ const requestJson = async (path, options = {}) => {
 
   if (!response.ok) {
     throw new Error(extractJiraErrorMessage(data, response.status));
+  }
+
+  // SPA/static fallbacks sometimes return index.html with HTTP 200 for unknown API routes.
+  if (!parsedJson || (typeof data === "object" && data && typeof data.message === "string" && /^\s*</.test(data.message))) {
+    throw new Error(
+      `API returned a non-JSON response for ${path}. Restart the local API (npm run dev:api or npm run dev:all) so new routes are loaded.`
+    );
   }
 
   return data;
@@ -235,13 +244,19 @@ export const saveIssueMetadata = async ({ issueKey, note, priority }) => {
 };
 
 export const importIssueMetadataCsv = async (csvText) => {
-  return requestJson("/api/jira/issue-metadata/import", {
+  const data = await requestJson("/api/jira/issue-metadata/import", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ csvText }),
   });
+  if (!data || data.ok !== true || typeof data.updatedPriorities !== "number") {
+    throw new Error(
+      "Priority import API response was incomplete. Restart npm run dev:all and try again."
+    );
+  }
+  return data;
 };
 
 export const fetchEpicPresets = async () => {
