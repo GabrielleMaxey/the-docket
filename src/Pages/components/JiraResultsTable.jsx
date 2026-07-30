@@ -70,7 +70,7 @@ const filterIssues = (issues, { keyQuery, statusFilter, assigneeFilter }) => {
 
 const getPrioritySortRank = (clampPriority, priorityValue) => {
   const priority = clampPriority(priorityValue);
-  return priority === 0 ? 11 : priority;
+  return priority === 0 ? 21 : priority;
 };
 
 const compareIssueKeys = (a, b) => {

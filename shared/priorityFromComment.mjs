@@ -1,5 +1,5 @@
 /**
- * Parse team priority prefix from Jira comment text (PRIORITY P1 … P10).
+ * Parse team priority prefix from Jira comment text (PRIORITY P1 … P20).
  * Used when PMs/managers push ranking via comment convention.
  */
 export const parsePriorityFromComment = (text) => {
@@ -14,7 +14,7 @@ export const parsePriorityFromComment = (text) => {
   }
 
   const priority = Number(match[1]);
-  if (!Number.isFinite(priority) || priority < 1 || priority > 10) {
+  if (!Number.isFinite(priority) || priority < 1 || priority > 20) {
     return null;
   }
 

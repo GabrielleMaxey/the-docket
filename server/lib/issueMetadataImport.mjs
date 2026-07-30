@@ -43,8 +43,8 @@ export const parseImportPriority = (value) => {
     if (!Number.isFinite(priority) || priority < 1) {
       return null;
     }
-    // App stores P1–P10; spreadsheet stack ranks may go past 10.
-    return Math.min(10, Math.round(priority));
+    // App stores P1–P20; spreadsheet stack ranks may go past 20.
+    return Math.min(20, Math.round(priority));
   }
 
   // Stack rank from Excel: "1", "13", "1.0", "1 - Critical"
@@ -54,7 +54,7 @@ export const parseImportPriority = (value) => {
     if (!Number.isFinite(priority) || priority < 1) {
       return null;
     }
-    return Math.min(10, Math.round(priority));
+    return Math.min(20, Math.round(priority));
   }
 
   return null;
@@ -282,7 +282,7 @@ export const planIssueMetadataImport = (rows, existingByKey = {}) => {
       skipped += 1;
       errors.push({
         row: row.rowNumber,
-        reason: `Invalid priority (${priorityRaw.slice(0, 40)}; need a number rank or P1–P10)`,
+        reason: `Invalid priority (${priorityRaw.slice(0, 40)}; need a number rank or P1–P20)`,
       });
       continue;
     }
