@@ -20,6 +20,7 @@ import {
   hasOnlyWorkfrontJiraErrors,
   sanitizeJiraErrorData,
 } from "../shared/jiraErrorUtils.mjs";
+import { extractMediaIdFromUrl } from "./lib/jiraNoteComment.mjs";
 
 const log = createLogger("server");
 
@@ -217,6 +218,31 @@ const jiraMultipartRequest = async ({ method = "POST", pathWithQuery, formData }
   return { ok: true, status: response.status, data };
 };
 
+const resolveJiraAttachmentMediaId = async (attachmentId) => {
+  const id = String(attachmentId || "").trim();
+  if (!id) {
+    return "";
+  }
+
+  const target = `${process.env.JIRA_BASE_URL}/rest/api/3/attachment/content/${encodeURIComponent(id)}`;
+  const response = await fetch(target, {
+    method: "GET",
+    headers: {
+      Accept: "*/*",
+      Authorization: getAuthHeader(),
+    },
+    redirect: "manual",
+  });
+
+  const location = response.headers.get("location") || "";
+  const fromLocation = extractMediaIdFromUrl(location);
+  if (fromLocation) {
+    return fromLocation;
+  }
+
+  return extractMediaIdFromUrl(response.url);
+};
+
 // Shared JQL search (used by route modules).
 // Supports both call styles currently present in the codebase:
 // 1) runJiraSearchRequest({ jql, maxResults, fields, nextPageToken, res })
@@ -286,6 +312,7 @@ const routeCtx = {
   dataDir: dbDir,
   jiraRequest,
   jiraMultipartRequest,
+  resolveJiraAttachmentMediaId,
   ensureEnvOrRespond,
   runJiraSearchRequest,
   resolveJiraUser,

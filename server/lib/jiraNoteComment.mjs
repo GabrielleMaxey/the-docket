@@ -1,7 +1,14 @@
 // Builds the ADF comment body for note pushes and orchestrates attachment
-// upload + comment posting for note images (Task 3: multipart push).
+// upload + comment posting for note images.
 
-export const buildNoteCommentAdf = ({ noteText = "", attachmentIds = [] } = {}) => {
+const MEDIA_FILE_ID_RE = /\/file\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i;
+
+export const extractMediaIdFromUrl = (url) => {
+  const match = String(url || "").match(MEDIA_FILE_ID_RE);
+  return match ? match[1] : "";
+};
+
+export const buildNoteCommentAdf = ({ noteText = "", mediaIds = [] } = {}) => {
   const content = [];
   const text = String(noteText || "").trim();
 
@@ -12,7 +19,7 @@ export const buildNoteCommentAdf = ({ noteText = "", attachmentIds = [] } = {}) 
     });
   }
 
-  for (const id of attachmentIds || []) {
+  for (const id of mediaIds || []) {
     content.push({
       type: "mediaSingle",
       attrs: { layout: "center" },
@@ -40,8 +47,9 @@ export const pushNoteCommentWithImages = async ({
   imageBuffers = [],
   jiraRequest,
   jiraMultipartRequest,
+  resolveAttachmentMediaId,
 }) => {
-  const attachmentIds = [];
+  const mediaIds = [];
 
   for (const image of imageBuffers) {
     const uploadResult = await jiraMultipartRequest({
@@ -51,22 +59,38 @@ export const pushNoteCommentWithImages = async ({
     });
 
     if (!uploadResult.ok) {
-      // Any attachments already uploaded in this loop (ids collected above) are
-      // orphaned on the Jira issue — no comment references them, but they are
-      // not rolled back here.
       return { ok: false, status: uploadResult.status, data: uploadResult.data };
     }
 
     const uploaded = Array.isArray(uploadResult.data) ? uploadResult.data[0] : uploadResult.data;
-    if (uploaded?.id) {
-      attachmentIds.push(String(uploaded.id));
+    const attachmentId = uploaded?.id != null ? String(uploaded.id) : "";
+    if (!attachmentId) {
+      return {
+        ok: false,
+        status: 502,
+        data: { error: "Jira attachment upload returned no id" },
+      };
     }
+
+    // ADF media nodes need the Media Services UUID, not the numeric attachment id.
+    const mediaId = await resolveAttachmentMediaId(attachmentId);
+    if (!mediaId) {
+      return {
+        ok: false,
+        status: 502,
+        data: {
+          error: "Could not resolve Jira media id for uploaded attachment",
+          attachmentId,
+        },
+      };
+    }
+    mediaIds.push(mediaId);
   }
 
   const commentResult = await jiraRequest({
     method: "POST",
     pathWithQuery: `/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`,
-    body: { body: buildNoteCommentAdf({ noteText, attachmentIds }) },
+    body: { body: buildNoteCommentAdf({ noteText, mediaIds }) },
   });
 
   if (!commentResult.ok) {
