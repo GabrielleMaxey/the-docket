@@ -15,8 +15,10 @@ describe("issueMetadataImport", () => {
     assert.equal(parseImportPriority("PRIORITY P4"), 4);
     assert.equal(parseImportPriority("1 - Critical"), 1);
     assert.equal(parseImportPriority("1.0"), 1);
-    assert.equal(parseImportPriority("13"), 10);
-    assert.equal(parseImportPriority("P12"), 10);
+    assert.equal(parseImportPriority("13"), 13);
+    assert.equal(parseImportPriority("P12"), 12);
+    assert.equal(parseImportPriority("25"), 20);
+    assert.equal(parseImportPriority("P21"), 20);
     assert.equal(parseImportPriority("Completed"), null);
     assert.equal(parseImportPriority(""), null);
   });
@@ -82,23 +84,25 @@ describe("issueMetadataImport", () => {
     assert.equal(tab.rows[0].odi, "ODI-8");
   });
 
-  it("imports NORA sheet ranks including values above 10", () => {
+  it("imports NORA sheet ranks including values above 20", () => {
     const csv = [
       "Priority,ODI,Jira Type,Description,Developer,Jira Status,Notes",
       "1,ODI-25578,Feature,desc,Sid,Ready for Verification,",
       "13,ODI-25421,Feature,desc,BB,Backlog,",
+      "25,ODI-25499,Feature,desc,BB,Backlog,",
       ",ODI-25468,Feature,desc,,Backlog,",
       "Completed,,,,,,",
     ].join("\n");
     const parsed = parseIssueMetadataCsv(csv);
     assert.equal(parsed.ok, true);
     const plan = planIssueMetadataImport(parsed.rows, {});
-    assert.equal(plan.updatedPriorities, 2);
+    assert.equal(plan.updatedPriorities, 3);
     assert.equal(plan.skipped, 2);
     assert.equal(plan.errors.length, 0);
     const byKey = Object.fromEntries(plan.upserts.map((u) => [u.issueKey, u]));
     assert.equal(byKey["ODI-25578"].priority, 1);
-    assert.equal(byKey["ODI-25421"].priority, 10);
+    assert.equal(byKey["ODI-25421"].priority, 13);
+    assert.equal(byKey["ODI-25499"].priority, 20);
   });
 
   it("overwrites priority and fills empty notes only", () => {

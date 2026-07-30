@@ -153,14 +153,14 @@ const clampPriority = (value) => {
     return 0;
   }
 
-  return Math.min(10, Math.max(0, num));
+  return Math.min(20, Math.max(0, num));
 };
 
 const isClosedLikeStatus = (status) => /^(closed|resolved|done)$/i.test(String(status || ""));
 
 const priorityTierClass = (prefix, value) => {
   const clamped = clampPriority(value);
-  if (clamped < 1 || clamped > 10) {
+  if (clamped < 1 || clamped > 20) {
     return `${prefix}-neutral`;
   }
 
