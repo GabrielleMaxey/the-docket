@@ -1,8 +1,8 @@
 # Team priority sync (spec)
 
-Planned shared priority store for ODI program work (NORA, Ask Greg, etc.). **Status: design approved, not implemented.**
+Shared priority store for ODI program work (NORA, Ask Greg, etc.). **Status: design updated — target engine MySQL; not implemented.**
 
-**Related:** [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) (current local-only behavior), [ROADMAP-ODI-MIXED-TEAM.md](../ROADMAP-ODI-MIXED-TEAM.md), [pilot-presets.md](../pilot-presets.md).
+**Related:** [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) (current local-only behavior), [ROADMAP-ODI-MIXED-TEAM.md](../ROADMAP-ODI-MIXED-TEAM.md), [pilot-presets.md](../pilot-presets.md), [NORA spreadsheet import](../superpowers/specs/2026-07-29-nora-spreadsheet-priority-import-design.md) (local bootstrap until this ships).
 
 ---
 
@@ -10,26 +10,44 @@ Planned shared priority store for ODI program work (NORA, Ask Greg, etc.). **Sta
 
 - Share **issue key + priority + updated_at + updated_by** across the team for designated ODI programs.
 - Keep **notes**, dashboard snapshots, reports, and JQL prefs **local** (unchanged).
-- Allow **personal priority** in assignee-style Work Week views without writing to the team DB.
-- Team-owned **Postgres or MySQL** behind a **team API** (Task Manager proxy calls the API; laptops never connect to the DB directly).
+- Allow **personal priority** in assignee-style Work Week views without writing to the shared DB.
+- Prefer a **team-owned shared database** Task Manager can use; laptops never expose DB credentials to the browser.
 
 ---
 
-## Architecture
+## Deployment model (updated)
+
+A shared DB may already be available for this use case. Prefer the simpler path when we control (or are granted) that database.
+
+### Recommended: proxy → shared DB (direct)
 
 ```
 Work Week / Dashboard UI
         ↓
-jiraProxy.mjs  (TEAM_PRIORITY_API_URL + auth)
+jiraProxy.mjs  (TEAM_PRIORITY_DATABASE_URL + auth)
         ↓
-Team Priority API  (your team owns)
-        ↓
-Postgres or MySQL  (PROD only)
+Shared MySQL DB
 ```
+
+- Connection string and credentials live only in the **API process** `.env` (desktop or hosted proxy).
+- Schema migrations owned by Task Manager (or ops SQL scripts checked into repo). See **[team-priority-sync-mysql.sql](./team-priority-sync-mysql.sql)**.
+- No separate microservice required for v1.
+
+### Fallback: proxy → Team Priority API → DB
+
+Keep only if security/ops requires an existing API layer in front of the DB (no direct DB grant to the proxy).
+
+```
+jiraProxy.mjs  →  TEAM_PRIORITY_API_URL  →  Shared DB
+```
+
+**Decision 10 (new):** Default implementation is **direct DB from `jiraProxy`**. Introduce a standalone Team Priority API only if DB access cannot be granted to the proxy host.
 
 ---
 
 ## Team database tables
+
+**Engine: MySQL** (decision 12). DDL: [team-priority-sync-mysql.sql](./team-priority-sync-mysql.sql).
 
 ### `shared_program`
 
@@ -74,7 +92,7 @@ Who may create/update/delete programs and roots (**decision 8**: bootstrap via s
 | Column | Notes |
 |--------|-------|
 | `issue_key` | PK — task/story key, e.g. `ODI-25800` |
-| `priority` | 1–10 only (no row when unset) |
+| `priority` | **1–20** only (no row when unset). Aligns with Work Week / NORA import clamps. |
 | `updated_at` | UTC timestamp |
 | `updated_by` | Jira display name or accountId |
 
@@ -82,26 +100,27 @@ Who may create/update/delete programs and roots (**decision 8**: bootstrap via s
 
 ---
 
-## Team API contract
+## App API contract (jiraProxy)
 
-Auth: service key or internal token in proxy `.env` (**decision 7**: PROD URL/credentials only).
+Whether storage is direct DB or a remote API, the **browser** always talks to the local proxy:
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/team-priority/bulk` | Body `{ issueKeys: [] }` → `{ items: { "ODI-1": { priority, updatedAt, updatedBy } } }` |
-| PUT | `/team-priority/:issueKey` | Body `{ priority, updatedBy }` — upsert 1–10 or delete when priority is 0 |
-| POST | `/shared-programs` | Admin only — create program + roots |
-| PUT | `/shared-programs/:id` | Admin only |
-| GET | `/team-priority/health` | Optional health for proxy banner |
+| POST | `/api/team-priority/bulk` | Body `{ issueKeys: [] }` → `{ items: { "ODI-1": { priority, updatedAt, updatedBy } } }` |
+| PUT | `/api/team-priority/:issueKey` | Body `{ priority }` — upsert **1–20** or delete when priority is 0 |
+| GET | `/api/shared-programs` | List enabled programs (for slot picker) |
+| POST | `/api/shared-programs` | Admin only — create program + roots |
+| PUT | `/api/shared-programs/:id` | Admin only |
+| GET | `/api/team-priority/health` | Optional health for offline banner |
 
 **Write validation (every PUT):**
 
-1. Caller authenticated (proxy service + optional user identity for audit).
+1. Caller authenticated (proxy session / service + Jira identity for audit).
 2. Resolve issue → walk Jira parent chain to root epic(s).
 3. Root epic must match an **enabled** `shared_program_root` row → else **403**.
 4. Issue **Closed/Resolved** in Jira → **403** or read-only reject (**decision 6**).
 5. `updated_by` set **server-side** from Jira `myself` (do not trust client spoofing).
-6. Priority `0` → DELETE row; 1–10 → upsert.
+6. Priority `0` → DELETE row; **1–20** → upsert.
 
 Bulk read: chunk large key lists (e.g. 200 per request). Index: PK on `issue_key`.
 
@@ -109,53 +128,54 @@ Bulk read: chunk large key lists (e.g. 200 per request). Index: PK on `issue_key
 
 ## Task Manager integration
 
-### Proxy routes (planned)
+### Env (PROD / shared-DB hosts)
 
-Thin pass-through to team API:
+**Direct DB (recommended):**
 
-- `POST /api/team-priority/bulk`
-- `PUT /api/team-priority/:issueKey`
+```bash
+TEAM_PRIORITY_DATABASE_URL=mysql://user:pass@host:3306/task_manager_team
+TEAM_PRIORITY_CACHE_TTL_MINUTES=60
+```
 
-`.env` (PROD only):
+(Driver may also accept discrete `TEAM_PRIORITY_DB_HOST` / `USER` / `PASSWORD` / `DATABASE` if a URL is awkward with special characters.)
+**Remote API fallback (only if needed):**
 
 ```bash
 TEAM_PRIORITY_API_URL=https://...
 TEAM_PRIORITY_API_KEY=...
-TEAM_PRIORITY_CACHE_TTL_MINUTES=60   # local cache TTL
+TEAM_PRIORITY_CACHE_TTL_MINUTES=60
 ```
+
+Unset both → team priority features stay off; local `issue_metadata` + CSV import continue as today (no comment-based priority).
 
 ### Slot priority mode
 
 **Rule: mark shared programs explicitly (positive allowlist).** Default for every Work Week JQL slot is **local / personal** priority. **Team** priority applies only when a slot is explicitly linked to a shared program.
 
-Do **not** infer team mode from JQL shape (e.g. “not assignee ⇒ team”) or from whether returned issues happen to fall under a shared epic root. **Slot linkage decides mode;** epic-root validation on the team API is a write-time safety net only.
+Do **not** infer team mode from JQL shape (e.g. “not assignee ⇒ team”) or from whether returned issues happen to fall under a shared epic root. **Slot linkage decides mode;** epic-root validation on writes is a safety net only.
 
 #### Mode summary
 
 | Mode | Slot configuration | Read | Write |
 |------|-------------------|------|-------|
-| **Local (default)** | No shared program linked | `issue_metadata.priority` | Local SQLite only — **never** team API |
-| **Team** | Slot linked to a `shared_program` (NORA, Ask Greg, …) | Team API (+ local cache, TTL) | Team API (when issue passes epic-root check) |
+| **Local (default)** | No shared program linked | `issue_metadata.priority` | Local SQLite only — **never** shared DB |
+| **Team** | Slot linked to a `shared_program` (NORA, Ask Greg, …) | Shared DB (+ local cache, TTL) | Shared DB (when issue passes epic-root check) |
 
-**Local mode includes all of the following** — no special casing beyond “slot not linked to a shared program”:
-
-- Assignee-style JQL (`assignee = currentUser()`, “Dev Team”, etc.)
-- Custom JQL for other ODI work the IC owns (project slices, labels, parents, one-off filters)
-- Any ad-hoc query that is **not** tied to a designated shared program
+**Local mode includes** assignee-style JQL, custom ODI slices, and any ad-hoc query **not** tied to a designated shared program.
 
 **Team mode applies when:**
 
-- Work Week slot has `sharedProgramId` (or slug) set to an enabled program, typically via quick-pick from a preset flagged as shared, or a “Shared program” dropdown in JQL controls
-- Dashboard drill-down / navigation from shared preset context (always team for priority in that flow)
+- Work Week slot has `sharedProgramId` (or slug) set to an enabled program
+- Dashboard drill-down / navigation from shared preset context (team priority in that flow)
 
-On **Run JQL** in local-mode slots: **skip** team bulk fetch entirely (no API call, no cache update for that run).
+On **Run JQL** in local-mode slots: **skip** team bulk fetch entirely.
 
 #### Overlap with shared programs (same issue, two slots)
 
-An issue may appear in both a **local** slot and a **team** slot (e.g. NORA ticket in “my assigned tasks” and in the NORA program slot). Modes are **per slot**, not per issue:
+Modes are **per slot**, not per issue:
 
-- **Local slot:** read/write `issue_metadata.priority` only; never push to team DB; do not display team DB values in that slot.
-- **Team slot:** read/write team DB; do not copy team values into `issue_metadata.priority` on write.
+- **Local slot:** read/write `issue_metadata.priority` only; never push to shared DB.
+- **Team slot:** read/write shared DB; do not copy team values into `issue_metadata.priority` on write.
 
 **Example:** `ODI-25789` under NORA. IC sets **P3** in slot 1 (My tasks, local). PM sets **P1** in slot 3 (NORA, team). IC still sees **P3** in slot 1 and **P1** in slot 3.
 
@@ -172,39 +192,19 @@ Extend `workWeekTasksJiraPreferences` (localStorage) per JQL slot:
 }
 ```
 
-`sharedProgramId: null` → local mode (default for new slots). Values match `shared_program.slug` from the team DB / synced config.
-
-Optional: link `epic_presets` rows to `shared_program` in Settings so quick-pick auto-fills `sharedProgramId` when user selects NORA or Ask Greg.
-
-#### Proxy / client contract
-
-Team PUT and bulk requests include **`teamContext: true`** only from team-mode slots. Proxy rejects or ignores team writes without that flag. Never infer team context from epic scope on the client alone.
+Optional: link `epic_presets` rows to `shared_program` in Settings so quick-pick auto-fills `sharedProgramId`.
 
 #### UI
 
 - Local slots: priority column labeled **Personal** (or neutral default).
-- Team slots: **Team** label; show `updated_by` / updated time from team DB when available.
+- Team slots: **Team** label; show `updated_by` / updated time when available.
 - JQL controls: optional “Shared program” selector per slot (default **None**).
 
-### Two priority modes (**decision 4**)
+### Jira comments (**decision 5**)
 
-See **Slot priority mode** above. Short form:
+`PRIORITY P#` comment parsing has been **removed** entirely (not only for team-mode slots). Shared DB (Atlas demo / future MySQL) and CSV import are the team ranking paths. Notes may still be pulled from the latest Jira comment when that preference is on.
 
-| Mode | When | Read | Write |
-|------|------|------|-------|
-| **Team** | Slot linked to shared program (or Dashboard shared context) | Team API | Team API |
-| **Local** | All other Work Week slots (assignee, custom ODI JQL, etc.) | `issue_metadata.priority` | Local SQLite only |
-
-Notes remain local in all modes.
-
-### Display source (**decision 4**)
-
-- **Team slot / Dashboard shared context:** team DB is the display source for priority.
-- **Local slot:** `issue_metadata.priority` only — do not merge or display team DB values in that slot.
-
-### `PRIORITY P#` Jira comments (**decision 5**)
-
-Once team DB is live, **disable** `parsePriorityFromComment` / Jira badge flow for team-scoped work. Team DB replaces the comment convention.
+CSV import (Settings → Import team priorities) remains useful as **bootstrap / migration** into the shared store (or local-only until team mode is enabled).
 
 ### Closed issues (**decision 6**)
 
@@ -214,7 +214,7 @@ Team priority column **read-only** when Jira status is Closed/Resolved (match ex
 
 ## Failure modes (**decision 3**)
 
-When team API is **unavailable** on Run JQL:
+When shared DB / team API is **unavailable** on Run JQL:
 
 1. Show **banner**: team priority unavailable; showing cached or local data.
 2. **Read:** use last successful bulk response from local SQLite cache if within TTL; else personal/local only where applicable.
@@ -243,38 +243,58 @@ Refresh `fetched_at` on each successful bulk fetch. Expire rows older than `TEAM
 |---|--------|----------|
 | 1 | Scope validation | **Epic roots only** (`shared_program_root`) |
 | 2 | Priority 0 | **Delete row** |
-| 3 | Team API down | Local fallback + **banner**; **cache** last bulk response in SQLite with **TTL** |
-| 4 | Display / write | **Positive allowlist:** team DB only in slots **linked to a shared program** (or Dashboard shared context). **All other slots default local** — assignee JQL, custom ODI project JQL, etc. Same issue can differ by slot; local writes never push to team DB |
-| 9 | Slot mode detection | **Mark shared programs on the slot** (`sharedProgramId`), not “mark assignee only”. Default `null` = local |
-| 5 | `PRIORITY P#` | **Ignored** once team DB is live |
+| 3 | Shared DB / API down | Local fallback + **banner**; **cache** last bulk response in SQLite with **TTL** |
+| 4 | Display / write | **Positive allowlist:** shared DB only in slots **linked to a shared program** (or Dashboard shared context). All other slots stay local |
+| 5 | `PRIORITY P#` | **Removed** — priority is not parsed from Jira comments |
 | 6 | Closed issues | Team priority **read-only** |
-| 7 | Environments | **PROD only** for team DB URL/credentials |
+| 7 | Environments | Shared DB URL/credentials **PROD / designated hosts only** (not committed) |
 | 8 | First admins | **`shared_program_admin` seed SQL** |
+| 9 | Slot mode detection | **`sharedProgramId` on the slot**; default `null` = local |
+| 10 | Access path | **Prefer proxy → shared DB direct**; separate Team Priority API only if DB grant is impossible |
+| 11 | Priority range | **1–20** (match Work Week UI and NORA CSV import clamp) |
+| 12 | Database engine | **MySQL** (production target) |
+| 13 | Demo store | **MongoDB Atlas** behind `TEAM_PRIORITY_MONGODB_URI` (see [Atlas demo design](../superpowers/specs/2026-07-29-atlas-team-priority-demo-design.md)) |
+
+---
+
+## Open questions (for the available DB)
+
+Confirm with whoever owns the MySQL instance before implementation:
+
+- [x] Engine: **MySQL**
+- [ ] Can `jiraProxy` receive a connection string, or must traffic go through an existing API?
+- [ ] New schema / tables allowed, or must we map onto existing tables?
+- [ ] Network reachability from developer machines vs only a hosted proxy
+- [ ] Who runs migrations and seeds (app on boot vs ops SQL)
 
 ---
 
 ## Open implementation tasks
 
-- [ ] Team API + PROD schema migration
-- [ ] Seed SQL: programs, roots, admins
-- [ ] Proxy pass-through routes + env vars
+- [ ] Confirm DB access model (decision 10) and connection env
+- [ ] Schema migration + seed: programs, roots, admins
+- [ ] Proxy data access layer (direct DB **or** HTTP client to team API)
+- [ ] Proxy routes: bulk, put, shared-programs list, health
 - [ ] `jiraClient.js` bulk + put wrappers
-- [ ] Epic-root validation service (Jira parent walk — reuse dashboard patterns)
-- [ ] Work Week: per-slot `sharedProgramId` in preferences + “Shared program” UI; branch read/write on slot mode
+- [ ] Epic-root validation (Jira parent walk — reuse dashboard patterns)
+- [ ] Work Week: per-slot `sharedProgramId` + “Shared program” UI; branch read/write on slot mode
 - [ ] Skip team bulk fetch when all active slots are local mode
 - [ ] `team_priority_cache` + TTL in `schema.mjs`
 - [ ] UI: Team vs Personal labels; offline banner
-- [ ] Remove/disable `priorityFromComment` when feature flag on
+- [x] Remove `priorityFromComment` / Jira priority badge (done)
+- [ ] Optional: one-time CSV / NORA import into shared DB for bootstrap
 - [ ] Update END_USER_GUIDE shared-priority section after ship
 
 ---
 
 ## Migration / pilot
 
-1. Deploy team API + seed NORA + Ask Greg roots + admins.
-2. Task Manager **read-only** team bulk fetch + cache.
-3. Enable team writes in shared context only.
-4. Pilot with ODI team; confirm personal assignee slots do not leak writes.
-5. Turn off `PRIORITY P#` parsing (feature flag).
+1. Provision or reuse shared DB; apply schema + seed NORA + Ask Greg roots + admins.
+2. Wire proxy with `TEAM_PRIORITY_DATABASE_URL` (or API fallback).
+3. Task Manager **read-only** team bulk fetch + cache.
+4. Enable team writes in shared-program slots only.
+5. Optional: import current NORA CSV rankings into `team_issue_priority` once.
+6. Pilot with ODI team; confirm personal assignee slots do not leak writes.
+7. Comment-based priority parsing already removed — no feature flag needed.
 
-No backfill requirement documented — team DB starts fresh unless ops runs a one-time import.
+No mandatory backfill — shared DB can start empty unless ops/CSV import seeds it.

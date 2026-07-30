@@ -24,6 +24,7 @@ import {
   NOTE_IMAGE_TOO_MANY_MESSAGE,
   isAllowedNoteImageMime,
 } from "../../shared/noteImageLimits.mjs";
+import { clampIssuePriority } from "../../shared/issuePriority.mjs";
 const log = createLogger("metadata");
 
 const uploadNoteImages = multer({
@@ -79,15 +80,6 @@ export const registerIssueMetadataRoutes = (
       keep_note_images = excluded.keep_note_images,
       updated_at = CURRENT_TIMESTAMP
   `);
-
-  const clampDbPriority = (value) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-      return 0;
-    }
-
-    return Math.max(0, Math.min(20, Math.round(numeric)));
-  };
 
   const isUnassignAssigneeRequest = (value) => {
     const normalized = String(value || "").trim().toLowerCase();
@@ -360,7 +352,7 @@ export const registerIssueMetadataRoutes = (
       const keepNoteImages = Boolean(row.keep_note_images);
       acc[row.issue_key] = {
         note: String(row.note || ""),
-        priority: clampDbPriority(row.priority),
+        priority: clampIssuePriority(row.priority),
         keepNoteImages,
         images: keepNoteImages ? listNoteImages(db, row.issue_key) : [],
       };
@@ -401,7 +393,7 @@ export const registerIssueMetadataRoutes = (
         for (const row of existingRows) {
           existingByKey[row.issue_key] = {
             note: String(row.note || ""),
-            priority: clampDbPriority(row.priority),
+            priority: clampIssuePriority(row.priority),
           };
         }
       }
@@ -526,8 +518,8 @@ export const registerIssueMetadataRoutes = (
 
     const nextNote = hasNote ? String(req.body.note) : String(current.note || "");
     const nextPriority = hasPriority
-      ? clampDbPriority(req.body.priority)
-      : clampDbPriority(current.priority);
+      ? clampIssuePriority(req.body.priority)
+      : clampIssuePriority(current.priority);
 
     upsertIssueMetadataStmt.run({
       issueKey,

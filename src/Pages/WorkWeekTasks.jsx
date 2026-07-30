@@ -17,6 +17,7 @@ import { useCalendarData } from "./hooks/useCalendarData";
 import { useWorkWeekHeaderPreferences } from "./hooks/useWorkWeekHeaderPreferences";
 import { useUpcomingDueBanner } from "./hooks/useUpcomingDueBanner";
 import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.js";
+import { fetchSharedPrograms } from "../services/jiraClient.js";
 import { isDrillDownDismissed } from "../utils/jqlRunPersistence.js";
 import { resolveCreateIssueDefaults } from "../../shared/createIssuePresetUtils.mjs";
 import { isConfiguredJqlRun, normalizeJqlCount, WORK_WEEK_STORAGE_KEYS } from "../utils/workWeekStorage.js";
@@ -82,7 +83,7 @@ const WorkWeekTasks = () => {
   );
 
   const {
-    jqlCount, jqlInputs, jqlLabels, jqlLoading, jqlRuns,
+    jqlCount, jqlInputs, jqlLabels, jqlSharedProgramIds, jqlLoading, jqlRuns,
     showRestoredJqlBanner, jqlError, jqlMaxResults, pullLatestComment, assigneeRefreshNotice,
     jiraNotes, jiraRowPriorities, prioritySourceByKey, selectedForPush,
     lastPushedJiraNoteByKey, pushState, saveState,
@@ -91,7 +92,7 @@ const WorkWeekTasks = () => {
     isClosedLikeStatus, clampPriority, getPriorityClass,
     getPriorityRowClass, formatDate, filtersLoading,
     setJqlCount, setJqlMaxResults, setPullLatestComment,
-    handleJqlChange, handleJqlLabelChange,
+    handleJqlChange, handleJqlLabelChange, handleJqlSharedProgramChange,
     handleResetSavedQueries, handleRunJql, handleLoadRemainingJql, handleDrillDownToKey, handleDrillDownToAssignee, clearDrillDownRun, handlePushSelected,
     handleSaveMetadata, handleSelectAll, handleStatusDraftChange,
     handleStatusUpdate, handleAssigneeDraftChange, handleAssigneeUpdate,
@@ -99,6 +100,26 @@ const WorkWeekTasks = () => {
     handleKeepNoteImagesToggle,
     handleSelectForPush, handlePushNote,
   } = useTaskManagerJira();
+
+  const [sharedPrograms, setSharedPrograms] = React.useState([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetchSharedPrograms()
+      .then((items) => {
+        if (!cancelled) {
+          setSharedPrograms(Array.isArray(items) ? items : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSharedPrograms([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [activeRunIndex, setActiveRunIndex] = React.useState(0);
 
@@ -351,9 +372,12 @@ const WorkWeekTasks = () => {
             jqlCount={jqlCount}
             jqlInputs={jqlInputs}
             jqlLabels={jqlLabels}
+            jqlSharedProgramIds={jqlSharedProgramIds}
+            sharedPrograms={sharedPrograms}
             onJqlCountChange={handleJqlCountChange}
             onJqlChange={handleJqlChange}
             onJqlLabelChange={handleJqlLabelChange}
+            onJqlSharedProgramChange={handleJqlSharedProgramChange}
             quickPickValueBySlot={quickPickValueBySlot}
             onQuickPickSelect={handleQuickPickSelect}
             onImportSlot={setImportSlotIndex}
@@ -437,6 +461,7 @@ const WorkWeekTasks = () => {
           handleKeepNoteImagesToggle={handleKeepNoteImagesToggle}
           handleSelectForPush={handleSelectForPush} handlePushNote={handlePushNote}
           onActiveTabChange={setActiveRunIndex}
+          jqlSharedProgramIds={jqlSharedProgramIds}
           onLoadRemaining={handleLoadRemainingJql}
           onClearDrillDownRun={handleClearDrillDownRun}
           onClearDrillDownFilter={hasDrillDownFilter ? handleClearDrillDownFilter : null}

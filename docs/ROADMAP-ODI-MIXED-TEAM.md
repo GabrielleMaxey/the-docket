@@ -13,24 +13,43 @@ Short product roadmap for teams with **individual contributors (ICs)**, **PMs**,
 | Role | Primary pages | Job to be done |
 |------|----------------|----------------|
 | **IC** | Work Week | Run JQL, update status/assignee, read PM priority, execute |
-| **PM** | Dashboard + Work Week | Refresh epic health, set team priority via Jira comments, watch contributors |
+| **PM** | Dashboard + Work Week | Refresh epic health, set team priority on shared-program slots, watch contributors |
 | **Manager** | Dashboard + Chat + reports | Executive/PO summaries, overdue/upcoming risk, briefings without deep Jira digging |
 
-**Shared rule today:** PMs and managers push Jira comments starting with **`PRIORITY P#`** (e.g. `PRIORITY P2 — blocked on vendor`). ICs read Jira and match the local **Priority** dropdown (optionally use **Pull most recent Jira comment** on Run JQL). See [END_USER_GUIDE.md § Shared projects](./END_USER_GUIDE.md#shared-projects--notes-and-priority-pms-and-managers).
+**Shared priority today:**
+
+1. **Local SQLite** — each laptop stores P1–P20 in `issue_metadata` (personal slots).
+2. **Atlas demo** — slots linked to a shared program read/write MongoDB Atlas (`TEAM_PRIORITY_MONGODB_URI`).
+3. **NORA CSV import** — Settings → Import team priorities (local and/or Atlas seed).
+
+Jira `PRIORITY P#` comment parsing was removed. **Target:** Shared MySQL for designated programs. Spec → [specs/team-priority-sync.md](./specs/team-priority-sync.md).
 
 ---
 
-## Top 5 build priorities
+## Top build priorities
 
 ### Step 1 — Auto-apply `PRIORITY P#` from Jira comments
 
 | | |
 |--|--|
 | **Effort** | Large |
-| **Who benefits** | PM, Manager, IC |
-| **Problem** | Leaders set priority in Jira; ICs still copy comments into local P1–P10 by hand. Breaks down on busy ODI boards. |
-| **Build** | On **Run JQL** (and refresh), parse the latest issue comment for `PRIORITY P1` … `P10`; set row priority and optional note snippet. Show source: “From Jira comment” vs “Local only”. Keep **Push note** flow for PMs unchanged. |
-| **Success** | IC opens Work Week after PM updates; priority column reflects team ranking without manual sync. |
+| **Status** | **Retired** — comment parsing removed; use shared-program slots + CSV/Atlas instead |
+| **Who benefits** | — |
+| **Problem** | Was interim until shared DB. |
+| **Build** | Removed `shared/priorityFromComment.mjs` and Jira badge flow. |
+| **Next** | Step 6 (MySQL) replaces Atlas demo for production. |
+
+---
+
+### Step 6 — Shared DB for group / program priorities
+
+| | |
+|--|--|
+| **Effort** | Large |
+| **Who benefits** | PM, Manager, IC on NORA / Ask Greg / other designated programs |
+| **Problem** | Priorities stay per-laptop (SQLite + comments + CSV). No live team ranking across machines. |
+| **Build** | Use team **MySQL** (preferred: `jiraProxy` connects directly). Tables for programs, epic roots, and `team_issue_priority` (P1–P20). Work Week slots opt into a **shared program**; other slots stay personal. Local SQLite cache + banner when DB is down. CSV import optional bootstrap. Full plan: [specs/team-priority-sync.md](./specs/team-priority-sync.md). |
+| **Success** | PM sets P3 on NORA in team slot; IC on another machine sees P3 after Run JQL — without comments or re-importing CSV. |
 
 ---
 
@@ -87,8 +106,8 @@ Short product roadmap for teams with **individual contributors (ICs)**, **PMs**,
 ## Adopt now (no code)
 
 1. **PM-owned preset list** — one set of ODI epic keys and JQL slots in Settings (program, my work, blocked, etc.).
-2. **Comment template** — `PRIORITY P# — {reason} — target {date}` for all team ranking updates.
-3. **Weekly rhythm** — PM **Refresh status** Monday; ICs **Run JQL** Monday (pull latest comment when syncing PM priority); Manager runs **Executive Summary** from the same snapshot before staff meeting.
+2. **Shared-program slots** — link NORA / Ask Greg Work Week slots to a shared program; change priority in-app (Atlas demo).
+3. **Weekly rhythm** — PM **Refresh status** Monday; ICs **Run JQL** on shared-program slots; Manager runs **Executive Summary** from the same snapshot before staff meeting.
 4. **Chat** — refresh Dashboard, then ask scoped questions (“what’s overdue across selected epics?”).
 5. **Stakeholders** — copy report markdown to Confluence/email for people who do not run the app.
 
@@ -98,21 +117,23 @@ Short product roadmap for teams with **individual contributors (ICs)**, **PMs**,
 
 | Phase | Focus | Outcome |
 |-------|--------|---------|
-| **Now** | Presets + `PRIORITY P#` SOP | Shared language for ODI priority |
-| **Phase 1** | Step 1 — parse priority from comments | ICs see PM ranking automatically |
+| **Retired** | Step 1 — parse priority from comments | Replaced by shared-program slots |
 | **Complete** | Step 2 — full JQL pagination | Table matches Jira at scale |
 | **Complete** | Step 3 — Dashboard drill-down | Leaders drive ICs from metrics |
-| **Next** | Steps 4–5 — team pack + digest | Faster onboarding and manager briefings |
+| **Shipped (bridge)** | NORA CSV priority import | Seed local / Atlas priorities from Excel |
+| **Demo** | Atlas team priority | Multi-machine ranking for linked slots |
+| **Next** | **Step 6 — shared DB (MySQL)** | Production multi-user ranking for designated programs |
+| **Also next** | Steps 4–5 — team pack + digest | Faster onboarding and manager briefings |
 
 ---
 
-## Second wave (after steps 1–5)
+## Second wave (after shared DB + steps 4–5)
 
 | Item | Effort | Note |
 |------|--------|------|
 | Due date column on Work Week table | Small | Align table with Dashboard due logic |
 | Bulk status/assignee on selected rows | Medium | PM backlog cleanup |
-| Map priority to Jira custom field (if ODI has one) | Medium | Long-term alternative to comment parsing |
+| Map priority to Jira custom field (if ODI has one) | Medium | Optional alternative once shared DB is stable |
 | Scheduled Dashboard refresh | Small | Reduces stale snapshots |
 | Outlook read-only in week planner | Large | IC planning; lower priority for ODI prioritization |
 
