@@ -86,7 +86,7 @@ export const registerIssueMetadataRoutes = (
       return 0;
     }
 
-    return Math.max(0, Math.min(10, Math.round(numeric)));
+    return Math.max(0, Math.min(20, Math.round(numeric)));
   };
 
   const isUnassignAssigneeRequest = (value) => {
