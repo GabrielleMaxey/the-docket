@@ -26,6 +26,7 @@ describe("issue metadata image routes", () => {
       noteImagesDir: baseDir,
       jiraRequest: async () => ({ ok: true, status: 201, data: {} }),
       jiraMultipartRequest: async () => ({ ok: true, status: 201, data: {} }),
+      resolveJiraAttachmentMediaId: async () => "6e7c7f2c-dd7a-499c-bceb-6f32bfbf32b5",
       ensureEnvOrRespond: () => true,
       resolveJiraUser: async () => ({}),
     });

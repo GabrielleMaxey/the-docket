@@ -60,7 +60,7 @@ const handleNoteImageUploadError = (err, _req, res, next) => {
 
 export const registerIssueMetadataRoutes = (
   app,
-  { db, jiraRequest, jiraMultipartRequest, ensureEnvOrRespond, resolveJiraUser, noteImagesDir }
+  { db, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, noteImagesDir }
 ) => {
   const selectIssueMetadataStmt = db.prepare(
     "SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key = ?"
@@ -118,6 +118,7 @@ export const registerIssueMetadataRoutes = (
           })),
           jiraRequest,
           jiraMultipartRequest,
+          resolveAttachmentMediaId: resolveJiraAttachmentMediaId,
         });
 
         if (!result.ok) {
