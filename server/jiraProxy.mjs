@@ -304,14 +304,22 @@ registerChatRoutes(app, routeCtx);
 const distDir = path.resolve(projectRoot, "dist");
 if (fs.existsSync(distDir)) {
   app.use(express.static(distDir));
-  app.use((_req, res) => {
-    res.sendFile(path.join(distDir, "index.html"));
+  app.use((req, res) => {
+    // Never mask missing API routes with the SPA shell — that looks like an empty success to clients.
+    if (String(req.path || "").startsWith("/api/")) {
+      return res.status(404).json({
+        error: "API route not found",
+        path: req.path,
+        method: req.method,
+      });
+    }
+    return res.sendFile(path.join(distDir, "index.html"));
   });
 }
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   log.info(`Jira proxy listening on http://localhost:${port}`);
   log.info(`Database: ${dbPath}`);
   const missing = getMissingEnv();
@@ -320,4 +328,14 @@ app.listen(port, () => {
   } else {
     log.info(`Jira base URL: ${process.env.JIRA_BASE_URL}`);
   }
+});
+
+server.on("error", (error) => {
+  if (error && error.code === "EADDRINUSE") {
+    log.error(`Port ${port} is already in use. Stop the other process, then retry.`);
+    log.error(`Hint: lsof -nP -iTCP:${port} -sTCP:LISTEN`);
+    process.exit(1);
+  }
+  log.error("Server failed to start", error instanceof Error ? error.message : error);
+  process.exit(1);
 });
