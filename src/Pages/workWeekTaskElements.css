@@ -897,16 +897,18 @@
 }
 
 /* ── closed / resolved row highlight ── */
+/* Closed/done: warm stone + left bar so it does not collide with blue P11–P12 tints. */
 .work-week-page .ww-results-table tbody .ww-row-closed {
-  background-color: #dbeafe;
+  background-color: #f3eee6;
+  box-shadow: inset 4px 0 0 #78716c;
 }
 
 .work-week-page .ww-results-table tbody .ww-row-closed td {
-  color: #1e40af;
+  color: #57534e;
 }
 
-/* ── priority row tint (20-interval × 5pt scale; we use bands 96–100 … 51–55) ──
-   App P1 = highest = interval 96–100 (red). App P10 = lowest = 51–55 (green-cyan). */
+/* ── priority row tint (20-interval × 5pt scale; bands 96–100 … cooler for lower ranks) ──
+   App P1 = highest = red. App P20 = lowest = cool slate. */
 .work-week-page .ww-results-table tbody .ww-row-priority-0 {
   background-color: #ffffff;
 }
@@ -951,6 +953,46 @@
   background-color: #cffafe;
 }
 
+.work-week-page .ww-results-table tbody .ww-row-priority-11 {
+  background-color: #e0f2fe;
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-12 {
+  background-color: #dbeafe;
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-13 {
+  background-color: #e0e7ff;
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-14 {
+  background-color: #ede9fe;
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-15 {
+  background-color: #f3e8ff;
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-16 {
+  background-color: #fae8ff;
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-17 {
+  background-color: #fce7f3;
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-18 {
+  background-color: #f1f5f9;
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-19 {
+  background-color: #e2e8f0;
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-20 {
+  background-color: #cbd5e1;
+}
+
 .work-week-page .ww-results-table tbody .ww-row-priority-neutral {
   background-color: #f8fafc;
 }
@@ -965,6 +1007,16 @@
 .work-week-page .ww-results-table tbody .ww-row-priority-8 td,
 .work-week-page .ww-results-table tbody .ww-row-priority-9 td,
 .work-week-page .ww-results-table tbody .ww-row-priority-10 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-11 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-12 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-13 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-14 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-15 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-16 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-17 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-18 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-19 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-20 td,
 .work-week-page .ww-results-table tbody .ww-row-priority-neutral td {
   color: #1f2937;
   opacity: 1;
@@ -1315,7 +1367,7 @@
   font-weight: 300;
 }
 
-/* Priority select / P-badge: same interval map as row tints (P1 = 96–100 … P10 = 51–55). */
+/* Priority select / P-badge: same interval map as row tints (P1 highest … P20 lowest). */
 .work-week-page .ww-priority-1 {
   background: #fecaca;
   border-color: #b91c1c;
@@ -1364,6 +1416,56 @@
 .work-week-page .ww-priority-10 {
   background: #67e8f9;
   border-color: #0e7490;
+}
+
+.work-week-page .ww-priority-11 {
+  background: #7dd3fc;
+  border-color: #0284c7;
+}
+
+.work-week-page .ww-priority-12 {
+  background: #93c5fd;
+  border-color: #2563eb;
+}
+
+.work-week-page .ww-priority-13 {
+  background: #a5b4fc;
+  border-color: #4f46e5;
+}
+
+.work-week-page .ww-priority-14 {
+  background: #c4b5fd;
+  border-color: #7c3aed;
+}
+
+.work-week-page .ww-priority-15 {
+  background: #d8b4fe;
+  border-color: #9333ea;
+}
+
+.work-week-page .ww-priority-16 {
+  background: #f0abfc;
+  border-color: #c026d3;
+}
+
+.work-week-page .ww-priority-17 {
+  background: #f9a8d4;
+  border-color: #db2777;
+}
+
+.work-week-page .ww-priority-18 {
+  background: #e2e8f0;
+  border-color: #64748b;
+}
+
+.work-week-page .ww-priority-19 {
+  background: #cbd5e1;
+  border-color: #475569;
+}
+
+.work-week-page .ww-priority-20 {
+  background: #94a3b8;
+  border-color: #334155;
 }
 .work-week-page .ww-priority-neutral {
   background: #f8fafc;

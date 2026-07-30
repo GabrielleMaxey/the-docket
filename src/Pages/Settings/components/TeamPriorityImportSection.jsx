@@ -84,7 +84,7 @@ const TeamPriorityImportSection = () => {
               .join("; ")}.`
           : "";
         setLocalError(
-          `Import finished but no priorities were updated (skipped ${data.skipped || 0}). Blank Priority and “Completed” rows are skipped; ranks above 10 import as P10.${skipHints}`
+          `Import finished but no priorities were updated (skipped ${data.skipped || 0}). Blank Priority and “Completed” rows are skipped; ranks above 20 import as P20.${skipHints}`
         );
       }
     } catch (err) {

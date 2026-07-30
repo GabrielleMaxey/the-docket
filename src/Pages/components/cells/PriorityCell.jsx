@@ -26,7 +26,7 @@ const PriorityCell = ({
             onChange={(event) => onChange(issueKey, event.target.value)}
             title={sourceTitle}
           >
-            {Array.from({ length: 11 }).map((_, i) => (
+            {Array.from({ length: 21 }).map((_, i) => (
               <option key={"row-priority-" + issueKey + "-" + i} value={i}>
                 {"P" + i}
               </option>
