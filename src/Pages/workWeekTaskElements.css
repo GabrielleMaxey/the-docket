@@ -1742,6 +1742,26 @@
   border-radius: 5px;
 }
 
+.work-week-page .ww-note-file-chip {
+  display: flex;
+  gap: 0.35rem;
+  max-width: 14rem;
+  color: #334155;
+  font-size: 0.72rem;
+  text-decoration: none;
+}
+
+.work-week-page .ww-note-file-chip:hover {
+  text-decoration: underline;
+}
+
+.work-week-page .ww-note-file-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .work-week-page .ww-note-image-remove {
   position: absolute;
   top: -0.35rem;
