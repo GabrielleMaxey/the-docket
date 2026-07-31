@@ -31,7 +31,7 @@ const uploadNoteImages = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: NOTE_IMAGE_MAX_BYTES, files: NOTE_IMAGE_MAX_COUNT },
   fileFilter: (_req, file, cb) => {
-    if (!isAllowedNoteImageMime(file.mimetype)) {
+    if (!isAllowedNoteImageMime(file.mimetype, file.originalname)) {
       return cb(new Error(NOTE_IMAGE_BAD_MIME_MESSAGE));
     }
     cb(null, true);

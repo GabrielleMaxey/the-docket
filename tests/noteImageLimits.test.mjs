@@ -9,25 +9,70 @@ import {
 describe("validateNoteImageFile", () => {
   it("rejects when at max count", () => {
     const result = validateNoteImageFile(
-      { type: "image/png", size: 100 },
+      { type: "image/png", size: 100, name: "a.png" },
       NOTE_IMAGE_MAX_COUNT
+    );
+    assert.equal(result.ok, false);
+    assert.match(result.error, /up to 5 files/i);
+  });
+
+  it("rejects unsupported type", () => {
+    const result = validateNoteImageFile(
+      { type: "application/zip", size: 100, name: "a.zip" },
+      0
     );
     assert.equal(result.ok, false);
   });
 
-  it("rejects non-image mime", () => {
-    const result = validateNoteImageFile({ type: "application/pdf", size: 100 }, 0);
-    assert.equal(result.ok, false);
+  it("accepts png under size limit", () => {
+    const result = validateNoteImageFile(
+      { type: "image/png", size: 1024, name: "a.png" },
+      0
+    );
+    assert.equal(result.ok, true);
   });
 
-  it("accepts png under size limit", () => {
-    const result = validateNoteImageFile({ type: "image/png", size: 1024 }, 0);
+  it("accepts pdf by mime", () => {
+    const result = validateNoteImageFile(
+      { type: "application/pdf", size: 1024, name: "a.pdf" },
+      0
+    );
     assert.equal(result.ok, true);
+  });
+
+  it("accepts docx by extension when mime is octet-stream", () => {
+    const result = validateNoteImageFile(
+      {
+        type: "application/octet-stream",
+        size: 1024,
+        name: "spec.docx",
+      },
+      0
+    );
+    assert.equal(result.ok, true);
+  });
+
+  it("accepts csv and xlsx", () => {
+    assert.equal(
+      validateNoteImageFile({ type: "text/csv", size: 10, name: "a.csv" }, 0).ok,
+      true
+    );
+    assert.equal(
+      validateNoteImageFile(
+        {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          size: 10,
+          name: "a.xlsx",
+        },
+        0
+      ).ok,
+      true
+    );
   });
 });
 
 describe("partitionNoteImageFiles", () => {
-  const png = () => ({ type: "image/png", size: 100 });
+  const png = () => ({ type: "image/png", size: 100, name: "a.png" });
 
   it("caps sequential batches at max count", () => {
     let count = 0;
@@ -37,6 +82,6 @@ describe("partitionNoteImageFiles", () => {
 
     const second = partitionNoteImageFiles(count, [png(), png(), png()]);
     assert.equal(second.accepted.length, 2);
-    assert.equal(second.error, `You can add up to ${NOTE_IMAGE_MAX_COUNT} images.`);
+    assert.match(second.error, /up to 5 files/i);
   });
 });
