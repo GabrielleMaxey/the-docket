@@ -1,6 +1,7 @@
 import React from "react";
 
-const IMAGE_TYPES = "image/png,image/jpeg,image/gif,image/webp";
+const ACCEPT_TYPES =
+  "image/png,image/jpeg,image/gif,image/webp,text/plain,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/vnd.ms-excel,.txt,.pdf,.doc,.docx,.xlsx,.csv";
 
 const formatByteSize = (byteSize) => `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
 
@@ -50,29 +51,48 @@ const NoteImagesStrip = ({
     >
       {children}
       <div className="ww-note-images-list">
-        {(images || []).map((image) => (
-          <div className="ww-note-image-thumb" key={image.localId}>
-            <a href={image.previewUrl} target="_blank" rel="noreferrer" title={`Preview ${image.filename}`}>
-              <img src={image.previewUrl} alt={image.filename} />
-            </a>
-            <button
-              type="button"
-              className="ww-note-image-remove"
-              onClick={() => onRemove(image.localId)}
-              disabled={disabled}
-              aria-label={`Remove ${image.filename}`}
-            >
-              ×
-            </button>
-            <span>{formatByteSize(image.byteSize)}</span>
-          </div>
-        ))}
+        {(images || []).map((image) => {
+          const isImage = (image.mimeType || image.type || "").startsWith("image/");
+
+          return (
+            <div className="ww-note-image-thumb" key={image.localId}>
+              {isImage ? (
+                <>
+                  <a href={image.previewUrl} target="_blank" rel="noreferrer" title={`Preview ${image.filename}`}>
+                    <img src={image.previewUrl} alt={image.filename} />
+                  </a>
+                  <span>{formatByteSize(image.byteSize)}</span>
+                </>
+              ) : (
+                <a
+                  className="ww-note-file-chip"
+                  href={image.previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={image.filename}
+                >
+                  <span className="ww-note-file-chip-name">{image.filename}</span>
+                  <span>{formatByteSize(image.byteSize)}</span>
+                </a>
+              )}
+              <button
+                type="button"
+                className="ww-note-image-remove"
+                onClick={() => onRemove(image.localId)}
+                disabled={disabled}
+                aria-label={`Remove ${image.filename}`}
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
       </div>
       <input
         ref={fileInputRef}
         className="ww-note-image-input"
         type="file"
-        accept={IMAGE_TYPES}
+        accept={ACCEPT_TYPES}
         multiple
         onChange={handleFileChange}
         disabled={disabled}
@@ -83,7 +103,7 @@ const NoteImagesStrip = ({
         onClick={() => fileInputRef.current?.click()}
         disabled={disabled}
       >
-        Add image
+        Add file
       </button>
       {onKeepChange ? (
         <label className="ww-note-image-keep">

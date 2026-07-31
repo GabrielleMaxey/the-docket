@@ -140,7 +140,7 @@ This is the main screen for managing your open work.
 2. **Max results** — first page size per query. The app can load **all** matching issues (up to a safe cap) — see Results table below.
 3. **Notes on run** — choose how row notes are filled when you **Run JQL** or refresh:
    - **Keep local notes** (default) — notes come from your local database for issues in the result set.
-   - **Pull most recent Jira comment** — overwrites each row's **Notes** text with that issue's latest Jira comment. Attached images are not changed. Use **Clear** to reset to **Keep local notes**.
+   - **Pull most recent Jira comment** — overwrites each row's **Notes** text with that issue's latest Jira comment. Attached files are not changed. Use **Clear** to reset to **Keep local notes**.
 4. **Run JQL** — loads fresh results from Jira, merges local (or shared-program) priorities, and saves results locally. Shortcut: **Ctrl+Enter** (Windows/Linux) or **⌘+Enter** (Mac).
 5. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes or priorities in the local database, or header reminders.
 6. **Create Issue** — opens a modal to create a new Jira issue in ODI. See [Create Issue](#create-issue) below for parent selection and ODI rules. In short: pick a preset or parent, enter a title, then click **✦ AI Draft** (Lumen blue button next to the Description label) to generate a description and, for Stories, a suggested sub-task list:
@@ -225,9 +225,9 @@ Each row is one Jira issue. What you can do per row:
 | Change **assignee** in Jira | Type a **display name, email, or username** in the Assignee box — suggestions appear as you type from Jira user search and assignees already in the table. Press **Enter** or click **Update Assignee** |
 | Set personal **priority** (P1–P10) | Priority dropdown — P1 = most urgent, P10 = least. A **Jira** badge means priority was set from the latest comment on **Run JQL** |
 | Write a **note** (local) | Type in the Notes box — text saves automatically |
-| Add **images** to a note | **Add image** button, paste while the notes area is focused, or drag-and-drop onto the notes cell. Up to **5** images per note; **5 MB** each; PNG, JPEG, GIF, or WebP only |
-| **Keep on this machine** (images) | Optional checkbox below the notes box. Off by default — images stay until you **Push note** or close/refresh the tab. Turn on to keep draft images on this machine across reloads |
-| Push note to Jira as a **comment** | Check the row checkbox → **Push note** (or **Push Selected** for multiple). Sends note text and images inline in the Jira comment; local image copies are cleared after a successful push |
+| Add **files** to a note | **Add file** button, paste while the notes area is focused (images only), or drag-and-drop onto the notes cell. Up to **5** files per note; **5 MB** each — images (PNG, JPEG, GIF, WebP) plus TXT, PDF, DOC/DOCX, XLSX, and CSV |
+| **Keep on this machine** (attachments) | Optional checkbox below the notes box. Off by default — attachments stay until you **Push note** or close/refresh the tab. Turn on to keep draft files on this machine across reloads |
+| Push note to Jira as a **comment** | Check the row checkbox → **Push note** (or **Push Selected** for multiple). Sends note text and attachments inline in the Jira comment (same as images for documents); local copies are cleared after a successful push |
 | Filter visible rows | **Filter by key**, **Status**, or **Assignee** above the table; **Clear filters** resets all three |
 | Page through results | **First / Prev / Next / Last** below the table (30 rows per page) |
 | Load more issues | When the status line shows **Loaded X of Y** and Y is larger than X, click **Load remaining** |
@@ -418,9 +418,9 @@ Some teams used a shared Excel tracker so everyone sees the same ranking. In Tas
 | What | Shared across the team? |
 |------|-------------------------|
 | Status and assignee changes | Yes — in Jira |
-| Notes you **push** as Jira comments | Yes — visible on the issue in Jira (text and inline images) |
+| Notes you **push** as Jira comments | Yes — visible on the issue in Jira (text and inline attachments) |
 | Local **Notes** box (before push) | No — your machine only |
-| Note **images** (before push) | No — your machine only unless **Keep on this machine** is on |
+| Note **attachments** (before push) | No — your machine only unless **Keep on this machine** is on |
 | **Priority** on a personal Work Week slot | No — local SQLite on this machine |
 | **Priority** on a slot linked to a **Shared program** | Yes — Atlas demo today (Team badge); MySQL long-term |
 
@@ -463,11 +463,11 @@ PMs can keep rankings in the NORA spreadsheet and share a **CSV** export:
 | Desktop app credentials + DB (packaged) | `%APPDATA%\Task Manager\` (Windows) or `~/Library/Application Support/Task Manager/` (Mac) | No |
 | Header reminders | This browser only | No |
 | Issue notes + priorities (P1–P20) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL | No for personal slots — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) |
-| Note images (**Keep on this machine**) | Local file (`data/note-images/` + SQLite) | No — cleared after a successful **Push note** |
+| Note attachments (**Keep on this machine**) | Local file (`data/note-images/` + SQLite) | No — cleared after a successful **Push note** |
 | Epic/JQL preset team pack (export/import) | JSON file you save/share | No |
 | Dashboard metrics snapshot | Local file (`data/workweek.sqlite`) | No |
 | Status/assignee changes | Jira | Yes |
-| Notes you push as comments | Jira | Yes — text/images only; priority is not read from comments |
+| Notes you push as comments | Jira | Yes — text and attachments; priority is not read from comments |
 
 ---
 
@@ -492,7 +492,7 @@ Expected. Notes are stored in a local file on the machine you started the app on
 Link the Work Week slot to a **Shared program** so priority reads/writes the team store (Atlas demo today). Or **Settings → Import team priorities** from the NORA CSV (local or Atlas). See [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
 
 **The Push note button is greyed out**
-You've already pushed that exact note (text and images) as a comment. Edit the note or change attached images and the button will re-enable.
+You've already pushed that exact note (text and attachments) as a comment. Edit the note or change attached files and the button will re-enable.
 
 **Chat gave a generic answer about my report**
 Generate the report or week plan first on Work Week or Dashboard, then ask Chat in the same browser. Session context is stored locally when you click Generate — it is not sent to a third-party cloud beyond your configured LLM provider.

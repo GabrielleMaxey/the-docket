@@ -1,18 +1,56 @@
 export const NOTE_IMAGE_MAX_COUNT = 5;
 export const NOTE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
-const ALLOWED_NOTE_IMAGE_MIMES = new Set([
+const ALLOWED_MIMES = new Set([
   "image/png",
   "image/jpeg",
   "image/gif",
   "image/webp",
+  "text/plain",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+  "application/vnd.ms-excel",
 ]);
 
-export const isAllowedNoteImageMime = (mime) => ALLOWED_NOTE_IMAGE_MIMES.has(mime);
+const ALLOWED_EXTENSIONS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".txt",
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".xlsx",
+  ".csv",
+]);
 
-export const NOTE_IMAGE_TOO_MANY_MESSAGE = `You can add up to ${NOTE_IMAGE_MAX_COUNT} images.`;
-export const NOTE_IMAGE_BAD_MIME_MESSAGE = "Choose a PNG, JPEG, GIF, or WebP image.";
-export const NOTE_IMAGE_TOO_LARGE_MESSAGE = `Each image must be ${
+const fileExtension = (name) => {
+  const raw = String(name || "");
+  const idx = raw.lastIndexOf(".");
+  if (idx < 0) return "";
+  return raw.slice(idx).toLowerCase();
+};
+
+export const isAllowedNoteImageMime = (mime, filename = "") => {
+  const normalized = String(mime || "").trim().toLowerCase();
+  if (ALLOWED_MIMES.has(normalized)) {
+    return true;
+  }
+  if (!normalized || normalized === "application/octet-stream") {
+    return ALLOWED_EXTENSIONS.has(fileExtension(filename));
+  }
+  return false;
+};
+
+export const NOTE_IMAGE_TOO_MANY_MESSAGE = `You can add up to ${NOTE_IMAGE_MAX_COUNT} files.`;
+export const NOTE_IMAGE_BAD_MIME_MESSAGE =
+  "Choose a PNG, JPEG, GIF, WebP, TXT, PDF, DOC, DOCX, XLSX, or CSV file.";
+export const NOTE_IMAGE_TOO_LARGE_MESSAGE = `Each file must be ${
   NOTE_IMAGE_MAX_BYTES / (1024 * 1024)
 } MB or smaller.`;
 
@@ -21,7 +59,7 @@ export const validateNoteImageFile = (file, currentCount) => {
     return { ok: false, error: NOTE_IMAGE_TOO_MANY_MESSAGE };
   }
 
-  if (!isAllowedNoteImageMime(file?.type)) {
+  if (!isAllowedNoteImageMime(file?.type, file?.name || file?.originalname)) {
     return { ok: false, error: NOTE_IMAGE_BAD_MIME_MESSAGE };
   }
 
