@@ -1408,11 +1408,13 @@
   min-width: 90px;
 }
 
-/* Keep Summary a bit tighter and give Notes more room */
+/* Summary gets more room; Due/MRD are narrowed to make space (nowrap dates
+   won't truncate under table-layout: auto, so this only affects how spare
+   width is distributed, not legibility). */
 .work-week-page .ww-results-table th:nth-child(3),
 .work-week-page .ww-results-table td:nth-child(3) {
-  width: 22%;
-  max-width: 260px;
+  width: 28%;
+  max-width: 340px;
 }
 
 .work-week-page .ww-results-table th:nth-child(4),
@@ -1436,16 +1438,16 @@
 /* Due (task due date or inherited MRD) */
 .work-week-page .ww-results-table th:nth-child(7),
 .work-week-page .ww-results-table td:nth-child(7) {
-  width: 6%;
-  min-width: 85px;
+  width: 4%;
+  min-width: 70px;
   white-space: nowrap;
 }
 
 /* MRD (Most Recent Done Date) */
 .work-week-page .ww-results-table th:nth-child(8),
 .work-week-page .ww-results-table td:nth-child(8) {
-  width: 6%;
-  min-width: 85px;
+  width: 4%;
+  min-width: 70px;
   white-space: nowrap;
 }
 
