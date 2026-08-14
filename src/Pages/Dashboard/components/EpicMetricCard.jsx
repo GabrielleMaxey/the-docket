@@ -137,6 +137,7 @@ const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePas
             jiraBaseUrl={jiraBaseUrl}
             chartVariant={chartVariant}
             dueByDate={dueByDate}
+            epicPresetId={epic.epicPresetId}
             showOverdueList={includePastDue}
           />
         </>

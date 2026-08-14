@@ -1,4 +1,5 @@
 import {
+  fetchEpicPresetScopeJql,
   fetchIssueMetadataBulk,
   fetchJiraSearchAll,
   fetchLatestJiraCommentsBulk,
@@ -540,6 +541,7 @@ export async function loadDrillDownIssueByKey({
 
 export async function loadDrillDownIssuesByAssignee({
   assigneeName,
+  epicPresetId,
   jqlMaxResults = 200,
   pullLatestComment,
   clampPriority,
@@ -557,8 +559,10 @@ export async function loadDrillDownIssuesByAssignee({
   if (!assignee) {
     return false;
   }
+  const scopedPresetId = String(epicPresetId || "").trim();
+  const scopeSuffix = scopedPresetId ? `:${scopedPresetId}` : "";
 
-  if (isDrillDownDismissed(makeDrillDownId("assignee", assignee))) {
+  if (isDrillDownDismissed(makeDrillDownId("assignee", `${assignee}${scopeSuffix}`))) {
     return false;
   }
 
@@ -568,9 +572,30 @@ export async function loadDrillDownIssuesByAssignee({
   try {
     const isUnassigned =
       assignee.toLowerCase() === "unassigned" || assignee.toLowerCase() === "__unassigned__";
-    const jql = isUnassigned
-      ? `project = ${UNASSIGNED_DRILLDOWN_PROJECT_KEY} AND assignee is EMPTY ORDER BY updated DESC`
-      : `assignee = "${escapeJqlString(assignee)}" ORDER BY updated DESC`;
+
+    let jql;
+    if (isUnassigned && scopedPresetId) {
+      // Reuse the preset's own resolved scope (handles epic-key fallback,
+      // Jira filter lookup, and hand-authored JQL identically to how the
+      // Dashboard computed this card's own numbers) rather than
+      // reconstructing an approximation. Wrapped in parens because preset
+      // JQL can be an unparenthesized OR chain - concatenating a clause
+      // without wrapping would only scope the last OR-branch.
+      let scopeJql = "";
+      try {
+        scopeJql = await fetchEpicPresetScopeJql(scopedPresetId);
+      } catch {
+        scopeJql = "";
+      }
+      jql = scopeJql
+        ? `(${scopeJql}) AND assignee is EMPTY ORDER BY updated DESC`
+        : `project = ${UNASSIGNED_DRILLDOWN_PROJECT_KEY} AND assignee is EMPTY ORDER BY updated DESC`;
+    } else if (isUnassigned) {
+      jql = `project = ${UNASSIGNED_DRILLDOWN_PROJECT_KEY} AND assignee is EMPTY ORDER BY updated DESC`;
+    } else {
+      jql = `assignee = "${escapeJqlString(assignee)}" ORDER BY updated DESC`;
+    }
+
     const data = await fetchJiraSearchAll({ jql, maxTotal: jqlMaxResults });
     if (isStale()) {
       return false;
@@ -582,7 +607,9 @@ export async function loadDrillDownIssuesByAssignee({
     if (issues.length === 0) {
       setJqlError(
         isUnassigned
-          ? "No open unassigned issues found."
+          ? scopedPresetId
+            ? "No unassigned issues found in this project."
+            : "No unassigned issues found."
           : `No open issues found for assignee "${assignee}".`
       );
       return false;
@@ -590,7 +617,7 @@ export async function loadDrillDownIssuesByAssignee({
 
     const drillRun = {
       index: DRILL_DOWN_RUN_INDEX,
-      drillDownId: makeDrillDownId("assignee", assignee),
+      drillDownId: makeDrillDownId("assignee", `${assignee}${scopeSuffix}`),
       drillDownType: "assignee",
       drillDownValue: assignee,
       label: `Drill-down: ${assignee}`,
@@ -602,6 +629,7 @@ export async function loadDrillDownIssuesByAssignee({
       error: null,
       isDrillDown: true,
       drillDownAssignee: assignee,
+      drillDownEpicPresetId: scopedPresetId || null,
     };
 
     const enriched = await enrichRunWithParentDoneDates(drillRun, fieldMappingRows);

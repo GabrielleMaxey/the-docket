@@ -1,14 +1,18 @@
 /** Hash-router links from Dashboard (or elsewhere) into Work Week with table filters. */
-export const buildWorkWeekHref = ({ key, assignee } = {}) => {
+export const buildWorkWeekHref = ({ key, assignee, epicPresetId } = {}) => {
   const params = new URLSearchParams();
   const issueKey = String(key || "").trim();
   const assigneeName = String(assignee || "").trim();
+  const epicPresetIdValue = String(epicPresetId || "").trim();
 
   if (issueKey) {
     params.set("key", issueKey);
   }
   if (assigneeName) {
     params.set("assignee", assigneeName);
+  }
+  if (assigneeName && epicPresetIdValue) {
+    params.set("epicPresetId", epicPresetIdValue);
   }
 
   const query = params.toString();
