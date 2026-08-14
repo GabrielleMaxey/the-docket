@@ -259,6 +259,18 @@ const Dashboard = () => {
                   denominator={overallTotals.totalIssues}
                   tone="orange"
                 />
+                <OverallSummaryCard
+                  label="Tasks in backlog"
+                  description="Percentage of all tasks across selected projects that are in backlog."
+                  percent={
+                    overallTotals.totalIssues > 0
+                      ? (overallTotals.backlogIssues / overallTotals.totalIssues) * 100
+                      : 0
+                  }
+                  numerator={overallTotals.backlogIssues}
+                  denominator={overallTotals.totalIssues}
+                  tone="gray"
+                />
                 {overallTotals.epicCount > 0 ? (
                   <OverallSummaryCard
                     label="Projects complete"

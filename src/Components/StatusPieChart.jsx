@@ -164,7 +164,7 @@ const StatusBarChart = ({ statusCounts, className = "" }) => {
         <li className="dashboard-pie-legend-total">
           <span className="dashboard-pie-swatch dashboard-pie-swatch--empty" aria-hidden="true" />
           <span className="dashboard-pie-legend-label">Total</span>
-          <span className="dashboard-pie-legend-value">{total} (100%)</span>
+          <span className="dashboard-pie-legend-value">{total}</span>
         </li>
       </ul>
     </div>
@@ -233,7 +233,7 @@ const StatusPieChart = ({ statusCounts, size = 160, className = "", variant = "p
         <li className="dashboard-pie-legend-total">
           <span className="dashboard-pie-swatch dashboard-pie-swatch--empty" aria-hidden="true" />
           <span className="dashboard-pie-legend-label">Total</span>
-          <span className="dashboard-pie-legend-value">{total} (100%)</span>
+          <span className="dashboard-pie-legend-value">{total}</span>
         </li>
       </ul>
     </div>

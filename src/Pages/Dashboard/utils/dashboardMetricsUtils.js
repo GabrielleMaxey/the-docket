@@ -135,6 +135,7 @@ export const getWorkloadStatusCounts = (source) => {
   return {
     inProgress: sumStatusCount(openCounts, "in progress"),
     readyForVerification: sumStatusCount(openCounts, "ready for verification"),
+    backlog: sumStatusCount(openCounts, "backlog"),
   };
 };
 
