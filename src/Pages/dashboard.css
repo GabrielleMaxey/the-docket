@@ -40,33 +40,50 @@
 }
 
 .dashboard-page .dashboard-stat-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid #dde7e9;
+  border-left: 3px solid #0c93d9;
+  border-radius: 0;
   padding: 0.85rem 1rem;
-  background: #f8fafc;
-  text-align: center;
+  background: #ffffff;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(15, 49, 51, 0.05);
+}
+
+.dashboard-page .dashboard-stat-card--blue {
+  border-left-color: #0c93d9;
+}
+
+.dashboard-page .dashboard-stat-card--orange {
+  border-left-color: #FB9429;
+}
+
+.dashboard-page .dashboard-stat-card--teal {
+  border-left-color: #2AEDE5;
 }
 
 .dashboard-page .dashboard-stat-label {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #64748b;
+  color: #5f767a;
   margin-bottom: 0.35rem;
 }
 
 .dashboard-page .dashboard-stat-value {
-  font-size: 1.35rem;
+  font-size: 2.1rem;
   font-weight: 700;
-  color: #0f172a;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: #0F3133;
+  font-variant-numeric: tabular-nums;
 }
 
 .dashboard-page .dashboard-overall-progress {
   height: 6px;
   border-radius: 999px;
-  background: #e2e8f0;
+  background: #eaf0f2;
   overflow: hidden;
-  margin: 0.5rem 0 0.4rem;
+  margin: 0.6rem 0 0.4rem;
 }
 
 .dashboard-page .dashboard-overall-progress-fill {
@@ -76,13 +93,25 @@
   transition: width 0.4s ease;
 }
 
+.dashboard-page .dashboard-overall-progress-fill--blue {
+  background: linear-gradient(90deg, #2AEDE5, #0c93d9);
+}
+
+.dashboard-page .dashboard-overall-progress-fill--orange {
+  background: linear-gradient(90deg, #FDD219, #FB9429);
+}
+
+.dashboard-page .dashboard-overall-progress-fill--teal {
+  background: linear-gradient(90deg, #b6f5f2, #2AEDE5);
+}
+
 .dashboard-page .dashboard-overall-progress-fill--warning {
   background: linear-gradient(90deg, #FB9429, #F95E4A);
 }
 
 .dashboard-page .dashboard-stat-description {
   font-size: 0.78rem;
-  color: #64748b;
+  color: #5f767a;
   margin-top: 0.25rem;
   line-height: 1.4;
 }
@@ -90,21 +119,74 @@
 .dashboard-page .dashboard-stat-detail {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #0c93d9;
+  color: #42595d;
   margin-top: 0.3rem;
 }
 
 .dashboard-page .dashboard-stat-card--warning {
-  border-color: #fca5a5;
-  background: #fff7f7;
+  border-color: #f6cfc9;
+  border-left-color: #F95E4A;
+  background: #fef7f5;
 }
 
 .dashboard-page .dashboard-stat-card--warning .dashboard-stat-value {
-  color: #b91c1c;
+  color: #8c2f23;
 }
 
 .dashboard-page .dashboard-stat-card--warning .dashboard-stat-detail {
-  color: #b91c1c;
+  color: #8c2f23;
+}
+
+/* ── Overall status summary chips ── */
+
+.dashboard-page .dashboard-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0 0 0.5rem;
+}
+
+.dashboard-page .dashboard-summary-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  background: #eaf0f2;
+}
+
+.dashboard-page .dashboard-summary-chip-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #2f4a4e;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-page .dashboard-summary-chip-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #2f4a4e;
+}
+
+.dashboard-page .dashboard-summary-chip--overdue {
+  background: #fdecea;
+}
+
+.dashboard-page .dashboard-summary-chip--overdue .dashboard-summary-chip-value,
+.dashboard-page .dashboard-summary-chip--overdue .dashboard-summary-chip-label {
+  color: #8c2f23;
+}
+
+.dashboard-page .dashboard-summary-chip--resolved {
+  background: #e4f6fb;
+}
+
+.dashboard-page .dashboard-summary-chip--resolved .dashboard-summary-chip-value,
+.dashboard-page .dashboard-summary-chip--resolved .dashboard-summary-chip-label {
+  color: #06627a;
 }
 
 /* ── Epic project grid: stacked with clear card separation ── */
@@ -510,7 +592,7 @@
 
 .dashboard-page .dashboard-pie-chart--empty {
   font-size: 0.85rem;
-  color: #64748b;
+  color: #5f767a;
 }
 
 .dashboard-page .dashboard-pie-chart--compact {
@@ -540,13 +622,13 @@
   align-items: start;
   margin-bottom: 0.35rem;
   font-size: 0.82rem;
-  color: #334155;
+  color: #2f4a4e;
 }
 
 .dashboard-page .dashboard-pie-legend-total {
   margin-top: 0.35rem;
   padding-top: 0.35rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #dde7e9;
   font-weight: 600;
 }
 
@@ -570,7 +652,7 @@
 
 .dashboard-page .dashboard-pie-legend-value {
   font-variant-numeric: tabular-nums;
-  color: #0f172a;
+  color: #0F3133;
   white-space: nowrap;
   text-align: right;
   padding-left: 0.25rem;
