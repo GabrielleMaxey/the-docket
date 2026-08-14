@@ -907,119 +907,22 @@
   color: #57534e;
 }
 
-/* ── priority row tint (20-interval × 5pt scale; bands 96–100 … cooler for lower ranks) ──
-   App P1 = highest = red. App P20 = lowest = cool slate. */
-.work-week-page .ww-results-table tbody .ww-row-priority-0 {
-  background-color: #ffffff;
+/* ── row banding ──
+   Only unprioritised rows band. Any row carrying a priority tint is left
+   alone so the tint reads as its own value rather than two alternating ones.
+   Higher specificity than the priority rules in priorityScale.css, so the
+   :nth-child match wins for these two classes regardless of import order. */
+.work-week-page .ww-results-table tbody tr.ww-row-priority-0:nth-child(even),
+.work-week-page .ww-results-table tbody tr.ww-row-priority-neutral:nth-child(even) {
+  background-color: #fbfdfd;
 }
 
-.work-week-page .ww-results-table tbody .ww-row-priority-1 {
-  background-color: #fee2e2;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-2 {
-  background-color: #ffedd5;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-3 {
-  background-color: #fff7ed;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-4 {
-  background-color: #fef3c7;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-5 {
-  background-color: #fef9c3;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-6 {
-  background-color: #ecfccb;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-7 {
-  background-color: #dcfce7;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-8 {
-  background-color: #d1fae5;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-9 {
-  background-color: #ccfbf1;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-10 {
-  background-color: #cffafe;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-11 {
-  background-color: #e0f2fe;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-12 {
-  background-color: #dbeafe;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-13 {
-  background-color: #e0e7ff;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-14 {
-  background-color: #ede9fe;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-15 {
-  background-color: #f3e8ff;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-16 {
-  background-color: #fae8ff;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-17 {
-  background-color: #fce7f3;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-18 {
-  background-color: #f1f5f9;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-19 {
-  background-color: #e2e8f0;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-20 {
-  background-color: #cbd5e1;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-neutral {
-  background-color: #f8fafc;
-}
-
-.work-week-page .ww-results-table tbody .ww-row-priority-1 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-2 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-3 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-4 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-5 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-6 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-7 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-8 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-9 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-10 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-11 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-12 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-13 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-14 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-15 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-16 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-17 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-18 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-19 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-20 td,
-.work-week-page .ww-results-table tbody .ww-row-priority-neutral td {
-  color: #1f2937;
-  opacity: 1;
+/* ── row hover ──
+   outline, not box-shadow: .ww-row-closed uses box-shadow for its left bar,
+   and setting box-shadow here would erase that bar on hover. */
+.work-week-page .ww-results-table tbody tr:hover td {
+  outline: 1px solid #6bc2ec;
+  outline-offset: -1px;
 }
 
 /* ── full-width results section below the three-column grid ── */
@@ -1367,111 +1270,6 @@
   font-weight: 300;
 }
 
-/* Priority select / P-badge: same interval map as row tints (P1 highest … P20 lowest). */
-.work-week-page .ww-priority-1 {
-  background: #fecaca;
-  border-color: #b91c1c;
-}
-
-.work-week-page .ww-priority-2 {
-  background: #fed7aa;
-  border-color: #c2410c;
-}
-
-.work-week-page .ww-priority-3 {
-  background: #fdba74;
-  border-color: #ea580c;
-}
-
-.work-week-page .ww-priority-4 {
-  background: #fde68a;
-  border-color: #d97706;
-}
-
-.work-week-page .ww-priority-5 {
-  background: #fef08a;
-  border-color: #ca8a04;
-}
-
-.work-week-page .ww-priority-6 {
-  background: #d9f99d;
-  border-color: #65a30d;
-}
-
-.work-week-page .ww-priority-7 {
-  background: #bbf7d0;
-  border-color: #15803d;
-}
-
-.work-week-page .ww-priority-8 {
-  background: #6ee7b7;
-  border-color: #047857;
-}
-
-.work-week-page .ww-priority-9 {
-  background: #5eead4;
-  border-color: #0f766e;
-}
-
-.work-week-page .ww-priority-10 {
-  background: #67e8f9;
-  border-color: #0e7490;
-}
-
-.work-week-page .ww-priority-11 {
-  background: #7dd3fc;
-  border-color: #0284c7;
-}
-
-.work-week-page .ww-priority-12 {
-  background: #93c5fd;
-  border-color: #2563eb;
-}
-
-.work-week-page .ww-priority-13 {
-  background: #a5b4fc;
-  border-color: #4f46e5;
-}
-
-.work-week-page .ww-priority-14 {
-  background: #c4b5fd;
-  border-color: #7c3aed;
-}
-
-.work-week-page .ww-priority-15 {
-  background: #d8b4fe;
-  border-color: #9333ea;
-}
-
-.work-week-page .ww-priority-16 {
-  background: #f0abfc;
-  border-color: #c026d3;
-}
-
-.work-week-page .ww-priority-17 {
-  background: #f9a8d4;
-  border-color: #db2777;
-}
-
-.work-week-page .ww-priority-18 {
-  background: #e2e8f0;
-  border-color: #64748b;
-}
-
-.work-week-page .ww-priority-19 {
-  background: #cbd5e1;
-  border-color: #475569;
-}
-
-.work-week-page .ww-priority-20 {
-  background: #94a3b8;
-  border-color: #334155;
-}
-.work-week-page .ww-priority-neutral {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #334155;
-}
 
 .work-week-page .ww-edit-cell {
   display: flex;
