@@ -228,6 +228,15 @@
   color: #06627a;
 }
 
+.dashboard-page .dashboard-summary-chip--backlog {
+  background: #eaeeee;
+}
+
+.dashboard-page .dashboard-summary-chip--backlog .dashboard-summary-chip-value,
+.dashboard-page .dashboard-summary-chip--backlog .dashboard-summary-chip-label {
+  color: #42595d;
+}
+
 /* ── Epic project grid: stacked with clear card separation ── */
 
 .dashboard-page .dashboard-epic-grid {

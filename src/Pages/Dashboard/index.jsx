@@ -304,6 +304,10 @@ const Dashboard = () => {
                     <span className="dashboard-summary-chip-value">{overallTotals.resolvedIssues}</span>
                     <span className="dashboard-summary-chip-label">resolved</span>
                   </div>
+                  <div className="dashboard-summary-chip dashboard-summary-chip--backlog">
+                    <span className="dashboard-summary-chip-value">{overallTotals.backlogIssues}</span>
+                    <span className="dashboard-summary-chip-label">backlog</span>
+                  </div>
                 </div>
               ) : null}
             </CollapsibleSection>
