@@ -72,7 +72,7 @@
 .dashboard-page .dashboard-overall-progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #22c55e, #0c93d9);
+  background: linear-gradient(90deg, #2AEDE5, #0c93d9);
   transition: width 0.4s ease;
 }
 
@@ -1105,12 +1105,14 @@
   padding: 0.1rem 0 0.25rem;
 }
 
+/* Status accents — values mirror src/utils/statusScale.js.
+   Upcoming reads as terminal-family blue; past due is the reserved alarm. */
 .dashboard-page .app-collapsible--due-upcoming {
-  border-left: 3px solid #22c55e;
+  border-left: 3px solid #0c93d9;
 }
 
 .dashboard-page .app-collapsible--due-past-due {
-  border-left: 3px solid #ef4444;
+  border-left: 3px solid #F95E4A;
 }
 
 /* ── Period summary chips ── */
