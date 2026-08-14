@@ -560,7 +560,11 @@ export async function loadDrillDownIssuesByAssignee({
   setJqlError("");
 
   try {
-    const jql = `assignee = "${escapeJqlString(assignee)}" ORDER BY updated DESC`;
+    const isUnassigned =
+      assignee.toLowerCase() === "unassigned" || assignee.toLowerCase() === "__unassigned__";
+    const jql = isUnassigned
+      ? "assignee is EMPTY ORDER BY updated DESC"
+      : `assignee = "${escapeJqlString(assignee)}" ORDER BY updated DESC`;
     const data = await fetchJiraSearchAll({ jql, maxTotal: jqlMaxResults });
     if (isStale()) {
       return false;
@@ -570,7 +574,11 @@ export async function loadDrillDownIssuesByAssignee({
     const total = Number(data?.total ?? issues.length);
 
     if (issues.length === 0) {
-      setJqlError(`No open issues found for assignee "${assignee}".`);
+      setJqlError(
+        isUnassigned
+          ? "No open unassigned issues found."
+          : `No open issues found for assignee "${assignee}".`
+      );
       return false;
     }
 
