@@ -245,6 +245,7 @@ const Dashboard = () => {
                   percent={snapshot.overallIssuePercent}
                   numerator={overallTotals.resolvedIssues}
                   denominator={overallTotals.totalIssues}
+                  tone="blue"
                 />
                 <OverallSummaryCard
                   label="Tasks in progress"
@@ -256,6 +257,7 @@ const Dashboard = () => {
                   }
                   numerator={overallTotals.inProgressIssues}
                   denominator={overallTotals.totalIssues}
+                  tone="orange"
                 />
                 {overallTotals.epicCount > 0 ? (
                   <OverallSummaryCard
@@ -264,6 +266,7 @@ const Dashboard = () => {
                     percent={snapshot.overallEpicPercent}
                     numerator={overallTotals.completeEpics}
                     denominator={overallTotals.epicCount}
+                    tone="teal"
                   />
                 ) : null}
                 <OverallSummaryCard
@@ -275,6 +278,22 @@ const Dashboard = () => {
                   warning={snapshot.overallOverduePercent > 0}
                 />
               </div>
+              {overallTotals.totalIssues > 0 ? (
+                <div className="dashboard-summary-chips">
+                  <div className="dashboard-summary-chip">
+                    <span className="dashboard-summary-chip-value">{overallTotals.totalIssues}</span>
+                    <span className="dashboard-summary-chip-label">issues</span>
+                  </div>
+                  <div className="dashboard-summary-chip dashboard-summary-chip--overdue">
+                    <span className="dashboard-summary-chip-value">{overallTotals.overdueOpenIssues}</span>
+                    <span className="dashboard-summary-chip-label">overdue</span>
+                  </div>
+                  <div className="dashboard-summary-chip dashboard-summary-chip--resolved">
+                    <span className="dashboard-summary-chip-value">{overallTotals.resolvedIssues}</span>
+                    <span className="dashboard-summary-chip-label">resolved</span>
+                  </div>
+                </div>
+              ) : null}
             </CollapsibleSection>
           ) : null}
 

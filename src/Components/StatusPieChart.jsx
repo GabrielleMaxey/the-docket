@@ -129,7 +129,7 @@ const StatusBarChart = ({ statusCounts, className = "" }) => {
                   y={y - 3}
                   textAnchor="middle"
                   fontSize="9"
-                  fill="#475569"
+                  fill="#42595d"
                 >
                   {count}
                 </text>
@@ -141,7 +141,7 @@ const StatusBarChart = ({ statusCounts, className = "" }) => {
                 y={CHART_H + 15}
                 textAnchor="middle"
                 fontSize="8"
-                fill="#64748b"
+                fill="#5f767a"
               >
                 {truncate(label, 10)}
               </text>
