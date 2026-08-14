@@ -2,6 +2,7 @@ import {
   bulkGetTeamPriorities,
   bulkPutTeamPriorities,
   isTeamPriorityMongoConfigured,
+  listAllTeamPriorities,
   listSharedPrograms,
   pingTeamPriorityMongo,
   putTeamPriority,
@@ -107,6 +108,35 @@ export const registerTeamPriorityRoutes = (app, { db, resolveJiraUser }) => {
         ok: true,
         updatedPriorities: result.updated,
         scanned: rows.length,
+      });
+    })
+  );
+
+  app.post(
+    "/api/team-priority/pull-to-local",
+    withTeamMongo("pull Atlas priorities to local", async (_req, res) => {
+      if (!db) {
+        return res.status(500).json({ error: "Local database unavailable" });
+      }
+
+      const entries = await listAllTeamPriorities();
+      const upsert = db.prepare(`
+        INSERT INTO issue_metadata (issue_key, note, priority, updated_at)
+        VALUES (@issueKey, '', @priority, CURRENT_TIMESTAMP)
+        ON CONFLICT(issue_key) DO UPDATE SET
+          priority = excluded.priority,
+          updated_at = CURRENT_TIMESTAMP
+      `);
+      const apply = db.transaction((rows) => {
+        for (const row of rows) {
+          upsert.run({ issueKey: row.issueKey, priority: row.priority });
+        }
+      });
+      apply(entries);
+
+      return res.json({
+        ok: true,
+        updatedPriorities: entries.length,
       });
     })
   );

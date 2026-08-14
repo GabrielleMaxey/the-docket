@@ -143,6 +143,24 @@ export const bulkGetTeamPriorities = async (issueKeys) => {
   return items;
 };
 
+// Every priority currently stored in Atlas, unfiltered by issue key.
+// Used to pull the shared set down into local SQLite.
+export const listAllTeamPriorities = async () => {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Team priority demo not configured");
+  }
+  const rows = await db.collection(COL_PRIORITIES).find({}).toArray();
+  return rows
+    .map((row) => ({
+      issueKey: String(row._id || "").trim().toUpperCase(),
+      priority: clampIssuePriority(row.priority),
+      updatedAt: row.updatedAt || null,
+      updatedBy: String(row.updatedBy || ""),
+    }))
+    .filter((row) => row.issueKey);
+};
+
 export const putTeamPriority = async ({ issueKey, priority, updatedBy }) => {
   const db = await getDb();
   if (!db) {
