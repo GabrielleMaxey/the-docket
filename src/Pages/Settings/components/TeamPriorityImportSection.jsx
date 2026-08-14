@@ -145,13 +145,19 @@ const TeamPriorityImportSection = () => {
   return (
     <SettingsSection
       title="Import team priorities"
-      description="Load NORA rankings from the shared Excel tracker (CSV)"
+      description="Upload a CSV to set priorities in bulk"
     >
       <p style={{ marginTop: 0, color: "#475569", fontSize: "0.9rem" }}>
-        Export the NORA tracker from Excel as <strong>CSV UTF-8</strong> (not the .xlsx workbook).
-        Required columns: Priority, ODI. Optional: Notes. Choose a target below —{" "}
-        <strong>This machine</strong> writes local SQLite; <strong>Atlas (demo)</strong> seeds the
-        shared demo DB (one-time).
+        This uploads a CSV file — it does not copy priorities that already exist in Atlas onto
+        this machine. To bring existing shared priorities down instead, use{" "}
+        <strong>Pull from Atlas</strong> in <strong>Team priority (Atlas demo)</strong> below.
+      </p>
+      <p style={{ marginTop: 0, color: "#475569", fontSize: "0.9rem" }}>
+        Export the team's NORA tracker from Excel as <strong>CSV UTF-8</strong> (not the .xlsx
+        workbook). Required columns: Priority, ODI. Optional: Notes.
+      </p>
+      <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "#475569", fontSize: "0.9rem" }}>
+        Choose where the CSV's priorities are written:
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center", marginBottom: "0.75rem" }}>
         <label style={{ display: "flex", gap: "0.35rem", alignItems: "center", fontSize: "0.9rem" }}>
@@ -161,7 +167,7 @@ const TeamPriorityImportSection = () => {
             checked={target === "local"}
             onChange={() => setTarget("local")}
           />
-          This machine (local SQLite)
+          This machine — local SQLite, used by Work Week right away
         </label>
         <label
           style={{
@@ -171,7 +177,11 @@ const TeamPriorityImportSection = () => {
             fontSize: "0.9rem",
             opacity: atlasConnected ? 1 : 0.5,
           }}
-          title={atlasConnected ? undefined : "Connect Atlas in the demo section below first"}
+          title={
+            atlasConnected
+              ? undefined
+              : "Atlas isn't reachable right now — check Team priority (Atlas demo) below"
+          }
         >
           <input
             type="radio"
@@ -180,7 +190,7 @@ const TeamPriorityImportSection = () => {
             onChange={() => setTarget("atlas")}
             disabled={!atlasConnected}
           />
-          Atlas (demo)
+          Atlas (demo) — shared database, doesn't change this machine until pulled
         </label>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
@@ -209,7 +219,7 @@ const TeamPriorityImportSection = () => {
           {result.skipped ? `, skipped ${result.skipped}` : ""}.
           {result.target === "local"
             ? " Open Work Week again (or re-run JQL) to see the new priorities."
-            : " Link a Work Week slot to a shared program to use them."}
+            : " Link a Work Week slot to a shared program to use them live, or use Pull from Atlas below to copy them to this machine."}
         </Message>
       ) : null}
       {Array.isArray(result?.errors) && result.errors.length > 0 ? (
