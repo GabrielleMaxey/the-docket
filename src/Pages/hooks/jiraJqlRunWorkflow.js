@@ -16,6 +16,12 @@ import {
 const errorMessage = (error, fallback) =>
   error instanceof Error ? error.message : fallback;
 
+// Lumen's Task Manager targets a single Jira project (ODI) - same default
+// used in CreateIssueModal.jsx. The unassigned drill-down is scoped to it so
+// clicking "Unassigned" returns ODI's unassigned backlog rather than every
+// unassigned issue across every project the API token can see.
+const UNASSIGNED_DRILLDOWN_PROJECT_KEY = "ODI";
+
 const mergeIssueMapsPreferExisting = (previous, additions) => {
   const merged = { ...previous };
   Object.entries(additions).forEach(([key, value]) => {
@@ -563,7 +569,7 @@ export async function loadDrillDownIssuesByAssignee({
     const isUnassigned =
       assignee.toLowerCase() === "unassigned" || assignee.toLowerCase() === "__unassigned__";
     const jql = isUnassigned
-      ? "assignee is EMPTY ORDER BY updated DESC"
+      ? `project = ${UNASSIGNED_DRILLDOWN_PROJECT_KEY} AND assignee is EMPTY ORDER BY updated DESC`
       : `assignee = "${escapeJqlString(assignee)}" ORDER BY updated DESC`;
     const data = await fetchJiraSearchAll({ jql, maxTotal: jqlMaxResults });
     if (isStale()) {
