@@ -79,6 +79,7 @@ const WorkWeekTasks = () => {
     () => ({
       key: searchParams.get("key") || "",
       assignee: searchParams.get("assignee") || "",
+      epicPresetId: searchParams.get("epicPresetId") || "",
     }),
     [searchParams]
   );
@@ -132,12 +133,23 @@ const WorkWeekTasks = () => {
 
   const drillDownKey = drillDownFilters.key.trim();
   const drillDownAssignee = drillDownFilters.assignee.trim();
+  const drillDownEpicPresetId = drillDownFilters.epicPresetId.trim();
   const drillDownKeyId = drillDownKey
     ? `issue:${drillDownKey.toLowerCase()}`
     : "";
   const drillDownAssigneeId = drillDownAssignee
-    ? `assignee:${drillDownAssignee.toLowerCase()}`
+    ? `assignee:${drillDownAssignee.toLowerCase()}${drillDownEpicPresetId ? `:${drillDownEpicPresetId}` : ""}`
     : "";
+
+  // A drill-down run matches only when both the assignee AND the epic scope
+  // agree, so "Unassigned" clicked from two different project cards (e.g.
+  // NORA vs. ask-greg) never collide into the same tab.
+  const matchesDrillDownAssignee = React.useCallback(
+    (run) =>
+      String(run.drillDownAssignee || "").trim() === drillDownAssignee &&
+      String(run.drillDownEpicPresetId || "").trim() === drillDownEpicPresetId,
+    [drillDownAssignee, drillDownEpicPresetId]
+  );
 
   const hasDrillDownFilter =
     drillDownKey.length > 0 || drillDownAssignee.length > 0;
@@ -157,7 +169,7 @@ const WorkWeekTasks = () => {
       );
     }
     if (drillDownAssignee) {
-      return String(run.drillDownAssignee || "").trim() === drillDownAssignee;
+      return matchesDrillDownAssignee(run);
     }
     return true;
   });
@@ -198,20 +210,26 @@ const WorkWeekTasks = () => {
 
     if (
       jqlRunsRef.current.some(
-        (run) =>
-          run.isDrillDown &&
-          String(run.drillDownAssignee || "").trim() === drillDownAssignee
+        (run) => run.isDrillDown && matchesDrillDownAssignee(run)
       )
     ) {
       return;
     }
 
-    void handleDrillDownToAssignee(drillDownAssignee).then((loaded) => {
+    void handleDrillDownToAssignee(drillDownAssignee, { epicPresetId: drillDownEpicPresetId }).then((loaded) => {
       if (loaded) {
         setActiveRunIndex(0);
       }
     });
-  }, [drillDownAssignee, drillDownAssigneeId, drillDownKey, filtersLoading, handleDrillDownToAssignee]);
+  }, [
+    drillDownAssignee,
+    drillDownAssigneeId,
+    drillDownEpicPresetId,
+    drillDownKey,
+    filtersLoading,
+    handleDrillDownToAssignee,
+    matchesDrillDownAssignee,
+  ]);
 
   const handleResetSavedQueriesWithConfirm = React.useCallback(() => {
     if (!window.confirm(
@@ -297,11 +315,11 @@ const WorkWeekTasks = () => {
         );
       }
       if (drillDownAssignee && run.drillDownType === "assignee") {
-        return String(run.drillDownAssignee || "").trim() === drillDownAssignee;
+        return matchesDrillDownAssignee(run);
       }
       return false;
     },
-    [drillDownAssignee, drillDownKey]
+    [drillDownAssignee, drillDownKey, matchesDrillDownAssignee]
   );
 
   const handleClearDrillDownRun = React.useCallback(
