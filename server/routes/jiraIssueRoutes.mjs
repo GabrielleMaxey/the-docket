@@ -134,9 +134,8 @@ const buildGenerateDescriptionResponse = (parsed, { isStory, isBug }) => {
 const DESCRIPTION_FORMAT_RULES = `Description formatting rules:
 - Start with "overview": 1–2 short sentences only. State the problem or goal plainly — no filler.
 - Follow with "sections": each has a clear "label" and "items" array of bullet lines (plain text, no markdown).
-- Use hyphen bullets in the final description (built server-side). Each bullet must be one concrete, actionable line.
-- If the title is vague, missing reproduction detail, or ambiguous, set "needsClarification": true and ask 2–4 specific "questions". Still provide your best partial draft when possible.
-- Omit sections that do not apply; do not invent environment or steps you cannot infer.`;
+- Each bullet must be one concrete, actionable line (hyphens are added server-side — omit them here).
+- Omit sections that do not apply. Do not invent steps, environment details, or technical specifics not present in the title or context.`;
 
 const STORY_EVALUATION_RULES = `Story goal evaluation (required):
 - Every Story must define three elements:
@@ -516,10 +515,16 @@ export const registerJiraIssueRoutes = (
 
     const isStory = issueType === "Story";
     const isBug = issueType === "Bug";
-    const context = [
-      epicName && `Epic: ${epicName}`,
-      epicKey && epicKey !== "JQL" && `Epic key: ${epicKey}`,
-    ].filter(Boolean).join(" | ");
+    const contextParts = [];
+    if (isStory || isBug) {
+      if (epicName) contextParts.push(`Epic: ${epicName}`);
+      if (epicKey && epicKey !== "JQL") contextParts.push(`Epic key: ${epicKey}`);
+    } else {
+      // For Tasks, epicKey is the parent Story key (Tasks parent to Stories, not Epics)
+      if (epicKey && epicKey !== "JQL") contextParts.push(`Parent Story key: ${epicKey}`);
+      if (epicName) contextParts.push(`Epic: ${epicName}`);
+    }
+    const context = contextParts.join(" | ");
 
     // ── ODI Jira Standards (Confluence: Jira Standards ODI Project Space Standards) ──
     //
@@ -556,6 +561,8 @@ Sub-task standards (only when the story is fully defined — propose 2–5):
 - Each sub-task is the smallest concrete unit of work needed to achieve the stated goal outcome.
 - Title format: short imperative phrase — "Configure X", "Implement Y handler", "Write tests for Z", "Deploy to UAT".
 - Sub-tasks will be created as Task issue type under this story in Jira.
+- Do not propose sub-tasks that cannot be reasonably inferred from the title and context.
+- Do not fabricate technical implementation steps for the "Development work" section; keep it high-level or omit it when specifics are unknown.
 
 ${STORY_EVALUATION_RULES}
 
@@ -573,22 +580,24 @@ ODI Bug standards:
   - Suggested troubleshooting
   - Development / fix approach
 - Suggest a priority: Low (no system breakdown), Medium (unexpected behavior, system still functional), High (large parts of the system collapse), Critical (complete system/workflow shutdown).
-- Ask clarifying questions when reproduction steps, environment, or expected behavior cannot be inferred from the title.
+- When reproduction steps, environment, or expected behavior cannot be inferred from the title, ask 2–3 clarifying questions (never more than 3), set "needsClarification": true, and still return your best partial draft.
 
 ${DESCRIPTION_FORMAT_RULES}`
       : `You are a Jira issue writer for the Operations Devops Itential (ODI) program at Lumen.
-Write a clear, concise description for a Jira ${issueType}.
-Overview: 1–2 sentences. Follow with labeled bullet sections for implementation or troubleshooting steps as needed.
+
+ODI Task standards:
+- A Task is the smallest concrete unit of implementation work, always assigned to an individual and always parented to a Story.
+- The description must state what specifically needs to be done and, where possible, why it matters to the parent story's goal.
+- Keep descriptions focused and brief — avoid generic filler steps.
+- If the title is too vague to write a useful description, ask 2–3 clarifying questions and set "needsClarification": true.
 
 ${DESCRIPTION_FORMAT_RULES}`;
 
     const userPrompt = isStory
-      ? `Write an ODI-standard Jira Story draft. First evaluate whether situation, ask, and result/goal outcome are fully defined from the title below.
+      ? `Write an ODI-standard Jira Story draft.
 
 Issue type: Story
 Title provided: ${summary}${context ? `\nContext: ${context}` : ""}
-
-If situation, ask, or goal outcome is missing or vague, set needsClarification true, ask 2–3 questions, return subtasks as [], and provide only a best-effort partial draft.
 
 Respond with valid JSON only — no prose, no markdown fences:
 {
@@ -616,29 +625,33 @@ Respond with valid JSON only — no prose, no markdown fences:
   "overview": "One or two concise sentences on what is broken and the impact.",
   "sections": [
     { "label": "Steps to reproduce", "items": ["Step one", "Step two"] },
+    { "label": "Expected behavior", "items": ["What should happen"] },
+    { "label": "Actual behavior", "items": ["What is actually happening"] },
+    { "label": "Environment / systems affected", "items": ["Service or system name"] },
     { "label": "Suggested troubleshooting", "items": ["Check X", "Verify Y"] },
     { "label": "Development / fix approach", "items": ["Fix Z in service A"] }
   ],
-  "priority": "Low | Medium | High | Critical"
+  "priority": "Low (no system breakdown) | Medium (unexpected behavior, system functional) | High (large parts collapse) | Critical (full shutdown)"
 }`
-      : `Write a Jira ${issueType} draft.
+      : `Write an ODI Task description.
 
-Issue type: ${issueType}
+Issue type: Task
 Title: ${summary}${context ? `\nContext: ${context}` : ""}
 
 Respond with valid JSON only — no prose, no markdown fences:
 {
   "needsClarification": false,
   "questions": [],
-  "overview": "One or two concise sentences.",
+  "overview": "One or two sentences: what is being done and why it matters to the parent story.",
   "sections": [
-    { "label": "Development work", "items": ["Concrete step"] }
+    { "label": "Steps / approach", "items": ["Specific action step 1", "Specific action step 2"] }
   ]
 }`;
 
     try {
       log.info(`generating description for ${issueType}: "${summary}"`);
-      const raw = await completeLlmText({ provider, systemPrompt, userMessage: userPrompt, maxTokens: 900 });
+      const maxTokens = isStory ? 1400 : isBug ? 900 : 600;
+      const raw = await completeLlmText({ provider, systemPrompt, userMessage: userPrompt, maxTokens });
       const cleaned = String(raw || "").replace(/```json|```/g, "").trim();
       let parsed;
       try {
