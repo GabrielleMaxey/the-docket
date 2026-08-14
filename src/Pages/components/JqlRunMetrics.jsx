@@ -19,8 +19,13 @@ const JqlRunMetrics = ({ run }) => {
     const s = String(i.fields?.status?.name || i.status || "").toLowerCase();
     return s.includes("verif");
   }).length;
+  const backlog = issues.filter((i) => {
+    const s = String(i.fields?.status?.name || i.status || "").toLowerCase();
+    return s.includes("backlog");
+  }).length;
 
   const closedPct = total > 0 ? Math.round((closed / total) * 100) : 0;
+  const backlogPct = total > 0 ? Math.round((backlog / total) * 100) : 0;
 
   return (
     <div className="ww-run-metrics">
@@ -39,6 +44,13 @@ const JqlRunMetrics = ({ run }) => {
             <div className="ww-run-progress-fill ww-progress-resolved" style={{ width: `${closedPct}%` }} />
           </div>
           <span className="ww-run-progress-pct">{closedPct}%</span>
+        </div>
+        <div className="ww-run-progress-row">
+          <span className="ww-run-progress-label">Backlog</span>
+          <div className="ww-run-progress-track">
+            <div className="ww-run-progress-fill ww-progress-backlog" style={{ width: `${backlogPct}%` }} />
+          </div>
+          <span className="ww-run-progress-pct">{backlogPct}%</span>
         </div>
       </div>
     </div>
