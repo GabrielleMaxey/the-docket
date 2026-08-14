@@ -360,6 +360,7 @@ export const useDashboardRefresh = ({
     let openIssues = 0;
     let overdueOpenIssues = 0;
     let inProgressIssues = 0;
+    let backlogIssues = 0;
     const { epicsComplete, epicCount } = collectEpicCompletionCounts(epics);
 
     for (const epic of epics) {
@@ -369,6 +370,7 @@ export const useDashboardRefresh = ({
       resolvedIssues += getTerminalIssueCount(epic);
       const workload = getWorkloadStatusCounts(epic);
       inProgressIssues += workload.inProgress;
+      backlogIssues += workload.backlog;
     }
 
     return {
@@ -377,6 +379,7 @@ export const useDashboardRefresh = ({
       openIssues,
       overdueOpenIssues,
       inProgressIssues,
+      backlogIssues,
       completeEpics: epicsComplete,
       epicCount,
     };

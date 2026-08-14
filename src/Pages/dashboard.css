@@ -79,6 +79,16 @@
   box-shadow: 0 1px 2px rgba(15, 49, 51, 0.08), 0 10px 22px rgba(42, 237, 229, 0.18);
 }
 
+.dashboard-page .dashboard-stat-card--gray {
+  border-left-color: #94a8ac;
+  background: linear-gradient(135deg, #ffffff 0%, #f6f7f7 100%);
+  box-shadow: 0 1px 2px rgba(15, 49, 51, 0.06), 0 6px 16px rgba(15, 49, 51, 0.06);
+}
+
+.dashboard-page .dashboard-stat-card--gray:hover {
+  box-shadow: 0 1px 2px rgba(15, 49, 51, 0.08), 0 10px 22px rgba(15, 49, 51, 0.1);
+}
+
 .dashboard-page .dashboard-stat-label {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -126,6 +136,11 @@
 .dashboard-page .dashboard-overall-progress-fill--teal {
   background: linear-gradient(90deg, #b6f5f2, #2AEDE5);
   box-shadow: 0 0 6px rgba(42, 237, 229, 0.5);
+}
+
+.dashboard-page .dashboard-overall-progress-fill--gray {
+  background: linear-gradient(90deg, #c9c9c9, #94a8ac);
+  box-shadow: none;
 }
 
 .dashboard-page .dashboard-overall-progress-fill--warning {
@@ -399,6 +414,10 @@
   min-width: 0;
   overflow: hidden;
   margin: 0.4rem 0 0.2rem;
+}
+
+.dashboard-page .dashboard-epic-contributor-chart .dashboard-pie-chart--compact {
+  align-items: center;
 }
 
 .dashboard-page .dashboard-epic-contributor-overdue-list {
@@ -705,6 +724,14 @@
 .dashboard-page .dashboard-epic-status-breakdown .dashboard-pie-chart--compact .dashboard-pie-legend {
   min-width: 255px;
   width: auto;
+}
+
+/* Per-contributor cards: center the chart+legend group instead of hugging
+   the left edge. Compound selector (both classes on one element) so this
+   wins over the plain .dashboard-epic-status-breakdown row-layout rule
+   above regardless of source order. */
+.dashboard-page .dashboard-assignee-status-breakdown.dashboard-epic-status-breakdown .dashboard-pie-chart--compact {
+  justify-content: center;
 }
 
 .dashboard-page .dashboard-assignee-section {
