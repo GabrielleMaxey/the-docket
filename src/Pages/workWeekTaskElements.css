@@ -571,6 +571,10 @@
   background: linear-gradient(90deg, #F95E4A, #b91c1c);
 }
 
+.work-week-page .ww-progress-backlog {
+  background: linear-gradient(90deg, #c9c9c9, #94a8ac);
+}
+
 .work-week-page .ww-run-progress-pct {
   font-size: 0.72rem;
   font-weight: 700;
