@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, Container, Divider } from "semantic-ui-react";
 import "./workWeekTaskElements.css";
+import "./priorityScale.css";
 import CollapsibleSection from "../Components/CollapsibleSection";
 import JiraResultsTable from "./components/JiraResultsTable";
 import TaskManagerHeaderPanel from "./components/TaskManagerHeaderPanel";
