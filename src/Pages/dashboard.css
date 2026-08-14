@@ -199,11 +199,11 @@
 }
 
 .dashboard-page .dashboard-epic-card {
-  border: 1px solid #dbeafe;
+  border: 1px solid #dde7e9;
   border-radius: 12px;
   padding: 1rem;
   background: #fff;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 4px 14px rgba(15, 49, 51, 0.06);
 }
 
 .dashboard-page .dashboard-epic-card-head {
@@ -458,9 +458,9 @@
   justify-content: center;
   margin: 0.75rem 0 1rem;
   padding: 1rem 1.1rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #dde7e9;
   border-radius: 12px;
-  background: #f8fafc;
+  background: #eaf0f2;
 }
 
 .dashboard-page .dashboard-epic-breakdown {
@@ -626,16 +626,27 @@
 }
 
 .dashboard-page .dashboard-pie-legend-total {
-  margin-top: 0.35rem;
-  padding-top: 0.35rem;
-  border-top: 1px solid #dde7e9;
-  font-weight: 600;
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  background: #eaf0f2;
+  font-weight: 700;
+}
+
+.dashboard-page .dashboard-pie-legend-total .dashboard-pie-legend-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0c93d9;
 }
 
 .dashboard-page .dashboard-pie-swatch {
   width: 12px;
   height: 12px;
-  border-radius: 3px;
+  border-radius: 4px;
   flex-shrink: 0;
   margin-top: 0.15rem;
 }

@@ -107,7 +107,7 @@ const StatusBarChart = ({ statusCounts, className = "" }) => {
 
           return (
             <g key={label}>
-              <rect x={x} y={y} width={BAR_W} height={barH} fill={color} rx={3}>
+              <rect x={x} y={y} width={BAR_W} height={barH} fill={color} rx={4}>
                 <title>{`${label}: ${count} (${pct}%)`}</title>
               </rect>
 
