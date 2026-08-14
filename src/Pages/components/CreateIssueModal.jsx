@@ -176,6 +176,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   const [descriptionError, setDescriptionError] = React.useState("");
   const [standardsOverrideAvailable, setStandardsOverrideAvailable] = React.useState(false);
   const [overrideDescriptionStandards, setOverrideDescriptionStandards] = React.useState(false);
+  const [overrideReason, setOverrideReason] = React.useState(""); // "clarification" | "standards"
   const [success, setSuccess] = React.useState("");
   const [createdIssueKey, setCreatedIssueKey] = React.useState("");
   const [jiraBaseUrl, setJiraBaseUrl] = React.useState("");
@@ -362,6 +363,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     setDescriptionError("");
     setStandardsOverrideAvailable(false);
     setOverrideDescriptionStandards(false);
+    setOverrideReason("");
     setSuccess("");
     setCreatedIssueKey("");
     setSuggestedSubtasks([]);
@@ -805,6 +807,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     if (issueType === "Story" && needsClarification && !allowDescriptionOverride) {
       setDescriptionError(STORY_NOT_DEFINED_ERROR);
       setStandardsOverrideAvailable(true);
+      setOverrideReason("clarification");
       return;
     }
 
@@ -824,12 +827,14 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       if (hardErrors.length > 0) {
         setStandardsOverrideAvailable(false);
         setOverrideDescriptionStandards(false);
+        setOverrideReason("");
         applyValidationErrors(standardsCheck.errors);
         return;
       }
       if (descriptionErrors.length > 0 && !allowDescriptionOverride) {
         applyValidationErrors(descriptionErrors);
         setStandardsOverrideAvailable(true);
+        setOverrideReason("standards");
         return;
       }
       applyValidationErrors(standardsCheck.errors);
@@ -1203,6 +1208,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
                 if (standardsOverrideAvailable) {
                   setStandardsOverrideAvailable(false);
                   setOverrideDescriptionStandards(false);
+                  setOverrideReason("");
                 }
               }}
               placeholder={issueType === "Story"
@@ -1219,8 +1225,9 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             {standardsOverrideAvailable ? (
               <Message warning size="small" style={{ marginTop: "0.5rem" }}>
                 <p style={{ margin: "0 0 0.45rem" }}>
-                  This description does not meet current ODI criteria. You can still create the issue
-                  after acknowledging the warning.
+                  {overrideReason === "clarification"
+                    ? "AI Draft flagged this story as not fully defined — the situation, ask, or goal outcome is unclear. Answering the questions above and re-running AI Draft is recommended."
+                    : "This description does not meet current ODI standards. Updating the description is recommended."}
                 </p>
                 <label style={{ display: "flex", alignItems: "flex-start", gap: "0.45rem", cursor: "pointer" }}>
                   <input
@@ -1230,8 +1237,9 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
                     style={{ marginTop: "0.2rem" }}
                   />
                   <span>
-                    Override ODI description standards and create anyway. I understand this description
-                    does not meet current ODI criteria.
+                    {overrideReason === "clarification"
+                      ? "Create anyway — I understand this story's ask or outcome may not be fully defined."
+                      : "Create anyway — I understand this description does not meet current ODI standards."}
                   </span>
                 </label>
               </Message>
