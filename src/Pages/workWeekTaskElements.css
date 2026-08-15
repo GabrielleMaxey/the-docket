@@ -1512,11 +1512,27 @@
   min-width: 320px;
 }
 
-/* Push to Jira */
+/* Push to Jira — pinned to the right edge of the scroll container so the
+   Push/Save buttons stay visible without needing to shrink Summary/Notes
+   or scroll all the way right. Solid background required for a sticky
+   cell to stay opaque over whatever scrolls behind it; this means a
+   priority-tinted or closed row's colour won't extend under this column
+   specifically (a visible seam at the boundary), which is an accepted
+   tradeoff of the pattern. */
 .work-week-page .ww-results-table th:nth-child(12),
 .work-week-page .ww-results-table td:nth-child(12) {
   width: 7%;
   min-width: 120px;
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: #ffffff;
+  box-shadow: -6px 0 8px -6px rgba(15, 49, 51, 0.2);
+}
+
+.work-week-page .ww-results-table th:nth-child(12) {
+  z-index: 3;
+  background: #f8fafc;
 }
 
 .work-week-page .ww-results-table th {
