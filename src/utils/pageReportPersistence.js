@@ -59,7 +59,6 @@ export const clearDashboardReportState = () => {
   try {
     window.localStorage.removeItem(DASHBOARD_REPORT_KEY);
   } catch {
-    // ignore
   }
 };
 
@@ -115,7 +114,6 @@ export const clearWeekPlanState = () => {
   try {
     window.localStorage.removeItem(WORK_WEEK_WEEK_PLAN_KEY);
   } catch {
-    // ignore
   }
 };
 

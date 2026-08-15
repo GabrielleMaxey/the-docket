@@ -14,8 +14,6 @@
   box-shadow: 0 2px 4px rgba(15, 49, 51, 0.12), 0 6px 18px rgba(15, 49, 51, 0.18);
 }
 
-/* Logo */
-
 .app-nav-logo {
   display: flex;
   align-items: center;
@@ -37,8 +35,6 @@
   height: 2rem;
   object-fit: contain;
 }
-
-/* Nav links list */
 
 .app-nav-links {
   display: flex;

@@ -662,7 +662,6 @@
 .dashboard-page .dashboard-pie-legend {
   list-style: none;
   margin: 0;
-  /* padding: 0; */
   min-width: 220px;
   flex: 1 1 220px;
 }

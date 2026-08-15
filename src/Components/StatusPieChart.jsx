@@ -68,9 +68,9 @@ const truncate = (str, max) =>
 
 const StatusBarChart = ({ statusCounts, className = "" }) => {
   const { entries: baseEntries, total } = buildPieData(statusCounts);
-  // Re-apply semantic colors for bars so each status is always the same
-  // color regardless of sort order. Pie charts use the original index-based
-  // rainbow colors (reverted above); bars use the semantic map.
+  // buildPieData's `entries` never carries colour (only its `slices` array
+  // does) - re-derive it here via the same getStatusColor so bars match pie
+  // slices exactly.
   const entries = baseEntries.map((entry, i) => ({
     ...entry,
     color: getStatusColor(entry.label, i),
