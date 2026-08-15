@@ -142,7 +142,7 @@ const AssigneeCell = ({
   };
 
   return (
-    <td>
+    <>
       <div className={"ww-edit-cell ww-assignee-cell" + (isClosedOrResolved ? " ww-edit-disabled" : "")}>
         <div className="ww-assignee-input-wrap">
           <input
@@ -203,7 +203,7 @@ const AssigneeCell = ({
       </div>
       {confirmation?.success ? <p className="ww-inline-success">✓ {confirmation.success}</p> : null}
       {confirmation?.error ? <p className="ww-inline-error">{confirmation.error}</p> : null}
-    </td>
+    </>
   );
 };
 
