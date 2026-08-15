@@ -573,9 +573,13 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     if (jql) {
       contextLines.push(`- Query (JQL): ${jql}`);
     }
+    const totalCount = Number(summary.total) || 0;
+    const closedCount = Number(summary.closed) || 0;
+    const completionRatePercent = totalCount > 0 ? Math.round((closedCount / totalCount) * 1000) / 10 : null;
     contextLines.push(
       `- Total issues: ${summary.total || 0}`,
       `- Open: ${summary.open || 0} | Resolved: ${summary.closed || 0}`,
+      `- Completion rate: ${completionRatePercent != null ? `${completionRatePercent}%` : "n/a (no issues in scope)"}`,
       `- Overdue: ${summary.overdue || 0}`,
       `- In Progress: ${summary.inProgress || 0}`,
       `- Ready for Verification: ${summary.readyForVerification || 0}`

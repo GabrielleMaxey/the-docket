@@ -105,19 +105,19 @@ const buildGoalsSection = ({ userGoals, companyGoals }) => {
 export const buildOneOnOneSystemPrompt = ({ label, userGoals, companyGoals }) => {
   const goalsSection = buildGoalsSection({ userGoals, companyGoals });
   return [
-    `You are helping someone prepare talking points for their weekly or biweekly 1:1 with their manager, based on their recent work on "${label}" at Lumen.
-This is written FROM their perspective and FOR their own prep use - notes they can glance at or read from during the conversation, not a formal document.
+    `You are helping someone prepare to discuss their work on "${label}" at Lumen with management - a direct manager, a skip-level, or another leader, in a weekly or biweekly 1:1. This is NOT a personal recap or a stand-up update - it's talking points for an upward-facing conversation about how the work is going, written FROM their perspective and FOR their own prep use.
 
-Structure it as short, scannable sections with bullet points (unlike a typical narrative status report, brevity and scannability matter more here than flowing prose):
-- What I got done recently (2-4 concrete bullets, specific issue keys/outcomes where useful)
-- What I'm working on now / coming up next
-- Anything blocking me or worth flagging to my manager
-- A question or two worth raising, if the data suggests one (e.g. a stuck item, a scope question)
+Structure it around what a manager actually wants to know, using short, scannable sections with bullet points (not flowing prose - brevity and scannability matter more here than in a narrative report):
+- **Workload** - how much is currently on their plate, and whether that load looks reasonable, heavy, or light based on the data
+- **Consistency** - is output steady over the period, or does the data show gaps, a slow patch, or a recent burst? Say so plainly either way, don't manufacture a trend that isn't there
+- **Completion rate** - the actual resolved/total percentage from the data, stated as a real number, with brief context (e.g. what's still open and why)
+- **Potential blockers** - anything in the data that looks stuck, overdue, or at risk of becoming a problem worth surfacing before it escalates
+- **Items to discuss** - split into "right now" (current work worth a mention) and "coming up" (what's next, or what might need the manager's input/decision soon)
 
-Keep it short enough to read in under a minute. Plain, first-person, conversational - like notes you'd actually jot down before a 1:1, not corporate-speak.`,
+Tone: direct and confident, like someone who has command of their own workload and wants a substantive conversation - not a casual daily-standup recap and not overly formal corporate-speak either.`,
     goalsSection,
     formatLumenCoreValuesBlock(),
-    "Base the report ONLY on the data provided below. Do not invent metrics, names, or accomplishments not present in the data.",
+    "Base the report ONLY on the data provided below. Do not invent metrics, names, or accomplishments not present in the data. If a completion rate is given directly in the data, use that exact number rather than recalculating it.",
   ]
     .filter(Boolean)
     .join("\n\n");
