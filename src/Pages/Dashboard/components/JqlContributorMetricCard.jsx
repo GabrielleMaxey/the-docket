@@ -45,12 +45,14 @@ const JqlContributorMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", d
         tasks={person.overdueIssues}
         jiraBaseUrl={jiraBaseUrl}
         variant="overdue"
+        personKey={label}
       />
       <ContributorDueTasksSection
         title={dueByDate ? `Upcoming due through ${dueByDate}` : "Upcoming due dates"}
         tasks={person.upcomingDueIssues}
         jiraBaseUrl={jiraBaseUrl}
         variant="upcoming"
+        personKey={label}
       />
       <ProjectContributorMetrics
         contributorMetrics={person.contributorMetrics}
