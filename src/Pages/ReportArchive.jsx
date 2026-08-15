@@ -7,6 +7,8 @@ import { useReportClipboard } from "../hooks/useReportClipboard";
 import {
   deleteArchivedReport,
   deleteArchivedReportsBySource,
+  deleteAllCoworkWeeklyPlanFiles,
+  deleteCoworkWeeklyPlanFile,
   fetchArchivedReportById,
   fetchArchivedReports,
   fetchCoworkWeeklyPlanByFilename,
@@ -145,7 +147,7 @@ const ReportList = ({
                   Save to archive
                 </Button>
               ) : null}
-              {!isCoworkFileItem(item) && onDelete ? (
+              {onDelete ? (
                 <Button
                   size="mini"
                   negative
@@ -308,7 +310,11 @@ const ReportArchivePanel = ({
 
   const handleDeleteReport = React.useCallback(
     async (item) => {
-      if (!window.confirm(`Delete “${item.label || "Untitled"}”? This cannot be undone.`)) {
+      const isFile = isCoworkFileItem(item);
+      const confirmText = isFile
+        ? `Delete the file “${item.filename || item.label}” from disk? This permanently removes it from the data folder and cannot be undone.`
+        : `Delete “${item.label || "Untitled"}”? This cannot be undone.`;
+      if (!window.confirm(confirmText)) {
         return;
       }
 
@@ -317,7 +323,11 @@ const ReportArchivePanel = ({
       setSaveMessage("");
 
       try {
-        await deleteArchivedReport(item.id);
+        if (isFile) {
+          await deleteCoworkWeeklyPlanFile(item.filename);
+        } else {
+          await deleteArchivedReport(item.id);
+        }
         if (selectedId === item.id) {
           setSelectedId(null);
           setSelectedReport(null);
@@ -333,17 +343,13 @@ const ReportArchivePanel = ({
   );
 
   const handleDeleteAll = React.useCallback(async () => {
-    if (coworkOnly) {
-      return;
-    }
     if (items.length === 0) {
       return;
     }
-    if (
-      !window.confirm(
-        `Delete all ${items.length} report${items.length !== 1 ? "s" : ""} in this tab? This cannot be undone.`
-      )
-    ) {
+    const confirmText = coworkOnly
+      ? `Delete all ${items.length} file${items.length !== 1 ? "s" : ""} from the data folder? This permanently removes them from disk and cannot be undone.`
+      : `Delete all ${items.length} report${items.length !== 1 ? "s" : ""} in this tab? This cannot be undone.`;
+    if (!window.confirm(confirmText)) {
       return;
     }
 
@@ -352,7 +358,11 @@ const ReportArchivePanel = ({
     setSaveMessage("");
 
     try {
-      await deleteArchivedReportsBySource(source);
+      if (coworkOnly) {
+        await deleteAllCoworkWeeklyPlanFiles();
+      } else {
+        await deleteArchivedReportsBySource(source);
+      }
       setSelectedId(null);
       setSelectedReport(null);
       await reloadList();
@@ -387,9 +397,9 @@ const ReportArchivePanel = ({
           onSelect={handleSelect}
           onSaveToArchive={coworkOnly ? handleSaveToArchive : undefined}
           savingId={savingId}
-          onDelete={coworkOnly ? undefined : handleDeleteReport}
+          onDelete={handleDeleteReport}
           deletingId={deletingId}
-          onDeleteAll={coworkOnly ? undefined : handleDeleteAll}
+          onDeleteAll={handleDeleteAll}
           deletingAll={deletingAll}
           emptyMessage={emptyMessage}
         />

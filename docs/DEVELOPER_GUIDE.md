@@ -510,6 +510,10 @@ All routes mounted by `server/jiraProxy.mjs`.
 | DELETE | `/api/reports/archive/:id` | Delete one archived report |
 | DELETE | `/api/reports/archive?source=...` | Delete every archived report matching `source` (`work_week\|dashboard\|adhoc` required - refuses an empty/unknown source rather than deleting the whole table) |
 | POST | `/api/reports/archive` | Manual save (Chat → Ad-hoc; body: `content`, optional `label`, `userPrompt`, `provider`) |
+| GET | `/api/reports/cowork-files` | List `weekly-plan-*.md` files in the data folder (read live from disk) |
+| GET | `/api/reports/cowork-files/:filename` | Read one CoWork weekly plan file's content |
+| DELETE | `/api/reports/cowork-files/:filename` | Delete one CoWork weekly plan file from disk (real filesystem delete, not a DB row - filename validated against the `weekly-plan-*.md` pattern and confined to the data folder, no path traversal) |
+| DELETE | `/api/reports/cowork-files` | Delete every `weekly-plan-*.md` file currently in the data folder |
 | POST | `/api/report/project` | Work Week per-query AI report (auto-archived) |
 | POST | `/api/plan/week` | Work Week AI week planner (auto-archived) |
 | GET | `/api/chat/status` | Chat provider readiness + OAuth state |

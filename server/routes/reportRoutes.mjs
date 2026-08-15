@@ -18,6 +18,8 @@ import {
 import {
   listCoworkWeeklyPlans,
   readCoworkWeeklyPlan,
+  deleteCoworkWeeklyPlan,
+  deleteAllCoworkWeeklyPlans,
 } from "../lib/coworkWeeklyPlans.mjs";
 import { createLogger } from "../lib/logger.mjs";
 import { buildFieldMappingsMap, buildUnionScopeFromJqls, fallbackPresetJql } from "../lib/epicFilterJql.mjs";
@@ -820,6 +822,39 @@ Rules:
       log.error("cowork file read failed", error instanceof Error ? error.message : error);
       return res.status(500).json({
         error: "Failed to read CoWork weekly plan",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Deletes a real file from the data folder on disk, not a database row -
+  // uses the same filename validation as the read route above (blocks path
+  // traversal, requires the weekly-plan-*.md pattern) before touching the
+  // filesystem.
+  app.delete("/api/reports/cowork-files/:filename", (req, res) => {
+    try {
+      const result = deleteCoworkWeeklyPlan(dataDir, req.params.filename);
+      if (!result.ok) {
+        return res.status(result.status || 400).json({ error: result.error });
+      }
+      return res.json({ ok: true, filename: result.filename });
+    } catch (error) {
+      log.error("cowork file delete failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to delete CoWork weekly plan",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.delete("/api/reports/cowork-files", (_req, res) => {
+    try {
+      const { deletedCount, errors } = deleteAllCoworkWeeklyPlans(dataDir);
+      return res.json({ ok: true, deletedCount, errors });
+    } catch (error) {
+      log.error("cowork files bulk delete failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to delete CoWork weekly plans",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
