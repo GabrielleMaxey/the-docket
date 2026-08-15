@@ -17,10 +17,8 @@ import {
 const errorMessage = (error, fallback) =>
   error instanceof Error ? error.message : fallback;
 
-// Lumen's Task Manager targets a single Jira project (ODI) - same default
-// used in CreateIssueModal.jsx. The unassigned drill-down is scoped to it so
-// clicking "Unassigned" returns ODI's unassigned backlog rather than every
-// unassigned issue across every project the API token can see.
+// Fallback project when no preset scope is available. Matches the default
+// used in CreateIssueModal.jsx - this app targets a single Jira project.
 const UNASSIGNED_DRILLDOWN_PROJECT_KEY = "ODI";
 
 const mergeIssueMapsPreferExisting = (previous, additions) => {
@@ -575,12 +573,8 @@ export async function loadDrillDownIssuesByAssignee({
 
     let jql;
     if (isUnassigned && scopedPresetId) {
-      // Reuse the preset's own resolved scope (handles epic-key fallback,
-      // Jira filter lookup, and hand-authored JQL identically to how the
-      // Dashboard computed this card's own numbers) rather than
-      // reconstructing an approximation. Wrapped in parens because preset
-      // JQL can be an unparenthesized OR chain - concatenating a clause
-      // without wrapping would only scope the last OR-branch.
+      // Reuses the preset's own resolved scope (same numbers the Dashboard
+      // card shows) rather than reconstructing an approximation.
       let scopeJql = "";
       try {
         scopeJql = await fetchEpicPresetScopeJql(scopedPresetId);

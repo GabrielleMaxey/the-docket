@@ -913,10 +913,10 @@
 }
 
 /* ── row banding ──
-   Only unprioritised rows band. Any row carrying a priority tint is left
-   alone so the tint reads as its own value rather than two alternating ones.
-   Higher specificity than the priority rules in priorityScale.css, so the
-   :nth-child match wins for these two classes regardless of import order. */
+   Only unprioritised rows band, so a priority tint reads as its own value
+   rather than alternating with a stripe. Higher specificity than the
+   priority rules in priorityScale.css guarantees these win regardless of
+   import order. */
 .work-week-page .ww-results-table tbody tr.ww-row-priority-0:nth-child(even),
 .work-week-page .ww-results-table tbody tr.ww-row-priority-neutral:nth-child(even) {
   background-color: #fbfdfd;
