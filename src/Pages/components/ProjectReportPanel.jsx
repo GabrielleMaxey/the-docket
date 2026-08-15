@@ -3,7 +3,7 @@ import { Button, Checkbox, Form } from "semantic-ui-react";
 import CollapsibleSection from "../../Components/CollapsibleSection";
 import ReportOutput from "../../Components/ReportOutput";
 import { useReportClipboard } from "../../hooks/useReportClipboard";
-import { generateProjectReport } from "../../services/jiraClient";
+import { fetchJiraSearchAll, generateProjectReport } from "../../services/jiraClient";
 import { saveChatSessionArtifact } from "../../utils/chatSessionContext";
 import {
   runBackgroundJob,
@@ -21,6 +21,26 @@ import {
 const isIssueOpen = (issue) => {
   const status = String(issue?.fields?.status?.name || issue?.status || "").toLowerCase();
   return !/(closed|resolved|done)/.test(status);
+};
+
+const buildSummaryFromIssues = (issues, jiraRowPriorities) => {
+  const open = issues.filter(isIssueOpen);
+  return {
+    total: issues.length,
+    open: open.length,
+    closed: issues.length - open.length,
+    overdue: issues.filter((iss) => isIssueOpen(iss) && iss.isOverdue).length,
+    topPriorities: open
+      .sort((a, b) => (jiraRowPriorities[a.key] || 99) - (jiraRowPriorities[b.key] || 99))
+      .slice(0, 8)
+      .map((iss) => ({
+        key: iss.key,
+        summary: iss.fields?.summary || iss.summary || "",
+        status: iss.fields?.status?.name || iss.status || "",
+        assignee: iss.fields?.assignee?.displayName || iss.assignee || "Unassigned",
+        isOverdue: Boolean(iss.isOverdue),
+      })),
+  };
 };
 
 const REPORT_TYPE_OPTIONS = [
@@ -47,7 +67,9 @@ const PWB_PERIOD_OPTIONS = [
   { value: "yearly", label: "Yearly" },
 ];
 
-const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
+const ALL_WORK_MONTHS_OPTIONS = [3, 6, 12];
+
+const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
   const runKey = getWorkWeekRunKey(run);
   const jobId = workWeekProjectReportJobId(runKey);
   const persisted = loadWorkWeekProjectReport(runKey);
@@ -65,7 +87,24 @@ const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
   const [includeCompanyGoals, setIncludeCompanyGoals] = React.useState(false);
   const [companyGoals, setCompanyGoals] = React.useState("");
 
+  // "current" | "all_work" | a specific other run's index
+  const [reportScope, setReportScope] = React.useState("current");
+  const [allWorkMonths, setAllWorkMonths] = React.useState(3);
+
   const isCareerReport = reportType === "one_on_one" || reportType === "pwb";
+
+  // Other Work Week query slots that are actually configured (real jql +
+  // label, not a transient drill-down tab), excluding this panel's own run.
+  const otherRuns = React.useMemo(() => {
+    return (jqlRuns || []).filter(
+      (r) =>
+        r.index !== run.index &&
+        !r.isDrillDown &&
+        !r.isPendingDrillDown &&
+        String(r.jql || "").trim() &&
+        String(r.label || "").trim()
+    );
+  }, [jqlRuns, run.index]);
 
   React.useEffect(() => {
     const saved = loadWorkWeekProjectReport(runKey);
@@ -101,28 +140,36 @@ const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
     runBackgroundJob(jobId, {
       label: jobLabel,
       run: async () => {
-        const issues = run.issues || [];
-        const open = issues.filter(isIssueOpen);
-        const summary = {
-          total: issues.length,
-          open: open.length,
-          closed: issues.length - open.length,
-          overdue: issues.filter((iss) => isIssueOpen(iss) && iss.isOverdue).length,
-          topPriorities: issues
-            .filter(isIssueOpen)
-            .sort((a, b) => (jiraRowPriorities[a.key] || 99) - (jiraRowPriorities[b.key] || 99))
-            .slice(0, 8)
-            .map((iss) => ({
-              key: iss.key,
-              summary: iss.fields?.summary || iss.summary || "",
-              status: iss.fields?.status?.name || iss.status || "",
-              assignee: iss.fields?.assignee?.displayName || iss.assignee || "Unassigned",
-              isOverdue: Boolean(iss.isOverdue),
-            })),
-        };
+        let scopeLabel = run.label || `Run ${(run.index || 0) + 1}`;
+        let scopeJql = run.jql || "";
+        let summary;
+
+        if (reportScope === "all_work") {
+          scopeLabel = `All my assigned work — past ${allWorkMonths} months`;
+          scopeJql = `assignee = currentUser() AND updated >= -${allWorkMonths}M ORDER BY updated DESC`;
+          const { issues } = await fetchJiraSearchAll({ jql: scopeJql, maxTotal: 500 });
+          summary = buildSummaryFromIssues(issues || [], jiraRowPriorities);
+        } else if (reportScope !== "current") {
+          const otherRun = otherRuns.find((r) => r.index === reportScope);
+          if (otherRun) {
+            scopeLabel = otherRun.label || scopeLabel;
+            scopeJql = otherRun.jql || "";
+            if (otherRun.issues?.length) {
+              summary = buildSummaryFromIssues(otherRun.issues, jiraRowPriorities);
+            } else {
+              const { issues } = await fetchJiraSearchAll({ jql: scopeJql, maxTotal: 500 });
+              summary = buildSummaryFromIssues(issues || [], jiraRowPriorities);
+            }
+          }
+        }
+
+        if (!summary) {
+          summary = buildSummaryFromIssues(run.issues || [], jiraRowPriorities);
+        }
+
         const result = await generateProjectReport({
-          label: run.label || `Run ${(run.index || 0) + 1}`,
-          jql: run.jql || "",
+          label: scopeLabel,
+          jql: scopeJql,
           summary,
           reportType,
           pwbPeriod: reportType === "pwb" ? pwbPeriod : undefined,
@@ -131,14 +178,14 @@ const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
         });
         saveWorkWeekProjectReport(runKey, {
           report: result,
-          runLabel: run.label || `Run ${(run.index || 0) + 1}`,
-          jql: run.jql || "",
+          runLabel: scopeLabel,
+          jql: scopeJql,
         });
         saveChatSessionArtifact({
           type: "work_week_project_report",
-          label: result.label || run.label || `Run ${(run.index || 0) + 1}`,
+          label: result.label || scopeLabel,
           content: result.report,
-          meta: { jql: run.jql || "" },
+          meta: { jql: scopeJql },
         });
         return result;
       },
@@ -158,6 +205,54 @@ const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
 
   return (
     <CollapsibleSection title="📄 Project Report">
+      <p className="app-report-type-label">Report scope</p>
+      <div className="app-report-type-grid">
+        <button
+          type="button"
+          className={`app-report-type-btn${reportScope === "current" ? " app-report-type-btn--active" : ""}`}
+          onClick={() => setReportScope("current")}
+        >
+          <span className="app-report-type-btn-label">Current query results</span>
+          <span className="app-report-type-btn-desc">
+            {run.label || `Run ${(run.index || 0) + 1}`} — what's already loaded above.
+          </span>
+        </button>
+        <button
+          type="button"
+          className={`app-report-type-btn${reportScope === "all_work" ? " app-report-type-btn--active" : ""}`}
+          onClick={() => setReportScope("all_work")}
+        >
+          <span className="app-report-type-btn-label">All my assigned work</span>
+          <span className="app-report-type-btn-desc">
+            Open and closed, by when it was last updated.
+          </span>
+        </button>
+        {otherRuns.map((r) => (
+          <button
+            key={r.index}
+            type="button"
+            className={`app-report-type-btn${reportScope === r.index ? " app-report-type-btn--active" : ""}`}
+            onClick={() => setReportScope(r.index)}
+          >
+            <span className="app-report-type-btn-label">{r.label}</span>
+            <span className="app-report-type-btn-desc">Another query slot on this page.</span>
+          </button>
+        ))}
+      </div>
+
+      {reportScope === "all_work" ? (
+        <Form.Group inline className="app-report-pwb-period-group">
+          {ALL_WORK_MONTHS_OPTIONS.map((months) => (
+            <Form.Radio
+              key={months}
+              label={`Past ${months} months`}
+              checked={allWorkMonths === months}
+              onChange={() => setAllWorkMonths(months)}
+            />
+          ))}
+        </Form.Group>
+      ) : null}
+
       <p className="app-report-type-label">Report type</p>
       <div className="app-report-type-grid">
         {REPORT_TYPE_OPTIONS.map((opt) => (
@@ -212,13 +307,7 @@ const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
       ) : null}
 
       <div className="app-report-controls">
-        <Button
-          size="small"
-          primary
-          onClick={handleGenerate}
-          loading={loading}
-          disabled={loading || !run.issues?.length}
-        >
+        <Button size="small" primary onClick={handleGenerate} loading={loading} disabled={loading}>
           Generate Report
         </Button>
       </div>
