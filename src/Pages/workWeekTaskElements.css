@@ -1445,10 +1445,10 @@
   min-width: 90px;
 }
 
-/* Summary and Notes get the extra room; Push to Jira is narrowed to make
-   space (its "Push note"/"Save to DB" buttons are full-width blocks, so
-   they just scale down rather than needing a fixed minimum). Due/MRD stay
-   narrow too (nowrap dates won't truncate under table-layout: auto, so
+/* Summary and Notes get the extra room. Status+Assignee are merged into one
+   column (below) so their combined width no longer needs two separate
+   allocations, freeing space that goes to Push to Jira and Notes. Due/MRD
+   stay narrow too (nowrap dates won't truncate under table-layout: auto, so
    this only affects how spare width is distributed, not legibility). */
 .work-week-page .ww-results-table th:nth-child(3),
 .work-week-page .ww-results-table td:nth-child(3) {
@@ -1456,25 +1456,29 @@
   max-width: 400px;
 }
 
+/* Status + Assignee, stacked vertically in one cell (see
+   .ww-cell-status-assignee below) instead of two side-by-side columns. */
 .work-week-page .ww-results-table th:nth-child(4),
 .work-week-page .ww-results-table td:nth-child(4) {
-  width: 9%;
-  min-width: 130px;
+  width: 12%;
+  min-width: 150px;
 }
 
 .work-week-page .ww-results-table th:nth-child(5),
 .work-week-page .ww-results-table td:nth-child(5) {
-  width: 8%;
-  min-width: 140px;
-}
-
-.work-week-page .ww-results-table th:nth-child(6),
-.work-week-page .ww-results-table td:nth-child(6) {
   width: 5%;
   min-width: 75px;
 }
 
 /* Due (task due date or inherited MRD) */
+.work-week-page .ww-results-table th:nth-child(6),
+.work-week-page .ww-results-table td:nth-child(6) {
+  width: 4%;
+  min-width: 70px;
+  white-space: nowrap;
+}
+
+/* MRD (Most Recent Done Date) */
 .work-week-page .ww-results-table th:nth-child(7),
 .work-week-page .ww-results-table td:nth-child(7) {
   width: 4%;
@@ -1482,41 +1486,52 @@
   white-space: nowrap;
 }
 
-/* MRD (Most Recent Done Date) */
+/* Parent */
 .work-week-page .ww-results-table th:nth-child(8),
 .work-week-page .ww-results-table td:nth-child(8) {
-  width: 4%;
-  min-width: 70px;
-  white-space: nowrap;
-}
-
-/* Parent */
-.work-week-page .ww-results-table th:nth-child(9),
-.work-week-page .ww-results-table td:nth-child(9) {
   width: 6%;
   min-width: 85px;
   white-space: nowrap;
 }
 
 /* Priority */
-.work-week-page .ww-results-table th:nth-child(10),
-.work-week-page .ww-results-table td:nth-child(10) {
+.work-week-page .ww-results-table th:nth-child(9),
+.work-week-page .ww-results-table td:nth-child(9) {
   width: 6%;
   min-width: 80px;
 }
 
 /* Notes */
-.work-week-page .ww-results-table th:nth-child(11),
-.work-week-page .ww-results-table td:nth-child(11) {
-  width: 23%;
+.work-week-page .ww-results-table th:nth-child(10),
+.work-week-page .ww-results-table td:nth-child(10) {
+  width: 24%;
   min-width: 320px;
 }
 
-/* Push to Jira */
-.work-week-page .ww-results-table th:nth-child(12),
-.work-week-page .ww-results-table td:nth-child(12) {
-  width: 7%;
-  min-width: 120px;
+/* Push to Jira — back to a comfortable width now that merging Status and
+   Assignee freed real space, rather than needing sticky positioning. */
+.work-week-page .ww-results-table th:nth-child(11),
+.work-week-page .ww-results-table td:nth-child(11) {
+  width: 9%;
+  min-width: 140px;
+}
+
+.work-week-page .ww-th-status-assignee {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+.work-week-page .ww-cell-status-assignee {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.work-week-page .ww-cell-status-assignee > .ww-edit-cell:first-child {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed #e2e8f0;
 }
 
 .work-week-page .ww-results-table th {
