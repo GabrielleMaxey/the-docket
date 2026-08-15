@@ -274,20 +274,33 @@ const ReportArchivePanel = ({
     <div className="report-archive-panel">
       <Header as="h3" className="report-archive-subtitle">{title}</Header>
       {saveMessage ? <Message positive size="small">{saveMessage}</Message> : null}
-      <ReportList
-        items={items}
-        loading={loading}
-        error={error}
-        selectedId={selectedId}
-        onSelect={handleSelect}
-        onSaveToArchive={coworkOnly ? handleSaveToArchive : undefined}
-        savingId={savingId}
-        emptyMessage={emptyMessage}
-      />
+      <CollapsibleSection
+        title="Reports"
+        storageKey={coworkOnly ? "files" : source}
+        persistKeyPrefix="report-archive-list-"
+        defaultOpen={true}
+        badge={loading ? "Loading…" : `${items.length} report${items.length !== 1 ? "s" : ""}`}
+      >
+        <ReportList
+          items={items}
+          loading={loading}
+          error={error}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          onSaveToArchive={coworkOnly ? handleSaveToArchive : undefined}
+          savingId={savingId}
+          emptyMessage={emptyMessage}
+        />
+      </CollapsibleSection>
       {detailLoading ? <Message info size="small">Loading report…</Message> : null}
       {detailError ? (
         <Message negative size="small">
           {detailError}
+        </Message>
+      ) : null}
+      {selectedReport && !detailLoading ? (
+        <Message info size="small">
+          ↓ Scroll down to view “{selectedReport.label || "the selected report"}” below.
         </Message>
       ) : null}
       {selectedReport ? (
