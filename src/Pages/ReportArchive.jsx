@@ -74,6 +74,8 @@ const ReportList = ({
   deletingId,
   onDeleteAll,
   deletingAll,
+  archivedByFilename = {},
+  coworkOnly = false,
   emptyMessage,
 }) => {
   if (loading) {
@@ -114,53 +116,57 @@ const ReportList = ({
                 disabled={deletingAll}
                 onClick={onDeleteAll}
               >
-                Delete all
+                {coworkOnly ? "Remove all from archive" : "Delete all"}
               </Button>
             ) : null}
           </Table.HeaderCell>
         </Table.Row>
       </Table.Header>
       <Table.Body>
-        {items.map((item) => (
-          <Table.Row key={item.id} active={selectedId === item.id}>
-            <Table.Cell>{formatTimestamp(item.createdAt)}</Table.Cell>
-            <Table.Cell>{formatReportType(item)}</Table.Cell>
-            <Table.Cell>{item.label || "Untitled"}</Table.Cell>
-            <Table.Cell collapsing>
-              <Button
-                size="mini"
-                primary={selectedId === item.id}
-                onClick={() => onSelect(item)}
-              >
-                {selectedId === item.id ? "Selected" : "View"}
-              </Button>
-              {isCoworkFileItem(item) && onSaveToArchive ? (
+        {items.map((item) => {
+          const isFile = isCoworkFileItem(item);
+          const hasArchivedCopy = isFile && Boolean(archivedByFilename[item.filename]);
+          return (
+            <Table.Row key={item.id} active={selectedId === item.id}>
+              <Table.Cell>{formatTimestamp(item.createdAt)}</Table.Cell>
+              <Table.Cell>{formatReportType(item)}</Table.Cell>
+              <Table.Cell>{item.label || "Untitled"}</Table.Cell>
+              <Table.Cell collapsing>
                 <Button
                   size="mini"
-                  style={{ marginLeft: "0.35rem" }}
-                  loading={savingId === item.id}
-                  disabled={savingId === item.id}
-                  onClick={() => onSaveToArchive(item)}
+                  primary={selectedId === item.id}
+                  onClick={() => onSelect(item)}
                 >
-                  Save to archive
+                  {selectedId === item.id ? "Selected" : "View"}
                 </Button>
-              ) : null}
-              {!isCoworkFileItem(item) && onDelete ? (
-                <Button
-                  size="mini"
-                  negative
-                  basic
-                  style={{ marginLeft: "0.35rem" }}
-                  loading={deletingId === item.id}
-                  disabled={deletingId === item.id}
-                  onClick={() => onDelete(item)}
-                >
-                  Delete
-                </Button>
-              ) : null}
-            </Table.Cell>
-          </Table.Row>
-        ))}
+                {isFile && onSaveToArchive ? (
+                  <Button
+                    size="mini"
+                    style={{ marginLeft: "0.35rem" }}
+                    loading={savingId === item.id}
+                    disabled={savingId === item.id}
+                    onClick={() => onSaveToArchive(item)}
+                  >
+                    Save to archive
+                  </Button>
+                ) : null}
+                {(!isFile && onDelete) || (isFile && hasArchivedCopy && onDelete) ? (
+                  <Button
+                    size="mini"
+                    negative
+                    basic
+                    style={{ marginLeft: "0.35rem" }}
+                    loading={deletingId === item.id}
+                    disabled={deletingId === item.id}
+                    onClick={() => onDelete(item)}
+                  >
+                    {isFile ? "Remove from archive" : "Delete"}
+                  </Button>
+                ) : null}
+              </Table.Cell>
+            </Table.Row>
+          );
+        })}
       </Table.Body>
     </Table>
   );
@@ -183,6 +189,33 @@ const ReportArchivePanel = ({
   const [saveMessage, setSaveMessage] = React.useState("");
   const [deletingId, setDeletingId] = React.useState(null);
   const [deletingAll, setDeletingAll] = React.useState(false);
+  // Files tab only: filename -> archived (generated_reports) row id, for
+  // files that have already been "Saved to archive". Lets Files show
+  // "Remove from archive" (deletes the DB copy) instead of touching the
+  // live file on disk, and only for rows that actually have a DB copy to
+  // remove.
+  const [archivedByFilename, setArchivedByFilename] = React.useState({});
+
+  const loadArchivedLookup = React.useCallback(async () => {
+    if (!coworkOnly) {
+      return;
+    }
+    try {
+      const workWeekItems = await fetchArchivedReports({ source: "work_week" });
+      const lookup = {};
+      for (const archived of workWeekItems) {
+        const filename = String(archived.meta?.filename || "").trim();
+        if (filename) {
+          lookup[filename] = archived.id;
+        }
+      }
+      setArchivedByFilename(lookup);
+    } catch {
+      // Non-fatal - Files just won't show "Remove from archive" for anything
+      // until this succeeds on a later load.
+      setArchivedByFilename({});
+    }
+  }, [coworkOnly]);
 
   const reportForClipboard = selectedReport
     ? { report: selectedReport.content, label: selectedReport.label }
@@ -208,6 +241,9 @@ const ReportArchivePanel = ({
         if (!cancelled) {
           setItems(nextItems);
         }
+        if (coworkOnly) {
+          await loadArchivedLookup();
+        }
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : "Failed to load reports");
@@ -225,7 +261,7 @@ const ReportArchivePanel = ({
     return () => {
       cancelled = true;
     };
-  }, [source, coworkOnly]);
+  }, [source, coworkOnly, loadArchivedLookup]);
 
   const reloadList = React.useCallback(async () => {
     setLoading(true);
@@ -235,6 +271,7 @@ const ReportArchivePanel = ({
     try {
       if (coworkOnly) {
         setItems(await fetchCoworkWeeklyPlans());
+        await loadArchivedLookup();
       } else {
         setItems(await fetchArchivedReports({ source }));
       }
@@ -244,7 +281,7 @@ const ReportArchivePanel = ({
     } finally {
       setLoading(false);
     }
-  }, [source, coworkOnly]);
+  }, [source, coworkOnly, loadArchivedLookup]);
 
   const handleSelect = React.useCallback(async (item) => {
     const id = item?.id ?? item;
@@ -308,6 +345,34 @@ const ReportArchivePanel = ({
 
   const handleDeleteReport = React.useCallback(
     async (item) => {
+      if (isCoworkFileItem(item)) {
+        const archivedId = archivedByFilename[item.filename];
+        if (!archivedId) {
+          return;
+        }
+        if (
+          !window.confirm(
+            `Remove the archived copy of “${item.label || item.filename}”? The file itself stays on disk - this only removes the saved copy from Past Reports.`
+          )
+        ) {
+          return;
+        }
+
+        setDeletingId(item.id);
+        setDetailError("");
+        setSaveMessage("");
+
+        try {
+          await deleteArchivedReport(archivedId);
+          await reloadList();
+        } catch (deleteError) {
+          setDetailError(deleteError instanceof Error ? deleteError.message : "Failed to remove archived copy");
+        } finally {
+          setDeletingId(null);
+        }
+        return;
+      }
+
       if (!window.confirm(`Delete “${item.label || "Untitled"}”? This cannot be undone.`)) {
         return;
       }
@@ -329,13 +394,43 @@ const ReportArchivePanel = ({
         setDeletingId(null);
       }
     },
-    [selectedId, reloadList]
+    [selectedId, reloadList, archivedByFilename]
   );
+
+  const filesWithArchivedCopy = coworkOnly
+    ? items.filter((item) => archivedByFilename[item.filename])
+    : [];
 
   const handleDeleteAll = React.useCallback(async () => {
     if (coworkOnly) {
+      if (filesWithArchivedCopy.length === 0) {
+        return;
+      }
+      if (
+        !window.confirm(
+          `Remove ${filesWithArchivedCopy.length} archived cop${filesWithArchivedCopy.length !== 1 ? "ies" : "y"} from Past Reports? The files themselves stay on disk.`
+        )
+      ) {
+        return;
+      }
+
+      setDeletingAll(true);
+      setDetailError("");
+      setSaveMessage("");
+
+      try {
+        await Promise.all(
+          filesWithArchivedCopy.map((item) => deleteArchivedReport(archivedByFilename[item.filename]))
+        );
+        await reloadList();
+      } catch (deleteError) {
+        setDetailError(deleteError instanceof Error ? deleteError.message : "Failed to remove archived copies");
+      } finally {
+        setDeletingAll(false);
+      }
       return;
     }
+
     if (items.length === 0) {
       return;
     }
@@ -361,7 +456,7 @@ const ReportArchivePanel = ({
     } finally {
       setDeletingAll(false);
     }
-  }, [coworkOnly, items.length, source, reloadList]);
+  }, [coworkOnly, items, source, reloadList, filesWithArchivedCopy, archivedByFilename]);
 
   return (
     <div className="report-archive-panel">
@@ -387,10 +482,12 @@ const ReportArchivePanel = ({
           onSelect={handleSelect}
           onSaveToArchive={coworkOnly ? handleSaveToArchive : undefined}
           savingId={savingId}
-          onDelete={coworkOnly ? undefined : handleDeleteReport}
+          onDelete={handleDeleteReport}
           deletingId={deletingId}
-          onDeleteAll={coworkOnly ? undefined : handleDeleteAll}
+          onDeleteAll={coworkOnly && filesWithArchivedCopy.length === 0 ? undefined : handleDeleteAll}
           deletingAll={deletingAll}
+          archivedByFilename={archivedByFilename}
+          coworkOnly={coworkOnly}
           emptyMessage={emptyMessage}
         />
       </CollapsibleSection>

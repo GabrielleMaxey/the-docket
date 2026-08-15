@@ -356,7 +356,7 @@ Snapshot-based stand-up brief — overdue/upcoming highlights, contributor load,
 
 For each tab: pick a row → **View** → expand the report to read, copy, or download. Dashboard archived reports may include the status chart that was shown at generation time.
 
-**Deleting:** Work Week, Dashboard, and Ad-hoc each have a **Delete** button per row and a **Delete all** button for the whole tab (both ask for confirmation first — this cannot be undone). The **Files** tab has neither, since those rows are live files on disk, not database entries — remove or move the file itself if you want it gone, or use **Save to archive** first if you want a deletable copy that survives the original file being moved or deleted.
+**Deleting:** Work Week, Dashboard, and Ad-hoc each have a **Delete** button per row and a **Delete all** button for the whole tab (both ask for confirmation first — this cannot be undone). **Files** never deletes the actual file on disk; instead, a file that's already been **Save to archive**d shows a **Remove from archive** button (and a **Remove all from archive** button appears once at least one file has an archived copy) that removes just the saved database copy — the file itself is untouched. Files with no archived copy show neither button, since there's nothing to remove; use **Save to archive** first if you want a removable copy.
 
 **CoWork weekly plans:** When Claude CoWork writes `weekly-plan-<date>.md` into the Task Manager `data/` folder, those files show under **Files**. Content is read live from disk until you click **Save to archive**, which copies it into the local Past Reports database as a week plan (so it remains after the file is moved or deleted).
 
