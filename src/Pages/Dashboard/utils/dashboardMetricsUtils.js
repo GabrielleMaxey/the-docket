@@ -211,6 +211,10 @@ export const buildContributorPieStatusCounts = (person) => {
       pie[status] = value;
     }
   }
+  const resolved = Number(person?.resolvedIssues) || 0;
+  if (resolved > 0) {
+    pie[TERMINAL_STATUS_LABEL] = resolved;
+  }
   return pie;
 };
 
