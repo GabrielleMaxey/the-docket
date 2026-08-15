@@ -274,6 +274,11 @@ const ReportArchivePanel = ({
     <div className="report-archive-panel">
       <Header as="h3" className="report-archive-subtitle">{title}</Header>
       {saveMessage ? <Message positive size="small">{saveMessage}</Message> : null}
+      {selectedReport && !detailLoading ? (
+        <Message info size="small">
+          ↓ Scroll down to view “{selectedReport.label || "the selected report"}” below.
+        </Message>
+      ) : null}
       <CollapsibleSection
         title="Reports"
         storageKey={coworkOnly ? "files" : source}
@@ -296,11 +301,6 @@ const ReportArchivePanel = ({
       {detailError ? (
         <Message negative size="small">
           {detailError}
-        </Message>
-      ) : null}
-      {selectedReport && !detailLoading ? (
-        <Message info size="small">
-          ↓ Scroll down to view “{selectedReport.label || "the selected report"}” below.
         </Message>
       ) : null}
       {selectedReport ? (
