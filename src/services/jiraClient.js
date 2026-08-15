@@ -600,11 +600,26 @@ export const generateIssueDescription = async ({ summary, issueType, epicKey, ep
   });
 };
 
-export const generateProjectReport = async ({ label, summary }) => {
+export const generateProjectReport = async ({
+  label,
+  summary,
+  reportType,
+  pwbPeriod,
+  userGoals,
+  companyGoals,
+}) => {
   return requestJson("/api/report/project", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label, summary, ...getLocalTimestampPayload() }),
+    body: JSON.stringify({
+      label,
+      summary,
+      reportType,
+      pwbPeriod,
+      userGoals,
+      companyGoals,
+      ...getLocalTimestampPayload(),
+    }),
   });
 };
 

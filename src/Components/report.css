@@ -4,6 +4,63 @@
   gap: 1rem;
 }
 
+.app-report-type-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #334155;
+  margin: 0 0 0.4rem;
+}
+
+.app-report-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.85rem;
+}
+
+.app-report-type-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0.8rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.app-report-type-btn:hover {
+  border-color: #93c5fd;
+  background: #e8f5fd;
+}
+
+.app-report-type-btn--active {
+  border-color: #0c93d9;
+  background: #e8f5fd;
+}
+
+.app-report-type-btn-label {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.app-report-type-btn-desc {
+  font-size: 0.74rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.app-report-pwb-period-group {
+  margin-bottom: 0.75rem !important;
+}
+
+.app-report-goals-form {
+  margin-bottom: 0.85rem;
+}
+
 .app-report-controls {
   display: flex;
   flex-wrap: wrap;

@@ -16,6 +16,8 @@ import "./reportArchive.css";
 
 const REPORT_TYPE_LABELS = {
   work_week_project_report: "Project report",
+  work_week_one_on_one: "1:1 prep",
+  work_week_pwb_review: "PWB review",
   week_plan: "Week plan",
   cowork_weekly_plan: "CoWork file",
   dashboard_report: "Dashboard report",
