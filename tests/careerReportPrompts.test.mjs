@@ -62,6 +62,38 @@ describe("buildOneOnOneSystemPrompt", () => {
     assert.match(prompt, /1:1/);
   });
 
+  it("frames the report as an upward conversation with management, not a personal recap", () => {
+    const prompt = buildOneOnOneSystemPrompt({ label: "NORA", userGoals: "", companyGoals: "" });
+    assert.match(prompt, /management/i);
+    assert.match(prompt, /skip-level/i);
+    assert.match(prompt, /NOT a personal recap/i);
+  });
+
+  it("requires all five management-facing sections", () => {
+    const prompt = buildOneOnOneSystemPrompt({ label: "NORA", userGoals: "", companyGoals: "" });
+    assert.match(prompt, /\*\*Workload\*\*/);
+    assert.match(prompt, /\*\*Consistency\*\*/);
+    assert.match(prompt, /\*\*Completion rate\*\*/);
+    assert.match(prompt, /\*\*Potential blockers\*\*/);
+    assert.match(prompt, /\*\*Items to discuss\*\*/);
+  });
+
+  it("splits items to discuss into current and upcoming", () => {
+    const prompt = buildOneOnOneSystemPrompt({ label: "NORA", userGoals: "", companyGoals: "" });
+    assert.match(prompt, /right now/i);
+    assert.match(prompt, /coming up/i);
+  });
+
+  it("instructs using a given completion rate exactly rather than recalculating it", () => {
+    const prompt = buildOneOnOneSystemPrompt({ label: "NORA", userGoals: "", companyGoals: "" });
+    assert.match(prompt, /completion rate is given directly in the data, use that exact number/i);
+  });
+
+  it("instructs against manufacturing a consistency trend the data doesn't support", () => {
+    const prompt = buildOneOnOneSystemPrompt({ label: "NORA", userGoals: "", companyGoals: "" });
+    assert.match(prompt, /don't manufacture a trend that isn't there/i);
+  });
+
   it("omits the goals section entirely when neither goal is provided", () => {
     const prompt = buildOneOnOneSystemPrompt({ label: "NORA", userGoals: "", companyGoals: "" });
     assert.doesNotMatch(prompt, /Your stated goals/);
