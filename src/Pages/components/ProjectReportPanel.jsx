@@ -4,10 +4,12 @@ import CollapsibleSection from "../../Components/CollapsibleSection";
 import ReportOutput from "../../Components/ReportOutput";
 import { useReportClipboard } from "../../hooks/useReportClipboard";
 import {
+  fetchAppSettings,
   fetchJiraSearchAll,
   fetchLatestJiraCommentsBulk,
   fetchRecentlyNotedIssueKeys,
   generateProjectReport,
+  saveAppSettings,
 } from "../../services/jiraClient";
 import { saveChatSessionArtifact } from "../../utils/chatSessionContext";
 import {
@@ -108,6 +110,12 @@ const PWB_PERIOD_OPTIONS = [
 
 const ALL_WORK_MONTHS_OPTIONS = [3, 6, 12];
 
+// Global (not per-run) app_settings keys, via the existing generic
+// GET/PUT /api/settings - same career goals apply regardless of which
+// project this panel is currently reporting on.
+const USER_GOALS_SETTINGS_KEY = "work_week_report_user_goals";
+const COMPANY_GOALS_SETTINGS_KEY = "work_week_report_company_goals";
+
 const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
   const runKey = getWorkWeekRunKey(run);
   const jobId = workWeekProjectReportJobId(runKey);
@@ -125,6 +133,44 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
   const [userGoals, setUserGoals] = React.useState("");
   const [includeCompanyGoals, setIncludeCompanyGoals] = React.useState(false);
   const [companyGoals, setCompanyGoals] = React.useState("");
+  const [goalsLoaded, setGoalsLoaded] = React.useState(false);
+
+  // Load previously-saved goals once on mount so the user doesn't have to
+  // retype them every time. Company goals default to shown-and-checked only
+  // if something was actually saved before.
+  React.useEffect(() => {
+    let cancelled = false;
+    fetchAppSettings()
+      .then((settings) => {
+        if (cancelled) return;
+        const savedUserGoals = String(settings?.[USER_GOALS_SETTINGS_KEY] || "");
+        const savedCompanyGoals = String(settings?.[COMPANY_GOALS_SETTINGS_KEY] || "");
+        if (savedUserGoals) setUserGoals(savedUserGoals);
+        if (savedCompanyGoals) {
+          setCompanyGoals(savedCompanyGoals);
+          setIncludeCompanyGoals(true);
+        }
+      })
+      .catch(() => {
+        // Non-fatal - the fields just start empty, same as before this existed.
+      })
+      .finally(() => {
+        if (!cancelled) setGoalsLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleClearSavedUserGoals = () => {
+    setUserGoals("");
+    saveAppSettings({ [USER_GOALS_SETTINGS_KEY]: "" }).catch(() => {});
+  };
+
+  const handleClearSavedCompanyGoals = () => {
+    setCompanyGoals("");
+    saveAppSettings({ [COMPANY_GOALS_SETTINGS_KEY]: "" }).catch(() => {});
+  };
 
   // "current" | "all_work" | a specific other run's index
   const [reportScope, setReportScope] = React.useState("current");
@@ -179,6 +225,23 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
     runBackgroundJob(jobId, {
       label: jobLabel,
       run: async () => {
+        // Auto-save non-empty goals for next time, independent of whether
+        // generation below succeeds - the user's typed input is worth
+        // keeping either way. Never auto-saves an empty value over a
+        // previously-saved one; clearing is only ever an explicit action
+        // (the Clear buttons), so a blank field this one time doesn't
+        // silently wipe a saved goal.
+        if (isCareerReport) {
+          const toSave = {};
+          if (userGoals.trim()) toSave[USER_GOALS_SETTINGS_KEY] = userGoals.trim();
+          if (includeCompanyGoals && companyGoals.trim()) {
+            toSave[COMPANY_GOALS_SETTINGS_KEY] = companyGoals.trim();
+          }
+          if (Object.keys(toSave).length > 0) {
+            saveAppSettings(toSave).catch(() => {});
+          }
+        }
+
         let scopeLabel = run.label || `Run ${(run.index || 0) + 1}`;
         let scopeJql = run.jql || "";
         let summary;
@@ -411,20 +474,49 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
             value={userGoals}
             onChange={(_e, { value }) => setUserGoals(value)}
           />
+          {userGoals ? (
+            <Button
+              type="button"
+              size="mini"
+              basic
+              disabled={!goalsLoaded}
+              onClick={handleClearSavedUserGoals}
+              style={{ marginTop: "-0.5rem", marginBottom: "0.75rem" }}
+            >
+              Clear
+            </Button>
+          ) : null}
           <Checkbox
             label="Also compare against company/team goals"
             checked={includeCompanyGoals}
             onChange={(_e, { checked }) => setIncludeCompanyGoals(Boolean(checked))}
           />
           {includeCompanyGoals ? (
-            <Form.TextArea
-              label="Company / team goals"
-              placeholder="Paste in your team's or company's current priorities/OKRs."
-              value={companyGoals}
-              onChange={(_e, { value }) => setCompanyGoals(value)}
-              style={{ marginTop: "0.5rem" }}
-            />
+            <>
+              <Form.TextArea
+                label="Company / team goals"
+                placeholder="Paste in your team's or company's current priorities/OKRs."
+                value={companyGoals}
+                onChange={(_e, { value }) => setCompanyGoals(value)}
+                style={{ marginTop: "0.5rem" }}
+              />
+              {companyGoals ? (
+                <Button
+                  type="button"
+                  size="mini"
+                  basic
+                  disabled={!goalsLoaded}
+                  onClick={handleClearSavedCompanyGoals}
+                  style={{ marginTop: "-0.5rem" }}
+                >
+                  Clear
+                </Button>
+              ) : null}
+            </>
           ) : null}
+          <p className="app-report-goals-hint">
+            Goals you enter here are saved automatically so you don't have to retype them next time — use Clear to remove a saved value.
+          </p>
         </Form>
       ) : null}
 
