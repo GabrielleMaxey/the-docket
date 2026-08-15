@@ -7,8 +7,6 @@ import { useReportClipboard } from "../hooks/useReportClipboard";
 import {
   deleteArchivedReport,
   deleteArchivedReportsBySource,
-  deleteAllCoworkWeeklyPlanFiles,
-  deleteCoworkWeeklyPlanFile,
   fetchArchivedReportById,
   fetchArchivedReports,
   fetchCoworkWeeklyPlanByFilename,
@@ -147,7 +145,7 @@ const ReportList = ({
                   Save to archive
                 </Button>
               ) : null}
-              {onDelete ? (
+              {!isCoworkFileItem(item) && onDelete ? (
                 <Button
                   size="mini"
                   negative
@@ -310,11 +308,7 @@ const ReportArchivePanel = ({
 
   const handleDeleteReport = React.useCallback(
     async (item) => {
-      const isFile = isCoworkFileItem(item);
-      const confirmText = isFile
-        ? `Delete the file “${item.filename || item.label}” from disk? This permanently removes it from the data folder and cannot be undone.`
-        : `Delete “${item.label || "Untitled"}”? This cannot be undone.`;
-      if (!window.confirm(confirmText)) {
+      if (!window.confirm(`Delete “${item.label || "Untitled"}”? This cannot be undone.`)) {
         return;
       }
 
@@ -323,11 +317,7 @@ const ReportArchivePanel = ({
       setSaveMessage("");
 
       try {
-        if (isFile) {
-          await deleteCoworkWeeklyPlanFile(item.filename);
-        } else {
-          await deleteArchivedReport(item.id);
-        }
+        await deleteArchivedReport(item.id);
         if (selectedId === item.id) {
           setSelectedId(null);
           setSelectedReport(null);
@@ -343,13 +333,17 @@ const ReportArchivePanel = ({
   );
 
   const handleDeleteAll = React.useCallback(async () => {
+    if (coworkOnly) {
+      return;
+    }
     if (items.length === 0) {
       return;
     }
-    const confirmText = coworkOnly
-      ? `Delete all ${items.length} file${items.length !== 1 ? "s" : ""} from the data folder? This permanently removes them from disk and cannot be undone.`
-      : `Delete all ${items.length} report${items.length !== 1 ? "s" : ""} in this tab? This cannot be undone.`;
-    if (!window.confirm(confirmText)) {
+    if (
+      !window.confirm(
+        `Delete all ${items.length} report${items.length !== 1 ? "s" : ""} in this tab? This cannot be undone.`
+      )
+    ) {
       return;
     }
 
@@ -358,11 +352,7 @@ const ReportArchivePanel = ({
     setSaveMessage("");
 
     try {
-      if (coworkOnly) {
-        await deleteAllCoworkWeeklyPlanFiles();
-      } else {
-        await deleteArchivedReportsBySource(source);
-      }
+      await deleteArchivedReportsBySource(source);
       setSelectedId(null);
       setSelectedReport(null);
       await reloadList();
@@ -397,9 +387,9 @@ const ReportArchivePanel = ({
           onSelect={handleSelect}
           onSaveToArchive={coworkOnly ? handleSaveToArchive : undefined}
           savingId={savingId}
-          onDelete={handleDeleteReport}
+          onDelete={coworkOnly ? undefined : handleDeleteReport}
           deletingId={deletingId}
-          onDeleteAll={handleDeleteAll}
+          onDeleteAll={coworkOnly ? undefined : handleDeleteAll}
           deletingAll={deletingAll}
           emptyMessage={emptyMessage}
         />
