@@ -110,7 +110,15 @@ A successful response looks like:
 
 ## 5. Set up presets (required for Dashboard + Chat)
 
-**Manual setup (recommended for a first-time install):**
+**Pilot shortcut:** after `npm install` and a first API start, seed shared ODI presets:
+
+```bash
+npm run seed:presets -- --all
+```
+
+See [pilot-presets.md](./pilot-presets.md) for interactive selection and catalog editing.
+
+**Manual setup:**
 
 1. Settings → **Epic & JQL presets** → Add preset
 2. For each project you want to track, add either:
@@ -118,12 +126,6 @@ A successful response looks like:
    - **JQL preset**: a saved JQL query + a label
 
 These presets appear in the Dashboard filter panel, the Work Week **Create Issue** modal (epic presets and saved queries — JQL presets can resolve parents from query results when no single epic key is embedded), and the Chat context panel.
-
-**Bulk seeding (optional, for teams with many presets to add at once):** write your own catalog file following the format in [pilot-presets.md](./pilot-presets.md), then run:
-
-```bash
-npm run seed:presets -- --file path/to/your-presets.json --all
-```
 
 ---
 
