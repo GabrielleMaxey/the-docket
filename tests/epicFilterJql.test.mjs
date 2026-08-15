@@ -48,13 +48,13 @@ describe("splitTrailingOrderBy", () => {
     });
   });
 
-  it("handles NORA's real preset JQL correctly", () => {
+  it("handles a real-shaped multi-clause preset JQL correctly", () => {
     const source =
-      'issuekey ~ "ODI-*" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), "Sub-task") AND summary ~ "(swigert OR NORA)" OR parent IN (ODI-23957) ORDER BY key DESC, parent ASC, status ASC, rank';
+      'issuekey ~ "ODI-*" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), "Sub-task") AND summary ~ "(codename OR ProjectAlpha)" OR parent IN (ODI-99001) ORDER BY key DESC, parent ASC, status ASC, rank';
     const result = splitTrailingOrderBy(source);
     assert.equal(
       result.scope,
-      'issuekey ~ "ODI-*" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), "Sub-task") AND summary ~ "(swigert OR NORA)" OR parent IN (ODI-23957)'
+      'issuekey ~ "ODI-*" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), "Sub-task") AND summary ~ "(codename OR ProjectAlpha)" OR parent IN (ODI-99001)'
     );
     assert.equal(result.orderBy, "ORDER BY key DESC, parent ASC, status ASC, rank");
   });
