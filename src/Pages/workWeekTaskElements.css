@@ -1445,13 +1445,15 @@
   min-width: 90px;
 }
 
-/* Summary gets more room; Due/MRD are narrowed to make space (nowrap dates
-   won't truncate under table-layout: auto, so this only affects how spare
-   width is distributed, not legibility). */
+/* Summary and Notes get the extra room; Push to Jira is narrowed to make
+   space (its "Push note"/"Save to DB" buttons are full-width blocks, so
+   they just scale down rather than needing a fixed minimum). Due/MRD stay
+   narrow too (nowrap dates won't truncate under table-layout: auto, so
+   this only affects how spare width is distributed, not legibility). */
 .work-week-page .ww-results-table th:nth-child(3),
 .work-week-page .ww-results-table td:nth-child(3) {
-  width: 28%;
-  max-width: 340px;
+  width: 32%;
+  max-width: 400px;
 }
 
 .work-week-page .ww-results-table th:nth-child(4),
@@ -1506,15 +1508,15 @@
 /* Notes */
 .work-week-page .ww-results-table th:nth-child(11),
 .work-week-page .ww-results-table td:nth-child(11) {
-  width: 20%;
-  min-width: 280px;
+  width: 23%;
+  min-width: 320px;
 }
 
 /* Push to Jira */
 .work-week-page .ww-results-table th:nth-child(12),
 .work-week-page .ww-results-table td:nth-child(12) {
-  width: 10%;
-  min-width: 150px;
+  width: 7%;
+  min-width: 120px;
 }
 
 .work-week-page .ww-results-table th {
