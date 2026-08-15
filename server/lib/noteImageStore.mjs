@@ -1,4 +1,4 @@
-// Disk + SQLite CRUD for "Keep on this machine" note image drafts (Task 4).
+// Disk + SQLite CRUD for "Keep on this machine" note image drafts.
 // Images live under `<baseDir>/<sanitized issue key>/` with metadata in
 // issue_note_images.
 

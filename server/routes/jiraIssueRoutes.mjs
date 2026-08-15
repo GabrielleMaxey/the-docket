@@ -497,7 +497,6 @@ export const registerJiraIssueRoutes = (
     }
   });
 
-  // POST /api/jira/issues/generate-description
   // Generates a description (and optional subtasks for Stories) from a title + context.
   app.post("/api/jira/issues/generate-description", async (req, res) => {
     const summary = String(req.body?.summary || "").trim();
@@ -521,28 +520,7 @@ export const registerJiraIssueRoutes = (
       epicKey && epicKey !== "JQL" && `Epic key: ${epicKey}`,
     ].filter(Boolean).join(" | ");
 
-    // ── ODI Jira Standards (Confluence: Jira Standards ODI Project Space Standards) ──
-    //
-    // STORY format — Job Story exclusively:
-    //   Summary (title) IS the job story: "When <situation>, I want <motivation>, so I can <outcome>."
-    //   Description expands on situation, motivation, and desired outcome in prose, then adds
-    //   any technical details a developer needs to carry out the work.
-    //   Stories are NEVER assigned to an individual; they remain in Backlog until all sub-tasks close.
-    //
-    // SUB-TASK format — smallest trackable unit of work under a Story:
-    //   Concrete, actionable implementation tasks. Each will be assigned to an individual.
-    //   Title should be a short imperative: "Configure X", "Write unit tests for Y", "Deploy Z to UAT".
-    //   Sub-tasks are created as Task issue type under the Story parent in Jira.
-    //
-    // BUG format:
-    //   Description must include: what is broken, steps to reproduce, expected vs actual behavior,
-    //   environment/system affected, and any known workaround.
-    //   Priority: Low (no breakdown) | Medium (unexpected behavior) | High (large parts collapse)
-    //   | Critical (full system/workflow shutdown).
-    //
-    // STRUCTURE: Project → Epic → Story → Sub-task  (or Epic → Bug)
-    //   Stories only ever live under an Epic. Sub-tasks only ever live under a Story.
-
+    // Standards below sourced from Confluence: Jira Standards ODI Project Space Standards.
     const systemPrompt = isStory
       ? `You are a Jira issue writer for the Operations Devops Itential (ODI) program at Lumen.
 
