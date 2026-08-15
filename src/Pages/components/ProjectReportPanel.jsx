@@ -6,6 +6,10 @@ import { useReportClipboard } from "../../hooks/useReportClipboard";
 import { fetchJiraSearchAll, generateProjectReport } from "../../services/jiraClient";
 import { saveChatSessionArtifact } from "../../utils/chatSessionContext";
 import {
+  buildParentMostRecentDoneDateMap,
+  getEffectiveDueDateForIssue,
+} from "../../utils/jiraIssueDoneDates.js";
+import {
   runBackgroundJob,
   useAttachBackgroundJob,
   useBackgroundJobRunning,
@@ -23,13 +27,30 @@ const isIssueOpen = (issue) => {
   return !/(closed|resolved|done)/.test(status);
 };
 
-const buildSummaryFromIssues = (issues, jiraRowPriorities) => {
+// Epic-level due date (MRD/IDD, via getEffectiveDueDateForIssue's parent-chain
+// fallback) compared against today. This space doesn't use per-task Jira due
+// dates today - due dates live at the Epic level - so this is the meaningful
+// notion of "overdue" here, not a raw duedate field that's essentially always
+// empty for individual tasks.
+const isIssueOverdueByEffectiveDueDate = (issue, dueDateContext) => {
+  if (!isIssueOpen(issue)) {
+    return false;
+  }
+  const effectiveDue = getEffectiveDueDateForIssue(issue, dueDateContext);
+  if (!effectiveDue) {
+    return false;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  return effectiveDue < today;
+};
+
+const buildSummaryFromIssues = (issues, jiraRowPriorities, dueDateContext) => {
   const open = issues.filter(isIssueOpen);
   return {
     total: issues.length,
     open: open.length,
     closed: issues.length - open.length,
-    overdue: issues.filter((iss) => isIssueOpen(iss) && iss.isOverdue).length,
+    overdue: open.filter((iss) => isIssueOverdueByEffectiveDueDate(iss, dueDateContext)).length,
     topPriorities: open
       .sort((a, b) => (jiraRowPriorities[a.key] || 99) - (jiraRowPriorities[b.key] || 99))
       .slice(0, 8)
@@ -38,7 +59,7 @@ const buildSummaryFromIssues = (issues, jiraRowPriorities) => {
         summary: iss.fields?.summary || iss.summary || "",
         status: iss.fields?.status?.name || iss.status || "",
         assignee: iss.fields?.assignee?.displayName || iss.assignee || "Unassigned",
-        isOverdue: Boolean(iss.isOverdue),
+        isOverdue: isIssueOverdueByEffectiveDueDate(iss, dueDateContext),
       })),
   };
 };
@@ -144,27 +165,61 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
         let scopeJql = run.jql || "";
         let summary;
 
+        // dueFieldId/mrdFieldId come from the global Jira field mapping (same
+        // for every query, not query-specific), so this run's own values are
+        // always the right ones to reuse. parentMostRecentDoneDateByKey IS
+        // query-specific - only trustworthy for issues that were actually
+        // enriched against it, so freshly-fetched issue sets need their own.
+        const { dueFieldId, mrdFieldId } = run;
+
         if (reportScope === "all_work") {
           scopeLabel = `All my assigned work — past ${allWorkMonths} months`;
           scopeJql = `assignee = currentUser() AND updated >= -${allWorkMonths}M ORDER BY updated DESC`;
           const { issues } = await fetchJiraSearchAll({ jql: scopeJql, maxTotal: 500 });
-          summary = buildSummaryFromIssues(issues || [], jiraRowPriorities);
+          const parentMostRecentDoneDateByKey = await buildParentMostRecentDoneDateMap(
+            issues || [],
+            mrdFieldId
+          );
+          summary = buildSummaryFromIssues(issues || [], jiraRowPriorities, {
+            dueFieldId,
+            mrdFieldId,
+            parentMostRecentDoneDateByKey,
+          });
         } else if (reportScope !== "current") {
           const otherRun = otherRuns.find((r) => r.index === reportScope);
           if (otherRun) {
             scopeLabel = otherRun.label || scopeLabel;
             scopeJql = otherRun.jql || "";
             if (otherRun.issues?.length) {
-              summary = buildSummaryFromIssues(otherRun.issues, jiraRowPriorities);
+              const parentMostRecentDoneDateByKey =
+                otherRun.parentMostRecentDoneDateByKey ||
+                (await buildParentMostRecentDoneDateMap(otherRun.issues, mrdFieldId));
+              summary = buildSummaryFromIssues(otherRun.issues, jiraRowPriorities, {
+                dueFieldId,
+                mrdFieldId,
+                parentMostRecentDoneDateByKey,
+              });
             } else {
               const { issues } = await fetchJiraSearchAll({ jql: scopeJql, maxTotal: 500 });
-              summary = buildSummaryFromIssues(issues || [], jiraRowPriorities);
+              const parentMostRecentDoneDateByKey = await buildParentMostRecentDoneDateMap(
+                issues || [],
+                mrdFieldId
+              );
+              summary = buildSummaryFromIssues(issues || [], jiraRowPriorities, {
+                dueFieldId,
+                mrdFieldId,
+                parentMostRecentDoneDateByKey,
+              });
             }
           }
         }
 
         if (!summary) {
-          summary = buildSummaryFromIssues(run.issues || [], jiraRowPriorities);
+          summary = buildSummaryFromIssues(run.issues || [], jiraRowPriorities, {
+            dueFieldId,
+            mrdFieldId,
+            parentMostRecentDoneDateByKey: run.parentMostRecentDoneDateByKey,
+          });
         }
 
         const result = await generateProjectReport({
