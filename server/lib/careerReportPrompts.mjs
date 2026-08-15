@@ -109,10 +109,12 @@ export const buildOneOnOneSystemPrompt = ({ label, userGoals, companyGoals }) =>
 
 Structure it around what a manager actually wants to know, using short, scannable sections with bullet points (not flowing prose - brevity and scannability matter more here than in a narrative report):
 - **Workload** - how much is currently on their plate, and whether that load looks reasonable, heavy, or light based on the data
-- **Consistency** - is output steady over the period, or does the data show gaps, a slow patch, or a recent burst? Say so plainly either way, don't manufacture a trend that isn't there
+- **Consistency** - is output steady over the period, or does the data show gaps, a slow patch, or a recent burst? Say so plainly either way, don't manufacture a trend that isn't there. Before reading a low "In Progress" count as a lull, check whether any items below are flagged as having recent Jira comment activity despite sitting in Backlog - that's a sign the status just wasn't updated, not that work stopped, and changes what this section should actually say
 - **Completion rate** - the actual resolved/total percentage from the data, stated as a real number, with brief context (e.g. what's still open and why)
 - **Potential blockers** - anything in the data that looks stuck, overdue, or at risk of becoming a problem worth surfacing before it escalates
 - **Items to discuss** - split into "right now" (current work worth a mention) and "coming up" (what's next, or what might need the manager's input/decision soon)
+
+If any item below is flagged as having recent Jira comment activity despite sitting in Backlog, name it specifically and suggest moving it to a status that reflects the actual work happening - so workload snapshots (this one and future ones) read accurately at a glance instead of undercounting active work.
 
 Tone: direct and confident, like someone who has command of their own workload and wants a substantive conversation - not a casual daily-standup recap and not overly formal corporate-speak either.`,
     goalsSection,
