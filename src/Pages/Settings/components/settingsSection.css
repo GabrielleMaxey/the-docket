@@ -68,3 +68,31 @@
   background: #ffffff;
   box-shadow: 0 6px 16px rgba(15, 49, 51, 0.06);
 }
+
+.settings-name-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.settings-name-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #e8f5fd;
+  color: #0c93d9;
+  font-size: 0.82rem;
+}
+
+.settings-name-chip-remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}

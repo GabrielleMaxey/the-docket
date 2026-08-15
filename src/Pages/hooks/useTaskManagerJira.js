@@ -22,7 +22,7 @@ import {
   JIRA_UNASSIGNED_ASSIGNEE,
   isJiraUnassignValue,
 } from "../../services/jiraClient";
-import { runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey, loadDrillDownIssuesByAssignee } from "./jiraJqlRunWorkflow.js";
+import { runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey, loadDrillDownIssuesByAssignee, loadDrillDownByJql } from "./jiraJqlRunWorkflow.js";
 import {
   dismissDrillDownId,
   drillDownJqlRuns,
@@ -871,7 +871,13 @@ export const useTaskManagerJira = () => {
     }
   };
 
-  const handleRunJql = () => {
+  const handleRunJql = (overrides = {}) => {
+    const nextJqlInputs = Array.isArray(overrides.jqlInputs) ? overrides.jqlInputs : jqlInputs;
+    const nextJqlLabels = Array.isArray(overrides.jqlLabels) ? overrides.jqlLabels : jqlLabels;
+    const nextSharedProgramIds = Array.isArray(overrides.jqlSharedProgramIds)
+      ? overrides.jqlSharedProgramIds
+      : jqlSharedProgramIds;
+
     const unsavedAssigneeCount = countUnsavedAssigneeEdits(assigneeDrafts, assigneeAccountIds);
     clearAllAssigneeDrafts();
     const notice = formatJqlRefreshNotice({ unsavedAssigneeCount, pullLatestComment });
@@ -883,9 +889,9 @@ export const useTaskManagerJira = () => {
       label: "Running JQL",
       run: () =>
         runJqlWorkflow({
-          jqlInputs,
-          jqlLabels,
-          jqlSharedProgramIds,
+          jqlInputs: nextJqlInputs,
+          jqlLabels: nextJqlLabels,
+          jqlSharedProgramIds: nextSharedProgramIds,
           jqlMaxResults,
           pullLatestComment,
           clampPriority,
@@ -987,6 +993,34 @@ export const useTaskManagerJira = () => {
     [jqlMaxResults, pullLatestComment, clampPriority, fieldMappingRows]
   );
 
+  const handleDrillDownToJql = React.useCallback(
+    (jql, label) => {
+      const query = String(jql || "").trim();
+      if (!query) {
+        return Promise.resolve(false);
+      }
+
+      const fetchSeq = ++drillDownFetchSeqRef.current;
+      return loadDrillDownByJql({
+        jql: query,
+        label,
+        jqlMaxResults,
+        pullLatestComment,
+        clampPriority,
+        setJqlRuns,
+        setJqlLoading: setJqlLoadingLocal,
+        setJiraRowPriorities,
+        setPrioritySourceByKey,
+        setJiraNotes,
+        setJqlError,
+        hydrateNoteImages: hydrateKeptNoteImages,
+        fieldMappingRows,
+        isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
+      });
+    },
+    [jqlMaxResults, pullLatestComment, clampPriority, fieldMappingRows]
+  );
+
   const clearDrillDownRuns = React.useCallback(() => {
     drillDownFetchSeqRef.current += 1;
     setJqlRuns((prev) => {
@@ -1063,6 +1097,7 @@ export const useTaskManagerJira = () => {
     handleLoadRemainingJql,
     handleDrillDownToKey,
     handleDrillDownToAssignee,
+    handleDrillDownToJql,
     clearDrillDownRuns,
     clearDrillDownRun,
     handlePushSelected,

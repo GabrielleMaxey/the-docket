@@ -1,4 +1,5 @@
 import { chunkValues, ISSUE_KEY_BATCH_SIZE } from "../../shared/jiraBatch.mjs";
+import { extractAccountIdFromInput } from "../../shared/directReportsJql.mjs";
 
 export const normalizeJiraUserQuery = (value) =>
   String(value || "")
@@ -12,6 +13,12 @@ const scoreJiraUserMatch = (user, rawQuery) => {
   const query = normalizeJiraUserQuery(rawQuery);
   if (!query) {
     return 0;
+  }
+
+  const accountId = String(user?.accountId || "").trim();
+  const queryAccountId = extractAccountIdFromInput(rawQuery);
+  if (accountId && (accountId === String(rawQuery || "").trim() || accountId === queryAccountId)) {
+    return 100;
   }
 
   const displayName = normalizeJiraUserQuery(user?.displayName);
@@ -72,6 +79,12 @@ export const searchJiraUsers = async ({ query, jiraRequest, maxResults = 20 }) =
     return [];
   }
 
+  const accountId = extractAccountIdFromInput(assigneeRaw);
+  if (accountId) {
+    const byAccountId = await fetchJiraUserByAccountId({ accountId, jiraRequest });
+    return byAccountId?.displayName ? [byAccountId] : [];
+  }
+
   const searchResult = await jiraRequest({
     pathWithQuery: `/rest/api/3/user/search?query=${encodeURIComponent(assigneeRaw)}&maxResults=${maxResults}`,
   });
@@ -101,10 +114,104 @@ export const searchJiraUsers = async ({ query, jiraRequest, maxResults = 20 }) =
     });
 };
 
+export const fetchJiraUserByAccountId = async ({ accountId, jiraRequest }) => {
+  const id = extractAccountIdFromInput(accountId) || String(accountId || "").trim();
+  if (!id || typeof jiraRequest !== "function") {
+    return null;
+  }
+
+  const paths = [
+    `/rest/api/3/user?accountId=${encodeURIComponent(id)}`,
+    `/rest/api/3/user/search?accountId=${encodeURIComponent(id)}`,
+    `/rest/api/3/user/bulk?accountId=${encodeURIComponent(id)}&maxResults=1`,
+  ];
+
+  for (const pathWithQuery of paths) {
+    const result = await jiraRequest({ pathWithQuery });
+    if (!result?.ok) {
+      continue;
+    }
+    const payload = result.data;
+    const rawUser = Array.isArray(payload)
+      ? payload[0]
+      : Array.isArray(payload?.values)
+        ? payload.values[0]
+        : payload;
+    const user = mapJiraUserRow(rawUser);
+    if (user.accountId) {
+      return user;
+    }
+  }
+
+  return null;
+};
+
+export const fetchJiraUsersByAccountIds = async ({ accountIds, jiraRequest }) => {
+  const ids = [
+    ...new Set(
+      (accountIds || [])
+        .map((value) => extractAccountIdFromInput(value))
+        .filter(Boolean)
+    ),
+  ];
+  const resolved = new Map();
+  if (ids.length === 0 || typeof jiraRequest !== "function") {
+    return [];
+  }
+
+  const params = ids.map((id) => `accountId=${encodeURIComponent(id)}`).join("&");
+  const bulk = await jiraRequest({
+    pathWithQuery: `/rest/api/3/user/bulk?${params}&maxResults=${Math.max(ids.length, 1)}`,
+  });
+  const bulkUsers = Array.isArray(bulk?.data?.values)
+    ? bulk.data.values
+    : Array.isArray(bulk?.data)
+      ? bulk.data
+      : [];
+  for (const raw of bulkUsers) {
+    const user = mapJiraUserRow(raw);
+    if (user.accountId) {
+      resolved.set(user.accountId, user);
+    }
+  }
+
+  for (const id of ids) {
+    if (resolved.has(id)) {
+      continue;
+    }
+    const user = await fetchJiraUserByAccountId({ accountId: id, jiraRequest });
+    if (user?.accountId) {
+      resolved.set(user.accountId, user);
+    }
+  }
+
+  return [...resolved.values()];
+};
+
+export const fetchJiraMyself = async ({ jiraRequest }) => {
+  if (typeof jiraRequest !== "function") {
+    return null;
+  }
+  const result = await jiraRequest({ pathWithQuery: "/rest/api/3/myself" });
+  if (!result?.ok) {
+    return null;
+  }
+  const user = mapJiraUserRow(result.data);
+  return user.accountId || user.displayName ? user : null;
+};
+
 export const resolveJiraUser = async ({ query, jiraRequest }) => {
   const assigneeRaw = String(query || "").trim();
   if (!assigneeRaw) {
     return null;
+  }
+
+  const accountId = extractAccountIdFromInput(assigneeRaw);
+  if (accountId) {
+    const byAccountId = await fetchJiraUserByAccountId({ accountId, jiraRequest });
+    if (byAccountId) {
+      return byAccountId;
+    }
   }
 
   const searchResult = await jiraRequest({

@@ -21,7 +21,14 @@ import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.j
 import { fetchSharedPrograms } from "../services/jiraClient.js";
 import { isDrillDownDismissed } from "../utils/jqlRunPersistence.js";
 import { resolveCreateIssueDefaults } from "../../shared/createIssuePresetUtils.mjs";
-import { isConfiguredJqlRun, normalizeJqlCount, WORK_WEEK_STORAGE_KEYS } from "../utils/workWeekStorage.js";
+import {
+  buildSharedProgramJql,
+  isConfiguredJqlRun,
+  isConfiguredJqlSlot,
+  normalizeJqlCount,
+  shouldReplaceSlotQueryForSharedProgram,
+  WORK_WEEK_STORAGE_KEYS,
+} from "../utils/workWeekStorage.js";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -42,6 +49,12 @@ const sanitizeReminders = (parsed) => {
       next[i] = { text: typeof item.text === "string" ? item.text : "", done: Boolean(item.done) };
     }
   }
+  return next;
+};
+
+const patchSlotValue = (values, index, value) => {
+  const next = Array.isArray(values) ? [...values] : [];
+  next[index] = value;
   return next;
 };
 
@@ -80,6 +93,8 @@ const WorkWeekTasks = () => {
       key: searchParams.get("key") || "",
       assignee: searchParams.get("assignee") || "",
       epicPresetId: searchParams.get("epicPresetId") || "",
+      jql: searchParams.get("jql") || "",
+      label: searchParams.get("label") || "",
     }),
     [searchParams]
   );
@@ -95,7 +110,7 @@ const WorkWeekTasks = () => {
     getPriorityRowClass, formatDate, filtersLoading,
     setJqlCount, setJqlMaxResults, setPullLatestComment,
     handleJqlChange, handleJqlLabelChange, handleJqlSharedProgramChange,
-    handleResetSavedQueries, handleRunJql, handleLoadRemainingJql, handleDrillDownToKey, handleDrillDownToAssignee, clearDrillDownRun, handlePushSelected,
+    handleResetSavedQueries, handleRunJql, handleLoadRemainingJql, handleDrillDownToKey, handleDrillDownToAssignee, handleDrillDownToJql, clearDrillDownRun, handlePushSelected,
     handleSaveMetadata, handleSelectAll, handleStatusDraftChange,
     handleStatusUpdate, handleAssigneeDraftChange, handleAssigneeUpdate,
     handleRowPriorityChange, handleNoteChange, handleNoteImagesAdd, handleNoteImageRemove,
@@ -134,11 +149,16 @@ const WorkWeekTasks = () => {
   const drillDownKey = drillDownFilters.key.trim();
   const drillDownAssignee = drillDownFilters.assignee.trim();
   const drillDownEpicPresetId = drillDownFilters.epicPresetId.trim();
+  const drillDownJql = drillDownFilters.jql.trim();
+  const drillDownJqlLabel = drillDownFilters.label.trim() || "Work Week";
   const drillDownKeyId = drillDownKey
     ? `issue:${drillDownKey.toLowerCase()}`
     : "";
   const drillDownAssigneeId = drillDownAssignee
     ? `assignee:${drillDownAssignee.toLowerCase()}${drillDownEpicPresetId ? `:${drillDownEpicPresetId}` : ""}`
+    : "";
+  const drillDownJqlId = drillDownJql
+    ? `jql:${`${drillDownJqlLabel}:${drillDownJql}`.slice(0, 160).toLowerCase()}`
     : "";
 
   // Both fields must match so "Unassigned" clicked from two different
@@ -151,7 +171,7 @@ const WorkWeekTasks = () => {
   );
 
   const hasDrillDownFilter =
-    drillDownKey.length > 0 || drillDownAssignee.length > 0;
+    drillDownKey.length > 0 || drillDownAssignee.length > 0 || drillDownJql.length > 0;
 
   const jqlRunsRef = React.useRef(jqlRuns);
   React.useEffect(() => {
@@ -170,11 +190,15 @@ const WorkWeekTasks = () => {
     if (drillDownAssignee) {
       return matchesDrillDownAssignee(run);
     }
+    if (drillDownJql) {
+      return run.drillDownType === "jql" && String(run.jql || "").trim() === drillDownJql;
+    }
     return true;
   });
   const drillDownDismissed =
     (drillDownKeyId && isDrillDownDismissed(drillDownKeyId)) ||
-    (drillDownAssigneeId && isDrillDownDismissed(drillDownAssigneeId));
+    (drillDownAssigneeId && isDrillDownDismissed(drillDownAssigneeId)) ||
+    (drillDownJqlId && isDrillDownDismissed(drillDownJqlId));
   const drillDownPending =
     hasDrillDownFilter && !drillDownDismissed && !hasDrillDownTab && !jqlError;
 
@@ -189,7 +213,7 @@ const WorkWeekTasks = () => {
         block: "start",
       });
     });
-  }, [hasDrillDownFilter, drillDownAssignee, drillDownKey]);
+  }, [hasDrillDownFilter, drillDownAssignee, drillDownJql, drillDownKey]);
 
   React.useEffect(() => {
     if (!drillDownKey || filtersLoading || isDrillDownDismissed(drillDownKeyId)) {
@@ -228,6 +252,34 @@ const WorkWeekTasks = () => {
     filtersLoading,
     handleDrillDownToAssignee,
     matchesDrillDownAssignee,
+  ]);
+
+  React.useEffect(() => {
+    if (!drillDownJql || filtersLoading || drillDownKey || drillDownAssignee || isDrillDownDismissed(drillDownJqlId)) {
+      return;
+    }
+
+    if (
+      jqlRunsRef.current.some(
+        (run) => run.isDrillDown && run.drillDownType === "jql" && String(run.jql || "").trim() === drillDownJql
+      )
+    ) {
+      return;
+    }
+
+    void handleDrillDownToJql(drillDownJql, drillDownJqlLabel).then((loaded) => {
+      if (loaded) {
+        setActiveRunIndex(0);
+      }
+    });
+  }, [
+    drillDownAssignee,
+    drillDownJql,
+    drillDownJqlId,
+    drillDownJqlLabel,
+    drillDownKey,
+    filtersLoading,
+    handleDrillDownToJql,
   ]);
 
   const handleResetSavedQueriesWithConfirm = React.useCallback(() => {
@@ -278,22 +330,88 @@ const WorkWeekTasks = () => {
     setHeaderPrefs((prev) => ({ ...prev, showUpcomingDueBanner: checked }));
   }, [setHeaderPrefs]);
 
+  const handleSharedProgramChange = React.useCallback(
+    (index, value) => {
+      const nextSlug = String(value || "").trim();
+      const previousSlug = String(jqlSharedProgramIds[index] || "").trim();
+      const previousProgram = sharedPrograms.find((program) => program.slug === previousSlug);
+      const nextProgram = sharedPrograms.find((program) => program.slug === nextSlug);
+
+      let nextInputs = jqlInputs;
+      let nextLabels = jqlLabels;
+      const nextProgramIds = patchSlotValue(jqlSharedProgramIds, index, nextSlug);
+
+      handleJqlSharedProgramChange(index, nextSlug);
+      if (nextProgram) {
+        const generatedJql = buildSharedProgramJql(nextProgram.epicRoots);
+        const previousGeneratedJql = buildSharedProgramJql(previousProgram?.epicRoots);
+        const { replaceJql, replaceLabel } = shouldReplaceSlotQueryForSharedProgram({
+          jql: jqlInputs[index],
+          label: jqlLabels[index],
+          index,
+          previousGeneratedJql,
+          previousLabel: previousProgram?.displayName || previousProgram?.slug || "",
+        });
+
+        if (replaceJql && generatedJql) {
+          nextInputs = patchSlotValue(jqlInputs, index, generatedJql);
+          handleJqlChange(index, generatedJql);
+        }
+        if (replaceLabel) {
+          const nextLabel = nextProgram.displayName || nextProgram.slug;
+          nextLabels = patchSlotValue(jqlLabels, index, nextLabel);
+          handleJqlLabelChange(index, nextLabel);
+        }
+      }
+
+      if (isConfiguredJqlSlot(nextInputs, nextLabels, index)) {
+        handleRunJql({
+          jqlInputs: nextInputs,
+          jqlLabels: nextLabels,
+          jqlSharedProgramIds: nextProgramIds,
+        });
+      }
+    },
+    [
+      handleJqlChange,
+      handleJqlLabelChange,
+      handleJqlSharedProgramChange,
+      handleRunJql,
+      jqlInputs,
+      jqlLabels,
+      jqlSharedProgramIds,
+      sharedPrograms,
+    ]
+  );
+
   const handleQuickPick = React.useCallback((index, preset) => {
-    if (!preset) return;
+    if (!preset) return { jqlInputs, jqlLabels };
     const jql = preset.presetType === "jql"
       ? String(preset.jql || "").trim()
       : (preset.epicKey ? `parent = ${preset.epicKey}` : "");
-    if (jql) handleJqlChange(index, jql);
-    if (preset.label) handleJqlLabelChange(index, preset.label);
-  }, [handleJqlChange, handleJqlLabelChange]);
+    let nextInputs = jqlInputs;
+    let nextLabels = jqlLabels;
+    if (jql) {
+      nextInputs = patchSlotValue(jqlInputs, index, jql);
+      handleJqlChange(index, jql);
+    }
+    if (preset.label) {
+      nextLabels = patchSlotValue(jqlLabels, index, preset.label);
+      handleJqlLabelChange(index, preset.label);
+    }
+    return { jqlInputs: nextInputs, jqlLabels: nextLabels };
+  }, [handleJqlChange, handleJqlLabelChange, jqlInputs, jqlLabels]);
 
   const handleQuickPickSelect = React.useCallback((index, presetId) => {
     if (!presetId) return;
     const preset = epicPresets.find((p) => String(p.id) === String(presetId));
     if (!preset) return;
-    handleQuickPick(index, preset);
+    const next = handleQuickPick(index, preset);
     setQuickPickValueBySlot((prev) => ({ ...prev, [index]: "" }));
-  }, [epicPresets, handleQuickPick]);
+    if (isConfiguredJqlSlot(next.jqlInputs, next.jqlLabels, index)) {
+      handleRunJql(next);
+    }
+  }, [epicPresets, handleQuickPick, handleRunJql]);
 
   const handleJqlCountChange = React.useCallback((value) => {
     setJqlCount(normalizeJqlCount(value));
@@ -316,9 +434,12 @@ const WorkWeekTasks = () => {
       if (drillDownAssignee && run.drillDownType === "assignee") {
         return matchesDrillDownAssignee(run);
       }
+      if (drillDownJql && run.drillDownType === "jql") {
+        return String(run.jql || "").trim() === drillDownJql;
+      }
       return false;
     },
-    [drillDownAssignee, drillDownKey, matchesDrillDownAssignee]
+    [drillDownAssignee, drillDownJql, drillDownKey, matchesDrillDownAssignee]
   );
 
   const handleClearDrillDownRun = React.useCallback(
@@ -395,7 +516,7 @@ const WorkWeekTasks = () => {
             onJqlCountChange={handleJqlCountChange}
             onJqlChange={handleJqlChange}
             onJqlLabelChange={handleJqlLabelChange}
-            onJqlSharedProgramChange={handleJqlSharedProgramChange}
+            onJqlSharedProgramChange={handleSharedProgramChange}
             quickPickValueBySlot={quickPickValueBySlot}
             onQuickPickSelect={handleQuickPickSelect}
             onImportSlot={setImportSlotIndex}
@@ -435,6 +556,8 @@ const WorkWeekTasks = () => {
                 {drillDownFilters.key ? `Filtering to ${drillDownFilters.key}` : null}
                 {drillDownFilters.key && drillDownFilters.assignee ? " · " : null}
                 {drillDownFilters.assignee ? `assignee ${drillDownFilters.assignee}` : null}
+                {drillDownFilters.assignee && drillDownEpicPresetId ? " in this project" : null}
+                {drillDownJql ? `${drillDownJqlLabel} tasks` : null}
                 {drillDownPending || jqlLoading ? " — loading from Jira…" : null}
                 {!drillDownPending && !jqlLoading && jqlError ? ` — ${jqlError}` : null}
               </p>

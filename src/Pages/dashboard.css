@@ -1460,7 +1460,9 @@
 
 .dashboard-page .dashboard-due-by-task-summary {
   color: #0f172a;
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
   line-height: 1.4;
 }
 

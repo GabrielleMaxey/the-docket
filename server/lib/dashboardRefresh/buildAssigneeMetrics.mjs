@@ -1,11 +1,20 @@
 import {
   computeAssigneeMetrics,
+  computeAssigneeMetricsFromIssueSet,
   computeContributorMetricsFromIssues,
   computeJqlWatchMetrics,
+  normalizeAssigneeName,
 } from "../../../shared/dashboardMetrics.mjs";
 import { buildDashboardMetricsJql } from "../epicFilterJql.mjs";
-import { resolveJiraUser, searchAllIssues } from "../jiraSearchHelpers.mjs";
+import { fetchJiraMyself, fetchJiraUsersByAccountIds, resolveJiraUser, searchAllIssues } from "../jiraSearchHelpers.mjs";
 import { buildEpicBreakdownForIssues, buildIssueEpicContext } from "./dueByHelpers.mjs";
+import {
+  buildDirectReportsJql,
+  extractAccountIdFromInput,
+  isCurrentUserMember,
+  looksLikeAccountId,
+  normalizeMemberNames,
+} from "../../../shared/directReportsJql.mjs";
 
 const escapeJqlString = (value) =>
   String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -149,6 +158,216 @@ const emptyJqlWatchMetric = (watched, error) => ({
   ...(error ? { error } : {}),
 });
 
+const resolveDirectReportLabel = (token, issues) => {
+  const accountId = extractAccountIdFromInput(token);
+  const email = String(token || "").trim().toLowerCase();
+  for (const issue of issues) {
+    const assignee = normalizeAssigneeName(issue);
+    if (accountId && assignee.accountId === accountId) {
+      return { displayName: assignee.displayName || token, accountId: assignee.accountId || accountId };
+    }
+    if (email.includes("@") && String(assignee.emailAddress || "").trim().toLowerCase() === email) {
+      return {
+        displayName: assignee.displayName || token,
+        accountId: assignee.accountId || "",
+      };
+    }
+  }
+  return { displayName: token, accountId: accountId || "" };
+};
+
+const pushDirectReportPerson = (roster, seen, person) => {
+  const queryName = String(person.queryName || "").trim();
+  const displayName = String(person.displayName || queryName).trim();
+  const accountId = String(person.accountId || "").trim();
+  if (!queryName && !displayName) {
+    return;
+  }
+  const idKey = accountId ? `id:${accountId}` : "";
+  const nameKey = `name:${(displayName || queryName).toLowerCase()}`;
+  if ((idKey && seen.has(idKey)) || seen.has(nameKey)) {
+    return;
+  }
+  if (idKey) {
+    seen.add(idKey);
+  }
+  seen.add(nameKey);
+  roster.push({
+    queryName: queryName || displayName,
+    displayName,
+    accountId,
+  });
+};
+
+const buildDirectReportRoster = async ({ memberNames, issues, jiraRequest, myself = null }) => {
+  const tokens = normalizeMemberNames(memberNames).filter(
+    (token) => !isCurrentUserMember(token, myself)
+  );
+  const accountIds = tokens.map((token) => extractAccountIdFromInput(token)).filter(Boolean);
+  const usersById = new Map();
+
+  for (const user of await fetchJiraUsersByAccountIds({ accountIds, jiraRequest })) {
+    if (user.accountId) {
+      usersById.set(user.accountId, user);
+    }
+  }
+
+  const roster = [];
+  const seen = new Set();
+  const myAccountId = String(myself?.accountId || "").trim();
+  const myName = String(myself?.displayName || "").trim().toLowerCase();
+
+  for (const issue of issues || []) {
+    const assignee = normalizeAssigneeName(issue);
+    if (!assignee.displayName && !assignee.accountId) {
+      continue;
+    }
+    if (myAccountId && assignee.accountId === myAccountId) {
+      continue;
+    }
+    if (myName && String(assignee.displayName || "").trim().toLowerCase() === myName) {
+      continue;
+    }
+    const resolved = assignee.accountId ? usersById.get(assignee.accountId) : null;
+    pushDirectReportPerson(roster, seen, {
+      queryName: resolved?.displayName || assignee.displayName || assignee.accountId,
+      displayName: resolved?.displayName || assignee.displayName || assignee.accountId,
+      accountId: assignee.accountId || resolved?.accountId || "",
+    });
+  }
+
+  for (const token of tokens) {
+    const accountId = extractAccountIdFromInput(token);
+    const user = accountId ? usersById.get(accountId) : null;
+    const fromIssues = resolveDirectReportLabel(token, issues);
+    const displayName = user?.displayName || fromIssues.displayName;
+    const resolvedAccountId = user?.accountId || fromIssues.accountId || accountId || "";
+    if (!displayName) {
+      continue;
+    }
+    if (looksLikeAccountId(displayName) && !user) {
+      continue;
+    }
+    if (isCurrentUserMember(displayName, myself) || isCurrentUserMember(resolvedAccountId, myself)) {
+      continue;
+    }
+
+    pushDirectReportPerson(roster, seen, {
+      queryName: displayName,
+      displayName,
+      accountId: resolvedAccountId,
+    });
+  }
+
+  return roster;
+};
+
+const buildDirectReportPersonMetrics = async ({
+  watched,
+  issues,
+  dueFieldId,
+  overdueFieldIds,
+  dueContext,
+  jiraRequest,
+  myself = null,
+}) => {
+  const jql = buildDirectReportsJql(watched.memberNames, myself) || watched.jql;
+  const groups = new Map();
+
+  for (const issue of issues || []) {
+    const assignee = normalizeAssigneeName(issue);
+    if (!assignee.displayName && !assignee.accountId) {
+      continue;
+    }
+    if (
+      isCurrentUserMember(assignee.displayName, myself) ||
+      isCurrentUserMember(assignee.accountId, myself)
+    ) {
+      continue;
+    }
+    const groupKey = String(assignee.accountId || assignee.displayName).trim().toLowerCase();
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, {
+        displayName: assignee.displayName || assignee.accountId,
+        accountId: assignee.accountId || "",
+        issues: [],
+      });
+    }
+    groups.get(groupKey).issues.push(issue);
+  }
+
+  const metrics = [...groups.values()].map((group) => ({
+    queryType: "direct_reports",
+    jql,
+    queryName: group.displayName,
+    resolvedDisplayName: group.displayName,
+    resolvedAccountId: group.accountId,
+    contributorMetrics: [],
+    epicBreakdown: [],
+    ...computeAssigneeMetricsFromIssueSet(
+      group.issues,
+      dueFieldId,
+      overdueFieldIds,
+      dueContext
+    ),
+  }));
+
+  const roster = await buildDirectReportRoster({
+    memberNames: watched.memberNames,
+    issues,
+    jiraRequest,
+    myself,
+  });
+  const seen = new Set();
+  for (const person of metrics) {
+    const accountId = String(person.resolvedAccountId || "").trim().toLowerCase();
+    const displayName = String(person.resolvedDisplayName || "").trim().toLowerCase();
+    if (accountId) {
+      seen.add(accountId);
+    }
+    if (displayName) {
+      seen.add(displayName);
+    }
+  }
+  for (const person of roster) {
+    const accountId = String(person.accountId || "").trim().toLowerCase();
+    const displayName = String(person.displayName || "").trim().toLowerCase();
+    if ((accountId && seen.has(accountId)) || (displayName && seen.has(displayName))) {
+      continue;
+    }
+    if (!accountId && !displayName) {
+      continue;
+    }
+    if (accountId) {
+      seen.add(accountId);
+    }
+    if (displayName) {
+      seen.add(displayName);
+    }
+    metrics.push({
+      queryType: "direct_reports",
+      jql,
+      queryName: person.displayName,
+      resolvedDisplayName: person.displayName,
+      resolvedAccountId: person.accountId,
+      contributorMetrics: [],
+      epicBreakdown: [],
+      ...emptyPersonWatchMetric(person.displayName),
+    });
+  }
+
+  if (metrics.length === 0) {
+    return [
+      emptyPersonWatchMetric(
+        watched.displayName,
+        "Add contributor names in Settings → My Direct Reports"
+      ),
+    ];
+  }
+
+  return metrics;
+};
+
 export const buildAssigneeMetricsForRefresh = async ({
   assigneeNames,
   watchedAssigneeIds,
@@ -202,8 +421,51 @@ export const buildAssigneeMetricsForRefresh = async ({
     }
 
     const watched = mapWatchedAssigneeRow(watchedRow);
-    if (watched.watchType === "jql") {
+    if (watched.watchType === "jql" || watched.watchType === "direct_reports") {
       try {
+        if (watched.watchType === "direct_reports") {
+          const myself = await fetchJiraMyself({ jiraRequest });
+          const rawJql = buildDirectReportsJql(watched.memberNames, myself);
+          if (!rawJql) {
+            assigneeMetrics.push(
+              ...(await buildDirectReportPersonMetrics({
+                watched,
+                issues: [],
+                dueFieldId,
+                overdueFieldIds,
+                dueContext: null,
+                jiraRequest,
+                myself,
+              }))
+            );
+            continue;
+          }
+          const metricsJql = buildDashboardMetricsJql(rawJql) || rawJql;
+          const { issues } = await searchAllIssues({
+            jql: metricsJql,
+            runJiraSearchRequest,
+          });
+          const dueContext = await buildAssigneeDueContext({
+            issues,
+            dueByDate,
+            dueByOptions,
+            mappingsByRole,
+            jiraRequest,
+          });
+          assigneeMetrics.push(
+            ...(await buildDirectReportPersonMetrics({
+              watched: { ...watched, jql: rawJql },
+              issues,
+              dueFieldId,
+              overdueFieldIds,
+              dueContext,
+              jiraRequest,
+              myself,
+            }))
+          );
+          continue;
+        }
+
         const metricsJql = buildDashboardMetricsJql(watched.jql) || watched.jql;
         const { issues } = await searchAllIssues({
           jql: metricsJql,
@@ -216,6 +478,7 @@ export const buildAssigneeMetricsForRefresh = async ({
           mappingsByRole,
           jiraRequest,
         });
+
         const metrics = computeJqlWatchMetrics(issues, [], dueFieldId, overdueFieldIds, dueContext);
         const contributorMetrics = computeContributorMetricsFromIssues(
           issues,
