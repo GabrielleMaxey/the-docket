@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import StatusPieChart from "../../../Components/StatusPieChart";
 import { buildContributorPieStatusCounts } from "../utils/dashboardMetricsUtils";
 import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
+import { formatPercent } from "../../../utils/format";
 import ContributorOverdueList from "./ContributorOverdueList";
 
 const ProjectContributorMetrics = ({
@@ -41,7 +42,8 @@ const ProjectContributorMetrics = ({
                 {person.name}
               </Link>
               <span className="dashboard-epic-contributor-stats">
-                {person.openIssues} open · {person.resolvedIssues} resolved
+                {person.openIssues} open · {person.resolvedIssues} resolved (
+                {formatPercent((person.resolvedIssues / person.totalIssues) * 100)})
                 {person.overdueOpenIssues > 0 ? ` · ${person.overdueOpenIssues} overdue` : ""}
                 {person.upcomingDueIssues?.length > 0
                   ? ` · ${person.upcomingDueIssues.length} upcoming`
