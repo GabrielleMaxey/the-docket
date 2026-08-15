@@ -120,6 +120,17 @@ const Dashboard = () => {
     return splitDueByIssues(issues);
   }, [snapshot?.dueByIssues]);
 
+  // Resolves the epic for the active project tab so the contributor section can scope to it.
+  const selectedProjectEpic = React.useMemo(() => {
+    if (activeProjectTab === "all") {
+      return null;
+    }
+    if (activeProjectTab.startsWith("pd-")) {
+      return pastDueEpics.find((epic) => `pd-${epic.id}` === activeProjectTab) || null;
+    }
+    return displayEpics.find((epic) => String(epic.id) === activeProjectTab) || null;
+  }, [activeProjectTab, displayEpics, pastDueEpics]);
+
   return (
     <Container className="dashboard-page">
       <Header as="h1">Project Metrics</Header>
@@ -348,6 +359,66 @@ const Dashboard = () => {
             </CollapsibleSection>
           ) : null}
 
+          {visibleSections.overdue &&
+          !selectedProjectEpic &&
+          (assigneeMetrics.length > 0 || assigneeNames.length > 0 || selectedWatchedIds.length > 0) ? (
+            <CollapsibleSection
+              title="Individual Contributor Metrics"
+              subtitle="Per-person workload and overdue performance for your selected people and custom queries."
+              storageKey="overdue"
+              persistKeyPrefix="dashboard-collapse-"
+              className="app-collapsible--spaced"
+              defaultOpen={true}
+              badge={
+                assigneeMetrics.length > 0
+                  ? `${assigneeMetrics.length} tracked`
+                  : "Refresh to load"
+              }
+            >
+              <DashboardRefreshActions
+                onRefresh={handleRefreshContributors}
+                onCancel={handleCancelRefresh}
+                loading={contributorsRefreshLoading}
+                canSubmit={canSubmitContributors}
+                submitLabel="Refresh contributors"
+                loadingHint={getDashboardRefreshLoadingHint("contributors")}
+                hint={
+                  hasContributorScope
+                    ? "Updates full-workload metrics for selected people and custom JQL watches."
+                    : "Select people or custom queries in Filters to refresh contributor metrics."
+                }
+              />
+              {assigneeMetrics.length > 0 ? (
+                <div className="dashboard-assignee-grid">
+                  {assigneeMetrics.map((person) =>
+                    person.queryType === "jql" ? (
+                      <JqlContributorMetricCard
+                        key={person.id}
+                        person={person}
+                        jiraBaseUrl={jiraBaseUrl}
+                        chartVariant={chartVariant}
+                        dueByDate={snapshot.dueByDate}
+                      />
+                    ) : (
+                      <AssigneeMetricCard
+                        key={person.id}
+                        person={person}
+                        jiraBaseUrl={jiraBaseUrl}
+                        chartVariant={chartVariant}
+                        dueByDate={snapshot.dueByDate}
+                      />
+                    )
+                  )}
+                </div>
+              ) : (
+                <Message info size="small">
+                  People are selected above — click <strong>Refresh contributors</strong> to load their
+                  full workload metrics (person watches use all assigned Jira issues).
+                </Message>
+              )}
+            </CollapsibleSection>
+          ) : null}
+
           {visibleSections.dueByUpcoming && snapshot.dueByDate ? (
             <CollapsibleSection
               title={`Upcoming due through ${snapshot.dueByDate}`}
@@ -441,67 +512,6 @@ const Dashboard = () => {
                   {snapshot.includePastDue
                     ? "No past due tasks in the current lookback window."
                     : "Past due rows are included only when Past Due Projects is enabled under Also include."}
-                </Message>
-              )}
-            </CollapsibleSection>
-          ) : null}
-
-          {visibleSections.overdue &&
-          (assigneeMetrics.length > 0 ||
-            assigneeNames.length > 0 ||
-            selectedWatchedIds.length > 0) ? (
-            <CollapsibleSection
-              title="Individual Contributor Metrics"
-              subtitle="Per-person workload and overdue performance for your selected people and custom queries."
-              storageKey="overdue"
-              persistKeyPrefix="dashboard-collapse-"
-              className="app-collapsible--spaced"
-              defaultOpen={true}
-              badge={
-                assigneeMetrics.length > 0
-                  ? `${assigneeMetrics.length} tracked`
-                  : "Refresh to load"
-              }
-            >
-              <DashboardRefreshActions
-                onRefresh={handleRefreshContributors}
-                onCancel={handleCancelRefresh}
-                loading={contributorsRefreshLoading}
-                canSubmit={canSubmitContributors}
-                submitLabel="Refresh contributors"
-                loadingHint={getDashboardRefreshLoadingHint("contributors")}
-                hint={
-                  hasContributorScope
-                    ? "Updates full-workload metrics for selected people and custom JQL watches."
-                    : "Select people or custom queries in Filters to refresh contributor metrics."
-                }
-              />
-              {assigneeMetrics.length > 0 ? (
-                <div className="dashboard-assignee-grid">
-                  {assigneeMetrics.map((person) =>
-                    person.queryType === "jql" ? (
-                      <JqlContributorMetricCard
-                        key={person.id}
-                        person={person}
-                        jiraBaseUrl={jiraBaseUrl}
-                        chartVariant={chartVariant}
-                        dueByDate={snapshot.dueByDate}
-                      />
-                    ) : (
-                      <AssigneeMetricCard
-                        key={person.id}
-                        person={person}
-                        jiraBaseUrl={jiraBaseUrl}
-                        chartVariant={chartVariant}
-                        dueByDate={snapshot.dueByDate}
-                      />
-                    )
-                  )}
-                </div>
-              ) : (
-                <Message info size="small">
-                  People are selected above — click <strong>Refresh contributors</strong> to load their
-                  full workload metrics (person watches use all assigned Jira issues).
                 </Message>
               )}
             </CollapsibleSection>

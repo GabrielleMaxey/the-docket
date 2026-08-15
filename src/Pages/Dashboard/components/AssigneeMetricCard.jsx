@@ -61,12 +61,14 @@ const AssigneeMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", dueByDa
         tasks={overdueTasks}
         jiraBaseUrl={jiraBaseUrl}
         variant="overdue"
+        personKey={assigneeName}
       />
       <ContributorDueTasksSection
         title={dueByDate ? `Upcoming due through ${dueByDate}` : "Upcoming due dates"}
         tasks={upcomingTasks}
         jiraBaseUrl={jiraBaseUrl}
         variant="upcoming"
+        personKey={assigneeName}
       />
       <EpicBreakdownList breakdown={epicBreakdown} jiraBaseUrl={jiraBaseUrl} />
     </div>
