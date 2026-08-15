@@ -50,7 +50,7 @@ const ProjectContributorMetrics = ({
                   : ""}
               </span>
             </div>
-            {Object.keys(person.openStatusCounts || {}).length > 0 || Number(person.resolvedIssues) > 0 ? (
+            {Object.keys(person.openStatusCounts || {}).length > 0 ? (
               <div className="dashboard-epic-contributor-chart">
                 <StatusPieChart
                   statusCounts={buildContributorPieStatusCounts(person)}
