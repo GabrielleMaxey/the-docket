@@ -8,11 +8,32 @@ import {
 } from "../../../services/jiraClient.js";
 import { useFlash } from "../../hooks/useFlash.js";
 
-const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError }) => {
+const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, epicPresets = [] }) => {
   const [watchedName, setWatchedName] = React.useState("");
   const [watchedJql, setWatchedJql] = React.useState("");
   const [watchType, setWatchType] = React.useState("person");
+  const [quickPickValue, setQuickPickValue] = React.useState("");
   const [flash, setFlash] = useFlash();
+
+  const handleQuickPickSelect = (presetId) => {
+    setQuickPickValue(presetId);
+    if (!presetId) return;
+    const preset = epicPresets.find((p) => String(p.id) === String(presetId));
+    if (!preset) return;
+    const jql =
+      preset.presetType === "jql"
+        ? String(preset.jql || "").trim()
+        : preset.epicKey
+          ? `parent = ${preset.epicKey}`
+          : "";
+    if (jql) {
+      setWatchedJql(jql);
+    }
+    if (!watchedName.trim() && preset.label) {
+      setWatchedName(preset.label);
+    }
+    setQuickPickValue("");
+  };
 
   const handleAddWatchedAssignee = async () => {
     const displayName = watchedName.trim();
@@ -25,6 +46,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError }
       setWatchedName("");
       setWatchedJql("");
       setWatchType("person");
+      setQuickPickValue("");
       setWatchedAssignees(await fetchWatchedAssignees());
       setFlash(watchType === "jql" ? "Custom query added." : "Person added.");
     } catch (err) {
@@ -50,9 +72,10 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError }
     >
       <p>
         Add people by display name to track their open task count and overdue rate, or define a
-        custom JQL query to scope a group — by project, team, label, or any combination. Each
-        entry appears as a quick-select chip on the Dashboard and is separate from the project
-        presets that drive the project tabs above.
+        custom JQL query to scope a group — by project, team, label, or any combination, or pick a
+        saved Epic/JQL preset to fill in the query for you. Each entry appears as a quick-select
+        chip on the Dashboard and is separate from the project presets that drive the project tabs
+        above.
       </p>
       <Table celled compact>
         <Table.Header>
@@ -93,8 +116,24 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError }
         <Form.Input label="Label" placeholder={watchType === "jql" ? "Platform team open tasks" : "jane.doe"}
           value={watchedName} onChange={(_e, { value }) => setWatchedName(value)} />
         {watchType === "jql" ? (
-          <Form.TextArea label="JQL" placeholder="assignee = currentUser() AND statusCategory != Done"
-            value={watchedJql} onChange={(_e, { value }) => setWatchedJql(value)} />
+          <>
+            {epicPresets.length > 0 ? (
+              <Form.Select
+                label="Quick pick (optional)"
+                placeholder="Choose a saved preset to fill in the JQL below…"
+                options={epicPresets.map((preset) => ({
+                  key: preset.id,
+                  value: preset.id,
+                  text: preset.label,
+                  description: preset.presetType === "jql" ? preset.jql : preset.epicKey,
+                }))}
+                value={quickPickValue}
+                onChange={(_e, { value }) => handleQuickPickSelect(value)}
+              />
+            ) : null}
+            <Form.TextArea label="JQL" placeholder="assignee = currentUser() AND statusCategory != Done"
+              value={watchedJql} onChange={(_e, { value }) => setWatchedJql(value)} />
+          </>
         ) : null}
         <Button onClick={handleAddWatchedAssignee}>Add</Button>
         {flash ? <Message positive size="mini" style={{ marginTop: "0.75rem" }}>✓ {flash}</Message> : null}
