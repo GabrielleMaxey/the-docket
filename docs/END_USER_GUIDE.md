@@ -194,7 +194,13 @@ On success, use **Add more detail in Jira** to open the new issue in your browse
 
 Appears after you Run JQL and get results. Shows:
 - Issue count chips (total, open, overdue, in progress) per query
-- A **📄 Project Report** section inside each query — click to expand, then **Generate Report** for an AI-written summary *from your perspective as the assignee*
+- A **📄 Project Report** section inside each query — click to expand, choose a **report scope**, a **report type**, then **Generate Report**:
+  - **Report scope** — what data the report is built from: **Current query results** (this slot, as loaded), **All my assigned work** (past 3/6/12 months — includes an issue if it had a status change, a reassignment, a note added in this app, or a comment added directly in Jira within that window; not just any Jira field update, and not limited to activity made through this app), or any other configured query slot on this Work Week page. Choosing a scope other than "Current query results" runs its own fresh Jira search rather than reusing what's already loaded.
+  - **Status Report** *(default)* — AI-written summary *from your perspective as the assignee*: how the project is tracking, what needs attention, next steps. Reads the scope's label and JQL to frame the report correctly — a closed-work scope gets a completed-work recap instead of being asked about "what needs attention"
+  - **1:1 Prep** — talking points for discussing your work with management (direct, skip-level, or otherwise) in a weekly or biweekly 1:1: workload, consistency, completion rate, potential blockers, and items to discuss now vs. coming up. Upward-facing, not a personal daily-standup recap
+  - **PWB Review** — first-person self-assessment prose for a quarterly, mid-year, or yearly PWB review (choose the period once selected)
+  - For 1:1 Prep and PWB Review, you can optionally add **your goals** and/or your **company/team goals** — the report will note where your work supports them, and honestly flag anything that seems disconnected. All three report types can reference Lumen's 8 Cultural Behaviors where the work genuinely demonstrates one, never as a forced checklist. Goals you enter are saved automatically (on this machine) so you don't have to retype them next time — each field shows a **Clear** button once it has text, for removing a saved value.
+  - **Status hygiene check:** all three report types check whether any of your top-priority Backlog items have a Jira comment within the last 14 days — a sign real work is happening even though the status was never updated. When that happens, the report names the item and suggests updating its status, so workload snapshots and self-assessments (this one and future ones) read accurately at a glance.
 - When a report is showing, use **Clear report** in the report header to remove it from this page only (does not delete copies in **Past Reports**)
 
 > The badge in the **📊 My Metrics** header shows your total open issue count at a glance.
@@ -241,7 +247,7 @@ Each row is one Jira issue. What you can do per row:
 
 A green banner confirms the active drill-down. Use **Clear filter** to remove the Dashboard filter from the URL while keeping any drill-down tabs you opened in this browser session. Use the small **x** on an individual green drill-down tab to remove only that tab.
 
-**MRD column:** The header shows **MRD** (hover for “Most Recent Done Date”). It displays the issue’s automated Most Recent Done Date when that field is set on the task. When the task has no MRD, the app walks the **parent chain** (for example Story → Epic) and shows the first ancestor that has an MRD. This uses the same ODI field mapping as Dashboard (`customfield_10009` by default). Standard Jira **Due date** is not shown in the table; it is still used behind the scenes for My Metrics past-due/upcoming counts and Chat context.
+**MRD column:** The header shows **MRD** (hover for “Most Recent Done Date”). It displays the issue’s automated Most Recent Done Date when that field is set on the task. When the task has no MRD, the app walks the **parent chain** (for example Story → Epic) and shows the first ancestor that has an MRD. This uses the same ODI field mapping as Dashboard (`customfield_10009` by default). Standard Jira **Due date** is not shown in the table, but if a task has one, it takes priority over the epic-level fallback for **My Metrics**’ overdue count (see below) and Chat context; most teams in this space don’t use per-task due dates today, so this is effectively the epic-level MRD/IDD in practice.
 
 On **shared projects**, link a Work Week slot to a **Shared program** (when the Atlas demo or future MySQL team DB is configured) so priorities sync across machines. Otherwise use local priority + NORA CSV import — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
 
@@ -349,6 +355,8 @@ Snapshot-based stand-up brief — overdue/upcoming highlights, contributor load,
 | **Files** | Live list of CoWork `weekly-plan-*.md` files in the data folder (read from disk; optional **Save to archive**) |
 
 For each tab: pick a row → **View** → expand the report to read, copy, or download. Dashboard archived reports may include the status chart that was shown at generation time.
+
+**Deleting:** Work Week, Dashboard, and Ad-hoc each have a **Delete** button per row and a **Delete all** button for the whole tab (both ask for confirmation first — this cannot be undone). **Files** never deletes the actual file on disk; instead, a file that's already been **Save to archive**d shows a **Remove from archive** button (and a **Remove all from archive** button appears once at least one file has an archived copy) that removes just the saved database copy — the file itself is untouched. Files with no archived copy show neither button, since there's nothing to remove; use **Save to archive** first if you want a removable copy.
 
 **CoWork weekly plans:** When Claude CoWork writes `weekly-plan-<date>.md` into the Task Manager `data/` folder, those files show under **Files**. Content is read live from disk until you click **Save to archive**, which copies it into the local Past Reports database as a week plan (so it remains after the file is moved or deleted).
 

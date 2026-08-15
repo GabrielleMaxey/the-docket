@@ -6,10 +6,13 @@ import {
   resolveFirstReadyReportProvider,
 } from "../lib/llmClient.mjs";
 import { loadWeeklyDigestFromDb } from "../lib/weeklyDigest.mjs";
+import { fetchLatestCommentTextBulk } from "../lib/jiraCommentText.mjs";
 import {
   insertGeneratedReport,
   getGeneratedReportById,
   listGeneratedReports,
+  deleteGeneratedReportById,
+  deleteGeneratedReportsBySource,
   REPORT_SOURCES,
 } from "../lib/reportArchive.mjs";
 import {
@@ -19,6 +22,13 @@ import {
 import { createLogger } from "../lib/logger.mjs";
 import { buildFieldMappingsMap, buildUnionScopeFromJqls, fallbackPresetJql } from "../lib/epicFilterJql.mjs";
 import { buildReportDueWindowsAndLinks } from "../lib/reportWorkWeekLinks.mjs";
+import {
+  CAREER_REPORT_TYPES,
+  buildOneOnOneSystemPrompt,
+  buildPwbSystemPrompt,
+  isValidCareerReportType,
+  isValidPwbPeriod,
+} from "../lib/careerReportPrompts.mjs";
 import { computeOverallRollup, normalizePastDueLookbackYears } from "../../shared/dashboardMetrics.mjs";
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildDirectReportsJql, isCurrentUserMember, isJqlCurrentUser, looksLikeAccountId } from "../../shared/directReportsJql.mjs";
@@ -547,17 +557,36 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
   // ─── Per-project report (WorkWeek task manager) ───────────────────────────
   app.post("/api/report/project", async (req, res) => {
     const label = String(req.body?.label || "Project").trim();
+    const jql = String(req.body?.jql || "").trim();
     const summary = req.body?.summary || {};
     const customInstructions = String(getCustomInstructionsStmt.get()?.value || "").trim();
+    const rawReportType = String(req.body?.reportType || "").trim();
+    const careerReportType = isValidCareerReportType(rawReportType) ? rawReportType : null;
+    const userGoals = String(req.body?.userGoals || "").trim();
+    const companyGoals = String(req.body?.companyGoals || "").trim();
+
+    if (careerReportType === CAREER_REPORT_TYPES.PWB && !isValidPwbPeriod(req.body?.pwbPeriod)) {
+      return res.status(400).json({ error: "A valid PWB review period (quarterly, mid_year, or yearly) is required." });
+    }
+    const pwbPeriod = careerReportType === CAREER_REPORT_TYPES.PWB ? req.body.pwbPeriod : null;
 
     const contextLines = [
       `## Project: ${label}`,
+    ];
+    if (jql) {
+      contextLines.push(`- Query (JQL): ${jql}`);
+    }
+    const totalCount = Number(summary.total) || 0;
+    const closedCount = Number(summary.closed) || 0;
+    const completionRatePercent = totalCount > 0 ? Math.round((closedCount / totalCount) * 1000) / 10 : null;
+    contextLines.push(
       `- Total issues: ${summary.total || 0}`,
       `- Open: ${summary.open || 0} | Resolved: ${summary.closed || 0}`,
+      `- Completion rate: ${completionRatePercent != null ? `${completionRatePercent}%` : "n/a (no issues in scope)"}`,
       `- Overdue: ${summary.overdue || 0}`,
       `- In Progress: ${summary.inProgress || 0}`,
-      `- Ready for Verification: ${summary.readyForVerification || 0}`,
-    ];
+      `- Ready for Verification: ${summary.readyForVerification || 0}`
+    );
     if (summary.statusBreakdown && Object.keys(summary.statusBreakdown).length > 0) {
       const parts = Object.entries(summary.statusBreakdown)
         .filter(([, v]) => Number(v) > 0)
@@ -566,24 +595,88 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
       if (parts) contextLines.push(`- Status breakdown: ${parts}`);
     }
     if (Array.isArray(summary.topPriorities) && summary.topPriorities.length > 0) {
+      // A Backlog-status issue with a recent Jira comment usually means real
+      // work is happening but the status was never updated to reflect it -
+      // exactly the kind of gap that makes "0 In Progress" look like a lull
+      // when it might not be one. Checked only for Backlog items (not all
+      // topPriorities) to keep the added Jira calls bounded.
+      const backlogKeys = summary.topPriorities
+        .filter((issue) => String(issue.status || "").trim().toLowerCase() === "backlog")
+        .map((issue) => issue.key)
+        .filter(Boolean);
+      const staleStatusKeys = new Set();
+      if (backlogKeys.length > 0) {
+        try {
+          const fourteenDaysAgo = new Date();
+          fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+          const cutoff = fourteenDaysAgo.toISOString().slice(0, 10);
+          const { items: latestComments } = await fetchLatestCommentTextBulk({
+            issueKeys: backlogKeys,
+            jiraRequest,
+          });
+          for (const key of backlogKeys) {
+            const created = String(latestComments?.[key]?.created || "");
+            if (created && created.slice(0, 10) >= cutoff) {
+              staleStatusKeys.add(key);
+            }
+          }
+        } catch (error) {
+          log.warn(
+            "Skipped backlog/comment status-hygiene check",
+            error instanceof Error ? error.message : error
+          );
+        }
+      }
+
       contextLines.push("", "### Top Priority Issues");
       for (const issue of summary.topPriorities) {
         const overdueFlag = issue.isOverdue ? " [OVERDUE]" : "";
-        contextLines.push(`- ${issue.key}: ${issue.summary} (${issue.status}, assigned: ${issue.assignee})${overdueFlag}`);
+        const staleStatusFlag = staleStatusKeys.has(issue.key)
+          ? " [Backlog status, but has a Jira comment within the last 14 days - status may be stale]"
+          : "";
+        contextLines.push(
+          `- ${issue.key}: ${issue.summary} (${issue.status}, assigned: ${issue.assignee})${overdueFlag}${staleStatusFlag}`
+        );
       }
     }
-    const systemParts = [
-      `You are writing a personal project status report for the assignee working on "${label}" at Lumen.
+
+    let systemPromptBase;
+    let archiveReportType = "work_week_project_report";
+    const archiveMeta = { summary, jql: jql || undefined };
+    if (careerReportType === CAREER_REPORT_TYPES.ONE_ON_ONE) {
+      systemPromptBase = buildOneOnOneSystemPrompt({ label, userGoals, companyGoals });
+      archiveReportType = "work_week_one_on_one";
+      archiveMeta.userGoals = userGoals || undefined;
+      archiveMeta.companyGoals = companyGoals || undefined;
+    } else if (careerReportType === CAREER_REPORT_TYPES.PWB) {
+      systemPromptBase = buildPwbSystemPrompt({ label, period: pwbPeriod, userGoals, companyGoals });
+      archiveReportType = "work_week_pwb_review";
+      archiveMeta.pwbPeriod = pwbPeriod;
+      archiveMeta.userGoals = userGoals || undefined;
+      archiveMeta.companyGoals = companyGoals || undefined;
+    } else {
+      systemPromptBase = `You are writing a personal project status report for the assignee working on "${label}" at Lumen.
 This report is written FROM the assignee's perspective and FOR their benefit — to help them understand their own workload, spot what needs attention, and feel clear on next steps.
 Write in second person ("you have", "your open items") so it reads as direct, useful feedback to the person doing the work.
 
-Summarize the project in 3-5 paragraphs:
-- How the project is tracking overall (completion %, pace)
-- What open items need the most attention, especially anything overdue
-- What's in progress and what should come next
-- Any risks or blockers to watch
+Before writing, look at the query's label and JQL below (if given) to understand what this query is actually scoped to, and let that shape the report - do not default to a generic "project status" framing if the query is narrower or different than that:
+- If the label/JQL implies only OPEN or IN-PROGRESS work (e.g. "My Open Work", "assignee = currentUser() AND statusCategory != Done"), focus on active workload, what needs attention, and next steps as usual.
+- If the label/JQL implies only CLOSED/RESOLVED work (e.g. "My Closed Work", "status in (Done, Resolved, Closed)"), do NOT talk about "what needs attention" or overdue items - instead recap what was completed and any notable outcomes. There may be little or nothing "open" to report on, and that's expected, not a gap.
+- If the label/JQL is scoped to a specific status, label, or subset (e.g. only overdue items, only a specific issue type), frame the whole report around that specific scope rather than treating the numbers as if they represent the assignee's entire workload.
+- If the label/JQL is unclear or looks like a general project/epic query, use the general framing below.
 
-Tone: supportive and honest — like a thoughtful colleague reviewing your work with you, not a manager writing a status update. No bullet lists — use flowing prose.`,
+Summarize in 3-5 paragraphs, using framing appropriate to what the query actually captures:
+- How the work in this query is tracking overall (completion %, pace) - or, for closed-only queries, what was accomplished
+- What open items need the most attention, especially anything overdue (skip this if the query has no open items to report)
+- What's in progress and what should come next (skip if not applicable to this query's scope)
+- Any risks or blockers to watch (skip if not applicable)
+
+If any item below is flagged as having recent Jira comment activity despite sitting in Backlog, mention it and suggest updating its status - real work may already be happening on it even though the status doesn't show that yet.
+
+Tone: supportive and honest — like a thoughtful colleague reviewing your work with you, not a manager writing a status update. No bullet lists — use flowing prose.`;
+    }
+    const systemParts = [
+      systemPromptBase,
       "Base your report ONLY on the data provided. Do not invent metrics or names.",
     ];
     if (customInstructions) systemParts.push(`\nAdditional instructions:\n${customInstructions}`);
@@ -591,11 +684,11 @@ Tone: supportive and honest — like a thoughtful colleague reviewing your work 
       const report = await callLLMForReport({ systemPrompt: systemParts.join("\n\n"), context: contextLines.join("\n"), label });
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.WORK_WEEK,
-        reportType: "work_week_project_report",
+        reportType: archiveReportType,
         label,
         content: report,
         createdAt: getClientArchiveTimestamp(req),
-        meta: { summary, ...getClientArchiveMeta(req) },
+        meta: { ...archiveMeta, ...getClientArchiveMeta(req) },
       });
       return res.json({ report, label, archiveId });
     } catch (error) {
@@ -833,6 +926,52 @@ Rules:
       log.error("archive get failed", error instanceof Error ? error.message : error);
       return res.status(500).json({
         error: "Failed to load archived report",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.delete("/api/reports/archive/:id", (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: "Invalid report id" });
+    }
+
+    try {
+      const deleted = deleteGeneratedReportById(db, id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      return res.json({ ok: true, id });
+    } catch (error) {
+      log.error("archive delete failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to delete archived report",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Bulk-delete every report in one Past Reports tab. `source` is required
+  // and must be a known value - unlike the list endpoint, where an empty
+  // filter harmlessly means "show everything", an empty filter here would
+  // mean "delete everything in the table", so that's refused rather than
+  // silently allowed.
+  app.delete("/api/reports/archive", (req, res) => {
+    const source = String(req.query?.source || "").trim();
+    if (!Object.values(REPORT_SOURCES).includes(source)) {
+      return res.status(400).json({
+        error: "A valid source query param is required (work_week, dashboard, or adhoc).",
+      });
+    }
+
+    try {
+      const deletedCount = deleteGeneratedReportsBySource(db, { source });
+      return res.json({ ok: true, deletedCount });
+    } catch (error) {
+      log.error("archive bulk delete failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to delete archived reports",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

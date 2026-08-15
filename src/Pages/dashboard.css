@@ -401,8 +401,9 @@
 }
 
 .dashboard-page .dashboard-epic-contributor-stats {
-  font-size: 0.76rem;
-  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
   text-align: right;
 }
 
