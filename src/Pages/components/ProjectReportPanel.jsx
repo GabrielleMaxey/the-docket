@@ -5,6 +5,7 @@ import ReportOutput from "../../Components/ReportOutput";
 import { useReportClipboard } from "../../hooks/useReportClipboard";
 import {
   fetchJiraSearchAll,
+  fetchLatestJiraCommentsBulk,
   fetchRecentlyNotedIssueKeys,
   generateProjectReport,
 } from "../../services/jiraClient";
@@ -192,26 +193,56 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
         if (reportScope === "all_work") {
           scopeLabel = `All my assigned work — past ${allWorkMonths} months`;
           const cutoff = monthsAgoDateString(allWorkMonths);
-          // "Touched" = a meaningful action, not just Jira's blanket `updated`
-          // timestamp (which bumps on any field change, including automated
-          // ones): a status change, a reassignment, or - merged in below - a
-          // note added in this app. Both changed-after clauses query Jira's
-          // own changelog server-side, not a full field-update comparison.
+          // "Touched" = one of four meaningful signals, not just Jira's
+          // blanket `updated` timestamp (bumps on any field change,
+          // including automated ones): a status change, a reassignment, a
+          // note added in this app, or a comment added directly in Jira -
+          // covering activity that happened outside this app too, not just
+          // through it.
           scopeJql = `assignee = currentUser() AND (status changed after "${cutoff}" OR assignee changed after "${cutoff}") ORDER BY updated DESC`;
-          const [{ issues: changedIssues }, notedKeys] = await Promise.all([
-            fetchJiraSearchAll({ jql: scopeJql, maxTotal: 500 }),
-            fetchRecentlyNotedIssueKeys(cutoff).catch(() => []),
-          ]);
-          let issues = changedIssues || [];
+
+          // Status/assignee changes are queried directly via Jira's own
+          // changelog (server-side, one search). Notes and comments aren't
+          // changelog fields Jira can filter by in a single query, so both
+          // need the full "currently assigned to me" pool as candidates to
+          // check individually against.
+          const [{ issues: changedIssues }, notedKeys, { issues: allAssignedIssues }] =
+            await Promise.all([
+              fetchJiraSearchAll({ jql: scopeJql, maxTotal: 500 }),
+              fetchRecentlyNotedIssueKeys(cutoff).catch(() => []),
+              fetchJiraSearchAll({ jql: "assignee = currentUser()", maxTotal: 500 }),
+            ]);
+
+          const issues = changedIssues || [];
           const knownKeys = new Set(issues.map((iss) => iss.key));
-          const missingNotedKeys = notedKeys.filter((key) => !knownKeys.has(key));
-          if (missingNotedKeys.length > 0) {
-            const { issues: notedIssues } = await fetchJiraSearchAll({
-              jql: `key in (${missingNotedKeys.join(",")}) AND assignee = currentUser()`,
-              maxTotal: missingNotedKeys.length,
-            }).catch(() => ({ issues: [] }));
-            issues = [...issues, ...(notedIssues || [])];
+          const notedKeySet = new Set(notedKeys);
+
+          for (const iss of allAssignedIssues || []) {
+            if (!knownKeys.has(iss.key) && notedKeySet.has(iss.key)) {
+              issues.push(iss);
+              knownKeys.add(iss.key);
+            }
           }
+
+          // Comments: no bulk "commented after" JQL clause exists, so the
+          // remaining unmatched candidates are checked one by one against
+          // Jira's own latest-comment timestamp.
+          const remainingCandidates = (allAssignedIssues || []).filter(
+            (iss) => !knownKeys.has(iss.key)
+          );
+          if (remainingCandidates.length > 0) {
+            const latestComments = await fetchLatestJiraCommentsBulk(
+              remainingCandidates.map((iss) => iss.key)
+            ).catch(() => ({}));
+            for (const iss of remainingCandidates) {
+              const created = String(latestComments?.[iss.key]?.created || "");
+              if (created && created.slice(0, 10) >= cutoff) {
+                issues.push(iss);
+                knownKeys.add(iss.key);
+              }
+            }
+          }
+
           const parentMostRecentDoneDateByKey = await buildParentMostRecentDoneDateMap(
             issues,
             mrdFieldId
