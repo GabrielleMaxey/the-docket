@@ -266,7 +266,12 @@ const ReportArchivePanel = ({
   const reloadList = React.useCallback(async () => {
     setLoading(true);
     setError("");
-    setSaveMessage("");
+    // Deliberately does NOT clear saveMessage - every caller already clears
+    // its own saveMessage at the start of its own handler, and several
+    // callers set a NEW message before calling this (e.g. "Saved to
+    // archive", "Removed the archived copy") that needs to survive the
+    // reload that follows it. Clearing it here would wipe that message the
+    // instant reloadList runs, before it was ever shown.
 
     try {
       if (coworkOnly) {
@@ -364,6 +369,9 @@ const ReportArchivePanel = ({
 
         try {
           await deleteArchivedReport(archivedId);
+          setSaveMessage(
+            `Removed the archived copy of “${item.label || item.filename}”. The file has not been deleted - it's still in the data folder - but it won't show as available to view here unless you click Save to archive again.`
+          );
           await reloadList();
         } catch (deleteError) {
           setDetailError(deleteError instanceof Error ? deleteError.message : "Failed to remove archived copy");
@@ -403,12 +411,13 @@ const ReportArchivePanel = ({
 
   const handleDeleteAll = React.useCallback(async () => {
     if (coworkOnly) {
-      if (filesWithArchivedCopy.length === 0) {
+      const removedCount = filesWithArchivedCopy.length;
+      if (removedCount === 0) {
         return;
       }
       if (
         !window.confirm(
-          `Remove ${filesWithArchivedCopy.length} archived cop${filesWithArchivedCopy.length !== 1 ? "ies" : "y"} from Past Reports? The files themselves stay on disk.`
+          `Remove ${removedCount} archived cop${removedCount !== 1 ? "ies" : "y"} from Past Reports? The files themselves stay on disk.`
         )
       ) {
         return;
@@ -421,6 +430,9 @@ const ReportArchivePanel = ({
       try {
         await Promise.all(
           filesWithArchivedCopy.map((item) => deleteArchivedReport(archivedByFilename[item.filename]))
+        );
+        setSaveMessage(
+          `Removed ${removedCount} archived cop${removedCount !== 1 ? "ies" : "y"} from Past Reports. Those files have not been deleted - they're still in the data folder - but won't show as available to view here unless you click Save to archive again.`
         );
         await reloadList();
       } catch (deleteError) {
