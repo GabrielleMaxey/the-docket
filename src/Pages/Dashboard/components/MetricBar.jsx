@@ -1,7 +1,6 @@
 import { formatPercent } from "../../../utils/format";
 import { getMappedStatusColor } from "../../../utils/statusScale";
 
-// Returns null for unmapped labels so the bar stays untinted.
 const getMetricBarColor = (label) => getMappedStatusColor(label);
 
 const MetricBar = ({ label, value, count }) => {

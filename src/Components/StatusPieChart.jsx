@@ -7,8 +7,7 @@ import { getStatusColor } from "../utils/statusScale";
 //   "pie"  (default) — existing SVG pie with legend
 //   "bar"            — vertical SVG bar chart with legend
 //
-// Colours come from src/utils/statusScale.js so the same status is always the
-// same colour across every chart, regardless of sort order or call site.
+// Colours come from statusScale.js, so a status stays the same colour everywhere.
 
 const polarToCartesian = (center, radius, angle) => ({
   x: center + radius * Math.cos(angle),

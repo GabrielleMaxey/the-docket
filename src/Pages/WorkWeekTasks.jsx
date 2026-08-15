@@ -141,9 +141,8 @@ const WorkWeekTasks = () => {
     ? `assignee:${drillDownAssignee.toLowerCase()}${drillDownEpicPresetId ? `:${drillDownEpicPresetId}` : ""}`
     : "";
 
-  // A drill-down run matches only when both the assignee AND the epic scope
-  // agree, so "Unassigned" clicked from two different project cards (e.g.
-  // NORA vs. ask-greg) never collide into the same tab.
+  // Both fields must match so "Unassigned" clicked from two different
+  // project cards doesn't collide into the same tab.
   const matchesDrillDownAssignee = React.useCallback(
     (run) =>
       String(run.drillDownAssignee || "").trim() === drillDownAssignee &&

@@ -404,13 +404,10 @@ const JiraResultsTable = ({
       setKeyFilterByRunIndex((prevFilters) => ({ ...prevFilters, [stateKey]: key }));
     }
     if (assignee) {
-      // The dropdown's own "Unassigned" option uses the sentinel value
-      // "__unassigned__" (matched by filterIssues against issues with no
-      // assignee). A drill-down arriving from the URL carries the literal
-      // display string "Unassigned" instead - seeding the filter with that
-      // raw string compares real issues' empty assignee names against the
-      // word "Unassigned" and never matches, silently filtering out every
-      // row while the "Loaded N of N" count above stays correct.
+      // filterIssues expects the sentinel "__unassigned__", not the literal
+      // word "Unassigned" that arrives via the URL - seeding it unconverted
+      // silently filters out every row (issues have no assignee name to
+      // match against the literal string).
       const isUnassignedDrillDown =
         assignee.toLowerCase() === "unassigned" || assignee.toLowerCase() === "__unassigned__";
       const filterValue = isUnassignedDrillDown ? "__unassigned__" : assignee;

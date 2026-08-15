@@ -321,11 +321,10 @@ export const fetchEpicPresets = async () => {
 };
 
 // Resolves a preset's real scope JQL (epic-key fallback, Jira filter lookup,
-// or hand-authored JQL text - whichever the preset actually uses), with any
-// trailing ORDER BY stripped. Callers wrap it themselves: `(${scopeJql}) AND
-// <clause>`. Never string-concatenate a clause onto a preset's raw jql field
-// directly - preset JQL can be an unparenthesized OR chain, so a clause
-// appended without wrapping only scopes the last OR-branch.
+// or hand-authored JQL), with the trailing ORDER BY stripped. Wrap it
+// yourself: `(${scopeJql}) AND <clause>` - preset JQL can be an
+// unparenthesized OR chain, so appending a clause without wrapping only
+// scopes the last OR-branch.
 export const fetchEpicPresetScopeJql = async (epicPresetId) => {
   const id = String(epicPresetId || "").trim();
   if (!id) {

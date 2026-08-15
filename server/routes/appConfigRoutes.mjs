@@ -188,13 +188,10 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
     return res.json(mapEpicPresetRow(getEpicPresetStmt.get(id)));
   });
 
-  // Resolves a preset's real scope JQL (handling epic-key fallback,
-  // jira_filter_id lookup, and hand-authored JQL text identically to how
-  // the Dashboard's own metrics are computed) with any trailing ORDER BY
-  // stripped, so a caller can safely wrap it: `(${scopeJql}) AND <clause>`.
-  // Needed because preset JQL can be an unparenthesized OR chain (e.g.
-  // "A AND B OR C") - concatenating a clause onto the raw string without
-  // this stripping+wrapping step would only scope the last OR-branch.
+  // Resolves a preset's real scope JQL (epic-key fallback, jira_filter_id
+  // lookup, or hand-authored JQL - same as the Dashboard's own metrics) with
+  // any trailing ORDER BY stripped, so a caller can safely wrap it:
+  // `(${scopeJql}) AND <clause>`.
   app.get("/api/epic-presets/:id/scope-jql", async (req, res) => {
     const id = Number(req.params.id);
     const row = getEpicPresetStmt.get(id);

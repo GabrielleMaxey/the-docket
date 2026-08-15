@@ -1,7 +1,6 @@
 import { formatPercent } from "../../../utils/format";
 
-// tone: "blue" | "orange" | "teal" — ignored when warning is true, since the
-// warning state always renders in the reserved alarm colour.
+// tone selects the card's rail/fill colour; ignored when warning is true.
 const OverallSummaryCard = ({
   label,
   description,

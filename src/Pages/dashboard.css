@@ -735,10 +735,9 @@
   width: auto;
 }
 
-/* Per-contributor cards: center the chart+legend group instead of hugging
-   the left edge. Compound selector (both classes on one element) so this
-   wins over the plain .dashboard-epic-status-breakdown row-layout rule
-   above regardless of source order. */
+/* Compound selector (both classes on one element) wins over the plain
+   .dashboard-epic-status-breakdown row-layout rule above regardless of
+   source order, so per-contributor cards center instead of hugging left. */
 .dashboard-page .dashboard-assignee-status-breakdown.dashboard-epic-status-breakdown .dashboard-pie-chart--compact {
   justify-content: center;
 }
