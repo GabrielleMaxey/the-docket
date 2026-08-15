@@ -602,6 +602,7 @@ export const generateIssueDescription = async ({ summary, issueType, epicKey, ep
 
 export const generateProjectReport = async ({
   label,
+  jql,
   summary,
   reportType,
   pwbPeriod,
@@ -613,6 +614,7 @@ export const generateProjectReport = async ({
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       label,
+      jql,
       summary,
       reportType,
       pwbPeriod,

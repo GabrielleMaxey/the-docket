@@ -122,6 +122,7 @@ const ProjectReportPanel = ({ run, jiraRowPriorities }) => {
         };
         const result = await generateProjectReport({
           label: run.label || `Run ${(run.index || 0) + 1}`,
+          jql: run.jql || "",
           summary,
           reportType,
           pwbPeriod: reportType === "pwb" ? pwbPeriod : undefined,
