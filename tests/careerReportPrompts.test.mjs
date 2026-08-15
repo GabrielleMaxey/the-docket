@@ -166,6 +166,12 @@ describe("buildPwbSystemPrompt", () => {
     assert.match(prompt, /Lead a cross-team initiative/);
   });
 
+  it("instructs treating a Backlog item with recent comment activity as real effort, and suggests a status fix", () => {
+    const prompt = buildPwbSystemPrompt({ label: "NORA", period: PWB_PERIODS.QUARTERLY, userGoals: "", companyGoals: "" });
+    assert.match(prompt, /recent Jira comment activity despite sitting in Backlog/i);
+    assert.match(prompt, /a status update is worth doing/i);
+  });
+
   it("always includes the Lumen core values block", () => {
     const prompt = buildPwbSystemPrompt({ label: "NORA", period: PWB_PERIODS.QUARTERLY, userGoals: "", companyGoals: "" });
     assert.match(prompt, /Lumen's 8 Cultural Behaviors/);

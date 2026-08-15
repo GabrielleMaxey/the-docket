@@ -147,6 +147,8 @@ Structure it as 3-5 paragraphs of flowing prose (no bullet lists) covering:
 - How the work connects to stated goals, if goals are provided below
 - A candid look at what's ahead or what didn't go as planned, if the data supports that
 
+If any item below is flagged as having recent Jira comment activity despite sitting in Backlog, treat that as genuine effort worth reflecting in the self-assessment - a stale status shouldn't make real work invisible in a formal review - and mention that a status update is worth doing so future snapshots of this work are accurate.
+
 Where the work genuinely reflects one of Lumen's 8 Cultural Behaviors (listed below for reference), you may name it naturally in a sentence - but only when the specific work actually demonstrates it, never as a checklist or forced mention of all eight.`,
     goalsSection,
     formatLumenCoreValuesBlock(),
