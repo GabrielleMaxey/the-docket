@@ -213,6 +213,11 @@ export const fetchIssueMetadataBulk = async (issueKeys) => {
   return data?.items || {};
 };
 
+export const fetchRecentlyNotedIssueKeys = async (since) => {
+  const data = await requestJson(`/api/jira/issue-metadata/recent-notes?since=${encodeURIComponent(since)}`);
+  return Array.isArray(data?.issueKeys) ? data.issueKeys : [];
+};
+
 export const fetchLatestJiraCommentsBulk = async (issueKeys) => {
   const data = await requestJson("/api/jira/issues/comments/latest/bulk", {
     method: "POST",

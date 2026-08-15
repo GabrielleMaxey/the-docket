@@ -3,7 +3,11 @@ import { Button, Checkbox, Form } from "semantic-ui-react";
 import CollapsibleSection from "../../Components/CollapsibleSection";
 import ReportOutput from "../../Components/ReportOutput";
 import { useReportClipboard } from "../../hooks/useReportClipboard";
-import { fetchJiraSearchAll, generateProjectReport } from "../../services/jiraClient";
+import {
+  fetchJiraSearchAll,
+  fetchRecentlyNotedIssueKeys,
+  generateProjectReport,
+} from "../../services/jiraClient";
 import { saveChatSessionArtifact } from "../../utils/chatSessionContext";
 import {
   buildParentMostRecentDoneDateMap,
@@ -21,6 +25,19 @@ import {
   loadWorkWeekProjectReport,
   saveWorkWeekProjectReport,
 } from "../../utils/pageReportPersistence";
+
+// Plain literal date arithmetic, not JQL relative-date syntax. Jira JQL's
+// relative-date units are y/w/d/h/m (minutes) - there is no "months" unit,
+// so "-3M" (the earlier, broken version of this) silently matched nothing.
+// Computing an actual date and embedding it as a literal avoids that class
+// of bug entirely, and matches how this app already does relative-date
+// filtering everywhere else (see computePastDueFloorDate in
+// shared/dashboardMetrics.mjs).
+const monthsAgoDateString = (months) => {
+  const d = new Date();
+  d.setMonth(d.getMonth() - Number(months || 0));
+  return d.toISOString().slice(0, 10);
+};
 
 const isIssueOpen = (issue) => {
   const status = String(issue?.fields?.status?.name || issue?.status || "").toLowerCase();
@@ -174,13 +191,32 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
 
         if (reportScope === "all_work") {
           scopeLabel = `All my assigned work — past ${allWorkMonths} months`;
-          scopeJql = `assignee = currentUser() AND updated >= -${allWorkMonths}M ORDER BY updated DESC`;
-          const { issues } = await fetchJiraSearchAll({ jql: scopeJql, maxTotal: 500 });
+          const cutoff = monthsAgoDateString(allWorkMonths);
+          // "Touched" = a meaningful action, not just Jira's blanket `updated`
+          // timestamp (which bumps on any field change, including automated
+          // ones): a status change, a reassignment, or - merged in below - a
+          // note added in this app. Both changed-after clauses query Jira's
+          // own changelog server-side, not a full field-update comparison.
+          scopeJql = `assignee = currentUser() AND (status changed after "${cutoff}" OR assignee changed after "${cutoff}") ORDER BY updated DESC`;
+          const [{ issues: changedIssues }, notedKeys] = await Promise.all([
+            fetchJiraSearchAll({ jql: scopeJql, maxTotal: 500 }),
+            fetchRecentlyNotedIssueKeys(cutoff).catch(() => []),
+          ]);
+          let issues = changedIssues || [];
+          const knownKeys = new Set(issues.map((iss) => iss.key));
+          const missingNotedKeys = notedKeys.filter((key) => !knownKeys.has(key));
+          if (missingNotedKeys.length > 0) {
+            const { issues: notedIssues } = await fetchJiraSearchAll({
+              jql: `key in (${missingNotedKeys.join(",")}) AND assignee = currentUser()`,
+              maxTotal: missingNotedKeys.length,
+            }).catch(() => ({ issues: [] }));
+            issues = [...issues, ...(notedIssues || [])];
+          }
           const parentMostRecentDoneDateByKey = await buildParentMostRecentDoneDateMap(
-            issues || [],
+            issues,
             mrdFieldId
           );
-          summary = buildSummaryFromIssues(issues || [], jiraRowPriorities, {
+          summary = buildSummaryFromIssues(issues, jiraRowPriorities, {
             dueFieldId,
             mrdFieldId,
             parentMostRecentDoneDateByKey,
@@ -279,7 +315,7 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
         >
           <span className="app-report-type-btn-label">All my assigned work</span>
           <span className="app-report-type-btn-desc">
-            Open and closed, by when it was last updated.
+            Open and closed — status changes, reassignments, or notes in the window.
           </span>
         </button>
         {otherRuns.map((r) => (

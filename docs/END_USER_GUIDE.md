@@ -195,7 +195,7 @@ On success, use **Add more detail in Jira** to open the new issue in your browse
 Appears after you Run JQL and get results. Shows:
 - Issue count chips (total, open, overdue, in progress) per query
 - A **📄 Project Report** section inside each query — click to expand, choose a **report scope**, a **report type**, then **Generate Report**:
-  - **Report scope** — what data the report is built from: **Current query results** (this slot, as loaded), **All my assigned work** (open and closed, by when last updated — past 3/6/12 months), or any other configured query slot on this Work Week page. Choosing a scope other than "Current query results" runs its own fresh Jira search rather than reusing what's already loaded.
+  - **Report scope** — what data the report is built from: **Current query results** (this slot, as loaded), **All my assigned work** (past 3/6/12 months — includes an issue if it had a status change, a reassignment, or a note added in this app within that window; not just any Jira field update), or any other configured query slot on this Work Week page. Choosing a scope other than "Current query results" runs its own fresh Jira search rather than reusing what's already loaded.
   - **Status Report** *(default)* — AI-written summary *from your perspective as the assignee*: how the project is tracking, what needs attention, next steps. Reads the scope's label and JQL to frame the report correctly — a closed-work scope gets a completed-work recap instead of being asked about "what needs attention"
   - **1:1 Prep** — short, scannable bullet points for a weekly or biweekly 1:1 with your manager
   - **PWB Review** — first-person self-assessment prose for a quarterly, mid-year, or yearly PWB review (choose the period once selected)
