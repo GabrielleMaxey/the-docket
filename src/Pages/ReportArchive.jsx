@@ -5,6 +5,8 @@ import ReportOutput from "../Components/ReportOutput";
 import ReportDiagrams from "./Dashboard/components/ReportDiagrams";
 import { useReportClipboard } from "../hooks/useReportClipboard";
 import {
+  deleteArchivedReport,
+  deleteArchivedReportsBySource,
   fetchArchivedReportById,
   fetchArchivedReports,
   fetchCoworkWeeklyPlanByFilename,
@@ -68,6 +70,8 @@ const ReportList = ({
   onSelect,
   onSaveToArchive,
   savingId,
+  onDelete,
+  deletingId,
   emptyMessage,
 }) => {
   if (loading) {
@@ -126,6 +130,19 @@ const ReportList = ({
                   Save to archive
                 </Button>
               ) : null}
+              {!isCoworkFileItem(item) && onDelete ? (
+                <Button
+                  size="mini"
+                  negative
+                  basic
+                  style={{ marginLeft: "0.35rem" }}
+                  loading={deletingId === item.id}
+                  disabled={deletingId === item.id}
+                  onClick={() => onDelete(item)}
+                >
+                  Delete
+                </Button>
+              ) : null}
             </Table.Cell>
           </Table.Row>
         ))}
@@ -149,6 +166,8 @@ const ReportArchivePanel = ({
   const [detailError, setDetailError] = React.useState("");
   const [savingId, setSavingId] = React.useState(null);
   const [saveMessage, setSaveMessage] = React.useState("");
+  const [deletingId, setDeletingId] = React.useState(null);
+  const [deletingAll, setDeletingAll] = React.useState(false);
 
   const reportForClipboard = selectedReport
     ? { report: selectedReport.content, label: selectedReport.label }
@@ -272,9 +291,80 @@ const ReportArchivePanel = ({
     [selectedId, selectedReport, reloadList]
   );
 
+  const handleDeleteReport = React.useCallback(
+    async (item) => {
+      if (!window.confirm(`Delete “${item.label || "Untitled"}”? This cannot be undone.`)) {
+        return;
+      }
+
+      setDeletingId(item.id);
+      setDetailError("");
+      setSaveMessage("");
+
+      try {
+        await deleteArchivedReport(item.id);
+        if (selectedId === item.id) {
+          setSelectedId(null);
+          setSelectedReport(null);
+        }
+        await reloadList();
+      } catch (deleteError) {
+        setDetailError(deleteError instanceof Error ? deleteError.message : "Failed to delete report");
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [selectedId, reloadList]
+  );
+
+  const handleDeleteAll = React.useCallback(async () => {
+    if (coworkOnly) {
+      return;
+    }
+    if (items.length === 0) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `Delete all ${items.length} report${items.length !== 1 ? "s" : ""} in this tab? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingAll(true);
+    setDetailError("");
+    setSaveMessage("");
+
+    try {
+      await deleteArchivedReportsBySource(source);
+      setSelectedId(null);
+      setSelectedReport(null);
+      await reloadList();
+    } catch (deleteError) {
+      setDetailError(deleteError instanceof Error ? deleteError.message : "Failed to delete reports");
+    } finally {
+      setDeletingAll(false);
+    }
+  }, [coworkOnly, items.length, source, reloadList]);
+
   return (
     <div className="report-archive-panel">
-      <Header as="h3" className="report-archive-subtitle">{title}</Header>
+      <div className="report-archive-header-row">
+        <Header as="h3" className="report-archive-subtitle">{title}</Header>
+        {!coworkOnly && items.length > 0 ? (
+          <Button
+            size="mini"
+            negative
+            basic
+            loading={deletingAll}
+            disabled={deletingAll}
+            onClick={handleDeleteAll}
+          >
+            Delete all
+          </Button>
+        ) : null}
+      </div>
       {saveMessage ? <Message positive size="small">{saveMessage}</Message> : null}
       {selectedReport && !detailLoading ? (
         <Message info size="small">
@@ -296,6 +386,8 @@ const ReportArchivePanel = ({
           onSelect={handleSelect}
           onSaveToArchive={coworkOnly ? handleSaveToArchive : undefined}
           savingId={savingId}
+          onDelete={coworkOnly ? undefined : handleDeleteReport}
+          deletingId={deletingId}
           emptyMessage={emptyMessage}
         />
       </CollapsibleSection>

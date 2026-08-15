@@ -663,6 +663,18 @@ export const fetchArchivedReportById = async (id) => {
   return data?.item || null;
 };
 
+export const deleteArchivedReport = async (id) => {
+  return requestJson(`/api/reports/archive/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+};
+
+export const deleteArchivedReportsBySource = async (source) => {
+  return requestJson(`/api/reports/archive?source=${encodeURIComponent(source)}`, {
+    method: "DELETE",
+  });
+};
+
 export const saveAdHocReport = async ({ content, label, userPrompt, provider }) => {
   return requestJson("/api/reports/archive", {
     method: "POST",

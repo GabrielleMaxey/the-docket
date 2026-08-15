@@ -507,6 +507,8 @@ All routes mounted by `server/jiraProxy.mjs`.
 | GET | `/api/reports/weekly-digest` | Snapshot-based weekly digest (markdown, no LLM) |
 | GET | `/api/reports/archive` | List archived reports (`?source=work_week\|dashboard\|adhoc`, `?limit=`) |
 | GET | `/api/reports/archive/:id` | Single archived report (includes content) |
+| DELETE | `/api/reports/archive/:id` | Delete one archived report |
+| DELETE | `/api/reports/archive?source=...` | Delete every archived report matching `source` (`work_week\|dashboard\|adhoc` required - refuses an empty/unknown source rather than deleting the whole table) |
 | POST | `/api/reports/archive` | Manual save (Chat → Ad-hoc; body: `content`, optional `label`, `userPrompt`, `provider`) |
 | POST | `/api/report/project` | Work Week per-query AI report (auto-archived) |
 | POST | `/api/plan/week` | Work Week AI week planner (auto-archived) |

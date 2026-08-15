@@ -11,6 +11,8 @@ import {
   insertGeneratedReport,
   getGeneratedReportById,
   listGeneratedReports,
+  deleteGeneratedReportById,
+  deleteGeneratedReportsBySource,
   REPORT_SOURCES,
 } from "../lib/reportArchive.mjs";
 import {
@@ -924,6 +926,52 @@ Rules:
       log.error("archive get failed", error instanceof Error ? error.message : error);
       return res.status(500).json({
         error: "Failed to load archived report",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.delete("/api/reports/archive/:id", (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: "Invalid report id" });
+    }
+
+    try {
+      const deleted = deleteGeneratedReportById(db, id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      return res.json({ ok: true, id });
+    } catch (error) {
+      log.error("archive delete failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to delete archived report",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Bulk-delete every report in one Past Reports tab. `source` is required
+  // and must be a known value - unlike the list endpoint, where an empty
+  // filter harmlessly means "show everything", an empty filter here would
+  // mean "delete everything in the table", so that's refused rather than
+  // silently allowed.
+  app.delete("/api/reports/archive", (req, res) => {
+    const source = String(req.query?.source || "").trim();
+    if (!Object.values(REPORT_SOURCES).includes(source)) {
+      return res.status(400).json({
+        error: "A valid source query param is required (work_week, dashboard, or adhoc).",
+      });
+    }
+
+    try {
+      const deletedCount = deleteGeneratedReportsBySource(db, { source });
+      return res.json({ ok: true, deletedCount });
+    } catch (error) {
+      log.error("archive bulk delete failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to delete archived reports",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
