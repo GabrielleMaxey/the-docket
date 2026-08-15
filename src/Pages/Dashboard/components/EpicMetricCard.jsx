@@ -97,6 +97,12 @@ const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePas
               value={epic.totalIssues > 0 ? (workloadStatuses.inProgress / epic.totalIssues) * 100 : 0}
             />
           ) : null}
+          {workloadStatuses.backlog > 0 ? (
+            <MetricBar
+              label="Backlog"
+              value={epic.totalIssues > 0 ? (workloadStatuses.backlog / epic.totalIssues) * 100 : 0}
+            />
+          ) : null}
           {!isJqlPreset ? (
             <MetricBar label="Project complete" value={epic.epicPercent} />
           ) : hasEpicBreakdown ? (
@@ -113,8 +119,8 @@ const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePas
           ) : (
             <p className="dashboard-assignee-meta">
               {getTerminalIssueCount(epic)} resolved · {epic.overdueOpenIssues} past due open / {epic.openIssues}{" "}
-              open · {workloadStatuses.inProgress} in progress · {workloadStatuses.readyForVerification} ready
-              for verification
+              open · {workloadStatuses.inProgress} in progress · {workloadStatuses.backlog} backlog ·{" "}
+              {workloadStatuses.readyForVerification} ready for verification
               {dueByDate && epic.dueByOpenIssues > 0 ? (
                 <strong className="dashboard-due-by-count">
                   {" "}&middot; {epic.dueByOpenIssues} upcoming due by {dueByDate}
