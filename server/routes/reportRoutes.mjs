@@ -6,6 +6,7 @@ import {
   resolveFirstReadyReportProvider,
 } from "../lib/llmClient.mjs";
 import { loadWeeklyDigestFromDb } from "../lib/weeklyDigest.mjs";
+import { fetchLatestCommentTextBulk } from "../lib/jiraCommentText.mjs";
 import {
   insertGeneratedReport,
   getGeneratedReportById,
@@ -592,10 +593,48 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
       if (parts) contextLines.push(`- Status breakdown: ${parts}`);
     }
     if (Array.isArray(summary.topPriorities) && summary.topPriorities.length > 0) {
+      // A Backlog-status issue with a recent Jira comment usually means real
+      // work is happening but the status was never updated to reflect it -
+      // exactly the kind of gap that makes "0 In Progress" look like a lull
+      // when it might not be one. Checked only for Backlog items (not all
+      // topPriorities) to keep the added Jira calls bounded.
+      const backlogKeys = summary.topPriorities
+        .filter((issue) => String(issue.status || "").trim().toLowerCase() === "backlog")
+        .map((issue) => issue.key)
+        .filter(Boolean);
+      const staleStatusKeys = new Set();
+      if (backlogKeys.length > 0) {
+        try {
+          const fourteenDaysAgo = new Date();
+          fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+          const cutoff = fourteenDaysAgo.toISOString().slice(0, 10);
+          const { items: latestComments } = await fetchLatestCommentTextBulk({
+            issueKeys: backlogKeys,
+            jiraRequest,
+          });
+          for (const key of backlogKeys) {
+            const created = String(latestComments?.[key]?.created || "");
+            if (created && created.slice(0, 10) >= cutoff) {
+              staleStatusKeys.add(key);
+            }
+          }
+        } catch (error) {
+          log.warn(
+            "Skipped backlog/comment status-hygiene check",
+            error instanceof Error ? error.message : error
+          );
+        }
+      }
+
       contextLines.push("", "### Top Priority Issues");
       for (const issue of summary.topPriorities) {
         const overdueFlag = issue.isOverdue ? " [OVERDUE]" : "";
-        contextLines.push(`- ${issue.key}: ${issue.summary} (${issue.status}, assigned: ${issue.assignee})${overdueFlag}`);
+        const staleStatusFlag = staleStatusKeys.has(issue.key)
+          ? " [Backlog status, but has a Jira comment within the last 14 days - status may be stale]"
+          : "";
+        contextLines.push(
+          `- ${issue.key}: ${issue.summary} (${issue.status}, assigned: ${issue.assignee})${overdueFlag}${staleStatusFlag}`
+        );
       }
     }
 
@@ -629,6 +668,8 @@ Summarize in 3-5 paragraphs, using framing appropriate to what the query actuall
 - What open items need the most attention, especially anything overdue (skip this if the query has no open items to report)
 - What's in progress and what should come next (skip if not applicable to this query's scope)
 - Any risks or blockers to watch (skip if not applicable)
+
+If any item below is flagged as having recent Jira comment activity despite sitting in Backlog, mention it and suggest updating its status - real work may already be happening on it even though the status doesn't show that yet.
 
 Tone: supportive and honest — like a thoughtful colleague reviewing your work with you, not a manager writing a status update. No bullet lists — use flowing prose.`;
     }

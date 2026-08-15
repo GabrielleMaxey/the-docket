@@ -89,6 +89,12 @@ describe("buildOneOnOneSystemPrompt", () => {
     assert.match(prompt, /completion rate is given directly in the data, use that exact number/i);
   });
 
+  it("instructs treating a Backlog item with recent comment activity as active work, not a lull, and suggests a status fix", () => {
+    const prompt = buildOneOnOneSystemPrompt({ label: "NORA", userGoals: "", companyGoals: "" });
+    assert.match(prompt, /recent Jira comment activity despite sitting in Backlog/i);
+    assert.match(prompt, /suggest moving it to a status that reflects the actual work/i);
+  });
+
   it("instructs against manufacturing a consistency trend the data doesn't support", () => {
     const prompt = buildOneOnOneSystemPrompt({ label: "NORA", userGoals: "", companyGoals: "" });
     assert.match(prompt, /don't manufacture a trend that isn't there/i);
