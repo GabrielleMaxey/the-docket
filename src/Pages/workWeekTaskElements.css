@@ -1390,7 +1390,7 @@
   color: #0c93d9;
   background: #e8f5fd;
   border-radius: 8px;
-  padding: 0.25rem 0.45rem;
+  padding: 0.18rem 0.35rem;
   font-size: 0.74rem;
   font-weight: 600;
   cursor: pointer;
@@ -1520,7 +1520,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.15rem;
+  gap: 0.5rem;
 }
 
 .work-week-page .ww-cell-status-assignee {
@@ -1641,7 +1641,7 @@
 }
 
 .work-week-page .ww-note-image-add {
-  padding: 0.3rem 0.5rem;
+  padding: 0.22rem 0.4rem;
   border: 1px solid #94a3b8;
   border-radius: 5px;
   background: white;
@@ -1715,7 +1715,7 @@
 .work-week-page .ww-save-btn {
   width: 100%;
   border-radius: 8px;
-  padding: 0.45rem 0.75rem;
+  padding: 0.35rem 0.6rem;
   font-size: 0.85rem;
   font-weight: 600;
   line-height: 1.25;
