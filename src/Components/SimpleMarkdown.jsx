@@ -1,7 +1,43 @@
-const renderInline = (text, keyPrefix) =>
-  text.split(/\*\*(.+?)\*\*/g).map((part, i) =>
-    i % 2 === 1 ? <strong key={`${keyPrefix}-b-${i}`}>{part}</strong> : part
-  );
+// Matches **bold** or [label](url). Internal hash-router links (starting
+// with "/#/" or "#/") navigate in place; anything else (a real https:// Jira
+// browse link, for example) opens in a new tab.
+const INLINE_PATTERN = /\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\)/g;
+
+const renderInline = (text, keyPrefix) => {
+  const nodes = [];
+  let lastIndex = 0;
+  let match;
+  let i = 0;
+
+  INLINE_PATTERN.lastIndex = 0;
+  while ((match = INLINE_PATTERN.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+    if (match[1] !== undefined) {
+      nodes.push(<strong key={`${keyPrefix}-b-${i}`}>{match[1]}</strong>);
+    } else {
+      const label = match[2];
+      const url = match[3];
+      const isInternal = url.startsWith("/#/") || url.startsWith("#/");
+      nodes.push(
+        <a
+          key={`${keyPrefix}-a-${i}`}
+          href={url}
+          {...(isInternal ? {} : { target: "_blank", rel: "noreferrer" })}
+        >
+          {label}
+        </a>
+      );
+    }
+    i += 1;
+    lastIndex = INLINE_PATTERN.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+  return nodes;
+};
 
 const SimpleMarkdown = ({ text }) => {
   if (!text) {
