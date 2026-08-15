@@ -11,7 +11,6 @@ import {
 } from "../../../shared/dashboardMetrics.mjs";
 import {
   buildDashboardMetricsJql,
-  buildPastDueJql,
   resolvePresetJql,
 } from "../epicFilterJql.mjs";
 import { fetchEpicIssue, resolveJiraUser, searchAllIssues } from "../jiraSearchHelpers.mjs";
@@ -188,124 +187,6 @@ const resolveJqlPresetDueByIssues = async ({
   }
 
   return [...jqlDueByIssues, ...epicDueByAdditions];
-};
-
-export const buildPastDueOnlyEpicMetrics = async ({
-  ctx,
-  jiraRequest,
-  runJiraSearchRequest,
-}) => {
-  const epicMetrics = [];
-  const scopedChildIssues = [];
-  log.info("dashboard query type: past_due");
-  const pastDueJql = buildPastDueJql({
-    mappingsByRole: ctx.mappingsByRole,
-    epicPastDueMode: ctx.epicPastDueMode,
-    epicKeys: [],
-    pastDueFloorDate: ctx.pastDueFloor,
-  });
-  const { issues } = await searchAllIssues({ jql: pastDueJql, runJiraSearchRequest });
-  const groups = new Map();
-
-  for (const issue of issues) {
-    const issueKey = String(issue.key || "").trim();
-    const isEpic = String(issue.fields?.issuetype?.name || "").toLowerCase() === "epic";
-    const epicKey = isEpic ? issueKey : String(issue.fields?.parent?.key || issueKey).trim();
-    if (!groups.has(epicKey)) {
-      groups.set(epicKey, { epicIssue: isEpic ? issue : null, issues: [] });
-    }
-    const group = groups.get(epicKey);
-    if (isEpic && !group.epicIssue) {
-      group.epicIssue = issue;
-    }
-    group.issues.push(issue);
-  }
-
-  for (const [epicKey, group] of groups.entries()) {
-    const epicIssue =
-      group.epicIssue ||
-      (await fetchEpicIssue({ epicKey, mappingsByRole: ctx.mappingsByRole, jiraRequest }));
-    const epicName = String(epicIssue?.fields?.summary || epicKey).trim() || epicKey;
-    const childMetrics = computeChildIssueMetrics(
-      group.issues,
-      epicKey,
-      ctx.dueFieldId,
-      ctx.dueByDate,
-      ctx.overdueFieldIds,
-      ctx.dueByOptions ? { ...ctx.dueByOptions, epicIssue } : null
-    );
-    const epicPercent = computeEpicPercent(epicIssue, ctx.mappingsByRole);
-    const { isPastDue, pastDueReason } = computeEpicPastDue({
-      epicIssue,
-      mappingsByRole: ctx.mappingsByRole,
-      epicPastDueMode: ctx.epicPastDueMode,
-      pastDueFloor: ctx.pastDueFloor,
-      trackPastDue: ctx.includePastDue,
-    });
-
-    const contributorDueByOptions = buildContributorDueContext(ctx, epicIssue);
-
-    let childDueByForEpic = childMetrics.dueByIssues;
-    const openChildKeys = new Set(
-      childMetrics.childIssues
-        .filter((issue) => isIssueOpen(issue))
-        .map((issue) => String(issue.key || ""))
-    );
-
-    const epicLevelDueBy = buildEpicLevelDueByIssues({
-      epicIssue,
-      childIssues: childMetrics.childIssues,
-      epicKey,
-      dueByDate: ctx.dueByDate,
-      candidateFieldIds: ctx.candidateFieldIds,
-      existingDueByKeys: new Set(childDueByForEpic.map((i) => i.key)),
-      pastDueFloor: ctx.pastDueFloor,
-      includePastDueInList: ctx.includePastDue,
-    });
-
-    if (ctx.dueByOptions?.preferEpicCompareForChildren && epicLevelDueBy.length > 0) {
-      childDueByForEpic = childMetrics.dueByIssues.filter((item) => !openChildKeys.has(item.key));
-    }
-
-    const { combined, dueByOpenIssues } = combineDueByIssues(
-      { ...childMetrics, dueByIssues: childDueByForEpic },
-      epicLevelDueBy
-    );
-
-    epicMetrics.push({
-      epicPresetId: null,
-      epicKey,
-      epicName,
-      issuePercent: childMetrics.issuePercent,
-      epicPercent,
-      overduePercent: childMetrics.overduePercent,
-      totalIssues: childMetrics.totalIssues,
-      completedIssues: childMetrics.completedIssues,
-      resolvedIssues: childMetrics.resolvedIssues,
-      openIssues: childMetrics.openIssues,
-      overdueOpenIssues: childMetrics.overdueOpenIssues,
-      dueByOpenIssues,
-      dueByIssues: combined,
-      initialDoneDate: formatDateOnly(getFieldValue(epicIssue, ctx.iddFieldId)),
-      mostRecentDoneDate: formatDateOnly(getFieldValue(epicIssue, ctx.mrdFieldId)),
-      projectEndDate: formatDateOnly(getFieldValue(epicIssue, ctx.pedFieldId)),
-      isPastDue,
-      pastDueReason,
-      statusCounts: childMetrics.statusCounts,
-      openStatusCounts: childMetrics.openStatusCounts,
-      contributorMetrics: computeContributorMetricsFromIssues(
-        childMetrics.childIssues,
-        ctx.dueFieldId,
-        ctx.overdueFieldIds,
-        contributorDueByOptions
-      ),
-      childIssues: childMetrics.childIssues,
-    });
-
-    scopedChildIssues.push(...childMetrics.childIssues);
-  }
-
-  return { epicMetrics, scopedChildIssues };
 };
 
 export const buildEpicMetricsFromPresets = async ({
@@ -495,8 +376,8 @@ export const buildEpicMetricsForRefresh = async ({
   jiraRequest,
   runJiraSearchRequest,
 }) => {
-  if (selectedPresets.length === 0 && ctx.includePastDue) {
-    return buildPastDueOnlyEpicMetrics({ ctx, jiraRequest, runJiraSearchRequest });
+  if (!Array.isArray(selectedPresets) || selectedPresets.length === 0) {
+    return { epicMetrics: [], scopedChildIssues: [] };
   }
 
   return buildEpicMetricsFromPresets({

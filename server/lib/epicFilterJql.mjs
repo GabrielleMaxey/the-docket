@@ -227,3 +227,69 @@ export const buildPastDueJql = ({
 
   return `${jql} ORDER BY updated DESC`;
 };
+
+export const buildUnionScopeFromJqls = (jqls) => {
+  const scopes = (Array.isArray(jqls) ? jqls : [])
+    .map((jql) => splitTrailingOrderBy(String(jql || "").trim()).scope)
+    .filter(Boolean);
+  if (scopes.length === 0) {
+    return "";
+  }
+  return scopes.map((scope) => `(${scope})`).join(" OR ");
+};
+
+export const applyJqlScope = (jql, unionScope) => {
+  const source = String(jql || "").trim();
+  const scopeClause = String(unionScope || "").trim();
+  if (!source || !scopeClause) {
+    return "";
+  }
+  const { scope, orderBy } = splitTrailingOrderBy(source);
+  if (!scope) {
+    return "";
+  }
+  return `(${scope}) AND (${scopeClause}) ${orderBy || "ORDER BY updated DESC"}`.trim();
+};
+
+const applyEpicKeyScope = (jql, epicKeys = []) => {
+  const scopedKeys = (Array.isArray(epicKeys) ? epicKeys : [])
+    .map((key) => String(key || "").trim())
+    .filter((key) => key && key !== "JQL");
+  if (scopedKeys.length === 0) {
+    return String(jql || "").trim();
+  }
+
+  const { scope, orderBy } = splitTrailingOrderBy(jql);
+  const keysList = scopedKeys.join(", ");
+  const scoped = scope
+    ? `(${scope}) AND (parent in (${keysList}) OR key in (${keysList}))`
+    : `(parent in (${keysList}) OR key in (${keysList}))`;
+  return `${scoped} ${orderBy || "ORDER BY updated DESC"}`.trim();
+};
+
+export const buildUpcomingDueJql = ({
+  mappingsByRole,
+  dueByField = "due_date",
+  dueByDate,
+  epicKeys = [],
+}) => {
+  const cutoff = String(dueByDate || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cutoff)) {
+    return "";
+  }
+
+  const role = dueByField === "due_date" ? "due_date" : String(dueByField || "due_date").trim();
+  const dueRef = jqlFieldRef(mappingsByRole?.get?.(role)) || "duedate";
+  const jql = `statusCategory != Done AND ${dueRef} >= startOfDay() AND ${dueRef} <= "${cutoff}" ORDER BY ${dueRef} ASC`;
+  return applyEpicKeyScope(jql, epicKeys);
+};
+
+export const buildStatusCategoryJql = ({ category, epicKeys = [] }) => {
+  const cat = String(category || "").trim();
+  if (!cat) {
+    return "";
+  }
+  const escaped = cat.replace(/"/g, '\\"');
+  const jql = `statusCategory = "${escaped}" ORDER BY updated DESC`;
+  return applyEpicKeyScope(jql, epicKeys);
+};

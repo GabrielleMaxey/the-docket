@@ -368,7 +368,9 @@ const JiraResultsTable = ({
   React.useEffect(() => {
     const key = String(drillDownFilters?.key || "").trim();
     const assignee = String(drillDownFilters?.assignee || "").trim();
-    const hasFilters = Boolean(key || assignee);
+    const jql = String(drillDownFilters?.jql || "").trim();
+    const epicPresetId = String(drillDownFilters?.epicPresetId || "").trim();
+    const hasFilters = Boolean(key || assignee || jql);
 
     if (!hasFilters) {
       if (!hadDrillDownFiltersRef.current) {
@@ -387,7 +389,7 @@ const JiraResultsTable = ({
 
     hadDrillDownFiltersRef.current = true;
 
-    const targetTab = findRunIndexForDrillDown(visibleRuns, { key, assignee });
+    const targetTab = findRunIndexForDrillDown(visibleRuns, { key, assignee, jql, epicPresetId });
     const safeTargetTab = targetTab >= 0 ? targetTab : 0;
     const targetRun = visibleRuns[safeTargetTab];
     const stateKey = getRunStateKey(targetRun, safeTargetTab);

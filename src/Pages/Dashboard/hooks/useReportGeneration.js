@@ -13,6 +13,13 @@ import {
   useAttachBackgroundJob,
   useBackgroundJobRunning,
 } from "../../../hooks/useBackgroundJobs.js";
+import {
+  collapseTerminalStatusCounts,
+  sumEpicMetrics,
+  sumWorkloadCounts,
+  workloadCountsToPieData,
+} from "../utils/dashboardMetricsUtils";
+import { isJqlCurrentUser, looksLikeAccountId } from "../../../../shared/directReportsJql.mjs";
 
 export const AUDIENCE_OPTIONS = [
   {
@@ -31,9 +38,20 @@ export const AUDIENCE_OPTIONS = [
     label: "Developer Report",
     description: "Team workload, overdue items by person, WIP, and upcoming tasks",
   },
+  {
+    value: "direct_reports",
+    label: "Ad-hoc team report",
+    description:
+      "From Settings → My Direct Reports. Select those chips and Refresh contributors — not project JQLs.",
+  },
 ];
 
-export const useReportGeneration = ({ epics = [], overallStatusCounts, chartVariant = "pie" }) => {
+export const useReportGeneration = ({
+  epics = [],
+  overallStatusCounts,
+  chartVariant = "pie",
+  assignees = [],
+}) => {
   const persisted = loadDashboardReportState();
 
   const [audience, setAudience] = React.useState(persisted?.audience || "executive");
@@ -58,6 +76,23 @@ export const useReportGeneration = ({ epics = [], overallStatusCounts, chartVari
     selectedEpicIds.length > 0
       ? selectedEpicIds
       : epics.map((e) => e.epicPresetId).filter(Boolean);
+
+  const selectedEpics = React.useMemo(() => {
+    if (selectedEpicIds.length === 0) {
+      return epics;
+    }
+    const selected = new Set(selectedEpicIds);
+    return epics.filter((epic) => selected.has(epic.epicPresetId));
+  }, [epics, selectedEpicIds]);
+
+  const scopedStatusCounts = React.useMemo(() => {
+    if (selectedEpics.length === 0) {
+      return overallStatusCounts;
+    }
+    return collapseTerminalStatusCounts(sumEpicMetrics(selectedEpics).statusCounts);
+  }, [selectedEpics, overallStatusCounts]);
+
+  const allProjectsSelected = selectedEpicIds.length === 0;
 
   const selectedOption = AUDIENCE_OPTIONS.find((o) => o.value === audience);
 
@@ -92,21 +127,31 @@ export const useReportGeneration = ({ epics = [], overallStatusCounts, chartVari
     setReport(null);
     setReportStatusCounts(null);
 
-    const hasChartData =
-      overallStatusCounts &&
-      Object.values(overallStatusCounts).some((value) => Number(value) > 0);
     const trimmedContext = additionalContext.trim();
 
     runBackgroundJob(BACKGROUND_JOB_IDS.DASHBOARD_REPORT, {
       label: `Generating ${selectedOption?.label || "report"}`,
       run: async () => {
+        const isAdhocTeam = audience === "direct_reports";
+        const teamPeople = assignees.filter(
+          (person) =>
+            (person?.queryType === "direct_reports" ||
+              (person?.queryType === "person" && Boolean(String(person?.jql || "").trim()))) &&
+            !isJqlCurrentUser(person.resolvedDisplayName || person.queryName) &&
+            !looksLikeAccountId(person.resolvedDisplayName || person.queryName)
+        );
+        const adhocCounts = workloadCountsToPieData(sumWorkloadCounts(teamPeople));
+        const countsForRequest = isAdhocTeam ? adhocCounts : scopedStatusCounts;
+        const hasChartData =
+          countsForRequest &&
+          Object.values(countsForRequest).some((value) => Number(value) > 0);
         const result = await generateReport({
           audience,
-          epicPresetIds: epicIds,
+          epicPresetIds: isAdhocTeam ? [] : epicIds,
           additionalContext: trimmedContext,
-          ...(hasChartData ? { statusCounts: overallStatusCounts, chartVariant } : {}),
+          ...(hasChartData ? { statusCounts: countsForRequest, chartVariant } : {}),
         });
-        const nextStatusCounts = result?.statusCounts || (hasChartData ? overallStatusCounts : null);
+        const nextStatusCounts = result?.statusCounts || (hasChartData ? countsForRequest : null);
         const nextChartVariant = result?.chartVariant || chartVariant || "pie";
 
         saveDashboardReportState({
@@ -141,8 +186,10 @@ export const useReportGeneration = ({ epics = [], overallStatusCounts, chartVari
     additionalContext,
     selectedEpicIds,
     selectedOption?.label,
-    overallStatusCounts,
+    scopedStatusCounts,
     chartVariant,
+    assignees,
+    applyReportResult,
   ]);
 
   const toggleEpicSelection = React.useCallback(
@@ -150,10 +197,16 @@ export const useReportGeneration = ({ epics = [], overallStatusCounts, chartVari
       setSelectedEpicIds((prev) => {
         const all = epics.map((e) => e.epicPresetId).filter(Boolean);
         const current = prev.length === 0 ? all : prev;
+        if (prev.length === 0) {
+          return [epicPresetId];
+        }
         const next = current.includes(epicPresetId)
           ? current.filter((id) => id !== epicPresetId)
           : [...current, epicPresetId];
-        return next.length === all.length ? [] : next;
+        if (next.length === 0 || next.length === all.length) {
+          return [];
+        }
+        return next;
       });
     },
     [epics]
@@ -178,9 +231,11 @@ export const useReportGeneration = ({ epics = [], overallStatusCounts, chartVari
     error,
     copied,
     selectedEpicIds,
+    allProjectsSelected,
     additionalContext,
     setAdditionalContext,
     selectedOption,
+    scopedStatusCounts,
     handleGenerate,
     handleClearReport,
     handleCopy,

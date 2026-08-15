@@ -571,23 +571,25 @@ export async function loadDrillDownIssuesByAssignee({
     const isUnassigned =
       assignee.toLowerCase() === "unassigned" || assignee.toLowerCase() === "__unassigned__";
 
-    let jql;
-    if (isUnassigned && scopedPresetId) {
-      // Reuses the preset's own resolved scope (same numbers the Dashboard
-      // card shows) rather than reconstructing an approximation.
-      let scopeJql = "";
+    let scopeJql = "";
+    if (scopedPresetId) {
       try {
         scopeJql = await fetchEpicPresetScopeJql(scopedPresetId);
       } catch {
         scopeJql = "";
       }
-      jql = scopeJql
-        ? `(${scopeJql}) AND assignee is EMPTY ORDER BY updated DESC`
-        : `project = ${UNASSIGNED_DRILLDOWN_PROJECT_KEY} AND assignee is EMPTY ORDER BY updated DESC`;
+    }
+
+    const assigneeClause = isUnassigned
+      ? "assignee is EMPTY"
+      : `assignee = "${escapeJqlString(assignee)}"`;
+    let jql;
+    if (scopeJql) {
+      jql = `(${scopeJql}) AND ${assigneeClause} ORDER BY updated DESC`;
     } else if (isUnassigned) {
       jql = `project = ${UNASSIGNED_DRILLDOWN_PROJECT_KEY} AND assignee is EMPTY ORDER BY updated DESC`;
     } else {
-      jql = `assignee = "${escapeJqlString(assignee)}" ORDER BY updated DESC`;
+      jql = `${assigneeClause} ORDER BY updated DESC`;
     }
 
     const data = await fetchJiraSearchAll({ jql, maxTotal: jqlMaxResults });
@@ -599,13 +601,15 @@ export async function loadDrillDownIssuesByAssignee({
     const total = Number(data?.total ?? issues.length);
 
     if (issues.length === 0) {
-      setJqlError(
-        isUnassigned
-          ? scopedPresetId
-            ? "No unassigned issues found in this project."
-            : "No unassigned issues found."
-          : `No open issues found for assignee "${assignee}".`
-      );
+      let emptyMessage = `No open issues found for assignee "${assignee}".`;
+      if (scopedPresetId && isUnassigned) {
+        emptyMessage = "No unassigned issues found in this project.";
+      } else if (scopedPresetId) {
+        emptyMessage = `No issues found for assignee "${assignee}" in this project.`;
+      } else if (isUnassigned) {
+        emptyMessage = "No unassigned issues found.";
+      }
+      setJqlError(emptyMessage);
       return false;
     }
 
@@ -614,7 +618,7 @@ export async function loadDrillDownIssuesByAssignee({
       drillDownId: makeDrillDownId("assignee", `${assignee}${scopeSuffix}`),
       drillDownType: "assignee",
       drillDownValue: assignee,
-      label: `Drill-down: ${assignee}`,
+      label: scopedPresetId ? `Drill-down: ${assignee} (project)` : `Drill-down: ${assignee}`,
       jql,
       issues,
       total,
@@ -667,3 +671,99 @@ export async function loadDrillDownIssuesByAssignee({
     setJqlLoading(false);
   }
 }
+
+export async function loadDrillDownByJql({
+  jql,
+  label,
+  jqlMaxResults = 200,
+  pullLatestComment,
+  clampPriority,
+  setJqlRuns,
+  setJqlLoading,
+  setJiraRowPriorities,
+  setPrioritySourceByKey,
+  setJiraNotes,
+  setJqlError,
+  hydrateNoteImages,
+  fieldMappingRows,
+  isStale = () => false,
+}) {
+  const query = String(jql || "").trim();
+  const tabLabel = String(label || "Work Week").trim() || "Work Week";
+  if (!query) {
+    return false;
+  }
+
+  const drillDownId = makeDrillDownId("jql", `${tabLabel}:${query}`.slice(0, 160));
+  if (isDrillDownDismissed(drillDownId)) {
+    return false;
+  }
+
+  setJqlLoading(true);
+  setJqlError("");
+
+  try {
+    const data = await fetchJiraSearchAll({ jql: query, maxTotal: jqlMaxResults });
+    if (isStale()) {
+      return false;
+    }
+
+    const issues = data?.issues || [];
+    const total = Number(data?.total ?? issues.length);
+    const drillRun = {
+      index: DRILL_DOWN_RUN_INDEX,
+      drillDownId,
+      drillDownType: "jql",
+      drillDownValue: query,
+      label: tabLabel,
+      jql: query,
+      issues,
+      total,
+      loaded: issues.length,
+      loadComplete: issues.length >= total,
+      error: null,
+      isDrillDown: true,
+    };
+
+    const enriched = await enrichRunWithParentDoneDates(drillRun, fieldMappingRows);
+    const issueKeys = issues
+      .map((issue) => String(issue.key || "").trim())
+      .filter(Boolean);
+
+    try {
+      await applyDrillDownMetadata({
+        issueKeys,
+        pullLatestComment,
+        clampPriority,
+        setJiraRowPriorities,
+        setJiraNotes,
+        hydrateNoteImages,
+      });
+    } catch (error) {
+      console.error("Failed to enrich JQL drill-down", error);
+    }
+
+    if (isStale()) {
+      return false;
+    }
+
+    setJqlRuns((prev) => {
+      const { drillDown, regular } = partitionJqlRuns(prev);
+      const nextDrillDown = [
+        enriched,
+        ...drillDown.filter((run) => run.drillDownId !== enriched.drillDownId),
+      ];
+      const next = mergeJqlRuns(nextDrillDown, regular);
+      persistJqlRunsToStorage(next);
+      return next;
+    });
+
+    return true;
+  } catch (error) {
+    setJqlError(errorMessage(error, `Failed to load ${tabLabel}`));
+    return false;
+  } finally {
+    setJqlLoading(false);
+  }
+}
+

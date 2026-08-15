@@ -177,7 +177,7 @@ export const sumEpicMetrics = (epics) => {
   };
 };
 
-export const workloadCountsToPieData = (counts) => {
+export const workloadCountsToPieData = (counts, { includeResolved = true } = {}) => {
   const data = {
     "Past Due": Number(counts?.pastDue || 0),
     "In Progress": Number(counts?.inProgress || 0),
@@ -190,7 +190,7 @@ export const workloadCountsToPieData = (counts) => {
   const resolved =
     Number(counts?.totalResolved) ||
     Math.max(0, Number(counts?.totalIssues) - Number(counts?.totalAssigned));
-  if (resolved > 0) {
+  if (includeResolved && resolved > 0) {
     data[TERMINAL_STATUS_LABEL] = resolved;
   }
 
@@ -200,6 +200,18 @@ export const workloadCountsToPieData = (counts) => {
   }
 
   return data;
+};
+
+export const buildContributorPieStatusCounts = (person) => {
+  const pie = {};
+  const openCounts = person?.openStatusCounts || {};
+  for (const [status, count] of Object.entries(openCounts)) {
+    const value = Number(count) || 0;
+    if (value > 0) {
+      pie[status] = value;
+    }
+  }
+  return pie;
 };
 
 export const getWeekLabel = (dateStr) => {
@@ -260,7 +272,7 @@ export const getDashboardRefreshStatusHint = ({ hasEpicScope, hasContributorScop
   const scope = resolveEffectiveRefreshScope({ hasEpicScope, hasContributorScope });
 
   if (!hasEpicScope && !hasContributorScope) {
-    return "Select at least one project preset, Past Due Projects, or contributor to track.";
+    return "Select at least one saved project preset or contributor to track.";
   }
   if (scope === "contributors") {
     return "Pulls workload and overdue metrics for selected people and custom queries from Jira.";
@@ -360,6 +372,36 @@ export const splitDueByIssues = (issues) => {
   }
 
   return { pastDue, upcoming };
+};
+
+export const filterDueByIssuesForProject = (issues, epic) => {
+  const list = Array.isArray(issues) ? issues : [];
+  if (!epic) {
+    return list;
+  }
+
+  const presetKey = String(epic.epicKey || "").trim();
+  if (presetKey === "JQL") {
+    const keys = new Set(
+      (epic.epicBreakdown || [])
+        .map((row) => String(row.epicKey || "").trim())
+        .filter(Boolean)
+    );
+    if (keys.size === 0) {
+      return [];
+    }
+    return list.filter((issue) => keys.has(String(issue.epicKey || "").trim()));
+  }
+
+  if (!presetKey) {
+    return [];
+  }
+
+  return list.filter((issue) => {
+    const issueEpic = String(issue.epicKey || "").trim();
+    const issueKey = String(issue.key || "").trim();
+    return issueEpic === presetKey || issueKey === presetKey;
+  });
 };
 
 export const formatDueByCountsLabel = (issues) => {
@@ -487,4 +529,79 @@ export const getDashboardAutoRefreshHint = (interval) => {
     return "While this page is open, metrics refresh automatically when the snapshot is older than 24 hours.";
   }
   return "Refresh only when you click Refresh status (or section refresh buttons).";
+};
+
+const WORKLOAD_KEYS = [
+  "totalIssues",
+  "totalAssigned",
+  "totalResolved",
+  "pastDue",
+  "inProgress",
+  "backlog",
+  "readyForVerification",
+  "readyForWork",
+  "analyzing",
+  "other",
+];
+
+export const sumWorkloadCounts = (assignees) => {
+  const totals = Object.fromEntries(WORKLOAD_KEYS.map((key) => [key, 0]));
+  for (const person of assignees || []) {
+    const counts = person.workloadCounts || {};
+    for (const key of WORKLOAD_KEYS) {
+      totals[key] += Number(counts[key] || 0);
+    }
+  }
+  return totals;
+};
+
+export const buildPersonProgressBars = (assignees) =>
+  (assignees || [])
+    .map((person) => {
+      const counts = person.workloadCounts;
+      const total = counts
+        ? Number(counts.totalIssues || 0)
+        : Number(person.totalIssues || 0);
+      const resolved = counts
+        ? Number(counts.totalResolved || 0)
+        : Number(person.resolvedIssues || 0);
+      const overdueCount = Number(person.overdueOpenCount || person.overdueOpenIssues || 0);
+      const open = counts
+        ? Number(counts.totalAssigned || person.totalOpenCount || 0)
+        : Number(person.openIssues || 0);
+      return {
+        name: person.resolvedDisplayName || person.queryName || person.name || "Unknown",
+        resolution: total > 0 ? (resolved / total) * 100 : 0,
+        resolved,
+        total,
+        overdue: open > 0 ? (overdueCount / open) * 100 : 0,
+        overdueCount,
+        open,
+      };
+    })
+    .filter((row) => row.total > 0 || row.open > 0);
+
+export const rollupEpicContributorPeople = (epics) => {
+  const byName = new Map();
+  for (const epic of epics || []) {
+    for (const row of epic.contributorMetrics || []) {
+      const name = String(row.name || "").trim();
+      if (!name) {
+        continue;
+      }
+      const prev = byName.get(name) || {
+        name,
+        totalIssues: 0,
+        resolvedIssues: 0,
+        overdueOpenIssues: 0,
+        openIssues: 0,
+      };
+      prev.totalIssues += Number(row.totalIssues || 0);
+      prev.resolvedIssues += Number(row.resolvedIssues || 0);
+      prev.overdueOpenIssues += Number(row.overdueOpenIssues || 0);
+      prev.openIssues += Number(row.openIssues || 0);
+      byName.set(name, prev);
+    }
+  }
+  return [...byName.values()];
 };

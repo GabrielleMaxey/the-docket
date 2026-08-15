@@ -1,6 +1,7 @@
 // Shared Jira metrics helpers — importable from server and browser (no Node/DOM APIs).
 
 import { resolveMappedFieldId } from "./odiFieldIds.mjs";
+import { extractAccountIdFromInput, looksLikeAccountId } from "./directReportsJql.mjs";
 
 export const getIssueStatusName = (issue) => {
   const status = issue?.fields?.status;
@@ -104,6 +105,21 @@ export const formatPastDueLookbackPhrase = (lookbackYears) => {
     return "6 months";
   }
   return `${years} year${years !== 1 ? "s" : ""}`;
+};
+
+export const formatOverdueWindowPhrase = (lookbackYears, includePastDue) => {
+  if (!includePastDue) {
+    return "all open work past due (no lookback floor)";
+  }
+  return `within the past ${formatPastDueLookbackPhrase(lookbackYears)}`;
+};
+
+export const formatUpcomingWindowPhrase = (dueByDate) => {
+  const date = String(dueByDate || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return "";
+  }
+  return `from today through ${date}`;
 };
 
 export const computePastDueFloorDate = (lookbackYears = 1) => {
@@ -794,10 +810,21 @@ export const personMatchesIssue = (
 
   const { displayName, emailAddress, accountId } = normalizeAssigneeName(issue);
   const issueAccountId = String(accountId || "").trim();
-  const targetAccountId = String(resolvedAccountId || "").trim();
+  const targetAccountId =
+    String(resolvedAccountId || "").trim() || extractAccountIdFromInput(queryName);
+  const queryEmail = String(queryName || "").trim().toLowerCase();
+  const issueEmail = String(emailAddress || "").trim().toLowerCase();
 
   if (targetAccountId && issueAccountId && targetAccountId === issueAccountId) {
     return true;
+  }
+
+  if (queryEmail.includes("@") && issueEmail && queryEmail === issueEmail) {
+    return true;
+  }
+
+  if (looksLikeAccountId(queryName) || /\bassignee\b/.test(query)) {
+    return false;
   }
 
   const normalizedDisplay = normalizePersonQuery(displayName);
@@ -1039,19 +1066,14 @@ export const buildOverdueIssueRows = (
     )
     .map((issue) => buildDueIssueRow(issue, dueFieldId, dueByOptions));
 
-export const computeAssigneeMetrics = (
-  issues,
-  queryName,
-  resolvedDisplayName,
+export const computeAssigneeMetricsFromIssueSet = (
+  personIssues,
   dueFieldId,
-  resolvedAccountId = "",
   extraOverdueFieldIds = [],
   dueContext = null
 ) => {
-  const personIssues = issues.filter((issue) =>
-    personMatchesIssue(issue, queryName, resolvedDisplayName, resolvedAccountId)
-  );
-  const personOpen = personIssues.filter((issue) => isIssueOpen(issue));
+  const scopedIssues = Array.isArray(personIssues) ? personIssues : [];
+  const personOpen = scopedIssues.filter((issue) => isIssueOpen(issue));
   const normalizedDueContext = normalizeAssigneeDueContext(dueContext);
   const { overdueIssues, upcomingDueIssues } = buildAssigneeDueIssueLists(
     personOpen,
@@ -1060,7 +1082,7 @@ export const computeAssigneeMetrics = (
     normalizedDueContext
   );
   const workloadCounts = computeAssigneeWorkloadCounts(
-    personIssues,
+    scopedIssues,
     dueFieldId,
     extraOverdueFieldIds,
     normalizedDueContext
@@ -1088,6 +1110,24 @@ export const computeAssigneeMetrics = (
     workloadCounts,
   };
 };
+
+export const computeAssigneeMetrics = (
+  issues,
+  queryName,
+  resolvedDisplayName,
+  dueFieldId,
+  resolvedAccountId = "",
+  extraOverdueFieldIds = [],
+  dueContext = null
+) =>
+  computeAssigneeMetricsFromIssueSet(
+    issues.filter((issue) =>
+      personMatchesIssue(issue, queryName, resolvedDisplayName, resolvedAccountId)
+    ),
+    dueFieldId,
+    extraOverdueFieldIds,
+    dueContext
+  );
 
 export const computeJqlWatchMetricsByAssignee = (jqlIssues, scopedChildIssues, dueFieldId) => {
   let issues = jqlIssues;
