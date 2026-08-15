@@ -940,11 +940,22 @@
 }
 
 /* ── row hover ──
-   outline, not box-shadow: .ww-row-closed uses box-shadow for its left bar,
-   and setting box-shadow here would erase that bar on hover. */
-.work-week-page .ww-results-table tbody tr:hover td {
-  outline: 1px solid #6bc2ec;
-  outline-offset: -1px;
+   Interactive elements only, not the whole row: links get a colour shift,
+   inputs/selects/textareas get a border highlight, buttons get a slight
+   brightness change. No outline/background on the row or cells themselves. */
+.work-week-page .ww-results-table tbody a:hover {
+  color: #0c93d9;
+}
+
+.work-week-page .ww-results-table tbody select:hover:not(:disabled),
+.work-week-page .ww-results-table tbody input:hover:not(:disabled),
+.work-week-page .ww-results-table tbody textarea:hover:not(:disabled) {
+  border-color: #6bc2ec;
+}
+
+.work-week-page .ww-results-table tbody button:hover:not(:disabled) {
+  filter: brightness(0.97);
+  border-color: #0c93d9;
 }
 
 /* ── full-width results section below the three-column grid ── */
