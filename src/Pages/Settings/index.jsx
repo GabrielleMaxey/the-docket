@@ -116,7 +116,7 @@ const Settings = () => {
         onError={setError}
       />
 
-      <MetricTargetsSection watchedAssignees={watchedAssignees} setWatchedAssignees={setWatchedAssignees} onError={setError} />
+      <MetricTargetsSection watchedAssignees={watchedAssignees} setWatchedAssignees={setWatchedAssignees} onError={setError} epicPresets={epicPresets} />
 
       <WorkWeekHeaderSection headerPrefs={headerPrefs} setHeaderPrefs={setHeaderPrefs} />
 
