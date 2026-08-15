@@ -143,7 +143,7 @@ This is the main screen for managing your open work.
    - **Pull most recent Jira comment** — overwrites each row's **Notes** text with that issue's latest Jira comment. Attached files are not changed. Use **Clear** to reset to **Keep local notes**.
 4. **Run JQL** — loads fresh results from Jira, merges local (or shared-program) priorities, and saves results locally. Shortcut: **Ctrl+Enter** (Windows/Linux) or **⌘+Enter** (Mac).
 5. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes or priorities in the local database, or header reminders.
-6. **Create Issue** — opens a modal to create a new Jira issue in ODI. See [Create Issue](#create-issue) below for parent selection and ODI rules. In short: pick a preset or parent, enter a title, then click **✦ AI Draft** (Lumen blue button next to the Description label) to generate a description and, for Stories, a suggested sub-task list:
+6. **Create Issue** — opens a modal to create a new Jira issue in ODI. See [Create Issue](#create-issue) below for parent selection and ODI rules. In short: pick a preset or parent, enter a title, then click **✦ AI Draft** (blue button next to the Description label) to generate a description and, for Stories, a suggested sub-task list:
    - **Story**: AI rewrites the title into Job Story format ("When… I want… so I can…") if it isn't already, and generates a description that expands on the situation, motivation, and desired outcome. 2–5 suggested sub-tasks appear as editable checkboxes; uncheck any you don't want before clicking Create.
    - **Bug**: AI generates a structured description covering what is broken, steps to reproduce, expected vs actual, environment, and any known workaround. A suggested priority (Low / Medium / High / Critical) appears based on ODI severity definitions.
    - **Task**: AI generates a plain description.
@@ -223,7 +223,7 @@ Each row is one Jira issue. What you can do per row:
 |--------|-----|
 | Change **status** in Jira | Dropdown → **Update Status** |
 | Change **assignee** in Jira | Type a **display name, email, or username** in the Assignee box — suggestions appear as you type from Jira user search and assignees already in the table. Press **Enter** or click **Update Assignee** |
-| Set personal **priority** (P1–P10) | Priority dropdown — P1 = most urgent, P10 = least. A **Jira** badge means priority was set from the latest comment on **Run JQL** |
+| Set personal **priority** (P1–P20) | Priority dropdown — P1 = most urgent, P20 = least. A **Jira** badge means priority was set from the latest comment on **Run JQL** |
 | Write a **note** (local) | Type in the Notes box — text saves automatically |
 | Add **files** to a note | **Add file** button, paste while the notes area is focused (images only), or drag-and-drop onto the notes cell. Up to **5** files per note; **5 MB** each — images (PNG, JPEG, GIF, WebP) plus TXT, PDF, DOC/DOCX, XLSX, and CSV |
 | **Keep on this machine** (attachments) | Optional checkbox below the notes box. Off by default — attachments stay until you **Push note** or close/refresh the tab. Turn on to keep draft files on this machine across reloads |
@@ -273,6 +273,7 @@ Many Dashboard lists link into **Work Week** with filters already applied:
 |-----------------|-------------------------|
 | Issue key (upcoming / past-due lists, overdue items) | Table filtered to that key |
 | Assignee name | Table filtered to that person |
+| **Unassigned** (on a Project Metrics card) | Table filtered to unassigned tasks *within that project's card* — not every unassigned task app-wide |
 | **Work Week** link on an epic or contributor | Filtered to that epic key or assignee |
 
 Jira browse links (↗) still open the issue in Jira in a new tab.
@@ -297,21 +298,21 @@ These filters are optional. **Refresh status** always updates resolution, worklo
 Toggle each section under **Views** in Filters & Settings. Open/closed state is remembered per section.
 
 **Overall Status**  
-Summary cards — % tasks resolved, % in progress, % projects complete (epics with MRD/IDD set, including epics discovered inside JQL presets), and % open tasks overdue.
+Summary cards — % tasks resolved, % in progress, % in backlog, % projects complete (epics with MRD/IDD set, including epics discovered inside JQL presets), and % open tasks overdue. Below the cards, count chips show total issues, overdue, resolved, and backlog at a glance.
 
 **Project Metrics**  
 One card per epic/JQL preset showing:
-- Issue completion %, epic %, overdue %
+- Issue completion %, in-progress % (when any tasks are in progress), backlog % (when any tasks are in backlog), epic %, overdue %
 - **JQL presets** also show **Epics complete** (share of epics with MRD/IDD set) and an **Epics in scope** list with per-epic task completion and epic-done status
 - Status breakdown (pie or bar chart — toggle under **Chart style**)
 - Deadline dates (Initial Done Date, Most Recent Done Date, Project End Date) on epic presets
 - Past due badge when a deadline has been missed (when Past Due Projects is enabled)
 
 **Upcoming Due Dates** *(optional)*  
-Green-accent card listing open tasks with due dates from **today through** your selected upcoming cutoff, grouped by project → person. Each row shows issue type (Task, Epic, etc.), key, summary, and due date. Period summary chips break counts down by week or month.
+Blue-accent card listing open tasks with due dates from **today through** your selected upcoming cutoff, grouped by project → person. Each row shows issue type (Task, Epic, etc.), key, summary, and due date. Period summary chips break counts down by week or month.
 
 **Past Due in lookback** *(optional)*  
-Red-accent card listing open tasks that missed their deadline within the selected lookback (1–3 years). Populated only when **Past Due Projects** is enabled. Empty state explains how to enable it.
+Coral-accent card listing open tasks that missed their deadline within the selected lookback (1–3 years). Populated only when **Past Due Projects** is enabled. Empty state explains how to enable it.
 
 **Individual Contributor Metrics**  
 One card per person or custom query configured in Settings → **Contributor Metrics** (or names you add directly in the Dashboard filter panel). The section appears as soon as people are selected — click **Refresh status** to load metrics. After refresh: open workload, overdue count, and status breakdown per person. Person names link to Work Week with an assignee drill-down.

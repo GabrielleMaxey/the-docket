@@ -958,15 +958,18 @@ export const useTaskManagerJira = () => {
   );
 
   const handleDrillDownToAssignee = React.useCallback(
-    (assigneeName) => {
+    (assigneeName, options = {}) => {
       const assignee = String(assigneeName || "").trim();
-      if (!assignee || isDrillDownDismissed(`assignee:${assignee.toLowerCase()}`)) {
+      const epicPresetId = String(options?.epicPresetId || "").trim();
+      const scopeSuffix = epicPresetId ? `:${epicPresetId}` : "";
+      if (!assignee || isDrillDownDismissed(`assignee:${assignee.toLowerCase()}${scopeSuffix}`)) {
         return Promise.resolve(false);
       }
 
       const fetchSeq = ++drillDownFetchSeqRef.current;
       return loadDrillDownIssuesByAssignee({
         assigneeName,
+        epicPresetId,
         jqlMaxResults,
         pullLatestComment,
         clampPriority,

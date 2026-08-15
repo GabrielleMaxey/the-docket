@@ -6,6 +6,7 @@ import {
   buildFieldMappingsMap,
   buildPastDueJql,
   resolvePresetJql,
+  splitTrailingOrderBy,
 } from "../lib/epicFilterJql.mjs";
 import { computePastDueFloorDate } from "../../shared/dashboardMetrics.mjs";
 
@@ -186,6 +187,34 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
     updateEpicPresetStmt.run({ id, ...payload });
     log.info(`updated epic preset ${id} "${payload.epicName}"`);
     return res.json(mapEpicPresetRow(getEpicPresetStmt.get(id)));
+  });
+
+  // Resolves a preset's real scope JQL (epic-key fallback, jira_filter_id
+  // lookup, or hand-authored JQL - same as the Dashboard's own metrics) with
+  // any trailing ORDER BY stripped, so a caller can safely wrap it:
+  // `(${scopeJql}) AND <clause>`.
+  app.get("/api/epic-presets/:id/scope-jql", async (req, res) => {
+    const id = Number(req.params.id);
+    const row = getEpicPresetStmt.get(id);
+    if (!row) {
+      return res.status(404).json({ error: "Epic preset not found" });
+    }
+
+    try {
+      const preset = mapEpicPresetRow(row);
+      const rawJql = await resolvePresetJql({ preset, jiraRequest });
+      if (!rawJql) {
+        return res.status(422).json({ error: "No JQL configured for this epic preset." });
+      }
+      const { scope: scopeJql } = splitTrailingOrderBy(rawJql);
+      return res.json({ scopeJql });
+    } catch (error) {
+      log.error(`scope-jql for preset ${id} failed`, error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to resolve preset JQL",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
   });
 
   app.delete("/api/epic-presets/:id", (req, res) => {

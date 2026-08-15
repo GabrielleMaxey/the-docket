@@ -9,7 +9,6 @@ import { searchAllIssues, searchJiraUsers } from "../lib/jiraSearchHelpers.mjs";
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
 
 export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, runJiraSearchRequest, db }) => {
-  // GET /api/jira/myself
   app.get("/api/jira/myself", async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
@@ -29,15 +28,14 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
     }
   });
 
-  // GET /api/jira/filters — returns only filters owned by the current user.
   app.get("/api/jira/filters", async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
 
     try {
-      // /rest/api/3/filter/my returns an array of filters owned by the
-      // authenticated user — not shared/public filters from other people.
+      // /rest/api/3/filter/my returns filters owned by the authenticated
+      // user only - not shared/public filters from other people.
       const result = await jiraRequest({
         pathWithQuery: "/rest/api/3/filter/my?expand=jql&orderBy=name",
       });
@@ -59,7 +57,7 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
     }
   });
 
-  // GET /api/jira/users/search?query=... — resolve display names / emails for assignee updates.
+  // Resolves display names / emails for assignee updates.
   app.get("/api/jira/users/search", async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
@@ -111,14 +109,14 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
     }
   };
 
-  // POST /api/jira/search — preferred: JQL in JSON body avoids URL-encoding issues.
+  // Preferred over the GET variant below: JQL in the JSON body avoids URL-encoding issues.
   app.post("/api/jira/search", async (req, res) => {
     const jql = String(req.body?.jql || "").trim();
     const maxResults = Number(req.body?.maxResults || 5);
     return handleJiraSearch(jql, maxResults, res);
   });
 
-  // POST /api/jira/search/all — paginated fetch up to maxTotal (cap 5000).
+  // Paginated fetch up to maxTotal (cap 5000).
   app.post("/api/jira/search/all", async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
@@ -146,7 +144,7 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
     }
   });
 
-  // GET /api/jira/search — kept for curl/testing convenience.
+  // Kept for curl/testing convenience; POST /api/jira/search is preferred otherwise.
   app.get("/api/jira/search", async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;

@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, Container, Divider } from "semantic-ui-react";
 import "./workWeekTaskElements.css";
+import "./priorityScale.css";
 import CollapsibleSection from "../Components/CollapsibleSection";
 import JiraResultsTable from "./components/JiraResultsTable";
 import TaskManagerHeaderPanel from "./components/TaskManagerHeaderPanel";
@@ -78,6 +79,7 @@ const WorkWeekTasks = () => {
     () => ({
       key: searchParams.get("key") || "",
       assignee: searchParams.get("assignee") || "",
+      epicPresetId: searchParams.get("epicPresetId") || "",
     }),
     [searchParams]
   );
@@ -131,12 +133,22 @@ const WorkWeekTasks = () => {
 
   const drillDownKey = drillDownFilters.key.trim();
   const drillDownAssignee = drillDownFilters.assignee.trim();
+  const drillDownEpicPresetId = drillDownFilters.epicPresetId.trim();
   const drillDownKeyId = drillDownKey
     ? `issue:${drillDownKey.toLowerCase()}`
     : "";
   const drillDownAssigneeId = drillDownAssignee
-    ? `assignee:${drillDownAssignee.toLowerCase()}`
+    ? `assignee:${drillDownAssignee.toLowerCase()}${drillDownEpicPresetId ? `:${drillDownEpicPresetId}` : ""}`
     : "";
+
+  // Both fields must match so "Unassigned" clicked from two different
+  // project cards doesn't collide into the same tab.
+  const matchesDrillDownAssignee = React.useCallback(
+    (run) =>
+      String(run.drillDownAssignee || "").trim() === drillDownAssignee &&
+      String(run.drillDownEpicPresetId || "").trim() === drillDownEpicPresetId,
+    [drillDownAssignee, drillDownEpicPresetId]
+  );
 
   const hasDrillDownFilter =
     drillDownKey.length > 0 || drillDownAssignee.length > 0;
@@ -156,7 +168,7 @@ const WorkWeekTasks = () => {
       );
     }
     if (drillDownAssignee) {
-      return String(run.drillDownAssignee || "").trim() === drillDownAssignee;
+      return matchesDrillDownAssignee(run);
     }
     return true;
   });
@@ -197,20 +209,26 @@ const WorkWeekTasks = () => {
 
     if (
       jqlRunsRef.current.some(
-        (run) =>
-          run.isDrillDown &&
-          String(run.drillDownAssignee || "").trim() === drillDownAssignee
+        (run) => run.isDrillDown && matchesDrillDownAssignee(run)
       )
     ) {
       return;
     }
 
-    void handleDrillDownToAssignee(drillDownAssignee).then((loaded) => {
+    void handleDrillDownToAssignee(drillDownAssignee, { epicPresetId: drillDownEpicPresetId }).then((loaded) => {
       if (loaded) {
         setActiveRunIndex(0);
       }
     });
-  }, [drillDownAssignee, drillDownAssigneeId, drillDownKey, filtersLoading, handleDrillDownToAssignee]);
+  }, [
+    drillDownAssignee,
+    drillDownAssigneeId,
+    drillDownEpicPresetId,
+    drillDownKey,
+    filtersLoading,
+    handleDrillDownToAssignee,
+    matchesDrillDownAssignee,
+  ]);
 
   const handleResetSavedQueriesWithConfirm = React.useCallback(() => {
     if (!window.confirm(
@@ -296,11 +314,11 @@ const WorkWeekTasks = () => {
         );
       }
       if (drillDownAssignee && run.drillDownType === "assignee") {
-        return String(run.drillDownAssignee || "").trim() === drillDownAssignee;
+        return matchesDrillDownAssignee(run);
       }
       return false;
     },
-    [drillDownAssignee, drillDownKey]
+    [drillDownAssignee, drillDownKey, matchesDrillDownAssignee]
   );
 
   const handleClearDrillDownRun = React.useCallback(

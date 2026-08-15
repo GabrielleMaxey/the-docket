@@ -11,6 +11,7 @@ const ProjectContributorMetrics = ({
   jiraBaseUrl,
   chartVariant,
   dueByDate,
+  epicPresetId,
   showOverdueList = true,
   showUpcomingList = true,
 }) => {
@@ -30,7 +31,7 @@ const ProjectContributorMetrics = ({
           <div key={person.name} className="dashboard-epic-contributor-row">
             <div className="dashboard-epic-contributor-head">
               <Link
-                to={buildWorkWeekHref({ assignee: person.name })}
+                to={buildWorkWeekHref({ assignee: person.name, epicPresetId })}
                 className="dashboard-epic-contributor-name dashboard-work-week-link"
               >
                 {person.name}

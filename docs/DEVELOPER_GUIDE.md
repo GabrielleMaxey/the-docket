@@ -115,6 +115,7 @@ taskManager/
 │   │   │   ├── index.jsx           # Orchestrator: loads data, mounts sections
 │   │   │   └── components/
 │   │   │       ├── SettingsSection.jsx       # Shared collapsible accordion wrapper
+│   │   │       ├── settingsSection.css       # Styles for SettingsSection (gradient header, hover depth)
 │   │   │       ├── PresetsSection.jsx        # Epic & JQL presets CRUD
 │   │   │       ├── DateFieldsSection.jsx     # Field mappings + past-due rules
 │   │   │       ├── MetricTargetsSection.jsx  # Contributor Metrics (people + custom queries)
@@ -124,6 +125,7 @@ taskManager/
 │   │   ├── Chat.jsx                # Chat page (+ Save to Past Reports)
 │   │   ├── ReportArchive.jsx       # Past Reports page (Work Week / Dashboard / Ad-hoc tabs)
 │   │   ├── workWeekTaskElements.css
+│   │   ├── priorityScale.css               # Priority colour data encoding (P1–P20, do not retint)
 │   │   ├── dashboard.css
 │   │   ├── components/
 │   │   │   ├── JiraResultsTable.jsx
@@ -165,7 +167,8 @@ taskManager/
 │       ├── pageReportPersistence.js # On-page report/plan localStorage + clear helpers
 │       ├── jiraIssueDoneDates.js  # Work Week MRD display + parent-chain inheritance
 │       ├── jqlRunPersistence.js   # Persist JQL runs when workflow completes off-page
-│       ├── workWeekNavigation.js  # buildWorkWeekHref({ key, assignee }) for drill-down
+│       ├── workWeekNavigation.js  # buildWorkWeekHref({ key, assignee, epicPresetId }) for drill-down
+│       ├── statusScale.js         # Status colour data encoding (do not retint) - shared by charts, MetricBar
 │       └── format.js              # formatPercent, formatTimestamp
 ├── docs/                     # ← you are here
 │   ├── END_USER_GUIDE.md     # Day-to-day usage (incl. browser-as-app)
@@ -363,11 +366,11 @@ Priority is **not** read from comment text. Shared-program slots load priority v
 
 ### Dashboard → Work Week drill-down
 
-`src/utils/workWeekNavigation.js` → `buildWorkWeekHref({ key, assignee })` returns `/work-week?key=…&assignee=…` (hash router). Dashboard components link via React Router `Link`:
+`src/utils/workWeekNavigation.js` → `buildWorkWeekHref({ key, assignee, epicPresetId })` returns `/work-week?key=…&assignee=…&epicPresetId=…` (hash router). `epicPresetId` is only set when `assignee` is also set, and only matters for the unassigned case (see point 5). Dashboard components link via React Router `Link`:
 
 - `DueByHierarchicalList.jsx` — issue keys, assignees, epic **Work Week** links
-- `EpicMetricCard.jsx` — epic key, contributor names, overdue task keys
-- `AssigneeMetricCard.jsx` — person name, overdue issue keys
+- `EpicMetricCard.jsx` — epic key, overdue task keys; passes `epic.epicPresetId` down to `ProjectContributorMetrics.jsx` for its contributor-name links
+- `AssigneeMetricCard.jsx` — person name, overdue issue keys (no `epicPresetId` — this card aggregates across every selected project, so there's no single project to scope to)
 
 `WorkWeekTasks.jsx` reads `useSearchParams()` and passes `drillDownFilters` to `JiraResultsTable`, which applies key/assignee filters on mount.
 
@@ -378,6 +381,9 @@ Drill-down behavior:
 3. **Pending state** — `JiraResultsTable.jsx` creates a temporary **Loading drill-down...** tab while `WorkWeekTasks.jsx` is fetching the target, so Dashboard clicks show the loading message even when regular JQL tabs already exist.
 4. **`loadDrillDownIssueByKey`** (`jiraJqlRunWorkflow.js`) — fetches `key = "ISSUE-KEY"` from Jira and prepends/refreshes a **Drill-down: ISSUE-KEY** tab (`isDrillDown: true`, `drillDownType: "issue"`, stable `drillDownId`).
 5. **`loadDrillDownIssuesByAssignee`** — when the assignee is not already in saved JQL results, runs `assignee = "Name"` in Jira and prepends/refreshes a **Drill-down: Name** tab (`drillDownType: "assignee"`). `WorkWeekTasks.jsx` triggers this from `?assignee=` when no matching run exists.
+   - **Unassigned is special-cased**, not just another assignee name: `assignee = "Unassigned"` is a literal string match against a Jira user, and no such user exists, so it always returned zero results. The fix runs `assignee is EMPTY` instead, scoped to the originating project's real JQL via `GET /api/epic-presets/:id/scope-jql` (falls back to `project = ODI` when no `epicPresetId` is available or the fetch fails). See `UNASSIGNED_DRILLDOWN_PROJECT_KEY` in `jiraJqlRunWorkflow.js`.
+   - `JiraResultsTable.jsx` also seeds its own row-level assignee filter dropdown from the URL. That dropdown expects the sentinel `"__unassigned__"`, not the literal string `"Unassigned"` — seeding it with the raw URL value silently filters out every row even when the fetch above succeeds. Both spots need to agree on the unassigned case.
+   - Because `epicPresetId` can differ per click, `matchesDrillDownAssignee` (`WorkWeekTasks.jsx`) requires **both** the assignee name and `epicPresetId` to match before treating a `jqlRuns` entry as "already loaded" — otherwise "Unassigned" clicked from two different project cards would collide into the same tab.
 
 A fetch sequence guard drops stale responses when keys change quickly or all drill-down runs are cleared internally.
 
@@ -485,6 +491,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 | GET/POST/PUT/DELETE | `/api/epic-presets` | Epic/JQL presets CRUD |
 | GET | `/api/epic-presets/export` | Team preset pack (JSON) |
 | POST | `/api/epic-presets/import` | Import team pack (`merge` or `replace`) |
+| GET | `/api/epic-presets/:id/scope-jql` | Resolves a preset's real JQL (epic-key, Jira filter, or hand-authored) with any trailing `ORDER BY` stripped — `{ scopeJql }`. Caller wraps it: `(${scopeJql}) AND <clause>` |
 | POST | `/api/epic-filters/run` | Run preset JQL (Work Week) |
 | GET | `/api/jira/filters` | Jira filters list |
 | GET | `/api/jira/filters/favourite` | Favourite filters |
@@ -590,7 +597,7 @@ Ad-hoc Chat saves use `saveAdHocReport()` → `POST /api/reports/archive` (not a
 | Work Week header banners | `localStorage` | `workWeekTasksHeaderPreferences` (`showJokeTicker`, `showUpcomingDueBanner`) |
 | Collapsible open/closed | `localStorage` via `usePersistedState` | various `ww-*` / `dashboard-*` keys |
 | Dashboard visible sections | `localStorage` | `dashboard-visible-sections` (`dueByUpcoming`, `dueByPastDue`, …) |
-| Issue notes + P1–P10 (persisted) | SQLite via proxy | `issue_metadata` |
+| Issue notes + P1–P20 (persisted) | SQLite via proxy | `issue_metadata` |
 | Generated reports archive | SQLite via proxy | `generated_reports` |
 | Dashboard snapshot | SQLite via proxy | `dashboard_snapshots` (+ related metric tables) |
 | Packaged desktop `.env` + SQLite | OS user data folder | `TASK_MANAGER_USER_DATA` (see Packaged desktop below) |
@@ -689,7 +696,7 @@ Set `LOG_LEVEL=debug` when tracing Jira API issues. The HTTP request logger fire
 
 `src/Pages/hooks/useUpcomingDueBanner.js` fetches `GET /api/dashboard/metrics` and `GET /api/jira/myself` in parallel, then filters `snapshot.dueByIssues` to only the current user's issues before the banner renders.
 
-The filter uses **exact display name matching** (case-insensitive), with a secondary check against the email local-part (e.g. `"gabrielle.maxey"` → `"gabrielle maxey"` after normalising dots). Fuzzy/substring matching is intentionally not used here — the snapshot's `assignee` field is always a clean Jira display name string, so partial matches would risk showing other team members' tasks. If the banner shows no tasks but you expect some, confirm that your Jira `displayName` matches what is stored in the snapshot (`assignee` field in `due_by_issues_json`).
+The filter uses **exact display name matching** (case-insensitive), with a secondary check against the email local-part (e.g. `"jane.doe"` → `"jane doe"` after normalising dots). Fuzzy/substring matching is intentionally not used here — the snapshot's `assignee` field is always a clean Jira display name string, so partial matches would risk showing other team members' tasks. If the banner shows no tasks but you expect some, confirm that your Jira `displayName` matches what is stored in the snapshot (`assignee` field in `due_by_issues_json`).
 
 ---
 
@@ -715,7 +722,7 @@ Pages that consume it — `Dashboard/index.jsx`, `Chat.jsx`, `WorkWeekTasks.jsx`
 | `npm run desktop:doctor` | Rebuilds `better-sqlite3` native module, then starts desktop dev |
 | `npm run desktop:rebuild-native` | Rebuilds native modules for current Electron version |
 | `npm run check:jira-client-exports` | Verifies every imported `jiraClient` symbol is exported (prevents runtime blank-screen import failures) |
-| `npm test` | Unit tests: `dashboardMetrics.mjs`, `epicFilterJql.mjs`, `chatSessionPrompt.mjs`, `issuePriority.mjs`, … |
+| `npm test` | Unit tests: `dashboardMetrics.mjs`, `epicFilterJql.mjs`, `chatSessionPrompt.mjs`, `issuePriority.mjs`, … `pretest` rebuilds `better-sqlite3` for system Node first — without it, running the desktop app beforehand leaves the native module built for Electron's ABI and tests fail with `ERR_DLOPEN_FAILED` (an environment artifact, not a real test failure) |
 | `npm run seed:presets` | Seed shared Epic/JQL presets into local SQLite — see [pilot-presets.md](./pilot-presets.md) |
 | `npm run build` | Runs export guard (`prebuild`), then creates production Vite bundle → `dist/` |
 | `npm run desktop:dist` | Full build + electron-builder → `release/` |
