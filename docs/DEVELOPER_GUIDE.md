@@ -696,7 +696,7 @@ Set `LOG_LEVEL=debug` when tracing Jira API issues. The HTTP request logger fire
 
 `src/Pages/hooks/useUpcomingDueBanner.js` fetches `GET /api/dashboard/metrics` and `GET /api/jira/myself` in parallel, then filters `snapshot.dueByIssues` to only the current user's issues before the banner renders.
 
-The filter uses **exact display name matching** (case-insensitive), with a secondary check against the email local-part (e.g. `"gabrielle.maxey"` → `"gabrielle maxey"` after normalising dots). Fuzzy/substring matching is intentionally not used here — the snapshot's `assignee` field is always a clean Jira display name string, so partial matches would risk showing other team members' tasks. If the banner shows no tasks but you expect some, confirm that your Jira `displayName` matches what is stored in the snapshot (`assignee` field in `due_by_issues_json`).
+The filter uses **exact display name matching** (case-insensitive), with a secondary check against the email local-part (e.g. `"jane.doe"` → `"jane doe"` after normalising dots). Fuzzy/substring matching is intentionally not used here — the snapshot's `assignee` field is always a clean Jira display name string, so partial matches would risk showing other team members' tasks. If the banner shows no tasks but you expect some, confirm that your Jira `displayName` matches what is stored in the snapshot (`assignee` field in `due_by_issues_json`).
 
 ---
 

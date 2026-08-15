@@ -10,10 +10,10 @@
 // it. Fills are saturated so a status is legible at a glance in a pie wedge,
 // bar, or dot without consulting a legend.
 //
-//   Terminal   Lumen blue → teal    work that has landed or is landing
-//   In flight  Lumen warm ramp      work actively moving
+//   Terminal   Brand blue → teal    work that has landed or is landing
+//   In flight  Brand warm ramp      work actively moving
 //   Inert      true neutral         work not moving, deliberately drained
-//   Alarm      Lumen coral          reserved; the only colour that means "act"
+//   Alarm      Brand coral          reserved; the only colour that means "act"
 //
 // Priority (src/Pages/priorityScale.css) is a separate encoding on its own
 // ramp. The two share hues but sit in different registers: priority renders as

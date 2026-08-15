@@ -32,8 +32,8 @@ Open `.env` in any text editor and fill in:
 
 | Variable | Example | Notes |
 |----------|---------|-------|
-| `JIRA_BASE_URL` | `https://lumen.atlassian.net` | No trailing slash |
-| `JIRA_EMAIL` | `gabrielle.maxey@lumen.com` | Atlassian account email |
+| `JIRA_BASE_URL` | `https://yourcompany.atlassian.net` | No trailing slash |
+| `JIRA_EMAIL` | `you@yourcompany.com` | Atlassian account email |
 | `JIRA_API_TOKEN` | `ATATTxxx...` | From step 1 |
 | `API_PORT` | `8787` | Optional; default is `8787` |
 | `LOG_LEVEL` | `info` | Optional; controls server log verbosity — `error`, `warn`, `info` (default), or `debug` |
@@ -103,22 +103,14 @@ Or directly in a browser: `http://localhost:8787/api/health`
 
 A successful response looks like:
 ```json
-{ "ok": true, "jiraBaseUrl": "https://lumen.atlassian.net" }
+{ "ok": true, "jiraBaseUrl": "https://yourcompany.atlassian.net" }
 ```
 
 ---
 
 ## 5. Set up presets (required for Dashboard + Chat)
 
-**Pilot shortcut:** after `npm install` and a first API start, seed shared ODI presets:
-
-```bash
-npm run seed:presets -- --all
-```
-
-See [pilot-presets.md](./pilot-presets.md) for interactive selection and catalog editing.
-
-**Manual setup:**
+**Manual setup (recommended for a first-time install):**
 
 1. Settings → **Epic & JQL presets** → Add preset
 2. For each project you want to track, add either:
@@ -126,6 +118,12 @@ See [pilot-presets.md](./pilot-presets.md) for interactive selection and catalog
    - **JQL preset**: a saved JQL query + a label
 
 These presets appear in the Dashboard filter panel, the Work Week **Create Issue** modal (epic presets and saved queries — JQL presets can resolve parents from query results when no single epic key is embedded), and the Chat context panel.
+
+**Bulk seeding (optional, for teams with many presets to add at once):** write your own catalog file following the format in [pilot-presets.md](./pilot-presets.md), then run:
+
+```bash
+npm run seed:presets -- --file path/to/your-presets.json --all
+```
 
 ---
 

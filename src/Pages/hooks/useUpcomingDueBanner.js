@@ -24,7 +24,7 @@ const issueAssignedToUser = (issue, profile) => {
     return true;
   }
 
-  // Email local-part match (e.g. "gabrielle.maxey" ↔ "gabrielle maxey" after normalising dots)
+  // Email local-part match (e.g. "jane.doe" ↔ "jane doe" after normalising dots)
   if (emailLocal) {
     const normEmailLocal = emailLocal.replace(/[._-]+/g, " ").trim();
     if (normEmailLocal && assignee === normEmailLocal) {

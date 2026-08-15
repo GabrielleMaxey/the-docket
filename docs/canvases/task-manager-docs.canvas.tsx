@@ -175,7 +175,7 @@ function SectionPanel({ section }: { section: SectionId }) {
     return (
       <Stack gap={16}>
         <Text>
-          Task Manager is a React + Vite desktop and browser app for Lumen ODI
+          Task Manager is a React + Vite desktop and browser app for ODI
           Jira workflows. It runs saved JQL, manages issues in a unified table,
           snapshots multi-project metrics, generates AI reports and week plans,
           and provides a Chat assistant — all through a local Express proxy that
