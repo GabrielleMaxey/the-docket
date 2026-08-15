@@ -1,0 +1,300 @@
+/* ── Priority colour scale (P1 highest … P20 lowest) ─────────────────────────
+   This file is a DATA ENCODING, not UI chrome.
+
+   Do not fold these values into the general neutral/brand palette, and do not
+   include this file in any find-and-replace pass that retints chrome colours.
+   The scale carries meaning: warm = urgent, cool = deferrable, drained = none.
+   Retinting chrome toward a hue that already appears in this ramp silently
+   corrupts the encoding without breaking anything visibly.
+
+   Hue order and meaning are unchanged from the previous scale:
+   coral → orange → amber → yellow → lime → green → emerald → teal → cyan →
+   sky → blue → indigo → violet → purple → fuchsia → pink → drained neutral.
+
+   Only intensity was retuned. The warm end (P1–P5) now sits on the brand
+   palette (#F95E4A / #FB9429 / #FDD219); the cool mid-range resolves toward
+   brand teal (#2AEDE5) and blue (#0c93d9); P18–P20 drain to a TRUE neutral gray rather
+   than blue-slate, so the lowest band reads as absence of hue and stays clear
+   of both the teal-leaning chrome palette and the P9–P12 cool band.
+
+   Row tints sit at ~92–96% lightness so cell text stays legible.
+   Badge fills are the saturated stops of the same hues.
+
+   Class names are emitted by priorityTierClass() in
+   src/Pages/hooks/useTaskManagerJira.js, bounded by MAX_ISSUE_PRIORITY
+   in shared/issuePriority.mjs. If that constant changes, this file must
+   gain or lose steps to match.
+*/
+
+:root {
+  --lm-pri-row-1: #fddedb;
+  --lm-pri-row-2: #fde7dc;
+  --lm-pri-row-3: #fdeedd;
+  --lm-pri-row-4: #fef0d3;
+  --lm-pri-row-5: #fef7d0;
+  --lm-pri-row-6: #f2f8d2;
+  --lm-pri-row-7: #e2f7dd;
+  --lm-pri-row-8: #d6f7e6;
+  --lm-pri-row-9: #d0f7f2;
+  --lm-pri-row-10: #d3f6fa;
+  --lm-pri-row-11: #dcf1fb;
+  --lm-pri-row-12: #dee9fa;
+  --lm-pri-row-13: #e2e5f9;
+  --lm-pri-row-14: #eae3f8;
+  --lm-pri-row-15: #f0e3f8;
+  --lm-pri-row-16: #f8e3f6;
+  --lm-pri-row-17: #f9e3ec;
+  --lm-pri-row-18: #efefef;
+  --lm-pri-row-19: #e1e1e1;
+  --lm-pri-row-20: #d0d0d0;
+  --lm-pri-row-none: #f1f3f3;
+  --lm-pri-row-text: #1f2937;
+}
+
+:root {
+  --lm-pri-badge-1: #fbc4bd;   --lm-pri-badge-1-bd: #c2402f;
+  --lm-pri-badge-2: #fcd0b8;   --lm-pri-badge-2-bd: #cf6420;
+  --lm-pri-badge-3: #fdd9a8;   --lm-pri-badge-3-bd: #d97a12;
+  --lm-pri-badge-4: #fde39a;   --lm-pri-badge-4-bd: #c98a0c;
+  --lm-pri-badge-5: #fdef9c;   --lm-pri-badge-5-bd: #b8940a;
+  --lm-pri-badge-6: #dcf5a6;   --lm-pri-badge-6-bd: #6f9b18;
+  --lm-pri-badge-7: #b9edcb;   --lm-pri-badge-7-bd: #16824a;
+  --lm-pri-badge-8: #96e8d5;   --lm-pri-badge-8-bd: #0b7d68;
+  --lm-pri-badge-9: #7ce4dd;   --lm-pri-badge-9-bd: #0a8f92;
+  --lm-pri-badge-10: #8fd9f2;  --lm-pri-badge-10-bd: #0c93d9;
+  --lm-pri-badge-11: #9ccdf5;  --lm-pri-badge-11-bd: #1f7fc4;
+  --lm-pri-badge-12: #adc4f5;  --lm-pri-badge-12-bd: #3b6fc9;
+  --lm-pri-badge-13: #b6bcf2;  --lm-pri-badge-13-bd: #5560c9;
+  --lm-pri-badge-14: #c6b6ef;  --lm-pri-badge-14-bd: #7a52c4;
+  --lm-pri-badge-15: #d5b3ee;  --lm-pri-badge-15-bd: #9245c0;
+  --lm-pri-badge-16: #eab3ec;  --lm-pri-badge-16-bd: #b03cb8;
+  --lm-pri-badge-17: #f0b0cd;  --lm-pri-badge-17-bd: #c03a76;
+  --lm-pri-badge-18: #dcdcdc;  --lm-pri-badge-18-bd: #8a8a8a;
+  --lm-pri-badge-19: #c9c9c9;  --lm-pri-badge-19-bd: #6e6e6e;
+  --lm-pri-badge-20: #b0b0b0;  --lm-pri-badge-20-bd: #545454;
+  --lm-pri-badge-none: #f1f3f3;
+  --lm-pri-badge-none-bd: #c3d0d3;
+  --lm-pri-badge-none-text: #2f4a4e;
+}
+
+/* ── Row tints ── */
+.work-week-page .ww-results-table tbody .ww-row-priority-0 {
+  background-color: #ffffff;
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-1 {
+  background-color: var(--lm-pri-row-1);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-2 {
+  background-color: var(--lm-pri-row-2);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-3 {
+  background-color: var(--lm-pri-row-3);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-4 {
+  background-color: var(--lm-pri-row-4);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-5 {
+  background-color: var(--lm-pri-row-5);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-6 {
+  background-color: var(--lm-pri-row-6);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-7 {
+  background-color: var(--lm-pri-row-7);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-8 {
+  background-color: var(--lm-pri-row-8);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-9 {
+  background-color: var(--lm-pri-row-9);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-10 {
+  background-color: var(--lm-pri-row-10);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-11 {
+  background-color: var(--lm-pri-row-11);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-12 {
+  background-color: var(--lm-pri-row-12);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-13 {
+  background-color: var(--lm-pri-row-13);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-14 {
+  background-color: var(--lm-pri-row-14);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-15 {
+  background-color: var(--lm-pri-row-15);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-16 {
+  background-color: var(--lm-pri-row-16);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-17 {
+  background-color: var(--lm-pri-row-17);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-18 {
+  background-color: var(--lm-pri-row-18);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-19 {
+  background-color: var(--lm-pri-row-19);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-20 {
+  background-color: var(--lm-pri-row-20);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-neutral {
+  background-color: var(--lm-pri-row-none);
+}
+
+.work-week-page .ww-results-table tbody .ww-row-priority-1 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-2 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-3 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-4 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-5 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-6 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-7 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-8 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-9 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-10 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-11 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-12 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-13 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-14 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-15 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-16 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-17 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-18 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-19 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-20 td,
+.work-week-page .ww-results-table tbody .ww-row-priority-neutral td {
+  color: var(--lm-pri-row-text);
+  opacity: 1;
+}
+
+/* ── Priority select / P-badge: same interval map as row tints ── */
+
+.work-week-page .ww-priority-1 {
+  background: var(--lm-pri-badge-1);
+  border-color: var(--lm-pri-badge-1-bd);
+}
+
+.work-week-page .ww-priority-2 {
+  background: var(--lm-pri-badge-2);
+  border-color: var(--lm-pri-badge-2-bd);
+}
+
+.work-week-page .ww-priority-3 {
+  background: var(--lm-pri-badge-3);
+  border-color: var(--lm-pri-badge-3-bd);
+}
+
+.work-week-page .ww-priority-4 {
+  background: var(--lm-pri-badge-4);
+  border-color: var(--lm-pri-badge-4-bd);
+}
+
+.work-week-page .ww-priority-5 {
+  background: var(--lm-pri-badge-5);
+  border-color: var(--lm-pri-badge-5-bd);
+}
+
+.work-week-page .ww-priority-6 {
+  background: var(--lm-pri-badge-6);
+  border-color: var(--lm-pri-badge-6-bd);
+}
+
+.work-week-page .ww-priority-7 {
+  background: var(--lm-pri-badge-7);
+  border-color: var(--lm-pri-badge-7-bd);
+}
+
+.work-week-page .ww-priority-8 {
+  background: var(--lm-pri-badge-8);
+  border-color: var(--lm-pri-badge-8-bd);
+}
+
+.work-week-page .ww-priority-9 {
+  background: var(--lm-pri-badge-9);
+  border-color: var(--lm-pri-badge-9-bd);
+}
+
+.work-week-page .ww-priority-10 {
+  background: var(--lm-pri-badge-10);
+  border-color: var(--lm-pri-badge-10-bd);
+}
+
+.work-week-page .ww-priority-11 {
+  background: var(--lm-pri-badge-11);
+  border-color: var(--lm-pri-badge-11-bd);
+}
+
+.work-week-page .ww-priority-12 {
+  background: var(--lm-pri-badge-12);
+  border-color: var(--lm-pri-badge-12-bd);
+}
+
+.work-week-page .ww-priority-13 {
+  background: var(--lm-pri-badge-13);
+  border-color: var(--lm-pri-badge-13-bd);
+}
+
+.work-week-page .ww-priority-14 {
+  background: var(--lm-pri-badge-14);
+  border-color: var(--lm-pri-badge-14-bd);
+}
+
+.work-week-page .ww-priority-15 {
+  background: var(--lm-pri-badge-15);
+  border-color: var(--lm-pri-badge-15-bd);
+}
+
+.work-week-page .ww-priority-16 {
+  background: var(--lm-pri-badge-16);
+  border-color: var(--lm-pri-badge-16-bd);
+}
+
+.work-week-page .ww-priority-17 {
+  background: var(--lm-pri-badge-17);
+  border-color: var(--lm-pri-badge-17-bd);
+}
+
+.work-week-page .ww-priority-18 {
+  background: var(--lm-pri-badge-18);
+  border-color: var(--lm-pri-badge-18-bd);
+}
+
+.work-week-page .ww-priority-19 {
+  background: var(--lm-pri-badge-19);
+  border-color: var(--lm-pri-badge-19-bd);
+}
+
+.work-week-page .ww-priority-20 {
+  background: var(--lm-pri-badge-20);
+  border-color: var(--lm-pri-badge-20-bd);
+}
+
+.work-week-page .ww-priority-neutral {
+  background: var(--lm-pri-badge-none);
+  border-color: var(--lm-pri-badge-none-bd);
+  color: var(--lm-pri-badge-none-text);
+}

@@ -1,5 +1,5 @@
 /* ── App navigation bar ── */
-/* Logo blue (#0c93d9) is used as the nav background per Lumen brand guidelines. */
+/* Logo blue (#0c93d9) anchors a subtle gradient nav background per brand guidelines. */
 
 .app-nav {
   position: sticky;
@@ -10,11 +10,9 @@
   justify-content: space-between;
   height: 56px;
   padding: 0 1.5rem;
-  background: #0c93d9;
-  box-shadow: 0 2px 8px rgba(12, 49, 51, 0.18);
+  background: linear-gradient(135deg, #0c93d9 0%, #076ea4 100%);
+  box-shadow: 0 2px 4px rgba(15, 49, 51, 0.12), 0 6px 18px rgba(15, 49, 51, 0.18);
 }
-
-/* Logo */
 
 .app-nav-logo {
   display: flex;
@@ -38,8 +36,6 @@
   object-fit: contain;
 }
 
-/* Nav links list */
-
 .app-nav-links {
   display: flex;
   align-items: center;
@@ -59,17 +55,19 @@
   color: rgba(255, 255, 255, 0.88);
   text-decoration: none;
   border-bottom: 3px solid transparent;
-  transition: color 0.12s, border-color 0.12s;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
 
 .app-nav-link:hover {
   color: #fff;
   border-bottom-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .app-nav-link.is-active {
   color: #FDD219;
   border-bottom-color: #FDD219;
+  background: rgba(253, 210, 25, 0.1);
 }
 
 .app-nav-icon {

@@ -29,6 +29,56 @@ export const buildFieldMappingsMap = (rows) => {
   return map;
 };
 
+// Replaces the contents of every quoted string in `text` with "x" (keeping
+// the quote characters and overall length/positions intact), so a regex
+// search on the result can't match text that only exists inside a JQL
+// string literal. Handles backslash-escaped quotes.
+const maskQuotedStrings = (text) => {
+  let masked = "";
+  let quoteChar = null;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoteChar) {
+      if (ch === "\\" && i + 1 < text.length) {
+        masked += "xx";
+        i += 1;
+        continue;
+      }
+      masked += ch === quoteChar ? ch : "x";
+      if (ch === quoteChar) {
+        quoteChar = null;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quoteChar = ch;
+    }
+    masked += ch;
+  }
+  return masked;
+};
+
+// Splits a JQL string into its scope clause and trailing ORDER BY clause.
+// Searches a quote-masked copy of the string so a summary/text-search term
+// like `summary ~ "purchase order by region"` can't be mistaken for the
+// query's real ORDER BY - a naive regex match on the raw string would cut
+// the scope off mid-literal in that case.
+export const splitTrailingOrderBy = (jql) => {
+  const source = String(jql || "").trim();
+  if (!source) {
+    return { scope: "", orderBy: "" };
+  }
+  const masked = maskQuotedStrings(source);
+  const match = masked.match(/\bORDER\s+BY\s+[\s\S]+$/i);
+  if (!match) {
+    return { scope: source, orderBy: "" };
+  }
+  return {
+    scope: source.slice(0, match.index).trim(),
+    orderBy: source.slice(match.index).trim(),
+  };
+};
+
 const OPEN_ONLY_STATUS_PATTERNS = [
   /\bAND\s+status\s+NOT\s+IN\s*\([^)]*\)/gi,
   /\bAND\s+statusCategory\s*!=\s*Done\b/gi,
@@ -42,9 +92,9 @@ export const buildDashboardMetricsJql = (jql) => {
     return "";
   }
 
-  const orderMatch = source.match(/\bORDER\s+BY\s+[\s\S]+$/i);
-  const orderClause = orderMatch ? orderMatch[0].trim() : "ORDER BY updated DESC";
-  let scopeClause = orderMatch ? source.slice(0, orderMatch.index).trim() : source;
+  const { scope, orderBy } = splitTrailingOrderBy(source);
+  const orderClause = orderBy || "ORDER BY updated DESC";
+  let scopeClause = scope;
 
   for (const pattern of OPEN_ONLY_STATUS_PATTERNS) {
     scopeClause = scopeClause.replace(pattern, "");

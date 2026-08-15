@@ -1,5 +1,5 @@
 # Executive Summary — Project Status Report
-**Lumen | My Team | Snapshot: June 23, 2026**
+**My Team | Snapshot: June 23, 2026**
 
 ---
 
@@ -21,7 +21,7 @@ The team is performing at a strong execution pace, with **88.2% of total tasks r
 
 ## 3. Challenges & Risks
 
-- **Rajrshi Shrestha** is the sole team member with overdue items, carrying **2 overdue tasks out of 50 open (4.0% overdue rate)**. While the absolute count is low, the concentration of all overdue work in a single contributor with a large open workload warrants monitoring and potential reprioritization support.
+- **One team member** is the sole contributor with overdue items, carrying **2 overdue tasks out of 50 open (4.0% overdue rate)**. While the absolute count is low, the concentration of all overdue work in a single contributor with a large open workload warrants monitoring and potential reprioritization support.
 - **252 tasks remain in Backlog** status, representing a sizable body of work not yet actively scheduled. Leadership should be aware of the risk this backlog poses to future sprint and delivery timelines if not progressively pulled forward.
 - **No projects have reached full completion** at the portfolio level despite the high task resolution rate, suggesting that final closure, sign-off, or acceptance criteria may be pending and could benefit from targeted attention.
 
@@ -37,7 +37,7 @@ The team has **69 tasks actively in progress** at the time of this snapshot, wit
 
 | Priority | Action | Owner / Focus Area |
 |---|---|---|
-| 🔴 Monitor | Review and resolve the 2 overdue tasks | Rajrshi Shrestha / Team Lead |
+| 🔴 Monitor | Review and resolve the 2 overdue tasks | Team member with overdue items / Team Lead |
 | 🟡 Plan | Develop a structured plan to draw down the 252-item backlog | Team Lead / Program Management |
 | 🟡 Confirm | Identify what is blocking formal project-level closure and define completion criteria | Leadership / Project Owners |
 | 🟢 Track | Continue monitoring the 22 items in verification to ensure timely closure | Team Lead |

@@ -520,14 +520,14 @@ describe("personMatchesIssue", () => {
   });
 
   it("matches email-style queries against display names", () => {
-    const issue = makeIssue({ assignee: "Gabrielle Maxey" });
-    assert.equal(personMatchesIssue(issue, "gabrielle.maxey", "Gabrielle Maxey"), true);
+    const issue = makeIssue({ assignee: "Jane Doe" });
+    assert.equal(personMatchesIssue(issue, "jane.doe", "Jane Doe"), true);
   });
 
   it("matches by account id when available", () => {
-    const issue = makeIssue({ assignee: "Gabrielle Maxey" });
+    const issue = makeIssue({ assignee: "Jane Doe" });
     issue.fields.assignee.accountId = "abc123";
-    assert.equal(personMatchesIssue(issue, "gabrielle.maxey", "", "abc123"), true);
+    assert.equal(personMatchesIssue(issue, "jane.doe", "", "abc123"), true);
   });
 });
 

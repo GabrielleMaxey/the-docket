@@ -40,7 +40,7 @@ const ChatAssistantSection = ({ settings, setSettings, chatStatus, onError }) =>
         <li>It searches Jira directly with JQL instead of guessing, when needed.</li>
         <li>It never states a name or fact unless it came from real selected-epic data or an actual Jira search — it won&apos;t guess or make up people.</li>
         <li>It keeps responses professional — no offensive or inappropriate language.</li>
-        <li>It only helps with Lumen Jira data — it declines requests that are unrelated or inappropriate, even if asked more than once.</li>
+        <li>It only helps with your organization's Jira data — it declines requests that are unrelated or inappropriate, even if asked more than once.</li>
       </ul>
       <p>
         Anything you type below is added <em>on top of</em> those defaults for every conversation — use it to tell the assistant how you&apos;d like it to answer. For example:

@@ -1,42 +1,13 @@
 import React from "react";
 import { formatPercent } from "../utils/format";
+import { getStatusColor } from "../utils/statusScale";
 
 // Generic SVG chart for a { label: count } status breakdown.
 // Supports two variants via the `variant` prop:
 //   "pie"  (default) — existing SVG pie with legend
 //   "bar"            — vertical SVG bar chart with legend
-
-const PIE_COLORS = [
-  "#0ea5e9",
-  "#8b5cf6",
-  "#22c55e",
-  "#f59e0b",
-  "#ef4444",
-  "#64748b",
-  "#ec4899",
-  "#14b8a6",
-];
-
-// Consistent color per status name so the same status is always the same
-// color across every chart on the page, regardless of sort order.
-const STATUS_COLOR_MAP = {
-  "resolved/closed/done": "#22c55e",
-  "in progress": "#0ea5e9",
-  "backlog": "#94a3b8",
-  "ready for verification": "#8b5cf6",
-  "ready for work": "#f59e0b",
-  "analyzing": "#ec4899",
-  "past due": "#ef4444",
-  "other": "#64748b",
-  "done": "#22c55e",
-  "closed": "#22c55e",
-  "resolved": "#22c55e",
-};
-
-const getStatusColor = (label, fallbackIndex) => {
-  const key = String(label || "").toLowerCase().trim();
-  return STATUS_COLOR_MAP[key] ?? PIE_COLORS[fallbackIndex % PIE_COLORS.length];
-};
+//
+// Colours come from statusScale.js, so a status stays the same colour everywhere.
 
 const polarToCartesian = (center, radius, angle) => ({
   x: center + radius * Math.cos(angle),
@@ -76,7 +47,7 @@ export const buildPieData = (statusCounts) => {
 
     return {
       ...entry,
-      color: PIE_COLORS[index % PIE_COLORS.length],
+      color: getStatusColor(entry.label, index),
       startAngle,
       endAngle,
     };
@@ -97,9 +68,9 @@ const truncate = (str, max) =>
 
 const StatusBarChart = ({ statusCounts, className = "" }) => {
   const { entries: baseEntries, total } = buildPieData(statusCounts);
-  // Re-apply semantic colors for bars so each status is always the same
-  // color regardless of sort order. Pie charts use the original index-based
-  // rainbow colors (reverted above); bars use the semantic map.
+  // buildPieData's `entries` never carries colour (only its `slices` array
+  // does) - re-derive it here via the same getStatusColor so bars match pie
+  // slices exactly.
   const entries = baseEntries.map((entry, i) => ({
     ...entry,
     color: getStatusColor(entry.label, i),
@@ -135,7 +106,7 @@ const StatusBarChart = ({ statusCounts, className = "" }) => {
 
           return (
             <g key={label}>
-              <rect x={x} y={y} width={BAR_W} height={barH} fill={color} rx={3}>
+              <rect x={x} y={y} width={BAR_W} height={barH} fill={color} rx={4}>
                 <title>{`${label}: ${count} (${pct}%)`}</title>
               </rect>
 
@@ -157,7 +128,7 @@ const StatusBarChart = ({ statusCounts, className = "" }) => {
                   y={y - 3}
                   textAnchor="middle"
                   fontSize="9"
-                  fill="#475569"
+                  fill="#42595d"
                 >
                   {count}
                 </text>
@@ -169,7 +140,7 @@ const StatusBarChart = ({ statusCounts, className = "" }) => {
                 y={CHART_H + 15}
                 textAnchor="middle"
                 fontSize="8"
-                fill="#64748b"
+                fill="#5f767a"
               >
                 {truncate(label, 10)}
               </text>
@@ -192,7 +163,7 @@ const StatusBarChart = ({ statusCounts, className = "" }) => {
         <li className="dashboard-pie-legend-total">
           <span className="dashboard-pie-swatch dashboard-pie-swatch--empty" aria-hidden="true" />
           <span className="dashboard-pie-legend-label">Total</span>
-          <span className="dashboard-pie-legend-value">{total} (100%)</span>
+          <span className="dashboard-pie-legend-value">{total}</span>
         </li>
       </ul>
     </div>
@@ -261,7 +232,7 @@ const StatusPieChart = ({ statusCounts, size = 160, className = "", variant = "p
         <li className="dashboard-pie-legend-total">
           <span className="dashboard-pie-swatch dashboard-pie-swatch--empty" aria-hidden="true" />
           <span className="dashboard-pie-legend-label">Total</span>
-          <span className="dashboard-pie-legend-value">{total} (100%)</span>
+          <span className="dashboard-pie-legend-value">{total}</span>
         </li>
       </ul>
     </div>

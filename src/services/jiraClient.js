@@ -320,6 +320,20 @@ export const fetchEpicPresets = async () => {
   return data?.items || [];
 };
 
+// Resolves a preset's real scope JQL (epic-key fallback, Jira filter lookup,
+// or hand-authored JQL), with the trailing ORDER BY stripped. Wrap it
+// yourself: `(${scopeJql}) AND <clause>` - preset JQL can be an
+// unparenthesized OR chain, so appending a clause without wrapping only
+// scopes the last OR-branch.
+export const fetchEpicPresetScopeJql = async (epicPresetId) => {
+  const id = String(epicPresetId || "").trim();
+  if (!id) {
+    return "";
+  }
+  const data = await requestJson(`/api/epic-presets/${encodeURIComponent(id)}/scope-jql`);
+  return String(data?.scopeJql || "").trim();
+};
+
 export const createEpicPreset = async (payload) => {
   return requestJson("/api/epic-presets", {
     method: "POST",

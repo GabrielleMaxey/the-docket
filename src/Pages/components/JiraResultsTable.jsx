@@ -404,7 +404,14 @@ const JiraResultsTable = ({
       setKeyFilterByRunIndex((prevFilters) => ({ ...prevFilters, [stateKey]: key }));
     }
     if (assignee) {
-      setAssigneeFilterByRunIndex((prevFilters) => ({ ...prevFilters, [stateKey]: assignee }));
+      // filterIssues expects the sentinel "__unassigned__", not the literal
+      // word "Unassigned" that arrives via the URL - seeding it unconverted
+      // silently filters out every row (issues have no assignee name to
+      // match against the literal string).
+      const isUnassignedDrillDown =
+        assignee.toLowerCase() === "unassigned" || assignee.toLowerCase() === "__unassigned__";
+      const filterValue = isUnassignedDrillDown ? "__unassigned__" : assignee;
+      setAssigneeFilterByRunIndex((prevFilters) => ({ ...prevFilters, [stateKey]: filterValue }));
     }
     setPageByRunIndex((prevPages) => ({ ...prevPages, [stateKey]: 1 }));
   }, [drillDownFilters, getJqlRunsIndex, onActiveTabChange, visibleRuns]);

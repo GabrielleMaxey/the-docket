@@ -1,10 +1,16 @@
 .app-collapsible {
   margin-top: 1.25rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #dde7e9;
   border-radius: 12px;
   overflow: hidden;
   background: #fff;
   width: 100%;
+  box-shadow: 0 1px 2px rgba(15, 49, 51, 0.05), 0 6px 16px rgba(15, 49, 51, 0.06);
+  transition: box-shadow 0.18s ease;
+}
+
+.app-collapsible:hover {
+  box-shadow: 0 1px 2px rgba(15, 49, 51, 0.06), 0 10px 22px rgba(15, 49, 51, 0.09);
 }
 
 .app-collapsible--spaced {
@@ -30,15 +36,15 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.75rem 1rem;
-  background: #f8fafc;
+  background: linear-gradient(135deg, #f6f9fa 0%, #eaf0f2 100%);
   border: none;
   cursor: pointer;
   text-align: left;
-  transition: background 0.12s;
+  transition: background 0.15s;
 }
 
 .app-collapsible-header:hover {
-  background: #f1f5f9;
+  background: linear-gradient(135deg, #eef4f5 0%, #e0eaec 100%);
 }
 
 .app-collapsible-title-wrap {
@@ -52,29 +58,30 @@
 .app-collapsible-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #0f172a;
+  color: #0F3133;
 }
 
 .app-collapsible-subtitle {
   font-size: 0.78rem;
   font-weight: 500;
-  color: #64748b;
+  color: #5f767a;
   line-height: 1.35;
 }
 
 .app-collapsible-badge {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #475569;
-  background: #e2e8f0;
+  color: #2f4a4e;
+  background: #ffffff;
   padding: 0.15rem 0.6rem;
   border-radius: 999px;
   white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 49, 51, 0.1);
 }
 
 .app-collapsible-chevron {
   font-size: 1.25rem;
-  color: #94a3b8;
+  color: #5f767a;
   transform: rotate(90deg);
   transition: transform 0.18s;
   line-height: 1;
@@ -87,5 +94,5 @@
 
 .app-collapsible-body {
   padding: 1.25rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #dde7e9;
 }
