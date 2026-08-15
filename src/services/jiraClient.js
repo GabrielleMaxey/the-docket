@@ -695,6 +695,18 @@ export const fetchCoworkWeeklyPlanByFilename = async (filename) => {
   return data?.item || null;
 };
 
+export const deleteCoworkWeeklyPlanFile = async (filename) => {
+  return requestJson(`/api/reports/cowork-files/${encodeURIComponent(filename)}`, {
+    method: "DELETE",
+  });
+};
+
+export const deleteAllCoworkWeeklyPlanFiles = async () => {
+  return requestJson("/api/reports/cowork-files", {
+    method: "DELETE",
+  });
+};
+
 export const saveCoworkWeeklyPlanToArchive = async ({ content, label, filename }) => {
   return requestJson("/api/reports/archive", {
     method: "POST",
