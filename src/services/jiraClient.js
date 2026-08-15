@@ -289,6 +289,14 @@ export const syncLocalPrioritiesToTeam = async () => {
   return data;
 };
 
+export const pullTeamPrioritiesToLocal = async () => {
+  const data = await requestJson("/api/team-priority/pull-to-local", { method: "POST" });
+  if (!data || data.ok !== true || typeof data.updatedPriorities !== "number") {
+    throw new Error("Atlas → local priority pull failed or returned an incomplete response.");
+  }
+  return data;
+};
+
 export const fetchSharedPrograms = async () => {
   const data = await requestJson("/api/shared-programs");
   return data?.items || [];

@@ -3,6 +3,7 @@ import { Button, Message } from "semantic-ui-react";
 import {
   fetchSharedPrograms,
   fetchTeamPriorityHealth,
+  pullTeamPrioritiesToLocal,
   seedTeamPriorityPrograms,
   syncLocalPrioritiesToTeam,
 } from "../../../services/jiraClient.js";
@@ -65,7 +66,8 @@ const TeamPriorityDemoSection = () => {
       <p style={{ marginTop: 0, color: "#475569", fontSize: "0.9rem" }}>
         {statusLine} Link a Work Week slot to a shared program — priority changes push to Atlas
         immediately. Use <strong>Import team priorities</strong> above with target{" "}
-        <strong>Atlas (demo)</strong> for one-time CSV seeding, or sync from local SQLite below.
+        <strong>Atlas (demo)</strong> for one-time CSV seeding, or push and pull between local
+        SQLite and Atlas below.
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
         <Button
@@ -109,6 +111,22 @@ const TeamPriorityDemoSection = () => {
           disabled={isBusy || !health?.connected}
         >
           Seed from local priorities
+        </Button>
+        <Button
+          type="button"
+          size="small"
+          onClick={() =>
+            void runAction("pull", async () => {
+              const data = await pullTeamPrioritiesToLocal();
+              setMessage(
+                `Pulled ${data.updatedPriorities} priorities from Atlas into local SQLite.`
+              );
+            })
+          }
+          loading={busy === "pull"}
+          disabled={isBusy || !health?.connected}
+        >
+          Pull from Atlas
         </Button>
       </div>
       {programs.length > 0 ? (
