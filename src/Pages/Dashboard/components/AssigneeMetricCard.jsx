@@ -46,7 +46,8 @@ const AssigneeMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", dueByDa
       ) : null}
       {total > 0 ? (
         <p className="dashboard-assignee-meta">
-          {total} total &middot; {open} open &middot; {resolved} resolved
+          {total} total &middot; {open} open &middot; {resolved} resolved (
+          {formatPercent((resolved / total) * 100)})
           {person.overdueOpenCount > 0 ? ` · ${person.overdueOpenCount} overdue` : ""}
           {upcomingTasks.length > 0 ? ` · ${upcomingTasks.length} upcoming` : ""}
         </p>
