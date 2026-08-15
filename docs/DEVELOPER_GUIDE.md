@@ -487,6 +487,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 | GET | `/api/jira/projects` | List projects |
 | GET | `/api/jira/projects/:key/createmeta` | Create-issue field metadata |
 | POST | `/api/jira/issue-metadata/bulk` | Bulk read notes + priority (SQLite) |
+| GET | `/api/jira/issue-metadata/recent-notes?since=YYYY-MM-DD` | Issue keys with a local note added/edited on or after `since` - used by Work Week's "All my assigned work" report scope |
 | PUT | `/api/jira/issue-metadata/:issueKey` | Update note + priority (SQLite) |
 | GET/POST/PUT/DELETE | `/api/epic-presets` | Epic/JQL presets CRUD |
 | GET | `/api/epic-presets/export` | Team preset pack (JSON) |
