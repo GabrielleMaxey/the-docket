@@ -1,9 +1,28 @@
 import { Button, Message } from "semantic-ui-react";
-import StatusPieChart from "../../../Components/StatusPieChart";
 import ReportOutput from "../../../Components/ReportOutput";
 import { AUDIENCE_OPTIONS, useReportGeneration } from "../hooks/useReportGeneration";
+import ReportDiagrams from "./ReportDiagrams";
+import {
+  buildPersonProgressBars,
+  rollupEpicContributorPeople,
+  sumEpicMetrics,
+  sumWorkloadCounts,
+  workloadCountsToPieData,
+} from "../utils/dashboardMetricsUtils";
+import { isJqlCurrentUser, looksLikeAccountId } from "../../../../shared/directReportsJql.mjs";
 
-const ReportPanel = ({ hasSnapshot, overallStatusCounts, chartVariant, epics = [] }) => {
+const isDirectReportAssignee = (person) =>
+  person?.queryType === "direct_reports" ||
+  (person?.queryType === "person" && Boolean(String(person?.jql || "").trim()));
+
+const ReportPanel = ({
+  hasSnapshot,
+  overallStatusCounts,
+  chartVariant,
+  epics = [],
+  assignees = [],
+  directReportWatches = [],
+}) => {
   const {
     audience,
     setAudience,
@@ -14,75 +33,112 @@ const ReportPanel = ({ hasSnapshot, overallStatusCounts, chartVariant, epics = [
     error,
     copied,
     selectedEpicIds,
+    allProjectsSelected,
     additionalContext,
     setAdditionalContext,
     selectedOption,
+    scopedStatusCounts,
     handleGenerate,
     handleClearReport,
     handleCopy,
     handleDownload,
     toggleEpicSelection,
     selectAllEpics,
-  } = useReportGeneration({ epics, overallStatusCounts, chartVariant });
+  } = useReportGeneration({ epics, overallStatusCounts, chartVariant, assignees });
 
-  const chartCounts = reportStatusCounts || overallStatusCounts;
-  const chartStyle = report ? reportChartVariant : chartVariant;
-  const hasChartData =
-    chartCounts && Object.values(chartCounts).some((value) => Number(value) > 0);
+  const isAdhocTeam = audience === "direct_reports";
+  const teamPeople = assignees.filter(
+    (person) =>
+      isDirectReportAssignee(person) &&
+      !isJqlCurrentUser(person.resolvedDisplayName || person.queryName) &&
+      !looksLikeAccountId(person.resolvedDisplayName || person.queryName)
+  );
+  const hasTeamPeople = teamPeople.length > 0;
+  const teamWorkload = sumWorkloadCounts(teamPeople);
+  const teamStatusCounts = isAdhocTeam ? workloadCountsToPieData(teamWorkload) : null;
+  const chartCounts = reportStatusCounts || (isAdhocTeam ? teamStatusCounts : scopedStatusCounts);
+  const scopedEpics =
+    selectedEpicIds.length > 0
+      ? epics.filter((epic) => selectedEpicIds.includes(epic.epicPresetId))
+      : epics;
+  const projectRollup = sumEpicMetrics(scopedEpics);
+  const progressBars = isAdhocTeam
+    ? []
+    : [
+        scopedEpics.length > 0
+          ? {
+              label: "Projects complete",
+              value:
+                scopedEpics.reduce((sum, epic) => sum + Number(epic.epicPercent || 0), 0) /
+                scopedEpics.length,
+            }
+          : null,
+        {
+          label: "Open tasks past due",
+          value:
+            scopedEpics.length > 0
+              ? scopedEpics.reduce((sum, epic) => sum + Number(epic.overduePercent || 0), 0) /
+                scopedEpics.length
+              : projectRollup.openIssues > 0
+                ? (projectRollup.overdueOpenIssues / projectRollup.openIssues) * 100
+                : 0,
+        },
+      ].filter(Boolean);
+  const personRows = buildPersonProgressBars(
+    isAdhocTeam ? teamPeople : audience === "developer" ? rollupEpicContributorPeople(scopedEpics) : []
+  );
+  const personBars = personRows.map((row) =>
+    isAdhocTeam
+      ? {
+          name: row.name,
+          value: row.resolution,
+          count: `${row.resolved}/${row.total}`,
+        }
+      : {
+          name: row.name,
+          value: row.overdue,
+          count: `${row.overdueCount} overdue`,
+        }
+  );
+  const personTitle = isAdhocTeam ? "Resolution by person" : "Overdue by person";
+  const canGenerate = hasSnapshot && (!isAdhocTeam || (directReportWatches.length > 0 && hasTeamPeople));
 
   return (
     <div className="app-report-panel dashboard-report-panel">
       <div className="dashboard-report-controls">
-        {epics.length > 1 ? (
-          <div style={{ marginBottom: "0.75rem" }}>
-            <p style={{ fontSize: "0.82rem", fontWeight: 700, color: "#334155", margin: "0 0 0.4rem" }}>
-              Include in report
+        {epics.length > 1 && !isAdhocTeam ? (
+          <div>
+            <p className="dashboard-report-context-label">Projects in this report</p>
+            <p className="dashboard-report-context-hint">
+              Same list as Project Metrics. Click one JQL to report on it alone, or click more to
+              include several.
+            </p>
+            <div className="dashboard-project-tabs">
               <button
                 type="button"
+                className={`dashboard-project-tab${allProjectsSelected ? " is-active" : ""}`}
                 onClick={selectAllEpics}
-                style={{
-                  marginLeft: "0.5rem",
-                  fontSize: "0.72rem",
-                  fontWeight: 400,
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "999px",
-                  padding: "0.1rem 0.45rem",
-                  background: "#f1f5f9",
-                  color: "#64748b",
-                  cursor: "pointer",
-                }}
               >
-                All
+                <span className="dashboard-project-tab-name">View All</span>
+                <span className="dashboard-project-tab-stat">
+                  {epics.length} project{epics.length === 1 ? "" : "s"}
+                </span>
               </button>
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
               {epics.map((epic) => {
                 const eid = epic.epicPresetId;
-                const checked = selectedEpicIds.length === 0 || selectedEpicIds.includes(eid);
+                const active = allProjectsSelected || selectedEpicIds.includes(eid);
                 return (
-                  <label
+                  <button
                     key={epic.id ?? eid}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.3rem",
-                      fontSize: "0.82rem",
-                      padding: "0.2rem 0.6rem",
-                      borderRadius: "999px",
-                      border: `1px solid ${checked ? "#0c93d9" : "#e2e8f0"}`,
-                      background: checked ? "#e8f5fd" : "#f8fafc",
-                      color: checked ? "#0c93d9" : "#475569",
-                      cursor: "pointer",
-                    }}
+                    type="button"
+                    className={`dashboard-project-tab${active && !allProjectsSelected ? " is-active" : ""}`}
+                    onClick={() => toggleEpicSelection(eid)}
                   >
-                    <input
-                      type="checkbox"
-                      style={{ display: "none" }}
-                      checked={checked}
-                      onChange={() => toggleEpicSelection(eid)}
-                    />
-                    {epic.label}
-                  </label>
+                    <span className="dashboard-project-tab-name">{epic.label}</span>
+                    <span className="dashboard-project-tab-stat">
+                      {Math.round(epic.issuePercent ?? 0)}% resolved
+                    </span>
+                  </button>
                 );
               })}
             </div>
@@ -126,13 +182,23 @@ const ReportPanel = ({ hasSnapshot, overallStatusCounts, chartVariant, epics = [
             primary
             onClick={handleGenerate}
             loading={loading}
-            disabled={loading || !hasSnapshot}
+            disabled={loading || !canGenerate}
           >
             Generate {selectedOption?.label || "Report"}
           </Button>
           {!hasSnapshot ? (
             <span className="dashboard-due-by-hint">
               Run a Dashboard refresh first so there is data to report on.
+            </span>
+          ) : null}
+          {hasSnapshot && isAdhocTeam && directReportWatches.length === 0 ? (
+            <span className="dashboard-due-by-hint">
+              Save a query in Settings → My Direct Reports first.
+            </span>
+          ) : null}
+          {hasSnapshot && isAdhocTeam && directReportWatches.length > 0 && !hasTeamPeople ? (
+            <span className="dashboard-due-by-hint">
+              Select My Direct Reports under Contributor Metrics, then click Refresh contributors.
             </span>
           ) : null}
         </div>
@@ -147,16 +213,13 @@ const ReportPanel = ({ hasSnapshot, overallStatusCounts, chartVariant, epics = [
         onDownload={handleDownload}
         onClear={report ? handleClearReport : undefined}
         chartSlot={
-          hasChartData ? (
-            <>
-              <p className="app-report-chart-label">Overall status</p>
-              <StatusPieChart
-                statusCounts={chartCounts}
-                size={160}
-                variant={chartStyle}
-              />
-            </>
-          ) : null
+          <ReportDiagrams
+            statusCounts={chartCounts}
+            chartVariant={reportChartVariant || chartVariant}
+            progressBars={progressBars}
+            personBars={personBars}
+            personTitle={personTitle}
+          />
         }
       />
     </div>

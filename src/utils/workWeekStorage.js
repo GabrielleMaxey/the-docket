@@ -75,6 +75,45 @@ export const getJqlSlotEditorIndexes = (jqlInputs, jqlLabels) => {
   return [...configured, trailingEmpty];
 };
 
+export const buildSharedProgramJql = (epicRoots) => {
+  const keys = [
+    ...new Set(
+      (Array.isArray(epicRoots) ? epicRoots : [])
+        .map((key) => String(key || "").trim().toUpperCase())
+        .filter(Boolean)
+    ),
+  ];
+  if (keys.length === 0) {
+    return "";
+  }
+  const list = keys.join(", ");
+  return `(parent in (${list}) OR key in (${list})) ORDER BY updated DESC`;
+};
+
+export const shouldReplaceSlotQueryForSharedProgram = ({
+  jql,
+  label,
+  index,
+  previousGeneratedJql = "",
+  previousLabel = "",
+}) => {
+  const currentJql = String(jql || "").trim();
+  const currentLabel = String(label || "").trim();
+  const defaultJql = String(DEFAULT_JQLS[index] || "").trim();
+  const defaultLabel = String(DEFAULT_JQL_LABELS[index] || "").trim();
+  const prevJql = String(previousGeneratedJql || "").trim();
+  const prevLabel = String(previousLabel || "").trim();
+
+  const replaceJql = Boolean(
+    !currentJql || currentJql === defaultJql || (prevJql && currentJql === prevJql)
+  );
+  const replaceLabel = Boolean(
+    !currentLabel || currentLabel === defaultLabel || (prevLabel && currentLabel === prevLabel)
+  );
+
+  return { replaceJql, replaceLabel };
+};
+
 export const isConfiguredJqlRun = (run) => {
   if (run?.isDrillDown || run?.isPendingDrillDown) {
     return true;

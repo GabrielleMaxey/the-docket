@@ -52,6 +52,7 @@ export const initDatabase = (db) => {
       resolved_account_id TEXT,
       watch_type TEXT NOT NULL DEFAULT 'person',
       jql TEXT,
+      member_names_json TEXT NOT NULL DEFAULT '[]',
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -161,6 +162,7 @@ const migrateDatabase = (db) => {
   ensureColumn(db, "epic_presets", "preset_type", "TEXT NOT NULL DEFAULT 'epic'");
   ensureColumn(db, "watched_assignees", "watch_type", "TEXT NOT NULL DEFAULT 'person'");
   ensureColumn(db, "watched_assignees", "jql", "TEXT");
+  ensureColumn(db, "watched_assignees", "member_names_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "dashboard_snapshots", "watched_assignee_ids_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "dashboard_assignee_metrics", "query_type", "TEXT NOT NULL DEFAULT 'person'");
   ensureColumn(db, "dashboard_assignee_metrics", "jql", "TEXT");
@@ -432,6 +434,8 @@ export const mapDashboardAssigneeMetricRow = (row) => {
       inProgress: Number(workloadCounts.inProgress || 0),
       backlog: Number(workloadCounts.backlog || 0),
       readyForVerification: Number(workloadCounts.readyForVerification || 0),
+      readyForWork: Number(workloadCounts.readyForWork || 0),
+      analyzing: Number(workloadCounts.analyzing || 0),
       other: Number(workloadCounts.other || 0),
     },
     error: String(row.error_message || "").trim() || null,
@@ -448,6 +452,7 @@ export const mapWatchedAssigneeRow = (row) => {
     displayName: String(row.display_name || "").trim(),
     watchType: String(row.watch_type || "person").trim(),
     jql: String(row.jql || "").trim(),
+    memberNames: parseJsonArray(row.member_names_json).map((value) => String(value || "").trim()).filter(Boolean),
     resolvedAccountId: String(row.resolved_account_id || "").trim(),
     sortOrder: Number(row.sort_order || 0),
     createdAt: row.created_at,

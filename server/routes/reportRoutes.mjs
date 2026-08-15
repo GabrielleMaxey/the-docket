@@ -1,6 +1,10 @@
 // Dashboard AI reports from the latest stored snapshot + configured LLM.
 
-import { completeLlmText, resolveFirstReadyReportProvider } from "../lib/llmClient.mjs";
+import {
+  completeLlmText,
+  formatUnableToGenerateReportError,
+  resolveFirstReadyReportProvider,
+} from "../lib/llmClient.mjs";
 import { loadWeeklyDigestFromDb } from "../lib/weeklyDigest.mjs";
 import {
   insertGeneratedReport,
@@ -13,58 +17,114 @@ import {
   readCoworkWeeklyPlan,
 } from "../lib/coworkWeeklyPlans.mjs";
 import { createLogger } from "../lib/logger.mjs";
+import { buildFieldMappingsMap, buildUnionScopeFromJqls, fallbackPresetJql } from "../lib/epicFilterJql.mjs";
+import { buildReportDueWindowsAndLinks } from "../lib/reportWorkWeekLinks.mjs";
+import { computeOverallRollup, normalizePastDueLookbackYears } from "../../shared/dashboardMetrics.mjs";
+import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
+import { buildDirectReportsJql, isCurrentUserMember, isJqlCurrentUser, looksLikeAccountId } from "../../shared/directReportsJql.mjs";
+import { fetchJiraMyself } from "../lib/jiraSearchHelpers.mjs";
 
 const log = createLogger("report");
 
 const REPORT_MAX_TOKENS = 2048;
 
+const POSSIBLE_REASONS_INSTRUCTION = `After the numbered sections, add **Possible reasons (hypotheses)**.
+These are optional interpretations of the metrics, not confirmed root causes.
+Only include hypotheses that fit the numbers. Mark each as possible. Do not invent tickets, people, or process facts that are not in the data.
+When relevant, consider:
+- Low resolution / completion %: work left in unfinished statuses; Done/Closed not used; verification skipped; Jira workflow statuses that never count as resolved; stalled pipelines.
+- High overdue %: due dates not maintained; work started late; blockers; items left open after the work was finished.
+- Heavy open load vs the rest of the team: assignment imbalance; tickets created and parked; WIP not limited.
+- Backlog-heavy vs In Progress: intake without pulling work; grooming stalled.
+If the metrics look healthy, say that and do not force problems.`;
+
 const AUDIENCE_CONFIGS = {
   executive: {
     label: "Executive Summary",
-    instruction: `You are writing an Executive Summary for senior leadership at Lumen.
-Use clear business language — no Jira terminology or technical jargon. Be concise but complete.
+    instruction: `Write an Executive Summary for senior leadership.
+Audience: non-technical. Do not mention Jira, epics, JQL, or field IDs.
+Use only the snapshot data. Do not invent names, tasks, milestones, or decisions.
+If a section has no supporting numbers, write "None in this snapshot."
 
-Structure your report with these exact sections:
-1. **Project Status Overview** — one-paragraph snapshot of overall health
-2. **Key Highlights & Achievements** — what's going well, milestones reached
-3. **Challenges & Risks** — overdue items, missed deadlines, concerns
-4. **Work in Progress** — what the team is actively working on now
-5. **Upcoming Action Items** — decisions or escalations leadership should be aware of
+Start with the snapshot date. Then use these headings only:
+1. **Project Status Overview** — 4–6 sentences: overall health using the three headline percentages (tasks resolved = delivery throughput; projects complete = share of projects finished; overdue = open work past due). Explain each in business terms.
+2. **Highlights** — progress the numbers support. No unverifiable wins.
+3. **Challenges and Risks** — past-due projects by name, overdue open work, deadline pressure.
+4. **Work in Progress** — open vs in-progress counts only; no invented task lists.
+5. **Asks for Leadership** — escalations implied by past-due items, overdue rate, or approaching dates.
+6. **Possible reasons (hypotheses)** — why the numbers might look this way (unfinished work not closed out in the tracker, dates not kept current, uneven assignment). Label as possible, not confirmed.
 
-Tone: professional, confident, data-backed.`,
+Keep it short (bullets under 2–5). Name individuals only when overdue load is a material risk.
+When you mention overdue or upcoming due dates, include the date window from the snapshot (e.g. "within the past 6 months", "from today through YYYY-MM-DD").
+Treat Initial Done Date, Most Recent Done Date, and Project End Date as target dates; never use those field names.
+Do not invent Work Week URLs. A Work Week links section is appended after your report.
+If extra user context is present, treat it as notes; metrics win on conflict.
+${POSSIBLE_REASONS_INSTRUCTION}`,
   },
 
   product_owner: {
     label: "Project Manager Summary",
-    instruction: `You are writing a Project Manager Summary for Lumen.
-Your role is to give a project manager everything they need to run, communicate, and close this project.
+    instruction: `Write a Project Manager Summary for running and communicating this portfolio.
+Use only the snapshot data. Do not invent goals, budgets, approvals, sign-offs, or scope impact.
+If a section has no supporting numbers, write "None in this snapshot."
 
-Address each of the following questions directly, using the metrics data provided:
+Start with the snapshot date. Then use these headings only:
+1. **Progress Measures** — how completion is measured here (task resolved %, project complete %, overdue %). Name projects and cite counts.
+2. **People and Stalls** — compare contributor open/overdue counts. Name a person only when their workload is significantly heavier than others on the project, or they risk missing a due date (high overdue %, past-due work). Do not invent decision-owners or approval queues. Do not roster everyone.
+3. **Deadline Realism** — target dates (Initial Done Date, Most Recent Done Date, Project End Date) vs current completion. Name every past-due project.
+4. **Schedule Health** — overall completion vs overdue rate; whether pace looks sufficient for remaining dates. No budget commentary (none in the data).
+5. **Risks and Delay Impact** — overdue items and past-due projects only. Downstream impact = delayed dates / unfinished work, not invented scope cuts. Name at-risk contributors when the metrics support it.
+6. **Stand-up Brief** — one short paragraph a PM can read aloud (counts, named at-risk people, next dates). Skip closeout language unless projects are actually complete.
+7. **Possible reasons (hypotheses)** — workflow/pipeline, date hygiene, and load-balance explanations that fit the metrics. Label as possible.
 
-1. **Business Goal & Success Metrics** — What does project completion look like based on the epic structure? How is progress currently being measured?
-2. **Key Stakeholders & Decision Authority** — Who are the active contributors? Are there items awaiting decisions, approvals, or sign-off? Flag anything stalled.
-3. **Deadline Realism** — What are the configured done dates? Is the current completion trajectory on track to meet them? Call out any past-due projects explicitly.
-4. **Schedule & Budget Tracking** — Overall completion %, overdue rate, and whether the pace is sufficient to hit the deadline.
-5. **Worst-Case Scenarios** — What risks could derail the project? Focus on overdue items, high overdue rates, stalled epics, and missed milestones.
-6. **Delay Impact Analysis** — If the currently delayed or overdue tasks are not resolved soon, what is the realistic downstream impact on timeline and scope?
-7. **Team Coordination Support** — Provide a summary paragraph suitable for use in daily or weekly stand-ups, a delivery date communication to stakeholders, and a closing note for final project closeout reports.
-
-Be specific — use percentages, task counts, and epic names. Flag red-flag metrics clearly.
-Tone: professional, action-oriented, project-management focused.`,
+Be specific: percentages, task counts, project names. Call out red-flag metrics. Naming people is appropriate for load imbalance or due-date risk; otherwise keep the team unnamed.
+When you mention overdue or upcoming due dates, include the date window from the snapshot.
+Do not invent Work Week URLs. A Work Week links section is appended after your report.
+If extra user context is present, treat it as notes; metrics win on conflict.
+${POSSIBLE_REASONS_INSTRUCTION}`,
   },
 
   developer: {
     label: "Developer Report",
-    instruction: `You are writing a status report for the development team at Lumen.
-Be specific — include assignee names, overdue counts per person, and task keys where available.
+    instruction: `Write a status report for the development team.
+Use only the snapshot data. Do not invent task keys, summaries, or velocity (none are in this snapshot).
+If a section has no supporting numbers, write "None in this snapshot."
 
-Structure your report with these exact sections:
-1. **Team Workload Summary** — open tasks per person, overall velocity
-2. **Overdue Items by Assignee** — who has overdue work and how much
-3. **Current Work in Progress** — what's actively being worked on
-4. **Upcoming Tasks & Focus Areas** — what's coming up, what needs attention
+Start with the snapshot date. Then use these headings only:
+1. **Team Workload** — open vs overdue counts per person from the team metrics.
+2. **Overdue by Person** — who has overdue work and how much; skip people with none.
+3. **In Progress** — status breakdowns and open counts only; no invented ticket lists.
+4. **Focus** — past-due projects, high overdue %, and approaching target dates. No upcoming-task list unless dates are in the data.
+5. **Possible reasons (hypotheses)** — e.g. low resolution rate from tickets not moved to Done, statuses that never count as resolved, or a stalled verification step. Label as possible.
 
-Tone: practical, task-focused, peer-level.`,
+When you mention overdue or upcoming due dates, include the date window from the snapshot.
+Do not invent Work Week URLs. A Work Week links section is appended after your report.
+Tone: practical, peer-level. Name people from the metrics. Prefer bullets.
+If extra user context is present, treat it as notes; metrics win on conflict.
+${POSSIBLE_REASONS_INSTRUCTION}`,
+  },
+
+  direct_reports: {
+    label: "Ad-hoc team report",
+    instruction: `Write an ad-hoc team report for a manager. The people list comes from Settings → My Direct Reports, not from project JQLs.
+Do not include the current user / manager (currentUser()) in the roster or narrative — this report is about their direct reports only.
+Use only the snapshot people metrics. Do not invent names, tickets, or 1:1 notes.
+Name every person listed in the team metrics, including people with zero open work.
+If a section has no supporting numbers, write "None in this snapshot."
+Do not treat this as a project-complete or delivery-closeout report.
+
+Start with the snapshot date. Then use these headings only:
+1. **Team roster and assignment** — for each person: assigned/open count and their share of team assigned work.
+2. **Overdue and upcoming** — overdue count and overdue %; upcoming-due count. Include the date windows from the snapshot.
+3. **Completion** — resolved vs total assigned (resolution %). Call out low completion only when the numbers support it.
+4. **Overload and due-date risk** — name people whose open load is clearly heavier than the team average, or who have high overdue % / upcoming due work. Do not roster everyone again.
+5. **Manager actions** — short bullets implied by the metrics only (redistribute load, check overdue items). No invented coaching.
+6. **Possible reasons (hypotheses)** — why resolution %, overdue, or load might look this way (missed Jira status transitions, mismanaged pipelines, dates not updated, parked backlog). Label as possible, not confirmed.
+
+When you mention overdue or upcoming due dates, include the date window from the snapshot.
+Do not invent Work Week URLs. A Work Week links section is appended after your report.
+If extra user context is present, treat it as notes; metrics win on conflict.
+${POSSIBLE_REASONS_INSTRUCTION}`,
   },
 };
 
@@ -85,6 +145,20 @@ const sanitizeStatusCounts = (value) => {
   return Object.keys(counts).length > 0 ? counts : null;
 };
 
+const isDirectReportAssigneeRow = (row) => {
+  const queryType = String(row.queryType || row.query_type || "person").trim();
+  const jql = String(row.jql || "").trim();
+  return queryType === "direct_reports" || (queryType === "person" && Boolean(jql));
+};
+
+const isTranslatedPersonName = (person) => {
+  const name = String(person?.resolvedDisplayName || person?.queryName || "").trim();
+  if (!name || isJqlCurrentUser(name) || looksLikeAccountId(name)) {
+    return false;
+  }
+  return true;
+};
+
 const sanitizeChartVariant = (value) => (String(value || "").trim() === "bar" ? "bar" : "pie");
 
 const getClientArchiveTimestamp = (req) => String(req.body?.savedAtLocal || "").trim();
@@ -98,14 +172,51 @@ const getClientArchiveMeta = (req) => {
   };
 };
 
-const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics }) => {
+const parseJsonObjectSafe = (raw) => {
+  try {
+    const parsed = JSON.parse(raw || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const parseJsonArrayLength = (raw) => {
+  try {
+    const parsed = JSON.parse(raw || "[]");
+    return Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    return 0;
+  }
+};
+
+const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics, windowContext }) => {
+  const rollup = epicMetrics.length > 0 ? computeOverallRollup(
+    epicMetrics.map((epic) => ({
+      ...epic,
+      completedIssues: epic.completedIssues ?? epic.closedIssues ?? 0,
+      statusCounts: epic.statusCounts || parseJsonObjectSafe(epic.statusCountsJson),
+    }))
+  ) : null;
+  const overallIssuePercent = rollup?.overallIssuePercent ?? snapshot.overallIssuePercent;
+  const overallEpicPercent = rollup?.overallEpicPercent ?? snapshot.overallEpicPercent;
+  const overallOverduePercent = rollup?.overallOverduePercent ?? snapshot.overallOverduePercent;
+  const scopeNames = epicMetrics
+    .map((epic) => epic.epicName || epic.epicKey)
+    .filter(Boolean);
+
   const lines = [
     "## Overall Project Metrics",
-    `- Tasks resolved: ${Number(snapshot.overallIssuePercent || 0).toFixed(1)}%`,
-    `- Projects complete: ${Number(snapshot.overallEpicPercent || 0).toFixed(1)}%`,
-    `- Open tasks overdue: ${Number(snapshot.overallOverduePercent || 0).toFixed(1)}%`,
+    `- Report scope: ${scopeNames.length > 0 ? scopeNames.join("; ") : "snapshot projects"}`,
+    `- Tasks resolved: ${Number(overallIssuePercent || 0).toFixed(1)}%`,
+    `- Projects complete: ${Number(overallEpicPercent || 0).toFixed(1)}%`,
+    `- Open tasks overdue: ${Number(overallOverduePercent || 0).toFixed(1)}%`,
     `- Snapshot captured: ${snapshot.refreshedAt || "unknown"}`,
   ];
+
+  if (windowContext) {
+    lines.push("", windowContext);
+  }
 
   if (epicMetrics.length > 0) {
     lines.push("", "## Projects & Epics");
@@ -146,15 +257,34 @@ const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics }) => {
 
   if (assigneeMetrics.length > 0) {
     lines.push("", "## Team Overdue Metrics");
-    const withWork = assigneeMetrics.filter((p) => p.totalOpenCount > 0);
-    if (withWork.length === 0) {
+    const people = assigneeMetrics.filter((person) => person.queryType !== "jql");
+    const listed = people.length > 0 ? people : assigneeMetrics;
+    const teamAssigned = listed.reduce(
+      (sum, person) => sum + Number(person.totalAssigned || person.totalOpenCount || 0),
+      0
+    );
+    const withOpen = listed.filter((person) => person.totalOpenCount > 0);
+    const avgOpen =
+      withOpen.length > 0
+        ? withOpen.reduce((sum, person) => sum + person.totalOpenCount, 0) / withOpen.length
+        : 0;
+
+    if (listed.length === 0) {
       lines.push("- No team members with open tasks tracked.");
     } else {
-      for (const person of withWork) {
+      for (const person of listed) {
         const name = person.resolvedDisplayName || person.queryName || "Unknown";
-        const pct = Number(person.overduePercent || 0).toFixed(1);
+        const pct =
+          person.overduePercent == null ? "n/a" : Number(person.overduePercent || 0).toFixed(1);
+        const assigned = Number(person.totalAssigned || person.totalOpenCount || 0);
+        const share = teamAssigned > 0 ? ((assigned / teamAssigned) * 100).toFixed(1) : "0.0";
+        const totalIssues = Number(person.totalIssues || 0);
+        const resolved = Number(person.totalResolved || 0);
+        const resolutionPct =
+          totalIssues > 0 ? ((resolved / totalIssues) * 100).toFixed(1) : "n/a";
+        const heavier = avgOpen > 0 && person.totalOpenCount > avgOpen * 1.25;
         lines.push(
-          `- ${name}: ${person.overdueOpenCount} overdue / ${person.totalOpenCount} open (${pct}% overdue)`
+          `- ${name}: ${person.overdueOpenCount} overdue / ${person.totalOpenCount} open (${pct}% overdue); assigned ${assigned} (${share}% of team assigned work); resolved ${resolved}/${totalIssues} (${resolutionPct}%); upcoming due ${person.upcomingDueCount || 0}${heavier ? "; heavier than team average open load" : ""}`
         );
       }
     }
@@ -164,18 +294,22 @@ const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics }) => {
 };
 
 const callLLMForReport = async ({ systemPrompt, context, label = "report" }) => {
-  log.info(`generating ${label}`);
   const provider = resolveFirstReadyReportProvider();
-  return completeLlmText({
-    systemPrompt,
-    userMessage: context,
-    maxTokens: REPORT_MAX_TOKENS,
-    provider,
-    forReports: true,
-  });
+  log.info(`generating ${label} via ${provider}`);
+  try {
+    return await completeLlmText({
+      systemPrompt,
+      userMessage: context,
+      maxTokens: REPORT_MAX_TOKENS,
+      provider,
+      forReports: true,
+    });
+  } catch (error) {
+    throw new Error(formatUnableToGenerateReportError(provider, error));
+  }
 };
 
-export const registerReportRoutes = (app, { db, dataDir }) => {
+export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
   const getLatestSnapshotStmt = db.prepare(
     "SELECT * FROM dashboard_snapshots ORDER BY refreshed_at DESC LIMIT 1"
   );
@@ -187,6 +321,16 @@ export const registerReportRoutes = (app, { db, dataDir }) => {
   );
   const getCustomInstructionsStmt = db.prepare(
     "SELECT value FROM app_settings WHERE key = 'chat_custom_instructions'"
+  );
+  const getEpicPastDueModeStmt = db.prepare(
+    "SELECT value FROM app_settings WHERE key = 'epic_past_due_mode'"
+  );
+  const listFieldMappingsStmt = db.prepare(
+    "SELECT role, field_id, field_name FROM jira_field_mappings ORDER BY role ASC"
+  );
+  const getEpicPresetStmt = db.prepare("SELECT * FROM epic_presets WHERE id = ?");
+  const listDirectReportWatchesStmt = db.prepare(
+    "SELECT * FROM watched_assignees WHERE watch_type = 'direct_reports' ORDER BY sort_order ASC, id ASC"
   );
 
   app.post("/api/report/generate", async (req, res) => {
@@ -215,12 +359,20 @@ export const registerReportRoutes = (app, { db, dataDir }) => {
       overallIssuePercent: snapshotRow.overall_issue_percent,
       overallEpicPercent: snapshotRow.overall_epic_percent,
       overallOverduePercent: snapshotRow.overall_overdue_percent,
+      includePastDue: Boolean(snapshotRow.include_past_due),
+      pastDueLookbackYears: normalizePastDueLookbackYears(
+        snapshotRow.past_due_lookback_years ??
+          (snapshotRow.extended_past_due_history ? 3 : 1)
+      ),
+      dueByDate: snapshotRow.due_by_date || null,
+      dueByField: String(snapshotRow.due_by_field || "due_date").trim(),
     };
 
     // Filter to the requested subset of projects if the user chose specific ones.
+    const presetEpicRows = epicRows.filter((row) => Number(row.epic_preset_id || 0) > 0);
     const filteredEpicRows = requestedEpicIds.length > 0
-      ? epicRows.filter((row) => requestedEpicIds.includes(Number(row.epic_preset_id || 0)))
-      : epicRows;
+      ? presetEpicRows.filter((row) => requestedEpicIds.includes(Number(row.epic_preset_id || 0)))
+      : presetEpicRows;
 
     const epicMetrics = filteredEpicRows.map((row) => ({
       epicKey: row.epic_key,
@@ -228,33 +380,127 @@ export const registerReportRoutes = (app, { db, dataDir }) => {
       totalIssues: Number(row.total_issues || 0),
       openIssues: Number(row.open_issues || 0),
       closedIssues: Number(row.closed_issues || 0),
+      completedIssues: Number(row.closed_issues || 0),
       overdueOpenIssues: Number(row.overdue_open_issues || 0),
+      dueByOpenIssues: Number(row.due_by_open_issues || 0),
       issuePercent: Number(row.issue_percent || 0),
+      epicPercent: Number(row.epic_percent || 0),
       isPastDue: Boolean(row.is_past_due),
       pastDueReason: row.past_due_reason,
       mostRecentDoneDate: row.most_recent_done_date,
       initialDoneDate: row.initial_done_date,
       projectEndDate: row.project_end_date,
       statusCountsJson: row.status_counts_json,
+      statusCounts: parseJsonObjectSafe(row.status_counts_json),
+      openStatusCounts: parseJsonObjectSafe(row.open_status_counts_json),
     }));
 
-    const assigneeMetrics = assigneeRows.map((row) => ({
-      queryName: row.query_name,
-      resolvedDisplayName: row.resolved_display_name,
-      totalOpenCount: Number(row.total_open_count || 0),
-      overdueOpenCount: Number(row.overdue_open_count || 0),
-      overduePercent: Number(row.overdue_percent || 0),
-    }));
+    const assigneeMetrics = assigneeRows.map((row) => {
+      const workload = parseJsonObjectSafe(row.workload_counts_json);
+      return {
+        queryName: row.query_name,
+        resolvedDisplayName: row.resolved_display_name,
+        resolvedAccountId: String(row.resolved_account_id || "").trim(),
+        queryType: String(row.query_type || "person").trim(),
+        jql: String(row.jql || "").trim(),
+        totalOpenCount: Number(row.total_open_count || 0),
+        overdueOpenCount: Number(row.overdue_open_count || 0),
+        overduePercent: row.overdue_percent == null ? null : Number(row.overdue_percent),
+        totalAssigned: Number(workload.totalAssigned ?? row.total_open_count ?? 0),
+        totalIssues: Number(workload.totalIssues || 0),
+        totalResolved: Number(workload.totalResolved || 0),
+        upcomingDueCount: parseJsonArrayLength(row.upcoming_due_issues_json),
+        inProgress: Number(workload.inProgress || 0),
+        backlog: Number(workload.backlog || 0),
+      };
+    });
 
-    const baseContext = buildReportContext({ snapshot, epicMetrics, assigneeMetrics });
+    let epicMetricsForReport = epicMetrics;
+    let assigneeMetricsForReport = assigneeMetrics;
+    const isAdhocTeamReport = audienceKey === "direct_reports";
+    let savedTeamQueries = [];
+    let myself = null;
+    if (isAdhocTeamReport) {
+      savedTeamQueries = listDirectReportWatchesStmt.all().map(mapWatchedAssigneeRow).filter(Boolean);
+      if (savedTeamQueries.length === 0) {
+        return res.status(400).json({
+          error:
+            "No My Direct Reports query in Settings. Save people there, select the query on Dashboard, then Refresh contributors.",
+        });
+      }
+      myself = typeof jiraRequest === "function" ? await fetchJiraMyself({ jiraRequest }) : null;
+      assigneeMetricsForReport = assigneeMetrics
+        .filter(isDirectReportAssigneeRow)
+        .filter(isTranslatedPersonName)
+        .filter(
+          (person) =>
+            !isCurrentUserMember(person.resolvedDisplayName || person.queryName, myself) &&
+            !isCurrentUserMember(person.queryName, myself) &&
+            !isCurrentUserMember(person.resolvedAccountId, myself)
+        );
+      if (assigneeMetricsForReport.length === 0) {
+        return res.status(400).json({
+          error:
+            "Ad-hoc team report needs My Direct Reports people in the snapshot. Select the My Direct Reports chips on Dashboard, then click Refresh contributors.",
+        });
+      }
+      epicMetricsForReport = [];
+    }
+
+    const mappingsByRole = buildFieldMappingsMap(listFieldMappingsStmt.all());
+    const epicPastDueMode = String(getEpicPastDueModeStmt.get()?.value || "either").trim();
+    const presetIdsForLinks = isAdhocTeamReport
+      ? []
+      : [
+          ...new Set(
+            (requestedEpicIds.length > 0
+              ? requestedEpicIds
+              : filteredEpicRows.map((row) => Number(row.epic_preset_id || 0))
+            ).filter((id) => id > 0)
+          ),
+        ];
+    const presetUnionScope = buildUnionScopeFromJqls(
+      isAdhocTeamReport
+        ? savedTeamQueries
+            .map((watch) => buildDirectReportsJql(watch.memberNames, myself) || watch.jql)
+            .filter(Boolean)
+        : presetIdsForLinks
+            .map((id) => mapEpicPresetRow(getEpicPresetStmt.get(id)))
+            .filter(Boolean)
+            .map((preset) => preset.jql || fallbackPresetJql(preset.epicKey))
+    );
+    const linkEpicMetrics = isAdhocTeamReport
+      ? assigneeMetricsForReport.map((person) => ({
+          overdueOpenIssues: person.overdueOpenCount,
+          dueByOpenIssues: person.upcomingDueCount,
+          openStatusCounts: {
+            "In Progress": person.inProgress,
+            Backlog: person.backlog,
+          },
+        }))
+      : epicMetricsForReport;
+    const dueWindows = buildReportDueWindowsAndLinks({
+      snapshot,
+      mappingsByRole,
+      epicPastDueMode,
+      presetUnionScope,
+      epicMetrics: linkEpicMetrics,
+    });
+
+    const baseContext = buildReportContext({
+      snapshot,
+      epicMetrics: epicMetricsForReport,
+      assigneeMetrics: assigneeMetricsForReport,
+      windowContext: dueWindows.windowContext,
+    });
     const context = additionalContext
       ? `${baseContext}\n\n## Additional User Context\n${additionalContext}`
       : baseContext;
 
     const systemParts = [
       config.instruction,
-      "Base your report ONLY on the data provided below. Do not invent names, metrics, or details.",
-      "Keep the report professional and grounded in the actual numbers.",
+      "Base the report only on the data that follows. Do not invent names, metrics, or details.",
+      "No preamble or sign-off. Use the requested headings only.",
     ];
 
     if (customInstructions) {
@@ -264,7 +510,10 @@ export const registerReportRoutes = (app, { db, dataDir }) => {
     const systemPrompt = systemParts.join("\n\n");
 
     try {
-      const report = await callLLMForReport({ systemPrompt, context, label: config.label });
+      const generated = await callLLMForReport({ systemPrompt, context, label: config.label });
+      const report = dueWindows.appendedSection
+        ? `${generated.trim()}\n\n${dueWindows.appendedSection}`
+        : generated.trim();
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.DASHBOARD,
         reportType: "dashboard_report",
@@ -290,8 +539,7 @@ export const registerReportRoutes = (app, { db, dataDir }) => {
     } catch (error) {
       log.error("generation failed", error instanceof Error ? error.message : error);
       return res.status(500).json({
-        error: "Report generation failed",
-        message: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : "Unable to generate report.",
       });
     }
   });
@@ -352,7 +600,9 @@ Tone: supportive and honest — like a thoughtful colleague reviewing your work 
       return res.json({ report, label, archiveId });
     } catch (error) {
       log.error("project report generation failed", error instanceof Error ? error.message : error);
-      return res.status(500).json({ error: "Project report generation failed", message: error instanceof Error ? error.message : "Unknown error" });
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : "Unable to generate report.",
+      });
     }
   });
 
@@ -429,7 +679,9 @@ Rules:
       return res.json({ plan, archiveId });
     } catch (error) {
       log.error("week plan generation failed", error instanceof Error ? error.message : error);
-      return res.status(500).json({ error: "Week plan generation failed", message: error instanceof Error ? error.message : "Unknown error" });
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : "Unable to generate report.",
+      });
     }
   });
 

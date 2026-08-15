@@ -4,6 +4,10 @@ import {
   buildDashboardMetricsJql,
   buildFieldMappingsMap,
   buildPastDueJql,
+  buildStatusCategoryJql,
+  buildUpcomingDueJql,
+  buildUnionScopeFromJqls,
+  applyJqlScope,
   fallbackPresetJql,
   splitTrailingOrderBy,
 } from "../server/lib/epicFilterJql.mjs";
@@ -181,5 +185,52 @@ describe("buildPastDueJql", () => {
 
     assert.match(jql, /duedate >= "2024-06-01"/);
     assert.match(jql, /"Most Recent Done Date" >= "2024-06-01"/);
+  });
+});
+
+describe("buildUpcomingDueJql", () => {
+  const mappingsByRole = buildFieldMappingsMap([
+    { role: "due_date", field_id: "duedate", field_name: "Due date" },
+    { role: "most_recent_done_date", field_id: "customfield_1", field_name: "Most Recent Done Date" },
+  ]);
+
+  it("returns empty without a cutoff date", () => {
+    assert.equal(buildUpcomingDueJql({ mappingsByRole, dueByDate: "" }), "");
+  });
+
+  it("uses the due field and cutoff, scoped to epic keys", () => {
+    const jql = buildUpcomingDueJql({
+      mappingsByRole,
+      dueByField: "due_date",
+      dueByDate: "2026-09-13",
+      epicKeys: ["ODI-1"],
+    });
+    assert.match(jql, /duedate >= startOfDay\(\)/);
+    assert.match(jql, /duedate <= "2026-09-13"/);
+    assert.match(jql, /parent in \(ODI-1\)/);
+  });
+});
+
+describe("buildStatusCategoryJql", () => {
+  it("builds an In Progress query", () => {
+    const jql = buildStatusCategoryJql({ category: "In Progress", epicKeys: ["ODI-9"] });
+    assert.match(jql, /statusCategory = "In Progress"/);
+    assert.match(jql, /key in \(ODI-9\)/);
+  });
+});
+
+describe("applyJqlScope", () => {
+  it("returns empty without a saved preset scope", () => {
+    assert.equal(applyJqlScope("statusCategory = \"To Do\" ORDER BY updated DESC", ""), "");
+  });
+
+  it("intersects bucket JQL with the union of saved preset queries", () => {
+    const scope = buildUnionScopeFromJqls([
+      "parent = ODI-1 ORDER BY updated DESC",
+      "parent = ODI-2 ORDER BY created ASC",
+    ]);
+    const jql = applyJqlScope('statusCategory = "To Do" ORDER BY updated DESC', scope);
+    assert.match(jql, /statusCategory = "To Do"/);
+    assert.match(jql, /\(parent = ODI-1\) OR \(parent = ODI-2\)/);
   });
 });

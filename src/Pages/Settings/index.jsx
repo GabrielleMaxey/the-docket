@@ -14,6 +14,7 @@ import { useEpicFilters } from "../../context/EpicFiltersContext.jsx";
 import PresetsSection from "./components/PresetsSection";
 import DateFieldsSection from "./components/DateFieldsSection";
 import MetricTargetsSection from "./components/MetricTargetsSection";
+import DirectReportsSection from "./components/DirectReportsSection";
 import WorkWeekHeaderSection from "./components/WorkWeekHeaderSection";
 import ChatAssistantSection from "./components/ChatAssistantSection";
 import TeamPriorityImportSection from "./components/TeamPriorityImportSection";
@@ -90,7 +91,7 @@ const Settings = () => {
   return (
     <Container style={{ marginTop: "1.5rem", marginBottom: "2rem", maxWidth: "1500px", width: "100%", paddingLeft: "1rem", paddingRight: "1rem" }}>
       <Header as="h1">Settings</Header>
-      <p>Manage epic presets, Jira date field mappings, past-due rules, and contributor metrics.</p>
+      <p>Manage epic presets, Jira date field mappings, past-due rules, contributor metrics, and direct reports queries.</p>
 
       {error ? <Message negative content={error} /> : null}
 
@@ -117,6 +118,8 @@ const Settings = () => {
       />
 
       <MetricTargetsSection watchedAssignees={watchedAssignees} setWatchedAssignees={setWatchedAssignees} onError={setError} epicPresets={epicPresets} />
+
+      <DirectReportsSection watchedAssignees={watchedAssignees} setWatchedAssignees={setWatchedAssignees} onError={setError} />
 
       <WorkWeekHeaderSection headerPrefs={headerPrefs} setHeaderPrefs={setHeaderPrefs} />
 

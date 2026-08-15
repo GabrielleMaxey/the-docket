@@ -458,6 +458,16 @@ export const createWatchedAssignee = async (payload) => {
   });
 };
 
+export const updateWatchedAssignee = async (id, payload) => {
+  return requestJson(`/api/watched-assignees/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload || {}),
+  });
+};
+
 export const deleteWatchedAssignee = async (id) => {
   return requestJson(`/api/watched-assignees/${encodeURIComponent(id)}`, {
     method: "DELETE",

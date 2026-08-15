@@ -20,6 +20,13 @@ const EpicFilterPanel = ({
   runLabel = "Run Selected",
   showRunButton = true,
   showPastDue = true,
+  extraGroupLabel = "",
+  extraOptions = [],
+  selectedExtraIds = [],
+  onToggleExtra,
+  onRemoveExtra,
+  dropdownLabel = "Epic presets",
+  emptyTriggerLabel = "Select epic presets",
 }) => {
   const options = presets.map((preset) => ({
     key: preset.id,
@@ -55,7 +62,10 @@ const EpicFilterPanel = ({
     onSelectionChange(selectedPresetIds.filter((id) => id !== presetId));
   };
 
-  const hasSelection = selectedPresetIds.length > 0 || includePastDue;
+  const extraSelected = extraOptions.filter((option) => selectedExtraIds.includes(option.id));
+  const selectedCount = selectedLabels.length + extraSelected.length;
+  const hasMenuItems = options.length > 0 || extraOptions.length > 0;
+  const hasSelection = selectedPresetIds.length > 0 || includePastDue || selectedExtraIds.length > 0;
 
   return (
     <div className="ww-epic-filter-panel">
@@ -70,7 +80,7 @@ const EpicFilterPanel = ({
 
       <div className="ww-epic-filter-controls">
         <div className="ww-epic-filter-dropdown-wrap">
-          <label htmlFor="epic-filter-dropdown-trigger">Epic presets</label>
+          <label htmlFor="epic-filter-dropdown-trigger">{dropdownLabel}</label>
           <div className="ww-epic-dropdown" ref={dropdownRef}>
             <button
               id="epic-filter-dropdown-trigger"
@@ -79,19 +89,19 @@ const EpicFilterPanel = ({
               aria-haspopup="listbox"
               aria-expanded={isDropdownOpen}
               onClick={() => setIsDropdownOpen((open) => !open)}
-              disabled={loading || presets.length === 0}
+              disabled={loading || !hasMenuItems}
             >
               <span>
                 {loading
                   ? "Loading presets..."
-                  : selectedLabels.length > 0
-                    ? `${selectedLabels.length} preset${selectedLabels.length === 1 ? "" : "s"} selected`
-                    : "Select epic presets"}
+                  : selectedCount > 0
+                    ? `${selectedCount} selected`
+                    : emptyTriggerLabel}
               </span>
               <span className="ww-epic-dropdown-caret" aria-hidden="true">▾</span>
             </button>
 
-            {isDropdownOpen && options.length > 0 ? (
+            {isDropdownOpen && hasMenuItems ? (
               <div className="ww-epic-dropdown-menu" role="listbox" aria-multiselectable="true">
                 {options.map((option) => {
                   const selected = selectedPresetIds.includes(option.value);
@@ -109,10 +119,34 @@ const EpicFilterPanel = ({
                     </button>
                   );
                 })}
+                {extraOptions.length > 0 ? (
+                  <>
+                    {extraGroupLabel ? (
+                      <div className="ww-epic-dropdown-group-label">{extraGroupLabel}</div>
+                    ) : null}
+                    {extraOptions.map((option) => {
+                      const selected = selectedExtraIds.includes(option.id);
+                      return (
+                        <button
+                          key={`extra-${option.id}`}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          className={`ww-epic-dropdown-option${selected ? " is-selected" : ""}`}
+                          title={option.title || ""}
+                          onClick={() => onToggleExtra?.(option.id)}
+                        >
+                          <input type="checkbox" tabIndex={-1} readOnly checked={selected} />
+                          <span>{option.label}</span>
+                        </button>
+                      );
+                    })}
+                  </>
+                ) : null}
               </div>
             ) : null}
 
-            {selectedLabels.length > 0 ? (
+            {selectedCount > 0 ? (
               <div className="ww-epic-selected-chips" aria-live="polite">
                 {selectedLabels.map((preset) => (
                   <span key={preset.key} className="ww-epic-chip">
@@ -122,6 +156,19 @@ const EpicFilterPanel = ({
                       className="ww-epic-chip-remove"
                       onClick={() => removePreset(preset.value)}
                       aria-label={`Remove ${preset.text}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                {extraSelected.map((option) => (
+                  <span key={`extra-${option.id}`} className="ww-epic-chip">
+                    {option.label}
+                    <button
+                      type="button"
+                      className="ww-epic-chip-remove"
+                      onClick={() => onRemoveExtra?.(option.id)}
+                      aria-label={`Remove ${option.label}`}
                     >
                       ×
                     </button>
@@ -140,7 +187,7 @@ const EpicFilterPanel = ({
         />
 
         <div className="ww-epic-filter-actions">
-          <Button size="small" basic onClick={onSelectAll} disabled={loading || presets.length === 0}>
+          <Button size="small" basic onClick={onSelectAll} disabled={loading || !hasMenuItems}>
             Select All
           </Button>
           <Button size="small" basic onClick={onClearSelection} disabled={!hasSelection}>

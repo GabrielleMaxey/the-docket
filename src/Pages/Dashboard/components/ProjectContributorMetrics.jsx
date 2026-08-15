@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import StatusPieChart from "../../../Components/StatusPieChart";
-import { getTerminalIssueCount } from "../../../../shared/dashboardMetrics.mjs";
-import { buildEpicPieStatusCounts } from "../utils/dashboardMetricsUtils";
+import { buildContributorPieStatusCounts } from "../utils/dashboardMetricsUtils";
 import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 import ContributorOverdueList from "./ContributorOverdueList";
 
@@ -33,6 +32,11 @@ const ProjectContributorMetrics = ({
               <Link
                 to={buildWorkWeekHref({ assignee: person.name, epicPresetId })}
                 className="dashboard-epic-contributor-name dashboard-work-week-link"
+                title={
+                  epicPresetId
+                    ? `Open ${person.name}'s tasks for this project in Work Week`
+                    : `Open ${person.name}'s tasks in Work Week`
+                }
               >
                 {person.name}
               </Link>
@@ -44,11 +48,10 @@ const ProjectContributorMetrics = ({
                   : ""}
               </span>
             </div>
-            {getTerminalIssueCount(person) > 0 ||
-            Object.keys(person.openStatusCounts || {}).length > 0 ? (
+            {Object.keys(person.openStatusCounts || {}).length > 0 ? (
               <div className="dashboard-epic-contributor-chart">
                 <StatusPieChart
-                  statusCounts={buildEpicPieStatusCounts(person)}
+                  statusCounts={buildContributorPieStatusCounts(person)}
                   size={110}
                   className="dashboard-pie-chart--compact"
                   variant={chartVariant}

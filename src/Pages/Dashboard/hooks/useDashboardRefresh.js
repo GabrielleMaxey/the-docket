@@ -150,13 +150,24 @@ export const useDashboardRefresh = ({
   }, [loadMetrics]);
 
   React.useEffect(() => {
+    const loadWatched = () => {
+      fetchWatchedAssignees()
+        .then((items) => setWatchedPeople(Array.isArray(items) ? items : []))
+        .catch(() => setWatchedPeople([]));
+    };
+
     fetchJiraHealth()
       .then((health) => setJiraBaseUrl(String(health?.jiraBaseUrl || "").trim()))
       .catch(() => setJiraBaseUrl(""));
 
-    fetchWatchedAssignees()
-      .then((items) => setWatchedPeople(items))
-      .catch(() => setWatchedPeople([]));
+    loadWatched();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        loadWatched();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   const projectFiltersStale = React.useMemo(() => {
@@ -244,7 +255,7 @@ export const useDashboardRefresh = ({
   );
 
   const handleRefresh = React.useCallback(() => {
-    const epicScope = selectedPresetIds.length > 0 || includePastDue;
+    const epicScope = selectedPresetIds.length > 0;
     const contributorScope = assigneeNames.length > 0 || selectedWatchedIds.length > 0;
     const refreshScope = resolveEffectiveRefreshScope({
       hasEpicScope: epicScope,
@@ -323,19 +334,24 @@ export const useDashboardRefresh = ({
   }, []);
 
   const personWatches = React.useMemo(
-    () => watchedPeople.filter((item) => item.watchType !== "jql"),
+    () => watchedPeople.filter((item) => item.watchType === "person"),
     [watchedPeople]
   );
   const jqlWatches = React.useMemo(
     () => watchedPeople.filter((item) => item.watchType === "jql"),
     [watchedPeople]
   );
+  const directReportWatches = React.useMemo(
+    () =>
+      watchedPeople.filter((item) => String(item.watchType || "").trim() === "direct_reports"),
+    [watchedPeople]
+  );
 
-  const displayEpics = snapshot?.epics || [];
+  const displayEpics = (snapshot?.epics || []).filter((epic) => Number(epic.epicPresetId || 0) > 0);
   const pastDueEpics = displayEpics.filter((epic) => epic.isPastDue);
   const assigneeMetrics = snapshot?.assignees || [];
   const showOverall = displayEpics.length >= 1;
-  const hasEpicScope = selectedPresetIds.length > 0 || includePastDue;
+  const hasEpicScope = selectedPresetIds.length > 0;
   const hasContributorScope = assigneeNames.length > 0 || selectedWatchedIds.length > 0;
   const effectiveRefreshScope = resolveEffectiveRefreshScope({ hasEpicScope, hasContributorScope });
   const canSubmit = (hasEpicScope || hasContributorScope) && !refreshLoading;
@@ -457,6 +473,7 @@ export const useDashboardRefresh = ({
     handleToggleWatched,
     personWatches,
     jqlWatches,
+    directReportWatches,
     displayEpics,
     pastDueEpics,
     assigneeMetrics,

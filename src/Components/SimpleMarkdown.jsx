@@ -1,41 +1,86 @@
-// Matches **bold** or [label](url). Internal hash-router links (starting
-// with "/#/" or "#/") navigate in place; anything else (a real https:// Jira
-// browse link, for example) opens in a new tab.
-const INLINE_PATTERN = /\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\)/g;
+import { Link } from "react-router-dom";
+
+const isSafeHref = (href) => {
+  const value = String(href || "").trim();
+  return (
+    value.startsWith("/#/") ||
+    value.startsWith("/work-week") ||
+    value.startsWith("https://") ||
+    value.startsWith("http://localhost") ||
+    value.startsWith("http://127.0.0.1")
+  );
+};
+
+const routerPathFromHref = (href) => {
+  const value = String(href || "").trim();
+  if (value.startsWith("/#/")) {
+    return value.slice(2);
+  }
+  if (value.startsWith("/work-week") || value.startsWith("/dashboard") || value.startsWith("/reports")) {
+    return value;
+  }
+  return null;
+};
 
 const renderInline = (text, keyPrefix) => {
   const nodes = [];
+  const source = String(text || "");
+  const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
   let lastIndex = 0;
   let match;
-  let i = 0;
+  let part = 0;
 
-  INLINE_PATTERN.lastIndex = 0;
-  while ((match = INLINE_PATTERN.exec(text)) !== null) {
+  const pushFormatted = (chunk) => {
+    String(chunk)
+      .split(/\*\*(.+?)\*\*/g)
+      .forEach((piece, i) => {
+        if (i % 2 === 1) {
+          nodes.push(<strong key={`${keyPrefix}-b-${part}-${i}`}>{piece}</strong>);
+        } else if (piece) {
+          nodes.push(piece);
+        }
+      });
+    part += 1;
+  };
+
+  while ((match = linkRe.exec(source))) {
     if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
+      pushFormatted(source.slice(lastIndex, match.index));
     }
-    if (match[1] !== undefined) {
-      nodes.push(<strong key={`${keyPrefix}-b-${i}`}>{match[1]}</strong>);
+    const label = match[1];
+    const href = String(match[2] || "").trim();
+    if (isSafeHref(href)) {
+      const to = routerPathFromHref(href);
+      if (to) {
+        nodes.push(
+          <Link key={`${keyPrefix}-a-${part}`} to={to} className="report-link">
+            {label}
+          </Link>
+        );
+      } else {
+        nodes.push(
+          <a
+            key={`${keyPrefix}-a-${part}`}
+            href={href}
+            className="report-link"
+            target="_blank"
+            rel="noreferrer"
+          >
+            {label}
+          </a>
+        );
+      }
+      part += 1;
     } else {
-      const label = match[2];
-      const url = match[3];
-      const isInternal = url.startsWith("/#/") || url.startsWith("#/");
-      nodes.push(
-        <a
-          key={`${keyPrefix}-a-${i}`}
-          href={url}
-          {...(isInternal ? {} : { target: "_blank", rel: "noreferrer" })}
-        >
-          {label}
-        </a>
-      );
+      pushFormatted(match[0]);
     }
-    i += 1;
-    lastIndex = INLINE_PATTERN.lastIndex;
+    lastIndex = match.index + match[0].length;
   }
-  if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
+
+  if (lastIndex < source.length) {
+    pushFormatted(source.slice(lastIndex));
   }
+
   return nodes;
 };
 

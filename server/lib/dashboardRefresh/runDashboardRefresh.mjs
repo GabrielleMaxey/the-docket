@@ -93,7 +93,15 @@ export const runDashboardRefresh = async ({
       .map((id) => getWatchedAssignee(id))
       .filter(Boolean)
       .map(mapWatchedAssigneeRow)
-      .map((watched) => (watched.watchType === "jql" ? "jql" : "person"));
+      .map((watched) => {
+        if (watched.watchType === "jql") {
+          return "jql";
+        }
+        if (watched.watchType === "direct_reports") {
+          return "direct_reports";
+        }
+        return "person";
+      });
     const contributorQueryTypes = [
       ...(input.assigneeNames.length > 0 ? ["person"] : []),
       ...watchedQueryTypes,

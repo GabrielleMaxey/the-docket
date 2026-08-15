@@ -79,6 +79,15 @@
   margin: 0;
 }
 
+.ww-epic-filter-panel .ww-epic-dropdown-group-label {
+  padding: 0.45rem 0.45rem 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
 .ww-epic-filter-panel .ww-epic-selected-chips {
   display: flex;
   flex-wrap: wrap;
