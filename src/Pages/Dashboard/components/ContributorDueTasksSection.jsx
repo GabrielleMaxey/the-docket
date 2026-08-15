@@ -1,3 +1,4 @@
+import CollapsibleSection from "../../../Components/CollapsibleSection";
 import ContributorOverdueList from "./ContributorOverdueList";
 
 const ContributorDueTasksSection = ({
@@ -6,6 +7,7 @@ const ContributorDueTasksSection = ({
   jiraBaseUrl,
   variant = "overdue",
   className = "",
+  personKey = "",
 }) => {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     return null;
@@ -16,16 +18,21 @@ const ContributorDueTasksSection = ({
       ? "dashboard-contributor-due-group--upcoming"
       : "dashboard-contributor-due-group--overdue";
 
+  const storageKey = personKey
+    ? `contributor-due-${variant}-${personKey}`
+    : null;
+
   return (
-    <div className={`dashboard-contributor-due-group ${groupClass} ${className}`.trim()}>
-      <div className="dashboard-contributor-due-header">
-        <span className="dashboard-contributor-due-title">{title}</span>
-        <span className="dashboard-contributor-due-count">
-          {tasks.length} item{tasks.length !== 1 ? "s" : ""}
-        </span>
-      </div>
-      <ContributorOverdueList tasks={tasks} jiraBaseUrl={jiraBaseUrl} variant={variant} />
-    </div>
+    <CollapsibleSection
+      title={title}
+      badge={`${tasks.length} item${tasks.length !== 1 ? "s" : ""}`}
+      storageKey={storageKey}
+      persistKeyPrefix="dashboard-collapse-"
+      defaultOpen={false}
+      className={`app-collapsible--compact dashboard-contributor-due-group ${groupClass} ${className}`.trim()}
+    >
+      <ContributorOverdueList tasks={tasks} jiraBaseUrl={jiraBaseUrl} variant={variant} layout="compact" />
+    </CollapsibleSection>
   );
 };
 

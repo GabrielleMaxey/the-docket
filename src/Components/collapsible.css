@@ -17,6 +17,24 @@
   margin-top: 1.75rem;
 }
 
+.app-collapsible--compact {
+  margin-top: 0.6rem;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.app-collapsible--compact .app-collapsible-header {
+  padding: 0.45rem 0.65rem;
+}
+
+.app-collapsible--compact .app-collapsible-title {
+  font-size: 0.8rem;
+}
+
+.app-collapsible--compact .app-collapsible-body {
+  padding: 0.5rem 0.65rem 0.65rem;
+}
+
 .app-collapsible--input {
   margin-top: 0;
   margin-bottom: 1rem;
