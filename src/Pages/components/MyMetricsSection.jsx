@@ -10,7 +10,7 @@ const isIssueOpen = (issue) => {
   return !/(closed|resolved|done)/.test(status);
 };
 
-const MyMetricsSection = ({ run, jiraRowPriorities }) => {
+const MyMetricsSection = ({ run, jiraRowPriorities, jqlRuns }) => {
   const totalOpen = React.useMemo(() => {
     let sum = 0;
     for (const issue of run?.issues || []) {
@@ -28,7 +28,7 @@ const MyMetricsSection = ({ run, jiraRowPriorities }) => {
       <div key={`run-summary-${run.index}`} className="ww-run-summary">
         <div className="ww-run-summary-label">{run.label || `Run ${(run.index || 0) + 1}`}</div>
         <JqlRunMetrics run={run} jiraRowPriorities={jiraRowPriorities} />
-        <ProjectReportPanel run={run} jiraRowPriorities={jiraRowPriorities} />
+        <ProjectReportPanel run={run} jiraRowPriorities={jiraRowPriorities} jqlRuns={jqlRuns} />
       </div>
     </CollapsibleSection>
   );

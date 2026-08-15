@@ -763,23 +763,23 @@ const JiraResultsTable = ({
                     </th>
                     <th>Jira Type</th>
                     <th>Summary</th>
-                    <th aria-sort={getHeaderAriaSort("status")}>
-                      <button
-                        type="button"
-                        className={"ww-sort-header-btn" + (sortField === "status" ? " is-active" : "")}
-                        onClick={() => handleHeaderSort("status")}
-                      >
-                        Status{getSortIndicator("status")}
-                      </button>
-                    </th>
-                    <th aria-sort={getHeaderAriaSort("assignee")}>
-                      <button
-                        type="button"
-                        className={"ww-sort-header-btn" + (sortField === "assignee" ? " is-active" : "")}
-                        onClick={() => handleHeaderSort("assignee")}
-                      >
-                        Assignee{getSortIndicator("assignee")}
-                      </button>
+                    <th>
+                      <div className="ww-th-status-assignee">
+                        <button
+                          type="button"
+                          className={"ww-sort-header-btn" + (sortField === "status" ? " is-active" : "")}
+                          onClick={() => handleHeaderSort("status")}
+                        >
+                          Status{getSortIndicator("status")}
+                        </button>
+                        <button
+                          type="button"
+                          className={"ww-sort-header-btn" + (sortField === "assignee" ? " is-active" : "")}
+                          onClick={() => handleHeaderSort("assignee")}
+                        >
+                          Assignee{getSortIndicator("assignee")}
+                        </button>
+                      </div>
                     </th>
                     <th>Updated</th>
                     <th title="Jira due date, or inherited Most Recent Done Date when due date is unset">
@@ -860,7 +860,7 @@ const JiraResultsTable = ({
                         <td>{issue.fields?.issuetype?.name || "-"}</td>
                         <td>{issue.fields?.summary || "No summary"}</td>
 
-                        <td>
+                        <td className="ww-cell-status-assignee">
                           <div className={"ww-edit-cell" + (isClosedOrResolved ? " ww-edit-disabled" : "")}>
                             <select
                               className="ww-edit-select"
@@ -888,19 +888,19 @@ const JiraResultsTable = ({
                               Update Status
                             </button>
                           </div>
-                        </td>
 
-                        <AssigneeCell
-                          issueKey={issueKey}
-                          assignee={assignee}
-                          isClosedOrResolved={isClosedOrResolved}
-                          draftValue={assigneeDrafts[issueKey]}
-                          knownAssignees={knownAssignees}
-                          loading={rowUpdate.loading}
-                          confirmation={rowUpdate}
-                          onDraftChange={handleAssigneeDraftChange}
-                          onUpdate={handleAssigneeUpdate}
-                        />
+                          <AssigneeCell
+                            issueKey={issueKey}
+                            assignee={assignee}
+                            isClosedOrResolved={isClosedOrResolved}
+                            draftValue={assigneeDrafts[issueKey]}
+                            knownAssignees={knownAssignees}
+                            loading={rowUpdate.loading}
+                            confirmation={rowUpdate}
+                            onDraftChange={handleAssigneeDraftChange}
+                            onUpdate={handleAssigneeUpdate}
+                          />
+                        </td>
 
                         <td>{updated}</td>
 

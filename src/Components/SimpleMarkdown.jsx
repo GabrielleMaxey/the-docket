@@ -92,21 +92,28 @@ const SimpleMarkdown = ({ text }) => {
   const elements = [];
   const lines = text.split("\n");
   let listItems = [];
+  let listType = null; // "ul" | "ol" | null
   let listKey = 0;
 
   const flushList = () => {
     if (listItems.length > 0) {
+      const ListTag = listType === "ol" ? "ol" : "ul";
       elements.push(
-        <ul key={`ul-${listKey}`} className="report-list">
+        <ListTag
+          key={`list-${listKey}`}
+          className={`report-list${listType === "ol" ? " report-list--ordered" : ""}`}
+        >
           {listItems}
-        </ul>
+        </ListTag>
       );
       listItems = [];
       listKey += 1;
     }
+    listType = null;
   };
 
   lines.forEach((line, i) => {
+    const orderedMatch = line.match(/^(\d+)\.\s+(.*)$/);
     if (line.startsWith("### ")) {
       flushList();
       elements.push(<h4 key={i} className="report-h3">{renderInline(line.slice(4), `h4-${i}`)}</h4>);
@@ -116,8 +123,17 @@ const SimpleMarkdown = ({ text }) => {
     } else if (line.startsWith("# ")) {
       flushList();
       elements.push(<h2 key={i} className="report-h1">{renderInline(line.slice(2), `h2-${i}`)}</h2>);
+    } else if (/^(---|\*\*\*|___)\s*$/.test(line.trim()) && line.trim().length >= 3) {
+      flushList();
+      elements.push(<hr key={i} className="report-hr" />);
     } else if (line.match(/^[-*] /)) {
+      if (listType === "ol") flushList();
+      listType = "ul";
       listItems.push(<li key={i}>{renderInline(line.slice(2), `li-${i}`)}</li>);
+    } else if (orderedMatch) {
+      if (listType === "ul") flushList();
+      listType = "ol";
+      listItems.push(<li key={i}>{renderInline(orderedMatch[2], `li-${i}`)}</li>);
     } else if (line.trim() === "") {
       flushList();
     } else {

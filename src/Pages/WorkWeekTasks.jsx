@@ -578,7 +578,7 @@ const WorkWeekTasks = () => {
 
         {/* My Metrics — directly below restored-results banner; scoped to active tab */}
         {jqlRuns.some((r) => isConfiguredJqlRun(r) && r.issues?.length > 0) && activeRun?.issues?.length > 0 ? (
-          <MyMetricsSection run={activeRun} jiraRowPriorities={jiraRowPriorities} />
+          <MyMetricsSection run={activeRun} jiraRowPriorities={jiraRowPriorities} jqlRuns={jqlRuns} />
         ) : null}
 
         <JiraResultsTable

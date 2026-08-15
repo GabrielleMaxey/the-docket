@@ -71,50 +71,34 @@ export const insertGeneratedReport = (
   return Number(result.lastInsertRowid);
 };
 
-export const listGeneratedReports = (db, { source, limit = 100 } = {}) => {
+// Shared by listGeneratedReports and deleteGeneratedReportsBySource, so
+// "Delete All" in a given Past Reports tab always matches exactly the same
+// set of rows that tab's list query would return - the two can't drift.
+const buildSourceWhereClause = (source) => {
   const normalizedSource = String(source || "").trim();
-  let rows;
-
   if (normalizedSource === REPORT_SOURCES.WORK_WEEK) {
-    rows = db
-      .prepare(
-        `SELECT id, source, report_type, label, meta_json, created_at
-         FROM generated_reports
-         WHERE report_type IN ('work_week_project_report', 'week_plan')
-         ORDER BY datetime(created_at) DESC, id DESC
-         LIMIT ?`
-      )
-      .all(limit);
-  } else if (normalizedSource === REPORT_SOURCES.DASHBOARD) {
-    rows = db
-      .prepare(
-        `SELECT id, source, report_type, label, meta_json, created_at
-         FROM generated_reports
-         WHERE report_type = 'dashboard_report'
-         ORDER BY datetime(created_at) DESC, id DESC
-         LIMIT ?`
-      )
-      .all(limit);
-  } else if (normalizedSource === REPORT_SOURCES.ADHOC) {
-    rows = db
-      .prepare(
-        `SELECT id, source, report_type, label, meta_json, created_at
-         FROM generated_reports
-         WHERE source = 'adhoc' OR report_type = 'chat_response'
-         ORDER BY datetime(created_at) DESC, id DESC
-         LIMIT ?`
-      )
-      .all(limit);
-  } else {
-    rows = db
-      .prepare(
-        `SELECT id, source, report_type, label, meta_json, created_at
-         FROM generated_reports
-         ORDER BY datetime(created_at) DESC, id DESC
-         LIMIT ?`
-      )
-      .all(limit);
+    return { whereSql: "WHERE report_type IN ('work_week_project_report', 'week_plan')", params: [] };
   }
+  if (normalizedSource === REPORT_SOURCES.DASHBOARD) {
+    return { whereSql: "WHERE report_type = 'dashboard_report'", params: [] };
+  }
+  if (normalizedSource === REPORT_SOURCES.ADHOC) {
+    return { whereSql: "WHERE source = 'adhoc' OR report_type = 'chat_response'", params: [] };
+  }
+  return { whereSql: "", params: [] };
+};
+
+export const listGeneratedReports = (db, { source, limit = 100 } = {}) => {
+  const { whereSql } = buildSourceWhereClause(source);
+  const rows = db
+    .prepare(
+      `SELECT id, source, report_type, label, meta_json, created_at
+       FROM generated_reports
+       ${whereSql}
+       ORDER BY datetime(created_at) DESC, id DESC
+       LIMIT ?`
+    )
+    .all(limit);
 
   return rows.map((row) => mapGeneratedReportRow(row));
 };
@@ -129,6 +113,17 @@ export const getGeneratedReportById = (db, id) => {
     .get(Number(id));
 
   return mapGeneratedReportRow(row, { includeContent: true });
+};
+
+export const deleteGeneratedReportById = (db, id) => {
+  const result = db.prepare("DELETE FROM generated_reports WHERE id = ?").run(Number(id));
+  return result.changes > 0;
+};
+
+export const deleteGeneratedReportsBySource = (db, { source } = {}) => {
+  const { whereSql } = buildSourceWhereClause(source);
+  const result = db.prepare(`DELETE FROM generated_reports ${whereSql}`).run();
+  return result.changes;
 };
 
 export const isWorkWeekReportType = (reportType) => WORK_WEEK_TYPES.has(reportType);

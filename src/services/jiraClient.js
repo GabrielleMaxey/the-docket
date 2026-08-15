@@ -213,6 +213,11 @@ export const fetchIssueMetadataBulk = async (issueKeys) => {
   return data?.items || {};
 };
 
+export const fetchRecentlyNotedIssueKeys = async (since) => {
+  const data = await requestJson(`/api/jira/issue-metadata/recent-notes?since=${encodeURIComponent(since)}`);
+  return Array.isArray(data?.issueKeys) ? data.issueKeys : [];
+};
+
 export const fetchLatestJiraCommentsBulk = async (issueKeys) => {
   const data = await requestJson("/api/jira/issues/comments/latest/bulk", {
     method: "POST",
@@ -600,11 +605,28 @@ export const generateIssueDescription = async ({ summary, issueType, epicKey, ep
   });
 };
 
-export const generateProjectReport = async ({ label, summary }) => {
+export const generateProjectReport = async ({
+  label,
+  jql,
+  summary,
+  reportType,
+  pwbPeriod,
+  userGoals,
+  companyGoals,
+}) => {
   return requestJson("/api/report/project", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label, summary, ...getLocalTimestampPayload() }),
+    body: JSON.stringify({
+      label,
+      jql,
+      summary,
+      reportType,
+      pwbPeriod,
+      userGoals,
+      companyGoals,
+      ...getLocalTimestampPayload(),
+    }),
   });
 };
 
@@ -639,6 +661,18 @@ export const fetchArchivedReports = async ({ source, limit } = {}) => {
 export const fetchArchivedReportById = async (id) => {
   const data = await requestJson(`/api/reports/archive/${encodeURIComponent(id)}`);
   return data?.item || null;
+};
+
+export const deleteArchivedReport = async (id) => {
+  return requestJson(`/api/reports/archive/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+};
+
+export const deleteArchivedReportsBySource = async (source) => {
+  return requestJson(`/api/reports/archive?source=${encodeURIComponent(source)}`, {
+    method: "DELETE",
+  });
 };
 
 export const saveAdHocReport = async ({ content, label, userPrompt, provider }) => {
