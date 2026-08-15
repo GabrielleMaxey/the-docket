@@ -194,7 +194,11 @@ On success, use **Add more detail in Jira** to open the new issue in your browse
 
 Appears after you Run JQL and get results. Shows:
 - Issue count chips (total, open, overdue, in progress) per query
-- A **📄 Project Report** section inside each query — click to expand, then **Generate Report** for an AI-written summary *from your perspective as the assignee*
+- A **📄 Project Report** section inside each query — click to expand, choose a report type, then **Generate Report**:
+  - **Status Report** *(default)* — AI-written summary *from your perspective as the assignee*: how the project is tracking, what needs attention, next steps
+  - **1:1 Prep** — short, scannable bullet points for a weekly or biweekly 1:1 with your manager
+  - **PWB Review** — first-person self-assessment prose for a quarterly, mid-year, or yearly PWB review (choose the period once selected)
+  - For 1:1 Prep and PWB Review, you can optionally add **your goals** and/or your **company/team goals** — the report will note where your work supports them, and honestly flag anything that seems disconnected. All three report types can reference Lumen's 8 Cultural Behaviors where the work genuinely demonstrates one, never as a forced checklist.
 - When a report is showing, use **Clear report** in the report header to remove it from this page only (does not delete copies in **Past Reports**)
 
 > The badge in the **📊 My Metrics** header shows your total open issue count at a glance.

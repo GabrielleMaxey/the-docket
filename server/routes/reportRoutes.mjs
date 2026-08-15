@@ -19,6 +19,13 @@ import {
 import { createLogger } from "../lib/logger.mjs";
 import { buildFieldMappingsMap, buildUnionScopeFromJqls, fallbackPresetJql } from "../lib/epicFilterJql.mjs";
 import { buildReportDueWindowsAndLinks } from "../lib/reportWorkWeekLinks.mjs";
+import {
+  CAREER_REPORT_TYPES,
+  buildOneOnOneSystemPrompt,
+  buildPwbSystemPrompt,
+  isValidCareerReportType,
+  isValidPwbPeriod,
+} from "../lib/careerReportPrompts.mjs";
 import { computeOverallRollup, normalizePastDueLookbackYears } from "../../shared/dashboardMetrics.mjs";
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildDirectReportsJql, isCurrentUserMember, isJqlCurrentUser, looksLikeAccountId } from "../../shared/directReportsJql.mjs";
@@ -549,6 +556,15 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     const label = String(req.body?.label || "Project").trim();
     const summary = req.body?.summary || {};
     const customInstructions = String(getCustomInstructionsStmt.get()?.value || "").trim();
+    const rawReportType = String(req.body?.reportType || "").trim();
+    const careerReportType = isValidCareerReportType(rawReportType) ? rawReportType : null;
+    const userGoals = String(req.body?.userGoals || "").trim();
+    const companyGoals = String(req.body?.companyGoals || "").trim();
+
+    if (careerReportType === CAREER_REPORT_TYPES.PWB && !isValidPwbPeriod(req.body?.pwbPeriod)) {
+      return res.status(400).json({ error: "A valid PWB review period (quarterly, mid_year, or yearly) is required." });
+    }
+    const pwbPeriod = careerReportType === CAREER_REPORT_TYPES.PWB ? req.body.pwbPeriod : null;
 
     const contextLines = [
       `## Project: ${label}`,
@@ -572,8 +588,23 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
         contextLines.push(`- ${issue.key}: ${issue.summary} (${issue.status}, assigned: ${issue.assignee})${overdueFlag}`);
       }
     }
-    const systemParts = [
-      `You are writing a personal project status report for the assignee working on "${label}" at Lumen.
+
+    let systemPromptBase;
+    let archiveReportType = "work_week_project_report";
+    const archiveMeta = { summary };
+    if (careerReportType === CAREER_REPORT_TYPES.ONE_ON_ONE) {
+      systemPromptBase = buildOneOnOneSystemPrompt({ label, userGoals, companyGoals });
+      archiveReportType = "work_week_one_on_one";
+      archiveMeta.userGoals = userGoals || undefined;
+      archiveMeta.companyGoals = companyGoals || undefined;
+    } else if (careerReportType === CAREER_REPORT_TYPES.PWB) {
+      systemPromptBase = buildPwbSystemPrompt({ label, period: pwbPeriod, userGoals, companyGoals });
+      archiveReportType = "work_week_pwb_review";
+      archiveMeta.pwbPeriod = pwbPeriod;
+      archiveMeta.userGoals = userGoals || undefined;
+      archiveMeta.companyGoals = companyGoals || undefined;
+    } else {
+      systemPromptBase = `You are writing a personal project status report for the assignee working on "${label}" at Lumen.
 This report is written FROM the assignee's perspective and FOR their benefit — to help them understand their own workload, spot what needs attention, and feel clear on next steps.
 Write in second person ("you have", "your open items") so it reads as direct, useful feedback to the person doing the work.
 
@@ -583,7 +614,10 @@ Summarize the project in 3-5 paragraphs:
 - What's in progress and what should come next
 - Any risks or blockers to watch
 
-Tone: supportive and honest — like a thoughtful colleague reviewing your work with you, not a manager writing a status update. No bullet lists — use flowing prose.`,
+Tone: supportive and honest — like a thoughtful colleague reviewing your work with you, not a manager writing a status update. No bullet lists — use flowing prose.`;
+    }
+    const systemParts = [
+      systemPromptBase,
       "Base your report ONLY on the data provided. Do not invent metrics or names.",
     ];
     if (customInstructions) systemParts.push(`\nAdditional instructions:\n${customInstructions}`);
@@ -591,11 +625,11 @@ Tone: supportive and honest — like a thoughtful colleague reviewing your work 
       const report = await callLLMForReport({ systemPrompt: systemParts.join("\n\n"), context: contextLines.join("\n"), label });
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.WORK_WEEK,
-        reportType: "work_week_project_report",
+        reportType: archiveReportType,
         label,
         content: report,
         createdAt: getClientArchiveTimestamp(req),
-        meta: { summary, ...getClientArchiveMeta(req) },
+        meta: { ...archiveMeta, ...getClientArchiveMeta(req) },
       });
       return res.json({ report, label, archiveId });
     } catch (error) {
