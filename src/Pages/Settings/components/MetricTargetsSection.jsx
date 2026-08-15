@@ -90,7 +90,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError }
           value={watchType}
           onChange={(_e, { value }) => setWatchType(String(value || "person"))}
         />
-        <Form.Input label="Label" placeholder={watchType === "jql" ? "Platform team open tasks" : "gabrielle.maxey"}
+        <Form.Input label="Label" placeholder={watchType === "jql" ? "Platform team open tasks" : "jane.doe"}
           value={watchedName} onChange={(_e, { value }) => setWatchedName(value)} />
         {watchType === "jql" ? (
           <Form.TextArea label="JQL" placeholder="assignee = currentUser() AND statusCategory != Done"
