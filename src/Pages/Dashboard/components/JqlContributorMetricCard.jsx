@@ -29,7 +29,8 @@ const JqlContributorMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", d
       ) : null}
       {total > 0 ? (
         <p className="dashboard-assignee-meta">
-          {total} total &middot; {open} open &middot; {resolved} resolved
+          {total} total &middot; {open} open &middot; {resolved} resolved (
+          {formatPercent((resolved / total) * 100)})
           {person.overdueOpenCount > 0
             ? ` · ${formatPercent(person.overduePercent)} overdue`
             : ""}
