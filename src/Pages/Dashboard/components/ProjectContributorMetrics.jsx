@@ -4,6 +4,7 @@ import { buildContributorPieStatusCounts } from "../utils/dashboardMetricsUtils"
 import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 import { formatPercent } from "../../../utils/format";
 import ContributorOverdueList from "./ContributorOverdueList";
+import MetricBar from "./MetricBar";
 
 const ProjectContributorMetrics = ({
   contributorMetrics,
@@ -50,11 +51,18 @@ const ProjectContributorMetrics = ({
                   : ""}
               </span>
             </div>
+            {person.totalIssues > 0 ? (
+              <MetricBar
+                label="Resolved"
+                value={(person.resolvedIssues / person.totalIssues) * 100}
+                count={person.resolvedIssues}
+              />
+            ) : null}
             {Object.keys(person.openStatusCounts || {}).length > 0 ? (
               <div className="dashboard-epic-contributor-chart">
                 <StatusPieChart
                   statusCounts={buildContributorPieStatusCounts(person)}
-                  size={110}
+                  size={140}
                   className="dashboard-pie-chart--compact"
                   variant={chartVariant}
                 />
