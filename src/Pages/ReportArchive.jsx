@@ -72,6 +72,8 @@ const ReportList = ({
   savingId,
   onDelete,
   deletingId,
+  onDeleteAll,
+  deletingAll,
   emptyMessage,
 }) => {
   if (loading) {
@@ -102,7 +104,20 @@ const ReportList = ({
           <Table.HeaderCell>When</Table.HeaderCell>
           <Table.HeaderCell>Type</Table.HeaderCell>
           <Table.HeaderCell>Title</Table.HeaderCell>
-          <Table.HeaderCell />
+          <Table.HeaderCell textAlign="right">
+            {onDeleteAll ? (
+              <Button
+                size="mini"
+                negative
+                basic
+                loading={deletingAll}
+                disabled={deletingAll}
+                onClick={onDeleteAll}
+              >
+                Delete all
+              </Button>
+            ) : null}
+          </Table.HeaderCell>
         </Table.Row>
       </Table.Header>
       <Table.Body>
@@ -350,21 +365,7 @@ const ReportArchivePanel = ({
 
   return (
     <div className="report-archive-panel">
-      <div className="report-archive-header-row">
-        <Header as="h3" className="report-archive-subtitle">{title}</Header>
-        {!coworkOnly && items.length > 0 ? (
-          <Button
-            size="mini"
-            negative
-            basic
-            loading={deletingAll}
-            disabled={deletingAll}
-            onClick={handleDeleteAll}
-          >
-            Delete all
-          </Button>
-        ) : null}
-      </div>
+      <Header as="h3" className="report-archive-subtitle">{title}</Header>
       {saveMessage ? <Message positive size="small">{saveMessage}</Message> : null}
       {selectedReport && !detailLoading ? (
         <Message info size="small">
@@ -388,6 +389,8 @@ const ReportArchivePanel = ({
           savingId={savingId}
           onDelete={coworkOnly ? undefined : handleDeleteReport}
           deletingId={deletingId}
+          onDeleteAll={coworkOnly ? undefined : handleDeleteAll}
+          deletingAll={deletingAll}
           emptyMessage={emptyMessage}
         />
       </CollapsibleSection>
