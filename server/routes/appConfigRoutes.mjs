@@ -6,6 +6,7 @@ import {
   buildFieldMappingsMap,
   buildPastDueJql,
   resolvePresetJql,
+  splitTrailingOrderBy,
 } from "../lib/epicFilterJql.mjs";
 import { computePastDueFloorDate } from "../../shared/dashboardMetrics.mjs";
 
@@ -205,8 +206,7 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
       if (!rawJql) {
         return res.status(422).json({ error: "No JQL configured for this epic preset." });
       }
-      const orderMatch = rawJql.match(/\bORDER\s+BY\s+[\s\S]+$/i);
-      const scopeJql = (orderMatch ? rawJql.slice(0, orderMatch.index) : rawJql).trim();
+      const { scope: scopeJql } = splitTrailingOrderBy(rawJql);
       return res.json({ scopeJql });
     } catch (error) {
       log.error(`scope-jql for preset ${id} failed`, error instanceof Error ? error.message : error);
