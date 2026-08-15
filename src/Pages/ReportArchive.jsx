@@ -2,7 +2,7 @@ import React from "react";
 import { Container, Header, Message, Tab, Table, Button } from "semantic-ui-react";
 import CollapsibleSection from "../Components/CollapsibleSection";
 import ReportOutput from "../Components/ReportOutput";
-import StatusPieChart from "../Components/StatusPieChart";
+import ReportDiagrams from "./Dashboard/components/ReportDiagrams";
 import { useReportClipboard } from "../hooks/useReportClipboard";
 import {
   fetchArchivedReportById,
@@ -312,14 +312,10 @@ const ReportArchivePanel = ({
             onDownload={handleDownload}
             chartSlot={
               archivedChart ? (
-                <>
-                  <p className="app-report-chart-label">Overall status</p>
-                  <StatusPieChart
-                    statusCounts={archivedChart.statusCounts}
-                    size={160}
-                    variant={archivedChart.chartVariant}
-                  />
-                </>
+                <ReportDiagrams
+                  statusCounts={archivedChart.statusCounts}
+                  chartVariant={archivedChart.chartVariant}
+                />
               ) : null
             }
           />

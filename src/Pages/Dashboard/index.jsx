@@ -8,6 +8,7 @@ import {
   DEFAULT_DASHBOARD_VISIBLE_SECTIONS,
   normalizeVisibleSections,
   splitDueByIssues,
+  filterDueByIssuesForProject,
   getDashboardRefreshLoadingHint,
   DASHBOARD_AUTO_REFRESH_OPTIONS,
   DASHBOARD_AUTO_REFRESH_MANUAL,
@@ -80,6 +81,7 @@ const Dashboard = () => {
     handleToggleWatched,
     personWatches,
     jqlWatches,
+    directReportWatches,
     displayEpics,
     pastDueEpics,
     assigneeMetrics,
@@ -108,6 +110,17 @@ const Dashboard = () => {
   const [chartVariant, setChartVariant] = usePersistedState("dashboard-chart-variant", "pie");
   const [activeProjectTab, setActiveProjectTab] = usePersistedState("dashboard-active-project-tab", "all");
 
+  const selectedProjectEpic = React.useMemo(() => {
+    if (!activeProjectTab || activeProjectTab === "all") {
+      return null;
+    }
+    if (activeProjectTab.startsWith("pd-")) {
+      return pastDueEpics.find((epic) => `pd-${epic.id}` === activeProjectTab) || null;
+    }
+    return displayEpics.find((epic) => String(epic.id) === activeProjectTab) || null;
+  }, [activeProjectTab, displayEpics, pastDueEpics]);
+  const isSingleProjectView = Boolean(selectedProjectEpic);
+
   const toggleSection = React.useCallback(
     (key) => {
       setVisibleSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -116,20 +129,12 @@ const Dashboard = () => {
   );
 
   const dueByIssueSplit = React.useMemo(() => {
-    const issues = Array.isArray(snapshot?.dueByIssues) ? snapshot.dueByIssues : [];
+    const allIssues = Array.isArray(snapshot?.dueByIssues) ? snapshot.dueByIssues : [];
+    const issues = isSingleProjectView
+      ? filterDueByIssuesForProject(allIssues, selectedProjectEpic)
+      : allIssues;
     return splitDueByIssues(issues);
-  }, [snapshot?.dueByIssues]);
-
-  // Resolves the epic for the active project tab so the contributor section can scope to it.
-  const selectedProjectEpic = React.useMemo(() => {
-    if (activeProjectTab === "all") {
-      return null;
-    }
-    if (activeProjectTab.startsWith("pd-")) {
-      return pastDueEpics.find((epic) => `pd-${epic.id}` === activeProjectTab) || null;
-    }
-    return displayEpics.find((epic) => String(epic.id) === activeProjectTab) || null;
-  }, [activeProjectTab, displayEpics, pastDueEpics]);
+  }, [snapshot?.dueByIssues, isSingleProjectView, selectedProjectEpic]);
 
   return (
     <Container className="dashboard-page">
@@ -164,6 +169,7 @@ const Dashboard = () => {
             setIncludePastDue={setIncludePastDue}
             personWatches={personWatches}
             jqlWatches={jqlWatches}
+            directReportWatches={directReportWatches}
             selectedWatchedIds={selectedWatchedIds}
             setSelectedWatchedIds={setSelectedWatchedIds}
             setAssigneeNames={setAssigneeNames}
@@ -199,7 +205,7 @@ const Dashboard = () => {
       {visibleSections.report && snapshot ? (
         <CollapsibleSection
           title="Generate Report"
-          subtitle="Create Executive, Project Manager, or Developer summaries from the current snapshot."
+          subtitle="Create Executive, Project Manager, Developer, or Ad-hoc team summaries from the current snapshot. Project audiences can use the project tabs. Ad-hoc team report uses Settings → My Direct Reports after you select those chips and Refresh contributors."
           storageKey="report"
           persistKeyPrefix="dashboard-collapse-"
           defaultOpen={false}
@@ -210,6 +216,8 @@ const Dashboard = () => {
             overallStatusCounts={collapseTerminalStatusCounts(snapshot?.statusCounts)}
             chartVariant={chartVariant}
             epics={displayEpics}
+            assignees={assigneeMetrics}
+            directReportWatches={directReportWatches}
           />
           <WeeklyDigestPanel hasSnapshot={Boolean(snapshot)} />
         </CollapsibleSection>
@@ -240,7 +248,7 @@ const Dashboard = () => {
 
       {snapshot ? (
         <>
-          {visibleSections.overall && showOverall ? (
+          {visibleSections.overall && showOverall && !isSingleProjectView ? (
             <CollapsibleSection
               title="Overall Status"
               subtitle="High-level health across selected projects: resolved, in-progress, complete, and overdue percentages."
@@ -343,7 +351,7 @@ const Dashboard = () => {
                 hint={
                   hasEpicScope
                     ? "Updates project cards and per-project contributor metrics from Jira."
-                    : "Select at least one project preset or enable Past Due Projects in Filters."
+                    : "Select at least one saved project preset in Filters."
                 }
               />
               <ProjectMetricsSection
@@ -360,7 +368,7 @@ const Dashboard = () => {
           ) : null}
 
           {visibleSections.overdue &&
-          !selectedProjectEpic &&
+          !isSingleProjectView &&
           (assigneeMetrics.length > 0 || assigneeNames.length > 0 || selectedWatchedIds.length > 0) ? (
             <CollapsibleSection
               title="Individual Contributor Metrics"

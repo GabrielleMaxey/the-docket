@@ -14,6 +14,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
   const [watchType, setWatchType] = React.useState("person");
   const [quickPickValue, setQuickPickValue] = React.useState("");
   const [flash, setFlash] = useFlash();
+  const contributorEntries = watchedAssignees.filter((person) => person.watchType !== "direct_reports");
 
   const handleQuickPickSelect = (presetId) => {
     setQuickPickValue(presetId);
@@ -73,9 +74,10 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
       <p>
         Add people by display name to track their open task count and overdue rate, or define a
         custom JQL query to scope a group — by project, team, label, or any combination, or pick a
-        saved Epic/JQL preset to fill in the query for you. Each entry appears as a quick-select
-        chip on the Dashboard and is separate from the project presets that drive the project tabs
-        above.
+        saved Epic/JQL preset to fill in the query for you. For a named manager team, use Settings
+        → <strong>My Direct Reports</strong> instead of writing JQL by hand. Each entry appears as
+        a quick-select chip on the Dashboard and is separate from the project presets that drive
+        the project tabs above.
       </p>
       <Table celled compact>
         <Table.Header>
@@ -87,10 +89,10 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
           </Table.Row>
         </Table.Header>
         <Table.Body>
-          {watchedAssignees.length === 0 ? (
+          {contributorEntries.length === 0 ? (
             <Table.Row><Table.Cell colSpan="4">No entries yet.</Table.Cell></Table.Row>
           ) : (
-            watchedAssignees.map((person) => (
+            contributorEntries.map((person) => (
               <Table.Row key={person.id}>
                 <Table.Cell>{person.watchType === "jql" ? "Custom query" : "Person"}</Table.Cell>
                 <Table.Cell>{person.displayName}</Table.Cell>

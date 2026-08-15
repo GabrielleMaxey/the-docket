@@ -73,53 +73,68 @@ const JqlControlsPanel = ({
         <div className="ww-jql-row-head">
           <label htmlFor={`jql-label-${index}`}>Label {index + 1}</label>
         </div>
-        {epicPresets.length > 0 ? (
-          <div className="ww-quick-pick-row">
-            <div className="ww-quick-pick-main">
-              <label className="ww-quick-pick-label" htmlFor={`quick-pick-${index}`}>
-                Quick pick:
-              </label>
-              <select
-                id={`quick-pick-${index}`}
-                className="ww-quick-pick-select"
-                value={quickPickValueBySlot[index] ?? ""}
-                onChange={(event) => onQuickPickSelect(index, event.target.value)}
-              >
-                <option value="">Choose preset…</option>
-                {epicPresets.map((preset) => (
-                  <option
-                    key={`qp-${index}-${preset.id}`}
-                    value={preset.id}
-                    title={
-                      preset.presetType === "jql"
-                        ? (preset.jql || preset.label)
-                        : preset.epicKey
-                    }
-                  >
-                    {preset.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="button"
-              className="ww-import-filter-btn ww-import-filter-btn-inline"
-              onClick={() => onImportSlot(index)}
-            >
-              Import from Jira
-            </button>
+        <div className="ww-quick-pick-row">
+          <div className="ww-quick-pick-cluster">
+            {epicPresets.length > 0 ? (
+              <div className="ww-quick-pick-main">
+                <label className="ww-quick-pick-label" htmlFor={`quick-pick-${index}`}>
+                  Quick pick:
+                </label>
+                <select
+                  id={`quick-pick-${index}`}
+                  className="ww-quick-pick-select"
+                  value={quickPickValueBySlot[index] ?? ""}
+                  onChange={(event) => onQuickPickSelect(index, event.target.value)}
+                >
+                  <option value="">Choose preset…</option>
+                  {epicPresets.map((preset) => (
+                    <option
+                      key={`qp-${index}-${preset.id}`}
+                      value={preset.id}
+                      title={
+                        preset.presetType === "jql"
+                          ? (preset.jql || preset.label)
+                          : preset.epicKey
+                      }
+                    >
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            {epicPresets.length > 0 && Array.isArray(sharedPrograms) && sharedPrograms.length > 0 ? (
+              <span className="ww-quick-pick-or">OR</span>
+            ) : null}
+            {Array.isArray(sharedPrograms) && sharedPrograms.length > 0 ? (
+              <div className="ww-quick-pick-main">
+                <label className="ww-quick-pick-label" htmlFor={`jql-shared-program-${index}`}>
+                  Shared project:
+                </label>
+                <select
+                  id={`jql-shared-program-${index}`}
+                  className="ww-quick-pick-select"
+                  value={jqlSharedProgramIds?.[index] || ""}
+                  onChange={(event) => onJqlSharedProgramChange?.(index, event.target.value)}
+                >
+                  <option value="">None (personal)</option>
+                  {sharedPrograms.map((program) => (
+                    <option key={`sp-${index}-${program.slug}`} value={program.slug}>
+                      {program.displayName || program.slug}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
-        ) : (
-          <div className="ww-quick-pick-row">
-            <button
-              type="button"
-              className="ww-import-filter-btn ww-import-filter-btn-inline"
-              onClick={() => onImportSlot(index)}
-            >
-              Import from Jira
-            </button>
-          </div>
-        )}
+          <button
+            type="button"
+            className="ww-import-filter-btn ww-import-filter-btn-inline"
+            onClick={() => onImportSlot(index)}
+          >
+            Import from Jira
+          </button>
+        </div>
         <div className="ww-jql-row-inline">
           <input
             id={`jql-label-${index}`}
@@ -136,23 +151,6 @@ const JqlControlsPanel = ({
           onChange={(event) => onJqlChange(index, event.target.value)}
           placeholder="project = ABC ORDER BY updated DESC"
         />
-        {Array.isArray(sharedPrograms) && sharedPrograms.length > 0 ? (
-          <div className="ww-jql-row-inline" style={{ marginTop: "0.4rem" }}>
-            <label htmlFor={`jql-shared-program-${index}`}>Shared program:</label>
-            <select
-              id={`jql-shared-program-${index}`}
-              value={jqlSharedProgramIds?.[index] || ""}
-              onChange={(event) => onJqlSharedProgramChange?.(index, event.target.value)}
-            >
-              <option value="">None (personal)</option>
-              {sharedPrograms.map((program) => (
-                <option key={`sp-${index}-${program.slug}`} value={program.slug}>
-                  {program.displayName || program.slug}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
       </div>
     ))}
 

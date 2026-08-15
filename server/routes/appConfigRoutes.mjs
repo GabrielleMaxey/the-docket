@@ -9,9 +9,10 @@ import {
   splitTrailingOrderBy,
 } from "../lib/epicFilterJql.mjs";
 import { computePastDueFloorDate } from "../../shared/dashboardMetrics.mjs";
+import { buildDirectReportsJql, normalizeMemberNames } from "../../shared/directReportsJql.mjs";
 
 const EPIC_PAST_DUE_MODES = new Set(["most_recent_done_date", "project_end_date", "either"]);
-const WATCH_TYPES = new Set(["person", "jql"]);
+const WATCH_TYPES = new Set(["person", "jql", "direct_reports"]);
 const PRESET_TYPES = new Set(["epic", "jql"]);
 const JQL_PRESET_KEY = "JQL";
 
@@ -63,8 +64,8 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
   );
   const getWatchedAssigneeStmt = db.prepare("SELECT * FROM watched_assignees WHERE id = ?");
   const insertWatchedAssigneeStmt = db.prepare(`
-    INSERT INTO watched_assignees (display_name, resolved_account_id, watch_type, jql, sort_order)
-    VALUES (@displayName, @resolvedAccountId, @watchType, @jql, @sortOrder)
+    INSERT INTO watched_assignees (display_name, resolved_account_id, watch_type, jql, member_names_json, sort_order)
+    VALUES (@displayName, @resolvedAccountId, @watchType, @jql, @memberNamesJson, @sortOrder)
   `);
   const updateWatchedAssigneeStmt = db.prepare(`
     UPDATE watched_assignees SET
@@ -72,6 +73,7 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
       resolved_account_id = @resolvedAccountId,
       watch_type = @watchType,
       jql = @jql,
+      member_names_json = @memberNamesJson,
       sort_order = @sortOrder
     WHERE id = @id
   `);
@@ -146,10 +148,27 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
       return { error: "jql is required when watchType is jql" };
     }
 
+    const existingNames = (() => {
+      try {
+        const parsed = JSON.parse(existing?.member_names_json || "[]");
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    })();
+    const memberNames = normalizeMemberNames(
+      body?.memberNames !== undefined ? body.memberNames : existingNames
+    );
+
+    if (watchType === "direct_reports" && memberNames.length === 0) {
+      return { error: "Add at least one contributor name" };
+    }
+
     return {
       displayName,
       watchType,
-      jql: watchType === "jql" ? jql : "",
+      jql: watchType === "direct_reports" ? buildDirectReportsJql(memberNames) : watchType === "jql" ? jql : "",
+      memberNamesJson: watchType === "direct_reports" ? JSON.stringify(memberNames) : "[]",
       resolvedAccountId: String(body?.resolvedAccountId ?? existing?.resolved_account_id ?? "").trim(),
       sortOrder: Number(body?.sortOrder ?? existing?.sort_order ?? 0),
     };

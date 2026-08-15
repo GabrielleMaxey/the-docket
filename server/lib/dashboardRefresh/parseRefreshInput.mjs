@@ -45,7 +45,7 @@ export const validateDashboardRefreshInput = (input) => {
 
   if (scope === "projects") {
     if (!hasProjects) {
-      return "Select at least one project preset or enable Past Due Projects";
+      return "Select at least one saved project preset";
     }
     return null;
   }
@@ -58,7 +58,7 @@ export const validateDashboardRefreshInput = (input) => {
   }
 
   if (!hasProjects && !hasContributors) {
-    return "Select at least one project preset, Past Due Projects, or contributor to track";
+    return "Select at least one saved project preset or contributor to track";
   }
 
   return null;

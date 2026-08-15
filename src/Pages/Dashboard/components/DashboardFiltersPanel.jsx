@@ -39,6 +39,7 @@ const DashboardFiltersPanel = ({
   setIncludePastDue,
   personWatches,
   jqlWatches,
+  directReportWatches = [],
   selectedWatchedIds,
   setSelectedWatchedIds,
   setAssigneeNames,
@@ -304,10 +305,33 @@ const DashboardFiltersPanel = ({
           ) : null}
         </p>
         <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "0 0 0.5rem" }}>
-          Optional — choose people or custom JQL queries for the{" "}
-          <strong>Individual Contributor Metrics</strong> section. Person watches use full assignee
-          workload; JQL watches render as a project contributor card with per-person breakdown.
+          Optional — choose <strong>My Direct Reports</strong> queries, people, or custom JQL for
+          the <strong>Individual Contributor Metrics</strong> section. Direct reports and person
+          watches use full assignee workload; JQL watches render as a project contributor card. The{" "}
+          <strong>Ad-hoc team report</strong> uses My Direct Reports, not project JQLs.
         </p>
+        <p className="dashboard-watch-group-label">My Direct Reports</p>
+        {directReportWatches.length === 0 ? (
+          <p className="dashboard-due-by-hint" style={{ marginTop: 0, marginBottom: "0.5rem" }}>
+            No queries yet. Add names, emails, or Atlassian IDs in Settings → My Direct Reports.
+          </p>
+        ) : (
+          <div className="dashboard-watched-chips">
+            {directReportWatches.map((watch) => (
+              <Button
+                key={watch.id}
+                size="mini"
+                primary={selectedWatchedIds.includes(watch.id)}
+                basic={!selectedWatchedIds.includes(watch.id)}
+                onClick={() => handleToggleWatched(watch.id)}
+                title={watch.jql}
+              >
+                {watch.displayName}
+              </Button>
+            ))}
+          </div>
+        )}
+        <p className="dashboard-watch-group-label">People and custom JQL</p>
         {personWatches.length > 0 || jqlWatches.length > 0 ? (
           <div className="dashboard-watched-chips">
             {personWatches.map((person) => (

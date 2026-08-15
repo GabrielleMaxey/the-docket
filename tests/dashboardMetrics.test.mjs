@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   computeAssigneeMetrics,
+  computeAssigneeMetricsFromIssueSet,
   computeContributorMetricsFromIssues,
   computeJqlWatchMetrics,
   computeJqlWatchMetricsByAssignee,
@@ -528,6 +529,28 @@ describe("personMatchesIssue", () => {
     const issue = makeIssue({ assignee: "Jane Doe" });
     issue.fields.assignee.accountId = "abc123";
     assert.equal(personMatchesIssue(issue, "jane.doe", "", "abc123"), true);
+  });
+
+  it("matches Atlassian account ids and emails from the query string", () => {
+    const issue = makeIssue({ assignee: "Jane Doe" });
+    issue.fields.assignee.accountId = "557058:c0b3c8e9-1234-4abc-9def-1234567890ab";
+    issue.fields.assignee.emailAddress = "jane@company.com";
+    assert.equal(
+      personMatchesIssue(issue, "557058:c0b3c8e9-1234-4abc-9def-1234567890ab", ""),
+      true
+    );
+    assert.equal(personMatchesIssue(issue, "accountid:557058:c0b3c8e9-1234-4abc-9def-1234567890ab", ""), true);
+    assert.equal(personMatchesIssue(issue, "jane@company.com", ""), true);
+  });
+
+  it("does not treat an assignee-in JQL string as matching every person in the list", () => {
+    const jane = makeIssue({ assignee: "Jane Doe" });
+    const bob = makeIssue({ assignee: "Bob Wilson" });
+    const jql = 'assignee in ("Jane Doe", "Bob Wilson") ORDER BY updated DESC';
+    assert.equal(personMatchesIssue(jane, jql, "Jane Doe"), false);
+    assert.equal(personMatchesIssue(bob, jql, "Bob Wilson"), false);
+    jane.fields.assignee.accountId = "acc-jane";
+    assert.equal(personMatchesIssue(jane, jql, "Jane Doe", "acc-jane"), true);
   });
 });
 

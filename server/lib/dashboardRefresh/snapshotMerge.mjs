@@ -6,7 +6,7 @@ export const normalizeRefreshScope = (value) => {
 };
 
 export const hasProjectRefreshScope = (input) =>
-  input.epicPresetIds.length > 0 || input.includePastDue;
+  input.epicPresetIds.length > 0;
 
 export const hasContributorRefreshScope = (input) =>
   input.assigneeNames.length > 0 || input.watchedAssigneeIds.length > 0;

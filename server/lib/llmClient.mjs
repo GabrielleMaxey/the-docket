@@ -223,8 +223,63 @@ const buildAnthropicJiraTool = () => ({
 const runJiraTool = ({ jiraRequest, args }) =>
   executeJiraSearch({ jiraRequest, jql: args?.jql, maxResults: args?.maxResults });
 
+const describeReportLlmTarget = (provider) => {
+  try {
+    if (provider === "ollama") {
+      return getOllamaConfig({ forReports: true });
+    }
+    if (provider === "openai") {
+      const { model, baseUrl } = getOpenAiCredentials({ forReports: true });
+      return { model, baseUrl };
+    }
+    if (provider === "anthropic") {
+      const { model, baseUrl } = getAnthropicCredentials({ forReports: true });
+      return { model, baseUrl };
+    }
+  } catch {
+    return { model: "", baseUrl: "" };
+  }
+  return { model: "", baseUrl: "" };
+};
+
+export const formatUnableToGenerateReportError = (provider, error) => {
+  const raw = error instanceof Error ? error.message : String(error || "");
+  const { model, baseUrl } = describeReportLlmTarget(provider);
+  const modelLabel = model || "configured";
+
+  if (!provider || provider === "disabled") {
+    return "Unable to generate report. No report model is configured.";
+  }
+
+  const modelUnavailable =
+    /unreachable|ECONNREFUSED|ENOTFOUND|ECONNRESET|fetch failed|not found|does not exist|unknown model|model .*not/i.test(
+      raw
+    );
+
+  if (modelUnavailable) {
+    const hint =
+      provider === "ollama" && baseUrl
+        ? ` Start Ollama at ${baseUrl}, or configure a different report provider.`
+        : "";
+    return `Unable to generate report. The ${modelLabel} model is not available.${hint}`;
+  }
+
+  return `Unable to generate report. ${raw}`;
+};
+
+const fetchOrThrow = async (url, options, label) => {
+  try {
+    return await fetch(url, options);
+  } catch (error) {
+    const cause = error?.cause;
+    const code = cause?.code || "";
+    const detail = String(cause?.message || error?.message || "fetch failed");
+    throw new Error(`${label || "LLM"} unreachable at ${url}: ${detail}${code ? ` (${code})` : ""}`);
+  }
+};
+
 const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens, tools }) => {
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const response = await fetchOrThrow(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -236,7 +291,7 @@ const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens,
       ...(maxTokens ? { max_tokens: maxTokens } : {}),
       ...(tools ? { tools, tool_choice: "auto" } : {}),
     }),
-  });
+  }, "OpenAI");
 
   const data = await response.json();
   if (!response.ok) {
@@ -247,7 +302,7 @@ const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens,
 };
 
 const callAnthropicMessages = async ({ apiKey, baseUrl, model, systemPrompt, messages, maxTokens, tools }) => {
-  const response = await fetch(`${baseUrl}/v1/messages`, {
+  const response = await fetchOrThrow(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "x-api-key": apiKey,
@@ -261,7 +316,7 @@ const callAnthropicMessages = async ({ apiKey, baseUrl, model, systemPrompt, mes
       messages,
       ...(tools ? { tools } : {}),
     }),
-  });
+  }, "Anthropic");
 
   const data = await response.json();
   if (!response.ok) {
@@ -273,7 +328,7 @@ const callAnthropicMessages = async ({ apiKey, baseUrl, model, systemPrompt, mes
 
 const callOllamaChat = async ({ systemPrompt, userMessage, maxTokens, forReports = false }) => {
   const { baseUrl, model } = getOllamaConfig({ forReports });
-  const response = await fetch(`${baseUrl}/api/chat`, {
+  const response = await fetchOrThrow(`${baseUrl}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -285,7 +340,7 @@ const callOllamaChat = async ({ systemPrompt, userMessage, maxTokens, forReports
       ],
       ...(maxTokens ? { options: { num_predict: maxTokens } } : {}),
     }),
-  });
+  }, "Ollama");
 
   const data = await response.json();
   if (!response.ok) {
