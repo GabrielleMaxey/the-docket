@@ -30,13 +30,13 @@ Run up to five saved JQL queries side-by-side and manage every issue in one tabl
 - **My Metrics** — per-query progress summary with issue counts and a per-project AI report (written for you, the assignee, in second person); **Clear report** removes the on-page copy only
 - **Help me plan my week** — answers 4 quick questions, then generates a day-by-day Monday–Friday plan based on your actual open issues
 - **Create Issue** — creates a new Jira issue from a modal with epic/parent selection (including saved JQL presets without a fixed epic key), ODI field defaults (project components validated against Jira), **✦ AI Draft** for ODI-standard descriptions, optional subtask assignee on Story create, and a link to open the new issue in Jira after create; Stories get suggested sub-tasks (Task type, parent-linked to the new story, editable checkboxes, created automatically on submit), Bugs get a suggested priority based on ODI severity definitions
-- **Dashboard drill-down** — links from Dashboard open assignee or issue deep links (`?assignee=`, `?key=`); drill-down tabs persist for the current browser session and can be cleared one at a time
+- **Dashboard drill-down** — links from Dashboard open assignee or issue deep links (`?assignee=`, `?key=`, plus `?epicPresetId=` so an **Unassigned** link scopes to the project card it came from); drill-down tabs persist for the current browser session and can be cleared one at a time
 
 ### Dashboard *(project-level view)*
 Select one or more saved Epic or JQL presets and get a metrics snapshot across all of them.
 
-- **Overall Status** — aggregate % resolved, % in progress, % complete, and % overdue across selected projects
-- **Project Metrics** — per-epic cards showing issue %, epic %, overdue %, status breakdown (pie or bar chart), and deadline dates
+- **Overall Status** — aggregate % resolved, % in progress, % in backlog, % complete, and % overdue across selected projects, plus issue/overdue/resolved/backlog count chips
+- **Project Metrics** — per-epic cards showing issue %, in-progress %, backlog %, epic %, overdue %, status breakdown (pie or bar chart), and deadline dates
 - **Upcoming Due Dates** — optional card: open tasks due from today through a chosen window (7d–90d or custom date), grouped by project → assignee; issue type shown per row
 - **Past Due in lookback** — optional card: missed deadlines within a 1–3 year lookback when Past Due Projects is enabled
 - **Individual Contributor Metrics** — per-person workload cards (open, in progress, overdue, backlog); names link to Work Week assignee drill-down
@@ -142,7 +142,7 @@ Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 | On-page reports/plans (Work Week + Dashboard) | Browser `localStorage` | No |
 | **Past Reports** archive | `data/workweek.sqlite` → `generated_reports`; saved under your browser's local timestamp/timezone | No |
 | Header reminders | Browser `localStorage` | No |
-| Per-issue notes + P1–P10 priority | `data/workweek.sqlite` (local file) | No |
+| Per-issue notes + P1–P20 priority | `data/workweek.sqlite` (local file) | No |
 | Status/assignee changes, pushed comments | Jira (lumen.atlassian.net) | Yes — visible in Jira to anyone with access |
 | Dashboard metrics snapshot | `data/workweek.sqlite` (dev) or user data folder (packaged desktop) | No |
 | Desktop `.env` + local DB (packaged app) | OS user data folder — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) | No |
