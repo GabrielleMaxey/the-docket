@@ -554,6 +554,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
   // ─── Per-project report (WorkWeek task manager) ───────────────────────────
   app.post("/api/report/project", async (req, res) => {
     const label = String(req.body?.label || "Project").trim();
+    const jql = String(req.body?.jql || "").trim();
     const summary = req.body?.summary || {};
     const customInstructions = String(getCustomInstructionsStmt.get()?.value || "").trim();
     const rawReportType = String(req.body?.reportType || "").trim();
@@ -568,12 +569,17 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
 
     const contextLines = [
       `## Project: ${label}`,
+    ];
+    if (jql) {
+      contextLines.push(`- Query (JQL): ${jql}`);
+    }
+    contextLines.push(
       `- Total issues: ${summary.total || 0}`,
       `- Open: ${summary.open || 0} | Resolved: ${summary.closed || 0}`,
       `- Overdue: ${summary.overdue || 0}`,
       `- In Progress: ${summary.inProgress || 0}`,
-      `- Ready for Verification: ${summary.readyForVerification || 0}`,
-    ];
+      `- Ready for Verification: ${summary.readyForVerification || 0}`
+    );
     if (summary.statusBreakdown && Object.keys(summary.statusBreakdown).length > 0) {
       const parts = Object.entries(summary.statusBreakdown)
         .filter(([, v]) => Number(v) > 0)
@@ -591,7 +597,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
 
     let systemPromptBase;
     let archiveReportType = "work_week_project_report";
-    const archiveMeta = { summary };
+    const archiveMeta = { summary, jql: jql || undefined };
     if (careerReportType === CAREER_REPORT_TYPES.ONE_ON_ONE) {
       systemPromptBase = buildOneOnOneSystemPrompt({ label, userGoals, companyGoals });
       archiveReportType = "work_week_one_on_one";
@@ -608,11 +614,17 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
 This report is written FROM the assignee's perspective and FOR their benefit — to help them understand their own workload, spot what needs attention, and feel clear on next steps.
 Write in second person ("you have", "your open items") so it reads as direct, useful feedback to the person doing the work.
 
-Summarize the project in 3-5 paragraphs:
-- How the project is tracking overall (completion %, pace)
-- What open items need the most attention, especially anything overdue
-- What's in progress and what should come next
-- Any risks or blockers to watch
+Before writing, look at the query's label and JQL below (if given) to understand what this query is actually scoped to, and let that shape the report - do not default to a generic "project status" framing if the query is narrower or different than that:
+- If the label/JQL implies only OPEN or IN-PROGRESS work (e.g. "My Open Work", "assignee = currentUser() AND statusCategory != Done"), focus on active workload, what needs attention, and next steps as usual.
+- If the label/JQL implies only CLOSED/RESOLVED work (e.g. "My Closed Work", "status in (Done, Resolved, Closed)"), do NOT talk about "what needs attention" or overdue items - instead recap what was completed and any notable outcomes. There may be little or nothing "open" to report on, and that's expected, not a gap.
+- If the label/JQL is scoped to a specific status, label, or subset (e.g. only overdue items, only a specific issue type), frame the whole report around that specific scope rather than treating the numbers as if they represent the assignee's entire workload.
+- If the label/JQL is unclear or looks like a general project/epic query, use the general framing below.
+
+Summarize in 3-5 paragraphs, using framing appropriate to what the query actually captures:
+- How the work in this query is tracking overall (completion %, pace) - or, for closed-only queries, what was accomplished
+- What open items need the most attention, especially anything overdue (skip this if the query has no open items to report)
+- What's in progress and what should come next (skip if not applicable to this query's scope)
+- Any risks or blockers to watch (skip if not applicable)
 
 Tone: supportive and honest — like a thoughtful colleague reviewing your work with you, not a manager writing a status update. No bullet lists — use flowing prose.`;
     }
