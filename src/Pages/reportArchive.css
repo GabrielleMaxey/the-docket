@@ -27,13 +27,6 @@
   color: #334155;
 }
 
-.report-archive-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
 .report-archive-table {
   margin-top: 0 !important;
 }
