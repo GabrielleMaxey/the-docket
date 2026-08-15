@@ -195,6 +195,16 @@
   margin-bottom: 0.2rem;
 }
 
+.app-report-markdown .report-list--ordered {
+  list-style: decimal;
+}
+
+.app-report-markdown .report-hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 1.15rem 0;
+}
+
 .app-report-markdown .report-link {
   color: #0c93d9;
   font-weight: 600;
