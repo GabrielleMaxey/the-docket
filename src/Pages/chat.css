@@ -63,3 +63,67 @@
 .chat-page .chat-input-form button {
   margin-top: 0.5rem;
 }
+
+.epic-eval-panel {
+  margin-top: 0;
+}
+
+.epic-eval-input-form {
+  margin-top: 0.5rem;
+}
+
+.epic-eval-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.epic-eval-status {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.epic-eval-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  font-size: 0.82rem;
+  color: #334155;
+  margin-bottom: 0.75rem;
+}
+
+.epic-eval-muted {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.epic-eval-stats {
+  margin: 0.5rem 0 !important;
+}
+
+.epic-eval-contributors,
+.epic-eval-blockers {
+  margin-top: 0.75rem;
+}
+
+.epic-eval-contributors h5,
+.epic-eval-blockers h5 {
+  margin: 0 0 0.25rem;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.epic-eval-contributors ul,
+.epic-eval-blockers ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.82rem;
+}
+
+.epic-eval-contributors li,
+.epic-eval-blockers li {
+  margin-bottom: 0.2rem;
+}
+

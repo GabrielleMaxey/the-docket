@@ -574,6 +574,10 @@ export const fetchEpicParentOptions = async (epicKey) => {
   return requestJson(`/api/jira/epics/${encodeURIComponent(String(epicKey || "").trim())}/parent-options`);
 };
 
+export const fetchEpicWorkload = async (epicKey) => {
+  return requestJson(`/api/jira/epics/${encodeURIComponent(String(epicKey || "").trim())}/workload`);
+};
+
 export const fetchJiraParentCandidates = async ({ jql, maxTotal = 100 }) => {
   return requestJson("/api/jira/issues/parent-candidates", {
     method: "POST",
