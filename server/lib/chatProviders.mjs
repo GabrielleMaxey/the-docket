@@ -4,7 +4,7 @@ import {
   ROVO_PROVIDER,
 } from "./llmClient.mjs";
 import { sendRovoChatMessage } from "./rovoChat.mjs";
-import { formatChatSessionContext } from "../../shared/chatSessionPrompt.mjs";
+import { formatChatSessionContext, formatEpicEvaluationContext } from "../../shared/chatSessionPrompt.mjs";
 
 export const buildEpicContextPrompt = (epicContext, customInstructions) => {
   const lines = [
@@ -42,6 +42,11 @@ export const buildEpicContextPrompt = (epicContext, customInstructions) => {
   const sessionText = formatChatSessionContext(epicContext?.sessionContext);
   if (sessionText) {
     lines.push("", "Session context (queries, dashboard snapshot, generated reports/plans):", sessionText);
+  }
+
+  const epicEvaluationText = formatEpicEvaluationContext(epicContext?.epicEvaluation);
+  if (epicEvaluationText) {
+    lines.push("", epicEvaluationText);
   }
 
   if (epicContext?.dashboardSummary) {

@@ -8,6 +8,7 @@ import {
   Segment,
 } from "semantic-ui-react";
 import EpicFilterPanel from "./components/EpicFilterPanel";
+import EpicEvaluationPanel from "./components/EpicEvaluationPanel";
 import { useEpicFilters } from "../context/EpicFiltersContext.jsx";
 import { fetchChatStatus, fetchDashboardMetrics, saveAdHocReport, sendChatMessage, signOutChat, startChatOAuth } from "../services/jiraClient";
 import { buildApiUrl } from "../services/apiBase";
@@ -33,6 +34,7 @@ const Chat = () => {
   const [chatError, setChatError] = React.useState("");
   const [chatStatus, setChatStatus] = React.useState(null);
   const [dashboardSnapshot, setDashboardSnapshot] = React.useState(null);
+  const [epicEvaluation, setEpicEvaluation] = React.useState(null);
   const [savedMessageIndexes, setSavedMessageIndexes] = React.useState(() => new Set());
   const [savingMessageIndex, setSavingMessageIndex] = React.useState(null);
 
@@ -122,6 +124,7 @@ const Chat = () => {
           selectedEpics,
           includePastDue,
           sessionContext,
+          epicEvaluation,
         },
       });
 
@@ -242,6 +245,12 @@ const Chat = () => {
           showRunButton={false}
         />
       </Segment>
+
+      <EpicEvaluationPanel
+        presets={presets}
+        onEpicLoaded={setEpicEvaluation}
+        onEpicCleared={() => setEpicEvaluation(null)}
+      />
 
       {chatError ? <Message negative>{chatError}</Message> : null}
 
