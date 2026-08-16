@@ -21,7 +21,7 @@ const BASE_IDEA_PROMPTS = [
   { icon: "⏰", text: "What's overdue across my work right now?" },
   { icon: "🎯", text: "What should I focus on today?" },
   { icon: "🚧", text: "Is anything blocking my open work?" },
-  { icon: "✅", text: "What have I completed recently?" },
+  { icon: "🧩", text: "What's my hardest task, and what are the next steps?" },
 ];
 
 const Chat = () => {
