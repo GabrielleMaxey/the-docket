@@ -161,9 +161,7 @@ const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics, windowCont
           if (parts) {
             lines.push(`- Status breakdown: ${parts}`);
           }
-        } catch {
-          // skip malformed JSON
-        }
+        } catch {}
       }
     }
   }
