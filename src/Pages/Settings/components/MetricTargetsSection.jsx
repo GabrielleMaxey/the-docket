@@ -21,18 +21,34 @@ const escapeJqlString = (value) => String(value || "").replace(/\\/g, "\\\\").re
 // Unfiltered by status, matching how the "person" (assignee) watch type
 // behaves - fetches everything and lets the existing metrics computation
 // split it into open/resolved/overdue, rather than only ever seeing open
-// issues here.
+// issues here. This is only the FALLBACK shape when no preset is picked -
+// picking a preset (e.g. the existing "Reporter's Current Issues" preset)
+// replaces this with that preset's own filtering/ordering instead, since
+// PMs may already have a preferred shape for this (resolution = Unresolved,
+// priority-ordered) that shouldn't be overridden by a different default.
 const buildReporterJql = (displayName) => `reporter = "${escapeJqlString(displayName)}" ORDER BY updated DESC`;
 
-// Detects a reporter-generated entry purely from its stored JQL matching
-// the exact pattern buildReporterJql produces, so the table can label it
-// "Reporter" instead of a generic "Custom query" - no separate DB flag
-// needed since this is fully derivable from the JQL text itself.
-const isReporterWatchJql = (jql, displayName) => String(jql || "").trim() === buildReporterJql(displayName);
+// Detects a reporter-type entry purely from whether its stored JQL
+// references the "reporter" field at all, not an exact-match on one
+// specific template - a preset-derived reporter JQL (e.g. substituted from
+// "Reporter's Current Issues") won't match buildReporterJql's own shape,
+// but is still fundamentally a reporter-scoped query, so the table should
+// still label it "Reporter" rather than a generic "Custom query".
+const isReporterWatchJql = (jql) => /(^|[\s(])reporter\s*=/.test(String(jql || ""));
+
+// Substitutes currentUser() in a preset's JQL for a specific named person,
+// so a PM-facing preset like "reporter = currentUser() AND resolution =
+// Unresolved ORDER BY priority DESC, updated DESC" becomes a query for
+// someone else's reported work, not just the person currently logged in.
+// Presets that don't reference currentUser() at all are returned unchanged -
+// a PM can still pick any preset, not just reporter-shaped ones.
+const substituteCurrentUser = (jql, displayName) =>
+  String(jql || "").replace(/currentUser\(\)/g, `"${escapeJqlString(displayName)}"`);
 
 const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, epicPresets = [] }) => {
   const [watchedName, setWatchedName] = React.useState("");
   const [watchedJql, setWatchedJql] = React.useState("");
+  const [watchedReporterJql, setWatchedReporterJql] = React.useState("");
   const [watchType, setWatchType] = React.useState("person");
   const [watchedCapacity, setWatchedCapacity] = React.useState("");
   const [quickPickValue, setQuickPickValue] = React.useState("");
@@ -53,7 +69,15 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
           ? `parent = ${preset.epicKey}`
           : "";
     if (jql) {
-      setWatchedJql(jql);
+      if (watchType === "reporter") {
+        // Substitute the picked preset's currentUser() for the name already
+        // typed above - if no name is typed yet, this leaves an empty ""
+        // placeholder the PM can fill in by typing the name and it'll be
+        // regenerated on blur, or they can just edit the JQL directly.
+        setWatchedReporterJql(substituteCurrentUser(jql, watchedName.trim()));
+      } else {
+        setWatchedJql(jql);
+      }
     }
     if (!watchedName.trim() && preset.label) {
       setWatchedName(preset.label);
@@ -61,10 +85,27 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
     setQuickPickValue("");
   };
 
+  // Reporter mode's JQL box auto-fills when the name field is left (blur),
+  // using whatever's already in the box as a hint: if it looks like a
+  // preset-derived query (references currentUser() or already has this
+  // person's old name in it), just re-substitute the new name into the
+  // same shape rather than resetting to the plain default template -
+  // preserves a PM's preset choice across renaming the target person.
+  const regenerateReporterJql = (nextName) => {
+    const name = nextName.trim();
+    if (!name) return;
+    setWatchedReporterJql((prev) => {
+      const trimmedPrev = prev.trim();
+      if (!trimmedPrev) return buildReporterJql(name);
+      if (/currentUser\(\)/.test(trimmedPrev)) return substituteCurrentUser(trimmedPrev, name);
+      return trimmedPrev.replace(/reporter\s*=\s*"[^"]*"/, `reporter = "${escapeJqlString(name)}"`);
+    });
+  };
+
   const handleAddWatchedAssignee = async () => {
     const displayName = watchedName.trim();
     const isReporter = watchType === "reporter";
-    const jql = isReporter ? buildReporterJql(displayName) : watchedJql.trim();
+    const jql = isReporter ? watchedReporterJql.trim() || buildReporterJql(displayName) : watchedJql.trim();
     if (!displayName) return;
     if (watchType === "jql" && !jql) { onError("JQL is required for a custom query entry."); return; }
     onError("");
@@ -78,6 +119,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
       });
       setWatchedName("");
       setWatchedJql("");
+      setWatchedReporterJql("");
       setWatchType("person");
       setWatchedCapacity("");
       setQuickPickValue("");
@@ -185,7 +227,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
                 <Table.Cell>
                   {person.watchType !== "jql"
                     ? "Person"
-                    : isReporterWatchJql(person.jql, person.displayName)
+                    : isReporterWatchJql(person.jql)
                       ? "Reporter"
                       : "Custom query"}
                 </Table.Cell>
@@ -229,13 +271,39 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
           placeholder={watchType === "jql" ? "Platform team open tasks" : "jane.doe"}
           value={watchedName}
           onChange={(_e, { value }) => setWatchedName(value)}
+          onBlur={() => {
+            if (watchType === "reporter") regenerateReporterJql(watchedName);
+          }}
         />
         {watchType === "reporter" ? (
-          <p className="ww-copy" style={{ marginTop: "-0.5rem", marginBottom: "0.75rem" }}>
-            Tracks issues this person <strong>reported</strong>, not issues assigned to them — useful
-            for PMs who want to see the current status of what they requested, regardless of who's
-            working it.
-          </p>
+          <>
+            <p className="ww-copy" style={{ marginTop: "-0.5rem", marginBottom: "0.75rem" }}>
+              Tracks issues this person <strong>reported</strong>, not issues assigned to them —
+              useful for PMs who want to see the current status of what they requested, regardless
+              of who's working it. Pick a saved preset below to reuse its filtering (e.g. the
+              "Reporter's Current Issues" preset), or just edit the JQL directly.
+            </p>
+            {epicPresets.length > 0 ? (
+              <Form.Select
+                label="Quick pick (optional)"
+                placeholder="Choose a saved preset to fill in the JQL below…"
+                options={epicPresets.map((preset) => ({
+                  key: preset.id,
+                  value: preset.id,
+                  text: preset.label,
+                  description: preset.presetType === "jql" ? preset.jql : preset.epicKey,
+                }))}
+                value={quickPickValue}
+                onChange={(_e, { value }) => handleQuickPickSelect(value)}
+              />
+            ) : null}
+            <Form.TextArea
+              label="JQL"
+              placeholder='reporter = "name" ORDER BY updated DESC'
+              value={watchedReporterJql}
+              onChange={(_e, { value }) => setWatchedReporterJql(value)}
+            />
+          </>
         ) : null}
         {watchType === "jql" ? (
           <>
