@@ -160,7 +160,7 @@ Where the work genuinely reflects one of Lumen's 8 Cultural Behaviors (listed be
     .join("\n\n");
 };
 
-// ── Dashboard AI report audience instructions (moved from server/routes/reportRoutes.mjs) ──
+// ── Dashboard AI report audience instructions (Executive Summary, Project Manager Summary, Developer Report, Ad-hoc team report) ──
 export const POSSIBLE_REASONS_INSTRUCTION = `After the numbered sections, add **Possible reasons (hypotheses)**.
 These are optional interpretations of the metrics, not confirmed root causes.
 Only include hypotheses that fit the numbers. Mark each as possible. Do not invent tickets, people, or process facts that are not in the data.
@@ -261,7 +261,7 @@ ${POSSIBLE_REASONS_INSTRUCTION}`,
   },
 };
 
-// ── Work Week "Status Report" prompt (moved from server/routes/reportRoutes.mjs) ──
+// ── Work Week "Status Report" prompt — a personal, second-person workload summary for the assignee, scoped to whatever the query's label/JQL actually captures ──
 export const buildStatusReportSystemPrompt = ({ label }) =>
   `You are writing a personal project status report for the assignee working on "${label}" at Lumen.
 This report is written FROM the assignee's perspective and FOR their benefit — to help them understand their own workload, spot what needs attention, and feel clear on next steps.
@@ -283,7 +283,7 @@ If any item below is flagged as having recent Jira comment activity despite sitt
 
 Tone: supportive and honest — like a thoughtful colleague reviewing your work with you, not a manager writing a status update. No bullet lists — use flowing prose.`;
 
-// ── Work Week "Help me plan my week" prompt (moved from server/routes/reportRoutes.mjs) ──
+// ── Work Week "Help me plan my week" prompt — day-by-day plan from a developer's open task data ──
 const WEEK_PLAN_FOCUS_INSTRUCTIONS = {
   balance: "Distribute effort across all active projects proportionally.",
   overdue: "Prioritize clearing overdue items first before taking on new work.",
@@ -310,7 +310,7 @@ Rules:
     ...(customInstructions ? [`\nAdditional instructions:\n${customInstructions}`] : []),
   ].join("\n\n");
 
-// ── Chat's main system prompt (moved from server/lib/chatProviders.mjs) ──
+// ── Chat's main system prompt — grounds every answer in real fetched context (session data, dashboard snapshot, selected epics) and requires tool calls or an honest "I don't know" over guessing ──
 export const buildEpicContextPrompt = (epicContext, customInstructions) => {
   const lines = [
     "You are a helpful assistant for a Jira task management app.",
@@ -361,7 +361,7 @@ export const buildEpicContextPrompt = (epicContext, customInstructions) => {
   return lines.join("\n");
 };
 
-// ── Create Issue modal's AI Draft prompts (moved from server/routes/jiraIssueRoutes.mjs) ──
+// ── Create Issue modal's AI Draft prompts — Story/Bug/Task drafts written to ODI's Jira standards (Job Story format, bug repro sections, task scoping), sourced from Confluence: Jira Standards ODI Project Space Standards ──
 export const DESCRIPTION_FORMAT_RULES = `Description formatting rules:
 - Start with "overview": 1–2 short sentences only. State the problem or goal plainly — no filler.
 - Follow with "sections": each has a clear "label" and "items" array of bullet lines (plain text, no markdown).
