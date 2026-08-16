@@ -14,7 +14,7 @@ const ProjectManagers = React.lazy(() => import("./Pages/ProjectManagers.jsx"));
 const Settings = React.lazy(() => import("./Pages/Settings.jsx"));
 
 const NAV_LINKS = [
-  { to: "/work-week", label: "My Tasks" },
+  { to: "/work-week", label: "Task Management" },
   { to: "/dashboard", label: "Metrics" },
   { to: "/project-managers", label: "Project Managers" },
   { to: "/reports", label: "Past Reports" },
