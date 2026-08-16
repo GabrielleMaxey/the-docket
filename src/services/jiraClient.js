@@ -578,6 +578,11 @@ export const fetchEpicWorkload = async (epicKey) => {
   return requestJson(`/api/jira/epics/${encodeURIComponent(String(epicKey || "").trim())}/workload`);
 };
 
+export const fetchCapacityPlanning = async () => {
+  const data = await requestJson("/api/project-managers/capacity");
+  return data?.items || [];
+};
+
 export const searchEpics = async (query) => {
   const q = String(query || "").trim();
   if (q.length < 2) {

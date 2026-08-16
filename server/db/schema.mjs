@@ -186,6 +186,12 @@ const migrateDatabase = (db) => {
   ensureColumn(db, "dashboard_assignee_metrics", "epic_breakdown_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "app_settings", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
   ensureColumn(db, "issue_metadata", "keep_note_images", "INTEGER NOT NULL DEFAULT 0");
+  // Capacity planning: an optional per-entry workload ceiling (open-issue
+  // count) set in Settings -> Contributor Metrics. NULL means "not set" -
+  // distinct from 0, which would mean "this person/team has zero capacity
+  // right now" - so capacity comparisons must treat NULL as "no target
+  // configured", not as zero.
+  ensureColumn(db, "watched_assignees", "capacity", "INTEGER");
 
   db.prepare(
     "UPDATE jira_field_mappings SET field_id = 'customfield_10008' WHERE role = 'initial_done_date' AND TRIM(field_id) = ''"
@@ -455,6 +461,9 @@ export const mapWatchedAssigneeRow = (row) => {
     memberNames: parseJsonArray(row.member_names_json).map((value) => String(value || "").trim()).filter(Boolean),
     resolvedAccountId: String(row.resolved_account_id || "").trim(),
     sortOrder: Number(row.sort_order || 0),
+    // null/undefined means "no capacity target configured" - kept distinct
+    // from 0 (a real, deliberate "zero capacity right now" value).
+    capacity: row.capacity === null || row.capacity === undefined ? null : Number(row.capacity),
     createdAt: row.created_at,
   };
 };
