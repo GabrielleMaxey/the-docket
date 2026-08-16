@@ -9,7 +9,7 @@ import {
   formatLumenCoreValuesBlock,
   isValidCareerReportType,
   isValidPwbPeriod,
-} from "../server/lib/careerReportPrompts.mjs";
+} from "../server/lib/aiInstructions.mjs";
 
 describe("isValidCareerReportType", () => {
   it("accepts the two known career report types", () => {
