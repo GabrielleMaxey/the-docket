@@ -78,6 +78,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   overflow: hidden;
+  max-width: 840px;
 }
 
 .app-report-output-header {
@@ -153,56 +154,72 @@
 }
 
 .app-report-markdown {
-  padding: 1rem;
-  font-size: 0.85rem;
-  line-height: 1.6;
+  padding: 1.25rem 1.5rem;
+  font-size: 0.92rem;
+  line-height: 1.68;
   color: #1e293b;
 }
 
 .app-report-markdown .report-h1 {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #0f172a;
-  margin: 1rem 0 0.4rem;
-  border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 0.3rem;
+  margin: 0 0 0.9rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #0c93d9;
 }
 
 .app-report-markdown .report-h2 {
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 700;
   color: #0f172a;
-  margin: 0.85rem 0 0.35rem;
+  margin: 1.35rem 0 0.5rem;
+}
+
+.app-report-markdown .report-h2:first-child {
+  margin-top: 0;
 }
 
 .app-report-markdown .report-h3 {
-  font-size: 0.92rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: #334155;
-  margin: 0.75rem 0 0.25rem;
+  margin: 1.1rem 0 0.4rem;
 }
 
 .app-report-markdown .report-p {
-  margin: 0.35rem 0;
+  margin: 0.9rem 0;
+}
+
+.app-report-markdown .report-p:first-child {
+  margin-top: 0;
+}
+
+.app-report-markdown .report-p strong {
+  color: #0f172a;
 }
 
 .app-report-markdown .report-list {
-  margin: 0.35rem 0 0.35rem 1.25rem;
+  margin: 0.6rem 0 1rem 1.4rem;
   padding: 0;
 }
 
 .app-report-markdown .report-list li {
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.45rem;
 }
 
 .app-report-markdown .report-list--ordered {
   list-style: decimal;
 }
 
+.app-report-markdown .report-list--ordered > li strong:first-child {
+  color: #0f172a;
+}
+
 .app-report-markdown .report-hr {
   border: none;
   border-top: 1px solid #e2e8f0;
-  margin: 1.15rem 0;
+  margin: 1.4rem 0;
 }
 
 .app-report-markdown .report-link {

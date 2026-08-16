@@ -4,6 +4,23 @@
   max-width: 900px;
 }
 
+.chat-page .chat-page-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.15rem !important;
+}
+
+.chat-page .chat-page-header-icon {
+  font-size: 1.5rem;
+}
+
+.chat-page > .ui.segment {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
 .chat-page .chat-status-row {
   display: flex;
   justify-content: space-between;
@@ -18,32 +35,60 @@
 }
 
 .chat-page .chat-thread {
-  min-height: 280px;
-  max-height: 480px;
+  min-height: 320px;
+  max-height: 520px;
   overflow-y: auto;
+  background: #fafbfc;
+}
+
+.chat-page .chat-bubble-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem;
+}
+
+.chat-page .chat-bubble-row--user {
+  align-items: flex-end;
+}
+
+.chat-page .chat-bubble-row--assistant {
+  align-items: flex-start;
+}
+
+.chat-page .chat-bubble-role {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  margin-bottom: 0.3rem;
+  padding: 0 0.2rem;
 }
 
 .chat-page .chat-bubble {
-  margin-bottom: 0.75rem;
-  padding: 0.65rem 0.85rem;
-  border-radius: 10px;
+  padding: 0.7rem 0.95rem;
+  border-radius: 14px;
   max-width: 85%;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .chat-page .chat-bubble-user {
-  margin-left: auto;
-  background: #dbeafe;
-  color: #1e3a8a;
+  background: #0c93d9;
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
 }
 
 .chat-page .chat-bubble-assistant {
-  background: #f1f5f9;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   color: #0f172a;
+  border-bottom-left-radius: 4px;
 }
 
 .chat-page .chat-bubble p {
   margin: 0;
   white-space: pre-wrap;
+  line-height: 1.5;
 }
 
 .chat-page .chat-bubble-note {
@@ -52,14 +97,439 @@
   color: #64748b;
 }
 
+.chat-page .chat-bubble-user .chat-bubble-note {
+  color: #dbeafe;
+}
+
 .chat-page .chat-bubble-actions {
   margin-top: 0.5rem;
 }
 
+.chat-page .chat-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2rem 1rem 1rem;
+}
+
+.chat-page .chat-empty-state-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.chat-page .chat-empty-state-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.2rem;
+}
+
+.chat-page .chat-empty-state-subtitle {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0 0 1.25rem;
+}
+
+.chat-page .chat-idea-prompts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 640px;
+}
+
+.chat-page .chat-idea-prompt {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 0.84rem;
+  color: #334155;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, transform 0.12s;
+}
+
+.chat-page .chat-idea-prompt:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #eaf6fd;
+  transform: translateY(-1px);
+}
+
+.chat-page .chat-idea-prompt:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-page .chat-idea-prompt-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
 .chat-page .chat-input-form {
-  margin-top: 0.75rem;
+  margin-top: 0.85rem;
+}
+
+.chat-page .chat-input-form textarea {
+  border-radius: 10px !important;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.chat-page .chat-input-form textarea:focus {
+  border-color: #0c93d9 !important;
+  box-shadow: 0 0 0 2px rgba(12, 147, 217, 0.15) !important;
 }
 
 .chat-page .chat-input-form button {
+  margin-top: 0.6rem;
+  border-radius: 8px !important;
+}
+
+
+.epic-eval-panel {
+  margin-top: 0;
+}
+
+.epic-eval-input-form {
   margin-top: 0.5rem;
 }
+
+.epic-eval-search-wrap {
+  position: relative;
+}
+
+.epic-eval-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin-top: 0.25rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.epic-eval-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.epic-eval-suggestion:last-child {
+  border-bottom: none;
+}
+
+.epic-eval-suggestion:hover {
+  background: #f8fafc;
+}
+
+.epic-eval-suggestion-key {
+  font-weight: 600;
+  color: #0c93d9;
+  flex-shrink: 0;
+}
+
+.epic-eval-suggestion-summary {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #334155;
+}
+
+.epic-eval-suggestion-status {
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-size: 0.76rem;
+}
+
+.epic-eval-suggestion-error {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+
+
+.epic-eval-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 1rem 0 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.epic-eval-header-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.epic-eval-key {
+  font-weight: 700;
+  color: #0c93d9;
+  font-size: 1.05rem;
+}
+
+.epic-eval-title {
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.epic-eval-status-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+  background: #eef2f7;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+}
+
+.epic-eval-section-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.epic-eval-timeline {
+  margin-bottom: 1.1rem;
+}
+
+.epic-eval-timeline-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.epic-eval-chip {
+  font-size: 0.78rem;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.3rem 0.6rem;
+}
+
+.epic-eval-chip strong {
+  color: #0f172a;
+  margin-left: 0.25rem;
+}
+
+.epic-eval-muted {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.epic-eval-all-clear {
+  color: #0c8a5f;
+}
+
+.epic-eval-workload {
+  margin-bottom: 1.1rem;
+}
+
+.epic-eval-workload-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.epic-eval-headline-chips {
+  display: flex;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.epic-eval-headline-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  padding: 0.55rem 0.4rem;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.epic-eval-headline-chip--open {
+  background: #eaf6fd;
+  border-color: #bfe6f7;
+}
+
+.epic-eval-headline-chip--alarm {
+  background: #fdeeec;
+  border-color: #f6c6bd;
+}
+
+.epic-eval-headline-chip--alarm .epic-eval-headline-value {
+  color: #d1442d;
+}
+
+.epic-eval-headline-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.epic-eval-headline-label {
+  font-size: 0.68rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 0.15rem;
+}
+
+/* StatusPieChart's own CSS lives in Dashboard/dashboard.css, which is only
+   loaded on the Dashboard page - re-scoped here the same way report.css
+   already re-scopes it for Work Week/Past Reports, rather than importing
+   an unrelated page's stylesheet. */
+.epic-eval-panel .dashboard-pie-chart {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.epic-eval-panel .dashboard-pie-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 160px;
+}
+
+.epic-eval-panel .dashboard-pie-legend li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 0.3rem 0.4rem;
+  align-items: center;
+  margin-bottom: 0.25rem;
+  font-size: 0.76rem;
+  color: #334155;
+}
+
+.epic-eval-panel .dashboard-pie-legend-total {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 0.3rem 0.4rem;
+  align-items: center;
+  margin-top: 0.35rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+}
+
+.epic-eval-panel .dashboard-pie-legend-total .dashboard-pie-legend-value {
+  font-weight: 700;
+  color: #0c93d9;
+}
+
+.epic-eval-panel .dashboard-pie-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.epic-eval-panel .dashboard-pie-swatch--empty {
+  visibility: hidden;
+}
+
+.epic-eval-panel .dashboard-pie-legend-value {
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+/* MetricBar's dashboard-metric-row/dashboard-progress CSS, same re-scoping
+   approach report.css already uses for the same shared component. */
+.epic-eval-panel .dashboard-metric-row {
+  margin-bottom: 0.5rem;
+}
+
+.epic-eval-panel .dashboard-metric-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #334155;
+  margin-bottom: 0.2rem;
+}
+
+.epic-eval-panel .dashboard-metric-count {
+  color: #94a3b8;
+}
+
+.epic-eval-panel .dashboard-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.epic-eval-panel .dashboard-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #0c93d9;
+}
+
+.epic-eval-contributors {
+  margin-bottom: 1.1rem;
+}
+
+.epic-eval-blocker-card {
+  border-left: 3px solid #f6c6bd;
+  background: #fdf7f6;
+  border-radius: 0 8px 8px 0;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.epic-eval-blocker-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #0f172a;
+}
+
+.epic-eval-blocker-meta {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.epic-eval-blocker-links {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.78rem;
+  color: #7c2d12;
+}
+
+

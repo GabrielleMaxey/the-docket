@@ -547,18 +547,18 @@ const ReportArchivePanel = ({
 const ReportArchive = () => {
   const panes = [
     {
-      menuItem: "Work Week",
+      menuItem: "My Tasks",
       render: () => (
         <Tab.Pane attached={false}>
-          <ReportArchivePanel source="work_week" title="My Work Week reports" />
+          <ReportArchivePanel source="work_week" title="My Tasks reports" />
         </Tab.Pane>
       ),
     },
     {
-      menuItem: "Dashboard",
+      menuItem: "Metrics",
       render: () => (
         <Tab.Pane attached={false}>
-          <ReportArchivePanel source="dashboard" title="Dashboard reports" />
+          <ReportArchivePanel source="dashboard" title="Metrics reports" />
         </Tab.Pane>
       ),
     },
