@@ -7,6 +7,7 @@
 
 import { searchAllIssues, fetchJiraMyself } from "./jiraSearchHelpers.mjs";
 import { buildDirectReportsJql } from "../../shared/directReportsJql.mjs";
+import { splitTrailingOrderBy } from "./epicFilterJql.mjs";
 
 const escapeJqlString = (value) =>
   String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -15,14 +16,26 @@ const escapeJqlString = (value) =>
 // watches, the entry's own JQL is reused as the assignee scope, with an
 // open-status filter appended (rather than trusting the saved JQL to
 // already be open-only, since some saved queries intentionally aren't).
+//
+// Any trailing ORDER BY must be stripped before wrapping the scope in
+// parens and appending more conditions - ORDER BY can only appear once,
+// at the very end of the whole query, never nested inside a parenthesized
+// scope followed by more AND clauses. A real live query against
+// "reporter = X ORDER BY updated DESC" confirmed this fails with a JQL
+// syntax error otherwise ("Expecting ')' but got 'ORDER'") - caught by
+// actually testing this against Jira, not just by reading the code.
 const buildOpenCountJql = (watched, myself) => {
   if (watched.watchType === "direct_reports") {
     const rawJql = buildDirectReportsJql(watched.memberNames, myself);
-    return rawJql ? `(${rawJql}) AND statusCategory != Done` : "";
+    if (!rawJql) return "";
+    const { scope } = splitTrailingOrderBy(rawJql);
+    return `(${scope}) AND statusCategory != Done`;
   }
   if (watched.watchType === "jql") {
-    const jql = String(watched.jql || "").trim();
-    return jql ? `(${jql}) AND statusCategory != Done` : "";
+    const raw = String(watched.jql || "").trim();
+    if (!raw) return "";
+    const { scope } = splitTrailingOrderBy(raw);
+    return `(${scope}) AND statusCategory != Done`;
   }
   const name = String(watched.displayName || "").trim();
   return name ? `assignee = "${escapeJqlString(name)}" AND statusCategory != Done` : "";
