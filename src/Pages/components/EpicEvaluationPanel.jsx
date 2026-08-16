@@ -1,7 +1,11 @@
 import React from "react";
 import { Button, Form, Message, Segment, Statistic } from "semantic-ui-react";
 import CollapsibleSection from "../../Components/CollapsibleSection";
-import { fetchEpicWorkload } from "../../services/jiraClient";
+import { fetchEpicWorkload, searchEpics } from "../../services/jiraClient";
+
+// An exact issue key ("SYNC-41", "ODI-1234") should load directly rather
+// than go through search-as-you-type.
+const EXACT_ISSUE_KEY_RE = /^[A-Z][A-Z0-9]*-\d+$/i;
 
 // Persistent "Evaluate an Epic" panel for Chat: lets the user load a
 // specific Epic's full task tree (workload/timeline/contributors/cross-team
@@ -14,6 +18,13 @@ const EpicEvaluationPanel = ({ presets = [], onEpicLoaded, onEpicCleared }) => {
   const [error, setError] = React.useState("");
   const [evaluation, setEvaluation] = React.useState(null);
 
+  const [searchResults, setSearchResults] = React.useState([]);
+  const [searchLoading, setSearchLoading] = React.useState(false);
+  const [searchError, setSearchError] = React.useState("");
+  const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const debounceRef = React.useRef(null);
+  const blurTimeoutRef = React.useRef(null);
+
   // Only genuine epic-keyed presets are useful here - this org's presets
   // are currently all preset_type "jql" (epicKey "JQL"), so this list will
   // often be empty, and the picker below only renders when it isn't.
@@ -25,12 +36,51 @@ const EpicEvaluationPanel = ({ presets = [], onEpicLoaded, onEpicCleared }) => {
     [presets]
   );
 
+  const isExactKey = EXACT_ISSUE_KEY_RE.test(epicKeyInput.trim());
+
+  // Search-as-you-type by epic name, same debounce pattern already used for
+  // assignee search (AssigneeCell.jsx) - matched deliberately rather than
+  // inventing a different one. Skipped once the input looks like an exact
+  // issue key, since at that point the person almost certainly means to
+  // load it directly, not search by name.
+  React.useEffect(() => {
+    const query = epicKeyInput.trim();
+    if (query.length < 2 || isExactKey) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      setSearchError("");
+      return undefined;
+    }
+
+    clearTimeout(debounceRef.current);
+    setSearchLoading(true);
+    setSearchError("");
+
+    debounceRef.current = setTimeout(() => {
+      searchEpics(query)
+        .then((items) => {
+          setSearchResults(items);
+          setSearchError("");
+        })
+        .catch((searchErr) => {
+          setSearchResults([]);
+          setSearchError(searchErr instanceof Error ? searchErr.message : "Epic search failed");
+        })
+        .finally(() => setSearchLoading(false));
+    }, 300);
+
+    return () => clearTimeout(debounceRef.current);
+  }, [epicKeyInput, isExactKey]);
+
+  React.useEffect(() => () => clearTimeout(blurTimeoutRef.current), []);
+
   const loadEpic = async (epicKey) => {
     const key = String(epicKey || "").trim().toUpperCase();
     if (!key) {
       return;
     }
 
+    setShowSuggestions(false);
     setLoading(true);
     setError("");
 
@@ -86,22 +136,58 @@ const EpicEvaluationPanel = ({ presets = [], onEpicLoaded, onEpicCleared }) => {
         ) : null}
 
         <Form onSubmit={(event) => event.preventDefault()} className="epic-eval-input-form">
-          <Form.Input
-            placeholder="Or type any Epic key, e.g. ODI-1234"
-            value={epicKeyInput}
-            onChange={(_e, { value }) => setEpicKeyInput(value)}
-            action={
-              <Button primary loading={loading} disabled={loading} onClick={() => loadEpic(epicKeyInput)}>
-                Load
-              </Button>
-            }
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void loadEpic(epicKeyInput);
+          <div className="epic-eval-search-wrap">
+            <Form.Input
+              placeholder="Search by epic name, or type an exact key like ODI-1234"
+              value={epicKeyInput}
+              loading={searchLoading}
+              onChange={(_e, { value }) => {
+                setEpicKeyInput(value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => {
+                blurTimeoutRef.current = setTimeout(() => setShowSuggestions(false), 150);
+              }}
+              action={
+                <Button
+                  primary
+                  loading={loading}
+                  disabled={loading || !epicKeyInput.trim()}
+                  onClick={() => loadEpic(epicKeyInput)}
+                >
+                  Load
+                </Button>
               }
-            }}
-          />
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void loadEpic(epicKeyInput);
+                }
+              }}
+            />
+            {showSuggestions && !isExactKey && (searchResults.length > 0 || searchError) ? (
+              <div className="epic-eval-suggestions">
+                {searchError ? (
+                  <div className="epic-eval-suggestion-error">{searchError}</div>
+                ) : (
+                  searchResults.map((result) => (
+                    <button
+                      type="button"
+                      key={result.key}
+                      className="epic-eval-suggestion"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => loadEpic(result.key)}
+                    >
+                      <span className="epic-eval-suggestion-key">{result.key}</span>
+                      <span className="epic-eval-suggestion-summary">{result.summary || "Untitled"}</span>
+                      <span className="epic-eval-suggestion-status">{result.status}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : null}
+          </div>
         </Form>
 
         {error ? (
@@ -109,6 +195,7 @@ const EpicEvaluationPanel = ({ presets = [], onEpicLoaded, onEpicCleared }) => {
             {error}
           </Message>
         ) : null}
+
 
         {evaluation ? (
           <div className="epic-eval-results">

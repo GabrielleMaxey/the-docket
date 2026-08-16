@@ -72,6 +72,74 @@
   margin-top: 0.5rem;
 }
 
+.epic-eval-search-wrap {
+  position: relative;
+}
+
+.epic-eval-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin-top: 0.25rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.epic-eval-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.epic-eval-suggestion:last-child {
+  border-bottom: none;
+}
+
+.epic-eval-suggestion:hover {
+  background: #f8fafc;
+}
+
+.epic-eval-suggestion-key {
+  font-weight: 600;
+  color: #0c93d9;
+  flex-shrink: 0;
+}
+
+.epic-eval-suggestion-summary {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #334155;
+}
+
+.epic-eval-suggestion-status {
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-size: 0.76rem;
+}
+
+.epic-eval-suggestion-error {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+
+
 .epic-eval-header {
   display: flex;
   align-items: center;

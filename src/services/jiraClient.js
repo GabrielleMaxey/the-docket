@@ -578,6 +578,15 @@ export const fetchEpicWorkload = async (epicKey) => {
   return requestJson(`/api/jira/epics/${encodeURIComponent(String(epicKey || "").trim())}/workload`);
 };
 
+export const searchEpics = async (query) => {
+  const q = String(query || "").trim();
+  if (q.length < 2) {
+    return [];
+  }
+  const data = await requestJson(`/api/jira/epics/search?q=${encodeURIComponent(q)}`);
+  return data?.items || [];
+};
+
 export const fetchJiraParentCandidates = async ({ jql, maxTotal = 100 }) => {
   return requestJson("/api/jira/issues/parent-candidates", {
     method: "POST",
