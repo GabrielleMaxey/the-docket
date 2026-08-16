@@ -5,6 +5,7 @@
 
 import { createLogger } from "../lib/logger.mjs";
 import { buildFieldMappingsMap } from "../lib/epicFilterJql.mjs";
+import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
 import {
   fetchAndValidateEpic,
   fetchEpicDescendants,
@@ -22,6 +23,11 @@ import {
 
 const log = createLogger("epic-workload");
 
+// Same backslash-then-quote escaping convention already used for JQL string
+// literals elsewhere in this app (server/lib/epicFilterJql.mjs,
+// shared/directReportsJql.mjs).
+const escapeJqlString = (value) => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
 export const registerEpicWorkloadRoutes = (app, { db, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
   const loadMappingsByRole = () => {
     const rows = db
@@ -29,6 +35,39 @@ export const registerEpicWorkloadRoutes = (app, { db, jiraRequest, runJiraSearch
       .all();
     return buildFieldMappingsMap(rows);
   };
+
+  // Search-by-text for the "Evaluate an Epic" panel's search field - lets
+  // someone find an epic by (partial) name instead of needing to already
+  // know its exact key. Deliberately searches summary only, not full text
+  // (which would also match comments/descriptions and return noisier
+  // results for what's meant to be a quick picker, not a general search).
+  app.get("/api/jira/epics/search", async (req, res) => {
+    if (!ensureEnvOrRespond(res)) {
+      return;
+    }
+
+    const query = String(req.query?.q || "").trim();
+    if (query.length < 2) {
+      return res.json({ items: [] });
+    }
+
+    try {
+      const jql = `issuetype = Epic AND summary ~ "${escapeJqlString(query)}*" ORDER BY updated DESC`;
+      const result = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 20 });
+      const items = (result.issues || []).map((issue) => ({
+        key: String(issue.key || "").trim(),
+        summary: String(issue.fields?.summary || "").trim(),
+        status: getIssueStatusName(issue),
+      }));
+      return res.json({ items });
+    } catch (error) {
+      log.error("epic search failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to search epics",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
 
   app.get("/api/jira/epics/:epicKey/workload", async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
