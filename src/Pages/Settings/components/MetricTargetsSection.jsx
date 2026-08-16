@@ -49,6 +49,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
   const [watchedName, setWatchedName] = React.useState("");
   const [watchedJql, setWatchedJql] = React.useState("");
   const [watchedReporterJql, setWatchedReporterJql] = React.useState("");
+  const [watchedPresetId, setWatchedPresetId] = React.useState("");
   const [watchType, setWatchType] = React.useState("person");
   const [watchedCapacity, setWatchedCapacity] = React.useState("");
   const [quickPickValue, setQuickPickValue] = React.useState("");
@@ -57,17 +58,29 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
   const [flash, setFlash] = useFlash();
   const contributorEntries = watchedAssignees.filter((person) => person.watchType !== "direct_reports");
 
+  // Same epic-preset -> JQL conversion Quick Pick already uses (jql-type
+  // presets: their own JQL; epic-type presets: parent = <epicKey>), reused
+  // here so "From a saved preset" behaves identically to picking the same
+  // preset via Quick Pick, just without the extra type-then-quick-pick step.
+  const jqlForPreset = (preset) =>
+    preset.presetType === "jql" ? String(preset.jql || "").trim() : preset.epicKey ? `parent = ${preset.epicKey}` : "";
+
+  const handlePresetTypeSelect = (presetId) => {
+    setWatchedPresetId(presetId);
+    if (!presetId) return;
+    const preset = epicPresets.find((p) => String(p.id) === String(presetId));
+    if (!preset) return;
+    if (!watchedName.trim()) {
+      setWatchedName(preset.label || "");
+    }
+  };
+
   const handleQuickPickSelect = (presetId) => {
     setQuickPickValue(presetId);
     if (!presetId) return;
     const preset = epicPresets.find((p) => String(p.id) === String(presetId));
     if (!preset) return;
-    const jql =
-      preset.presetType === "jql"
-        ? String(preset.jql || "").trim()
-        : preset.epicKey
-          ? `parent = ${preset.epicKey}`
-          : "";
+    const jql = jqlForPreset(preset);
     if (jql) {
       if (watchType === "reporter") {
         // Substitute the picked preset's currentUser() for the name already
@@ -105,26 +118,44 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
   const handleAddWatchedAssignee = async () => {
     const displayName = watchedName.trim();
     const isReporter = watchType === "reporter";
-    const jql = isReporter ? watchedReporterJql.trim() || buildReporterJql(displayName) : watchedJql.trim();
+    const isPreset = watchType === "preset";
+    const selectedPreset = isPreset ? epicPresets.find((p) => String(p.id) === String(watchedPresetId)) : null;
+    const jql = isReporter
+      ? watchedReporterJql.trim() || buildReporterJql(displayName)
+      : isPreset
+        ? selectedPreset
+          ? jqlForPreset(selectedPreset)
+          : ""
+        : watchedJql.trim();
     if (!displayName) return;
     if (watchType === "jql" && !jql) { onError("JQL is required for a custom query entry."); return; }
+    if (isPreset && !jql) { onError("Pick a saved preset first."); return; }
     onError("");
     try {
       await createWatchedAssignee({
         displayName,
-        watchType: isReporter ? "jql" : watchType,
-        jql: watchType === "jql" || isReporter ? jql : "",
+        watchType: isReporter || isPreset ? "jql" : watchType,
+        jql: watchType === "jql" || isReporter || isPreset ? jql : "",
         sortOrder: watchedAssignees.length,
         capacity: watchedCapacity.trim() === "" ? null : watchedCapacity.trim(),
       });
       setWatchedName("");
       setWatchedJql("");
       setWatchedReporterJql("");
+      setWatchedPresetId("");
       setWatchType("person");
       setWatchedCapacity("");
       setQuickPickValue("");
       setWatchedAssignees(await fetchWatchedAssignees());
-      setFlash(watchType === "jql" ? "Custom query added." : isReporter ? "Reporter watch added." : "Person added.");
+      setFlash(
+        watchType === "jql"
+          ? "Custom query added."
+          : isReporter
+            ? "Reporter watch added."
+            : isPreset
+              ? "Added from preset."
+              : "Person added."
+      );
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to add entry");
     }
@@ -261,11 +292,40 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
           options={[
             { key: "person", text: "Person (display name)", value: "person" },
             { key: "reporter", text: "Reporter (display name)", value: "reporter" },
+            { key: "preset", text: "From a saved preset", value: "preset" },
             { key: "jql", text: "Custom query (JQL)", value: "jql" },
           ]}
           value={watchType}
           onChange={(_e, { value }) => setWatchType(String(value || "person"))}
         />
+        {watchType === "preset" ? (
+          <>
+            <p className="ww-copy" style={{ marginBottom: "0.75rem" }}>
+              Pick any saved Epic/JQL preset to track its workload directly here — reuses that
+              preset's query exactly as saved. For more control (editing the query, or scoping a
+              specific person within a preset), use <strong>Custom query (JQL)</strong> instead,
+              which also has a Quick pick.
+            </p>
+            {epicPresets.length > 0 ? (
+              <Form.Select
+                label="Preset"
+                placeholder="Choose a saved Epic/JQL preset…"
+                options={epicPresets.map((preset) => ({
+                  key: preset.id,
+                  value: preset.id,
+                  text: preset.label,
+                  description: preset.presetType === "jql" ? preset.jql : preset.epicKey,
+                }))}
+                value={watchedPresetId}
+                onChange={(_e, { value }) => handlePresetTypeSelect(value)}
+              />
+            ) : (
+              <Message size="mini" info>
+                No saved presets yet — add one under Epic & JQL presets above.
+              </Message>
+            )}
+          </>
+        ) : null}
         <Form.Input
           label="Label"
           placeholder={watchType === "jql" ? "Platform team open tasks" : "jane.doe"}
