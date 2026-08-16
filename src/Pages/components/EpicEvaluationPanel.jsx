@@ -1,6 +1,8 @@
 import React from "react";
-import { Button, Form, Message, Segment, Statistic } from "semantic-ui-react";
+import { Button, Form, Message, Segment } from "semantic-ui-react";
 import CollapsibleSection from "../../Components/CollapsibleSection";
+import StatusPieChart from "../../Components/StatusPieChart";
+import MetricBar from "../Dashboard/components/MetricBar";
 import { fetchEpicWorkload, searchEpics } from "../../services/jiraClient";
 
 // An exact issue key ("SYNC-41", "ODI-1234") should load directly rather
@@ -25,9 +27,6 @@ const EpicEvaluationPanel = ({ presets = [], onEpicLoaded, onEpicCleared }) => {
   const debounceRef = React.useRef(null);
   const blurTimeoutRef = React.useRef(null);
 
-  // Only genuine epic-keyed presets are useful here - this org's presets
-  // are currently all preset_type "jql" (epicKey "JQL"), so this list will
-  // often be empty, and the picker below only renders when it isn't.
   const epicPresets = React.useMemo(
     () =>
       (presets || []).filter(
@@ -38,11 +37,6 @@ const EpicEvaluationPanel = ({ presets = [], onEpicLoaded, onEpicCleared }) => {
 
   const isExactKey = EXACT_ISSUE_KEY_RE.test(epicKeyInput.trim());
 
-  // Search-as-you-type by epic name, same debounce pattern already used for
-  // assignee search (AssigneeCell.jsx) - matched deliberately rather than
-  // inventing a different one. Skipped once the input looks like an exact
-  // issue key, since at that point the person almost certainly means to
-  // load it directly, not search by name.
   React.useEffect(() => {
     const query = epicKeyInput.trim();
     if (query.length < 2 || isExactKey) {
@@ -108,7 +102,7 @@ const EpicEvaluationPanel = ({ presets = [], onEpicLoaded, onEpicCleared }) => {
   return (
     <Segment className="epic-eval-panel">
       <CollapsibleSection
-        title="Evaluate an Epic"
+        title="🎯 Evaluate an Epic"
         storageKey="chat-epic-evaluation"
         persistKeyPrefix="chat-"
         defaultOpen={true}
@@ -166,6 +160,7 @@ const EpicEvaluationPanel = ({ presets = [], onEpicLoaded, onEpicCleared }) => {
                 }
               }}
             />
+
             {showSuggestions && !isExactKey && (searchResults.length > 0 || searchError) ? (
               <div className="epic-eval-suggestions">
                 {searchError ? (
@@ -196,13 +191,13 @@ const EpicEvaluationPanel = ({ presets = [], onEpicLoaded, onEpicCleared }) => {
           </Message>
         ) : null}
 
-
         {evaluation ? (
           <div className="epic-eval-results">
             <div className="epic-eval-header">
-              <div>
-                <strong>{evaluation.epic.key}</strong> — {evaluation.epic.summary || "Untitled"}{" "}
-                <span className="epic-eval-status">({evaluation.epic.status || "Unknown"})</span>
+              <div className="epic-eval-header-main">
+                <span className="epic-eval-key">{evaluation.epic.key}</span>
+                <span className="epic-eval-title">{evaluation.epic.summary || "Untitled"}</span>
+                <span className="epic-eval-status-pill">{evaluation.epic.status || "Unknown"}</span>
               </div>
               <Button size="mini" basic onClick={handleClear}>
                 Clear
@@ -210,78 +205,105 @@ const EpicEvaluationPanel = ({ presets = [], onEpicLoaded, onEpicCleared }) => {
             </div>
 
             <div className="epic-eval-timeline">
+              <span className="epic-eval-section-label">🗓️ Timeline</span>
               {evaluation.epic.projectEndDate ||
               evaluation.epic.mostRecentDoneDate ||
               evaluation.epic.initialDoneDate ? (
-                <>
+                <div className="epic-eval-timeline-chips">
                   {evaluation.epic.projectEndDate ? (
-                    <span>Project End Date: {evaluation.epic.projectEndDate}</span>
+                    <span className="epic-eval-chip">
+                      Project End Date <strong>{evaluation.epic.projectEndDate}</strong>
+                    </span>
                   ) : null}
                   {evaluation.epic.mostRecentDoneDate ? (
-                    <span>Most Recent Done Date: {evaluation.epic.mostRecentDoneDate}</span>
+                    <span className="epic-eval-chip">
+                      Most Recent Done Date <strong>{evaluation.epic.mostRecentDoneDate}</strong>
+                    </span>
                   ) : null}
                   {evaluation.epic.initialDoneDate ? (
-                    <span>Initial Done Date: {evaluation.epic.initialDoneDate}</span>
+                    <span className="epic-eval-chip">
+                      Initial Done Date <strong>{evaluation.epic.initialDoneDate}</strong>
+                    </span>
                   ) : null}
-                </>
+                </div>
               ) : (
                 <span className="epic-eval-muted">No Project End Date / MRD / IDD set on this epic.</span>
               )}
             </div>
 
-            <Statistic.Group size="mini" widths="four" className="epic-eval-stats">
-              <Statistic>
-                <Statistic.Value>{evaluation.workload.total}</Statistic.Value>
-                <Statistic.Label>Total tasks</Statistic.Label>
-              </Statistic>
-              <Statistic>
-                <Statistic.Value>{evaluation.workload.open}</Statistic.Value>
-                <Statistic.Label>Open</Statistic.Label>
-              </Statistic>
-              <Statistic>
-                <Statistic.Value>{evaluation.workload.closed}</Statistic.Value>
-                <Statistic.Label>Closed</Statistic.Label>
-              </Statistic>
-              <Statistic>
-                <Statistic.Value>{evaluation.workload.overdue}</Statistic.Value>
-                <Statistic.Label>Overdue</Statistic.Label>
-              </Statistic>
-            </Statistic.Group>
+            <div className="epic-eval-workload">
+              <span className="epic-eval-section-label">📊 Workload</span>
+              <div className="epic-eval-workload-body">
+                <div className="epic-eval-headline-chips">
+                  <div className="epic-eval-headline-chip">
+                    <span className="epic-eval-headline-value">{evaluation.workload.total}</span>
+                    <span className="epic-eval-headline-label">Total tasks</span>
+                  </div>
+                  <div className="epic-eval-headline-chip epic-eval-headline-chip--open">
+                    <span className="epic-eval-headline-value">{evaluation.workload.open}</span>
+                    <span className="epic-eval-headline-label">Open</span>
+                  </div>
+                  <div
+                    className={`epic-eval-headline-chip${
+                      evaluation.workload.overdue > 0 ? " epic-eval-headline-chip--alarm" : ""
+                    }`}
+                  >
+                    <span className="epic-eval-headline-value">{evaluation.workload.overdue}</span>
+                    <span className="epic-eval-headline-label">Overdue</span>
+                  </div>
+                </div>
+                {Object.keys(evaluation.workload.statusCounts || {}).length > 0 ? (
+                  <StatusPieChart
+                    statusCounts={evaluation.workload.statusCounts}
+                    size={120}
+                    className="epic-eval-pie"
+                  />
+                ) : null}
+              </div>
+            </div>
 
             {evaluation.contributors.length > 0 ? (
               <div className="epic-eval-contributors">
-                <h5>Contributors</h5>
-                <ul>
-                  {evaluation.contributors.map((c) => (
-                    <li key={c.name}>
-                      {c.name}: {c.totalIssues} total · {c.openIssues} open · {c.resolvedIssues} resolved
-                    </li>
-                  ))}
-                </ul>
+                <span className="epic-eval-section-label">👥 Contributors</span>
+                {evaluation.contributors.map((c) => (
+                  <MetricBar
+                    key={c.name}
+                    label={c.name}
+                    value={c.totalIssues > 0 ? (c.resolvedIssues / c.totalIssues) * 100 : 0}
+                    count={`${c.totalIssues} total · ${c.openIssues} open`}
+                  />
+                ))}
               </div>
             ) : null}
 
             <div className="epic-eval-blockers">
-              <h5>Potential cross-team blockers</h5>
+              <span className="epic-eval-section-label">🚧 Potential cross-team blockers</span>
               {evaluation.blockers.length > 0 ? (
                 <>
                   <p className="epic-eval-muted">
                     Tasks with a Jira issue link to a different project — a reasonable proxy for
                     &ldquo;involves another team&rdquo;, not a certainty.
                   </p>
-                  <ul>
-                    {evaluation.blockers.map((b) => (
-                      <li key={b.key}>
-                        <strong>{b.key}</strong> ({b.status}, {b.assignee}):{" "}
-                        {b.crossTeamLinks
-                          .map((link) => `${link.linkType} ${link.linkedKey} (${link.linkedProject})`)
-                          .join("; ")}
-                      </li>
-                    ))}
-                  </ul>
+                  {evaluation.blockers.map((b) => (
+                    <div key={b.key} className="epic-eval-blocker-card">
+                      <div className="epic-eval-blocker-head">
+                        <strong>{b.key}</strong>
+                        <span className="epic-eval-blocker-meta">
+                          {b.status} · {b.assignee}
+                        </span>
+                      </div>
+                      <div className="epic-eval-blocker-links">
+                        {b.crossTeamLinks.map((link) => (
+                          <span key={link.linkedKey} className="epic-eval-blocker-link">
+                            {link.linkType} <strong>{link.linkedKey}</strong> ({link.linkedProject})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </>
               ) : (
-                <p className="epic-eval-muted">No cross-team blocker candidates detected.</p>
+                <p className="epic-eval-muted epic-eval-all-clear">✓ No cross-team blocker candidates detected.</p>
               )}
             </div>
           </div>
