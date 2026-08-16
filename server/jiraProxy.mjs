@@ -12,6 +12,7 @@ import { registerChatRoutes } from "./routes/chatRoutes.mjs";
 import { registerJiraCoreRoutes } from "./routes/jiraCoreRoutes.mjs";
 import { registerJiraIssueRoutes } from "./routes/jiraIssueRoutes.mjs";
 import { registerIssueMetadataRoutes } from "./routes/issueMetadataRoutes.mjs";
+import { registerEpicWorkloadRoutes } from "./routes/epicWorkloadRoutes.mjs";
 import { registerTeamPriorityRoutes } from "./routes/teamPriorityRoutes.mjs";
 import { resolveJiraUser } from "./lib/jiraSearchHelpers.mjs";
 import { getJiraSearchFields } from "./lib/jiraSearchFields.mjs";
@@ -322,6 +323,7 @@ const routeCtx = {
 registerJiraCoreRoutes(app, routeCtx);
 registerJiraIssueRoutes(app, routeCtx);
 registerIssueMetadataRoutes(app, routeCtx);
+registerEpicWorkloadRoutes(app, routeCtx);
 registerTeamPriorityRoutes(app, routeCtx);
 registerAppConfigRoutes(app, routeCtx);
 registerDashboardRoutes(app, routeCtx);

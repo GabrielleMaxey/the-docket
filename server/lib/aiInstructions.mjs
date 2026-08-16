@@ -4,7 +4,7 @@
 // "status report" type (kept as-is in reportRoutes.mjs) - these are written
 // for a career conversation, not a workload snapshot.
 
-import { formatChatSessionContext } from "../../shared/chatSessionPrompt.mjs";
+import { formatChatSessionContext, formatEpicEvaluationContext } from "../../shared/chatSessionPrompt.mjs";
 
 // Lumen's 8 Cultural Behaviors, transcribed from the company's internal
 // culture deck. Used as an optional evaluative lens so the LLM can note,
@@ -355,6 +355,11 @@ export const buildEpicContextPrompt = (epicContext, customInstructions) => {
   const sessionText = formatChatSessionContext(epicContext?.sessionContext);
   if (sessionText) {
     lines.push("", "Session context (queries, dashboard snapshot, generated reports/plans):", sessionText);
+  }
+
+  const epicEvaluationText = formatEpicEvaluationContext(epicContext?.epicEvaluation);
+  if (epicEvaluationText) {
+    lines.push("", epicEvaluationText);
   }
 
   if (epicContext?.dashboardSummary) {
