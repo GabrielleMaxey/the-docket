@@ -109,6 +109,8 @@ export const buildOneOnOneSystemPrompt = ({ label, userGoals, companyGoals }) =>
   return [
     `You are helping someone prepare to discuss their work on "${label}" at Lumen with management - a direct manager, a skip-level, or another leader, in a weekly or biweekly 1:1. This is NOT a personal recap or a stand-up update - it's talking points for an upward-facing conversation about how the work is going, written FROM their perspective and FOR their own prep use.
 
+Start with a single markdown heading naming the report, in the form "## 1:1 Prep — <the label above>". This is the only heading-level line in the report - everything below it uses bold section labels in bullets, not further headings.
+
 Structure it around what a manager actually wants to know, using short, scannable sections with bullet points (not flowing prose - brevity and scannability matter more here than in a narrative report):
 - **Workload** - how much is currently on their plate, and whether that load looks reasonable, heavy, or light based on the data
 - **Consistency** - is output steady over the period, or does the data show gaps, a slow patch, or a recent burst? Say so plainly either way, don't manufacture a trend that isn't there. Before reading a low "In Progress" count as a lull, check whether any items below are flagged as having recent Jira comment activity despite sitting in Backlog - that's a sign the status just wasn't updated, not that work stopped, and changes what this section should actually say
@@ -130,6 +132,8 @@ Tone: direct and confident, like someone who has command of their own workload a
 export const buildPwbSystemPrompt = ({ label, period, userGoals, companyGoals }) => {
   const periodLabel = PWB_PERIOD_LABELS[period] || "review-period";
   const goalsSection = buildGoalsSection({ userGoals, companyGoals });
+  const periodTitlePrefix =
+    period === PWB_PERIODS.YEARLY ? "Annual" : period === PWB_PERIODS.MID_YEAR ? "Mid-Year" : "Quarterly";
   const periodGuidance =
     period === PWB_PERIODS.YEARLY
       ? "This is a yearly review - write a comprehensive narrative covering the full scope of the work below, suitable to adapt directly into a formal PWB self-assessment."
@@ -140,6 +144,8 @@ export const buildPwbSystemPrompt = ({ label, period, userGoals, companyGoals })
   return [
     `You are helping someone draft self-assessment language for their ${periodLabel} PWB review, based on their work on "${label}" at Lumen.
 This is written in first person, as a professional but genuine self-assessment - the kind of writing someone would submit or read from in a formal review conversation, not casual notes.
+
+Start with a single markdown heading naming the report, in the form "## ${periodTitlePrefix} PWB Self-Assessment". This is the only heading in the report - everything below it is flowing prose paragraphs, not further headings or bullets.
 
 ${periodGuidance}
 
@@ -266,6 +272,8 @@ export const buildStatusReportSystemPrompt = ({ label }) =>
   `You are writing a personal project status report for the assignee working on "${label}" at Lumen.
 This report is written FROM the assignee's perspective and FOR their benefit — to help them understand their own workload, spot what needs attention, and feel clear on next steps.
 Write in second person ("you have", "your open items") so it reads as direct, useful feedback to the person doing the work.
+
+Start with a single markdown heading naming the report, in the form "## Status Report — ${label}". This is the only heading in the report - everything below it is flowing prose paragraphs, not further headings or bullets.
 
 Before writing, look at the query's label and JQL below (if given) to understand what this query is actually scoped to, and let that shape the report - do not default to a generic "project status" framing if the query is narrower or different than that:
 - If the label/JQL implies only OPEN or IN-PROGRESS work (e.g. "My Open Work", "assignee = currentUser() AND statusCategory != Done"), focus on active workload, what needs attention, and next steps as usual.
