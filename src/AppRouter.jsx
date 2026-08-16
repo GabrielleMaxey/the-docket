@@ -13,8 +13,8 @@ const ReportArchive = React.lazy(() => import("./Pages/ReportArchive.jsx"));
 const Settings = React.lazy(() => import("./Pages/Settings.jsx"));
 
 const NAV_LINKS = [
-  { to: "/work-week", label: "Work Week" },
-  { to: "/dashboard", label: "Dashboard" },
+  { to: "/work-week", label: "My Tasks" },
+  { to: "/dashboard", label: "Metrics" },
   { to: "/reports", label: "Past Reports" },
   { to: "/chat", label: "Chat" },
   { to: "/settings", label: "Settings", icon: "⚙️" },

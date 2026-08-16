@@ -7,8 +7,13 @@
     },
     {
       "presetType": "jql",
-      "label": "My Current Issues",
+      "label": "My Current Open Issues",
       "jql": "assignee = currentUser() AND resolution = Unresolved ORDER BY priority DESC, updated DESC"
+    },
+    {
+      "presetType": "jql",
+      "label": "All Issues From the Past Year",
+      "jql": "(statusCategory IN (\"To Do\", \"In Progress\") or (statusCategory = \"Done\" and resolved >= -52w)) and assignee = currentUser() ORDER BY status DESC, created DESC"
     },
     {
       "presetType": "jql",

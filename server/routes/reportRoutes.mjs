@@ -26,9 +26,12 @@ import {
   CAREER_REPORT_TYPES,
   buildOneOnOneSystemPrompt,
   buildPwbSystemPrompt,
+  buildStatusReportSystemPrompt,
+  buildWeekPlanSystemPrompt,
   isValidCareerReportType,
   isValidPwbPeriod,
-} from "../lib/careerReportPrompts.mjs";
+  AUDIENCE_CONFIGS,
+} from "../lib/aiInstructions.mjs";
 import { computeOverallRollup, normalizePastDueLookbackYears } from "../../shared/dashboardMetrics.mjs";
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildDirectReportsJql, isCurrentUserMember, isJqlCurrentUser, looksLikeAccountId } from "../../shared/directReportsJql.mjs";
@@ -37,106 +40,6 @@ import { fetchJiraMyself } from "../lib/jiraSearchHelpers.mjs";
 const log = createLogger("report");
 
 const REPORT_MAX_TOKENS = 2048;
-
-const POSSIBLE_REASONS_INSTRUCTION = `After the numbered sections, add **Possible reasons (hypotheses)**.
-These are optional interpretations of the metrics, not confirmed root causes.
-Only include hypotheses that fit the numbers. Mark each as possible. Do not invent tickets, people, or process facts that are not in the data.
-When relevant, consider:
-- Low resolution / completion %: work left in unfinished statuses; Done/Closed not used; verification skipped; Jira workflow statuses that never count as resolved; stalled pipelines.
-- High overdue %: due dates not maintained; work started late; blockers; items left open after the work was finished.
-- Heavy open load vs the rest of the team: assignment imbalance; tickets created and parked; WIP not limited.
-- Backlog-heavy vs In Progress: intake without pulling work; grooming stalled.
-If the metrics look healthy, say that and do not force problems.`;
-
-const AUDIENCE_CONFIGS = {
-  executive: {
-    label: "Executive Summary",
-    instruction: `Write an Executive Summary for senior leadership.
-Audience: non-technical. Do not mention Jira, epics, JQL, or field IDs.
-Use only the snapshot data. Do not invent names, tasks, milestones, or decisions.
-If a section has no supporting numbers, write "None in this snapshot."
-
-Start with the snapshot date. Then use these headings only:
-1. **Project Status Overview** — 4–6 sentences: overall health using the three headline percentages (tasks resolved = delivery throughput; projects complete = share of projects finished; overdue = open work past due). Explain each in business terms.
-2. **Highlights** — progress the numbers support. No unverifiable wins.
-3. **Challenges and Risks** — past-due projects by name, overdue open work, deadline pressure.
-4. **Work in Progress** — open vs in-progress counts only; no invented task lists.
-5. **Asks for Leadership** — escalations implied by past-due items, overdue rate, or approaching dates.
-6. **Possible reasons (hypotheses)** — why the numbers might look this way (unfinished work not closed out in the tracker, dates not kept current, uneven assignment). Label as possible, not confirmed.
-
-Keep it short (bullets under 2–5). Name individuals only when overdue load is a material risk.
-When you mention overdue or upcoming due dates, include the date window from the snapshot (e.g. "within the past 6 months", "from today through YYYY-MM-DD").
-Treat Initial Done Date, Most Recent Done Date, and Project End Date as target dates; never use those field names.
-Do not invent Work Week URLs. A Work Week links section is appended after your report.
-If extra user context is present, treat it as notes; metrics win on conflict.
-${POSSIBLE_REASONS_INSTRUCTION}`,
-  },
-
-  product_owner: {
-    label: "Project Manager Summary",
-    instruction: `Write a Project Manager Summary for running and communicating this portfolio.
-Use only the snapshot data. Do not invent goals, budgets, approvals, sign-offs, or scope impact.
-If a section has no supporting numbers, write "None in this snapshot."
-
-Start with the snapshot date. Then use these headings only:
-1. **Progress Measures** — how completion is measured here (task resolved %, project complete %, overdue %). Name projects and cite counts.
-2. **People and Stalls** — compare contributor open/overdue counts. Name a person only when their workload is significantly heavier than others on the project, or they risk missing a due date (high overdue %, past-due work). Do not invent decision-owners or approval queues. Do not roster everyone.
-3. **Deadline Realism** — target dates (Initial Done Date, Most Recent Done Date, Project End Date) vs current completion. Name every past-due project.
-4. **Schedule Health** — overall completion vs overdue rate; whether pace looks sufficient for remaining dates. No budget commentary (none in the data).
-5. **Risks and Delay Impact** — overdue items and past-due projects only. Downstream impact = delayed dates / unfinished work, not invented scope cuts. Name at-risk contributors when the metrics support it.
-6. **Stand-up Brief** — one short paragraph a PM can read aloud (counts, named at-risk people, next dates). Skip closeout language unless projects are actually complete.
-7. **Possible reasons (hypotheses)** — workflow/pipeline, date hygiene, and load-balance explanations that fit the metrics. Label as possible.
-
-Be specific: percentages, task counts, project names. Call out red-flag metrics. Naming people is appropriate for load imbalance or due-date risk; otherwise keep the team unnamed.
-When you mention overdue or upcoming due dates, include the date window from the snapshot.
-Do not invent Work Week URLs. A Work Week links section is appended after your report.
-If extra user context is present, treat it as notes; metrics win on conflict.
-${POSSIBLE_REASONS_INSTRUCTION}`,
-  },
-
-  developer: {
-    label: "Developer Report",
-    instruction: `Write a status report for the development team.
-Use only the snapshot data. Do not invent task keys, summaries, or velocity (none are in this snapshot).
-If a section has no supporting numbers, write "None in this snapshot."
-
-Start with the snapshot date. Then use these headings only:
-1. **Team Workload** — open vs overdue counts per person from the team metrics.
-2. **Overdue by Person** — who has overdue work and how much; skip people with none.
-3. **In Progress** — status breakdowns and open counts only; no invented ticket lists.
-4. **Focus** — past-due projects, high overdue %, and approaching target dates. No upcoming-task list unless dates are in the data.
-5. **Possible reasons (hypotheses)** — e.g. low resolution rate from tickets not moved to Done, statuses that never count as resolved, or a stalled verification step. Label as possible.
-
-When you mention overdue or upcoming due dates, include the date window from the snapshot.
-Do not invent Work Week URLs. A Work Week links section is appended after your report.
-Tone: practical, peer-level. Name people from the metrics. Prefer bullets.
-If extra user context is present, treat it as notes; metrics win on conflict.
-${POSSIBLE_REASONS_INSTRUCTION}`,
-  },
-
-  direct_reports: {
-    label: "Ad-hoc team report",
-    instruction: `Write an ad-hoc team report for a manager. The people list comes from Settings → My Direct Reports, not from project JQLs.
-Do not include the current user / manager (currentUser()) in the roster or narrative — this report is about their direct reports only.
-Use only the snapshot people metrics. Do not invent names, tickets, or 1:1 notes.
-Name every person listed in the team metrics, including people with zero open work.
-If a section has no supporting numbers, write "None in this snapshot."
-Do not treat this as a project-complete or delivery-closeout report.
-
-Start with the snapshot date. Then use these headings only:
-1. **Team roster and assignment** — for each person: assigned/open count and their share of team assigned work.
-2. **Overdue and upcoming** — overdue count and overdue %; upcoming-due count. Include the date windows from the snapshot.
-3. **Completion** — resolved vs total assigned (resolution %). Call out low completion only when the numbers support it.
-4. **Overload and due-date risk** — name people whose open load is clearly heavier than the team average, or who have high overdue % / upcoming due work. Do not roster everyone again.
-5. **Manager actions** — short bullets implied by the metrics only (redistribute load, check overdue items). No invented coaching.
-6. **Possible reasons (hypotheses)** — why resolution %, overdue, or load might look this way (missed Jira status transitions, mismanaged pipelines, dates not updated, parked backlog). Label as possible, not confirmed.
-
-When you mention overdue or upcoming due dates, include the date window from the snapshot.
-Do not invent Work Week URLs. A Work Week links section is appended after your report.
-If extra user context is present, treat it as notes; metrics win on conflict.
-${POSSIBLE_REASONS_INSTRUCTION}`,
-  },
-};
 
 const sanitizeStatusCounts = (value) => {
   if (!value || typeof value !== "object") {
@@ -258,9 +161,7 @@ const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics, windowCont
           if (parts) {
             lines.push(`- Status breakdown: ${parts}`);
           }
-        } catch {
-          // skip malformed JSON
-        }
+        } catch {}
       }
     }
   }
@@ -655,25 +556,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
       archiveMeta.userGoals = userGoals || undefined;
       archiveMeta.companyGoals = companyGoals || undefined;
     } else {
-      systemPromptBase = `You are writing a personal project status report for the assignee working on "${label}" at Lumen.
-This report is written FROM the assignee's perspective and FOR their benefit — to help them understand their own workload, spot what needs attention, and feel clear on next steps.
-Write in second person ("you have", "your open items") so it reads as direct, useful feedback to the person doing the work.
-
-Before writing, look at the query's label and JQL below (if given) to understand what this query is actually scoped to, and let that shape the report - do not default to a generic "project status" framing if the query is narrower or different than that:
-- If the label/JQL implies only OPEN or IN-PROGRESS work (e.g. "My Open Work", "assignee = currentUser() AND statusCategory != Done"), focus on active workload, what needs attention, and next steps as usual.
-- If the label/JQL implies only CLOSED/RESOLVED work (e.g. "My Closed Work", "status in (Done, Resolved, Closed)"), do NOT talk about "what needs attention" or overdue items - instead recap what was completed and any notable outcomes. There may be little or nothing "open" to report on, and that's expected, not a gap.
-- If the label/JQL is scoped to a specific status, label, or subset (e.g. only overdue items, only a specific issue type), frame the whole report around that specific scope rather than treating the numbers as if they represent the assignee's entire workload.
-- If the label/JQL is unclear or looks like a general project/epic query, use the general framing below.
-
-Summarize in 3-5 paragraphs, using framing appropriate to what the query actually captures:
-- How the work in this query is tracking overall (completion %, pace) - or, for closed-only queries, what was accomplished
-- What open items need the most attention, especially anything overdue (skip this if the query has no open items to report)
-- What's in progress and what should come next (skip if not applicable to this query's scope)
-- Any risks or blockers to watch (skip if not applicable)
-
-If any item below is flagged as having recent Jira comment activity despite sitting in Backlog, mention it and suggest updating its status - real work may already be happening on it even though the status doesn't show that yet.
-
-Tone: supportive and honest — like a thoughtful colleague reviewing your work with you, not a manager writing a status update. No bullet lists — use flowing prose.`;
+      systemPromptBase = buildStatusReportSystemPrompt({ label });
     }
     const systemParts = [
       systemPromptBase,
@@ -709,13 +592,6 @@ Tone: supportive and honest — like a thoughtful colleague reviewing your work 
 
     if (projects.length === 0) return res.status(400).json({ error: "No project data provided." });
 
-    const focusInstructions = {
-      balance: "Distribute effort across all active projects proportionally.",
-      overdue: "Prioritize clearing overdue items first before taking on new work.",
-      single: "Focus the majority of effort on the single most critical project.",
-      meetings: "Keep the plan light — account for limited deep-work time this week.",
-    };
-
     const contextLines = [
       "## Weekly Planning Context",
       `- Work week capacity: ${capacityHours} hours`,
@@ -735,23 +611,7 @@ Tone: supportive and honest — like a thoughtful colleague reviewing your work 
       }
     }
 
-    const systemPrompt = [
-      `You are a productivity coach helping a developer at Lumen plan their work week.
-Create a practical, day-by-day plan (Monday–Friday) based on the task data below.
-Focus approach: ${focusInstructions[focusStyle] || focusInstructions.balance}
-
-Structure:
-- **Monday – Friday**: 2–4 concrete tasks per day with issue keys
-- **Key Risks**: overdue items or blockers to watch
-- **Recommended Focus**: one sentence on the week's top priority
-
-Rules:
-- Only reference actual issue keys and summaries from the data below
-- Keep each day realistic given ${capacityHours}h total capacity
-- Flag overdue items with ⚠️`,
-      "Base the plan ONLY on the data provided below.",
-      ...(customInstructions ? [`\nAdditional instructions:\n${customInstructions}`] : []),
-    ].join("\n\n");
+    const systemPrompt = buildWeekPlanSystemPrompt({ focusStyle, capacityHours, customInstructions });
 
     try {
       const plan = await callLLMForReport({ systemPrompt, context: contextLines.join("\n"), label: "week plan" });

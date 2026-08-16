@@ -8,11 +8,21 @@ import {
   Segment,
 } from "semantic-ui-react";
 import EpicFilterPanel from "./components/EpicFilterPanel";
+import EpicEvaluationPanel from "./components/EpicEvaluationPanel";
 import { useEpicFilters } from "../context/EpicFiltersContext.jsx";
 import { fetchChatStatus, fetchDashboardMetrics, saveAdHocReport, sendChatMessage, signOutChat, startChatOAuth } from "../services/jiraClient";
 import { buildApiUrl } from "../services/apiBase";
 import { buildChatSessionContext } from "../utils/chatSessionContext";
 import "./chat.css";
+
+// Always-available starter prompts, general enough to make sense with no
+// epic loaded and nothing selected yet.
+const BASE_IDEA_PROMPTS = [
+  { icon: "⏰", text: "What's overdue across my work right now?" },
+  { icon: "🎯", text: "What should I focus on today?" },
+  { icon: "🚧", text: "Is anything blocking my open work?" },
+  { icon: "🧩", text: "What's my hardest task, and what are the next steps?" },
+];
 
 const Chat = () => {
   const {
@@ -33,6 +43,7 @@ const Chat = () => {
   const [chatError, setChatError] = React.useState("");
   const [chatStatus, setChatStatus] = React.useState(null);
   const [dashboardSnapshot, setDashboardSnapshot] = React.useState(null);
+  const [epicEvaluation, setEpicEvaluation] = React.useState(null);
   const [savedMessageIndexes, setSavedMessageIndexes] = React.useState(() => new Set());
   const [savingMessageIndex, setSavingMessageIndex] = React.useState(null);
 
@@ -73,6 +84,34 @@ const Chat = () => {
     [presets, selectedPresetIds]
   );
 
+  // Idea prompts shown before the first message: a couple grounded in
+  // whatever is actually loaded right now (the evaluated epic, or the
+  // selected epic/JQL presets), filled out with general starters so the
+  // list never looks sparse. Capped at 5 so it stays a quick scan, not
+  // another wall to read.
+  const ideaPrompts = React.useMemo(() => {
+    const prompts = [];
+    if (epicEvaluation?.epic?.key) {
+      const key = epicEvaluation.epic.key;
+      prompts.push(
+        { icon: "📊", text: `What's the workload breakdown on ${key}?` },
+        { icon: "🚧", text: `Is anything blocking ${key} right now?` }
+      );
+    } else if (selectedEpics.length > 0) {
+      prompts.push({ icon: "📋", text: "Summarize open work for my selected epics." });
+    }
+    for (const prompt of BASE_IDEA_PROMPTS) {
+      if (prompts.length >= 5) break;
+      prompts.push(prompt);
+    }
+    return prompts;
+  }, [epicEvaluation, selectedEpics]);
+
+  const handlePromptClick = (text) => {
+    if (sending) return;
+    void handleSend(text);
+  };
+
   const handleSignIn = async () => {
     setChatError("");
     try {
@@ -94,8 +133,11 @@ const Chat = () => {
     }
   };
 
-  const handleSend = async () => {
-    const text = input.trim();
+  // Accepts an optional override so idea-prompt clicks can send immediately
+  // without hitting the stale-state race of setInput(text) followed
+  // synchronously by handleSend() reading the not-yet-updated input state.
+  const handleSend = async (overrideText) => {
+    const text = String(overrideText ?? input).trim();
     if (!text || sending) {
       return;
     }
@@ -122,6 +164,7 @@ const Chat = () => {
           selectedEpics,
           includePastDue,
           sessionContext,
+          epicEvaluation,
         },
       });
 
@@ -188,7 +231,9 @@ const Chat = () => {
 
   return (
     <Container className="chat-page">
-      <Header as="h1">Chat</Header>
+      <Header as="h1" className="chat-page-header">
+        <span className="chat-page-header-icon" aria-hidden="true">💬</span> Chat
+      </Header>
       <p className="ww-copy">
         Ask questions about selected epics, your Work Week JQL results, dashboard metrics, and any
         reports or week plans you generated in this browser.
@@ -243,37 +288,65 @@ const Chat = () => {
         />
       </Segment>
 
+      <EpicEvaluationPanel
+        presets={presets}
+        onEpicLoaded={setEpicEvaluation}
+        onEpicCleared={() => setEpicEvaluation(null)}
+      />
+
       {chatError ? <Message negative>{chatError}</Message> : null}
 
       <Segment className="chat-thread">
         {messages.length === 0 ? (
-          <Message info size="small">
-            Start a conversation. Example: “Which epics are past due?” or “Summarize open work for
-            the selected epics.”
-          </Message>
+          <div className="chat-empty-state">
+            <div className="chat-empty-state-icon">💬</div>
+            <p className="chat-empty-state-title">Ask anything about your tasks</p>
+            <p className="chat-empty-state-subtitle">
+              Try one of these, or ask your own question below.
+            </p>
+            <div className="chat-idea-prompts">
+              {ideaPrompts.map((prompt) => (
+                <button
+                  key={prompt.text}
+                  type="button"
+                  className="chat-idea-prompt"
+                  disabled={!chatReady || sending}
+                  onClick={() => handlePromptClick(prompt.text)}
+                >
+                  <span className="chat-idea-prompt-icon" aria-hidden="true">{prompt.icon}</span>
+                  <span>{prompt.text}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         ) : (
           messages.map((message, index) => (
             <div
               key={`${message.role}-${index}`}
-              className={
-                message.role === "user" ? "chat-bubble chat-bubble-user" : "chat-bubble chat-bubble-assistant"
-              }
+              className={`chat-bubble-row chat-bubble-row--${message.role === "user" ? "user" : "assistant"}`}
             >
-              <p>{message.content}</p>
-              {message.note ? <p className="chat-bubble-note">{message.note}</p> : null}
-              {message.role === "assistant" ? (
-                <div className="chat-bubble-actions">
-                  <Button
-                    size="mini"
-                    basic
-                    loading={savingMessageIndex === index}
-                    disabled={savedMessageIndexes.has(index) || savingMessageIndex !== null}
-                    onClick={() => void handleSaveResponse(index)}
-                  >
-                    {savedMessageIndexes.has(index) ? "Saved to Past Reports" : "Save to Past Reports"}
-                  </Button>
-                </div>
-              ) : null}
+              <span className="chat-bubble-role">{message.role === "user" ? "You" : "Assistant"}</span>
+              <div
+                className={
+                  message.role === "user" ? "chat-bubble chat-bubble-user" : "chat-bubble chat-bubble-assistant"
+                }
+              >
+                <p>{message.content}</p>
+                {message.note ? <p className="chat-bubble-note">{message.note}</p> : null}
+                {message.role === "assistant" ? (
+                  <div className="chat-bubble-actions">
+                    <Button
+                      size="mini"
+                      basic
+                      loading={savingMessageIndex === index}
+                      disabled={savedMessageIndexes.has(index) || savingMessageIndex !== null}
+                      onClick={() => void handleSaveResponse(index)}
+                    >
+                      {savedMessageIndexes.has(index) ? "Saved to Past Reports" : "Save to Past Reports"}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
             </div>
           ))
         )}
@@ -292,7 +365,7 @@ const Chat = () => {
           }}
           disabled={!chatReady || sending}
         />
-        <Button primary onClick={handleSend} loading={sending} disabled={!chatReady || sending}>
+        <Button primary onClick={() => handleSend()} loading={sending} disabled={!chatReady || sending}>
           Send
         </Button>
       </Form>

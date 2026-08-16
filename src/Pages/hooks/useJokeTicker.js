@@ -68,9 +68,7 @@ export const useJokeTicker = (enabled = true) => {
         if (line) {
           nextApiJokes.push(line);
         }
-      } catch {
-        // Keep static jokes when API is unavailable.
-      }
+      } catch {}
     }
 
     setApiJokes(shuffleItems(nextApiJokes));

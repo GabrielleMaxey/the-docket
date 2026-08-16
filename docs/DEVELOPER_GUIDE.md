@@ -482,6 +482,8 @@ All routes mounted by `server/jiraProxy.mjs`.
 | POST | `/api/jira/issues` | Create issue |
 | GET | `/api/jira/issues/:issueKey/summary` | Issue type summary (`isEpic`, `isStory`) for manual parent validation |
 | GET | `/api/jira/epics/:epicKey/parent-options` | Epic + stories for epic-preset parent picker |
+| GET | `/api/jira/epics/search?q=` | Search Epics by summary text (min 2 chars) - for Chat's "Evaluate an Epic" panel picker |
+| GET | `/api/jira/epics/:epicKey/workload` | Epic's full descendant tree (Epic -> Story -> Task) with workload totals, per-contributor breakdown, timeline (PED/MRD/IDD), and cross-team blocker candidates - for Chat's "Evaluate an Epic" panel |
 | POST | `/api/jira/issues/parent-candidates` | Body: `{ jql, maxTotal? }` — parent chains from a saved query |
 | POST | `/api/jira/issues/generate-description` | AI-generated description + subtasks/priority for a new issue (body: `summary`, `issueType`, `epicKey`, `epicName`) |
 | GET | `/api/jira/projects` | List projects |

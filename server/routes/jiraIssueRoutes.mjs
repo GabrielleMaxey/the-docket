@@ -1,5 +1,6 @@
 import { createLogger } from "../lib/logger.mjs";
 import { completeLlmText, resolveFirstReadyReportProvider } from "../lib/llmClient.mjs";
+import { buildAiDraftSystemPrompt, buildAiDraftUserPrompt } from "../lib/aiInstructions.mjs";
 import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
 import { loadParentCandidatesFromJql } from "../lib/jiraParentCandidates.mjs";
 import { getJiraSearchFields } from "../lib/jiraSearchFields.mjs";
@@ -130,24 +131,6 @@ const buildGenerateDescriptionResponse = (parsed, { isStory, isBug }) => {
     priority: isBug ? String(parsed?.priority || "").trim() || null : null,
   };
 };
-
-const DESCRIPTION_FORMAT_RULES = `Description formatting rules:
-- Start with "overview": 1–2 short sentences only. State the problem or goal plainly — no filler.
-- Follow with "sections": each has a clear "label" and "items" array of bullet lines (plain text, no markdown).
-- Each bullet must be one concrete, actionable line (hyphens are added server-side — omit them here).
-- Omit sections that do not apply. Do not invent steps, environment details, or technical specifics not present in the title or context.`;
-
-const STORY_EVALUATION_RULES = `Story goal evaluation (required):
-- Every Story must define three elements:
-  1. Situation — when/where/for whom is this needed?
-  2. Ask — what capability, change, or deliverable is being requested?
-  3. Result / goal outcome — what concrete result proves success ("so I can…")?
-- The summary (job story) and overview must make the ask and result/goal outcome explicit.
-- Include "Ask" and "Goal / outcome" sections in "sections" when the story is fully defined.
-- Sub-tasks must each trace directly to achieving the stated goal outcome — no generic filler tasks.
-- If you cannot confidently infer the situation, ask, OR result/goal from the user's title/prompt, set "needsClarification": true.
-- When needsClarification is true: ask exactly 2–3 targeted questions (never more than 3), return "subtasks": [], and still return your best partial summary/overview draft.
-- Only propose subtasks when the story is fully defined.`;
 
 export const registerJiraIssueRoutes = (
   app,
@@ -525,106 +508,10 @@ export const registerJiraIssueRoutes = (
     }
     const context = contextParts.join(" | ");
 
-    // Standards below sourced from Confluence: Jira Standards ODI Project Space Standards.
-    const systemPrompt = isStory
-      ? `You are a Jira issue writer for the Operations Devops Itential (ODI) program at Lumen.
-
-ODI Story standards:
-- The story TITLE (summary) must follow the Job Story format: "When <situation>, I want <motivation/ask>, so I can <result/goal outcome>."
-- If the title provided is not already in job story format, rewrite it into that format and return it as "summary". Keep the summary to one concise sentence (under 25 words when possible).
-- The overview must state the ask and the result/goal outcome in 1–2 sentences only.
-- Stories are never assigned to individuals; they remain in Backlog until all sub-tasks are closed.
-
-Sub-task standards (only when the story is fully defined — propose 2–5):
-- Each sub-task is the smallest concrete unit of work needed to achieve the stated goal outcome.
-- Title format: short imperative phrase — "Configure X", "Implement Y handler", "Write tests for Z", "Deploy to UAT".
-- Sub-tasks will be created as Task issue type under this story in Jira.
-- Do not propose sub-tasks that cannot be reasonably inferred from the title and context.
-- Do not fabricate technical implementation steps for the "Development work" section; keep it high-level or omit it when specifics are unknown.
-
-${STORY_EVALUATION_RULES}
-
-${DESCRIPTION_FORMAT_RULES}`
-      : isBug
-      ? `You are a Jira issue writer for the Operations Devops Itential (ODI) program at Lumen.
-
-ODI Bug standards:
-- Overview: 1–2 sentences describing what is broken and user impact.
-- Use clearly labeled sections with bullet items. Prefer these labels when applicable:
-  - Steps to reproduce
-  - Expected behavior
-  - Actual behavior
-  - Environment / systems affected
-  - Suggested troubleshooting
-  - Development / fix approach
-- Suggest a priority: Low (no system breakdown), Medium (unexpected behavior, system still functional), High (large parts of the system collapse), Critical (complete system/workflow shutdown).
-- When reproduction steps, environment, or expected behavior cannot be inferred from the title, ask 2–3 clarifying questions (never more than 3), set "needsClarification": true, and still return your best partial draft.
-
-${DESCRIPTION_FORMAT_RULES}`
-      : `You are a Jira issue writer for the Operations Devops Itential (ODI) program at Lumen.
-
-ODI Task standards:
-- A Task is the smallest concrete unit of implementation work, always assigned to an individual and always parented to a Story.
-- The description must state what specifically needs to be done and, where possible, why it matters to the parent story's goal.
-- Keep descriptions focused and brief — avoid generic filler steps.
-- If the title is too vague to write a useful description, ask 2–3 clarifying questions and set "needsClarification": true.
-
-${DESCRIPTION_FORMAT_RULES}`;
-
-    const userPrompt = isStory
-      ? `Write an ODI-standard Jira Story draft.
-
-Issue type: Story
-Title provided: ${summary}${context ? `\nContext: ${context}` : ""}
-
-Respond with valid JSON only — no prose, no markdown fences:
-{
-  "needsClarification": false,
-  "questions": [],
-  "summary": "When <situation>, I want <ask>, so I can <result/goal outcome>.",
-  "overview": "One or two sentences naming the ask and the measurable goal outcome.",
-  "sections": [
-    { "label": "Ask", "items": ["What is being requested"] },
-    { "label": "Goal / outcome", "items": ["How we know this succeeded"] },
-    { "label": "Development work", "items": ["Concrete step tied to the goal"] }
-  ],
-  "subtasks": ["Imperative task title 1", "Imperative task title 2"]
-}`
-      : isBug
-      ? `Write an ODI-standard Jira Bug draft.
-
-Issue type: Bug
-Title: ${summary}${context ? `\nContext: ${context}` : ""}
-
-Respond with valid JSON only — no prose, no markdown fences:
-{
-  "needsClarification": false,
-  "questions": [],
-  "overview": "One or two concise sentences on what is broken and the impact.",
-  "sections": [
-    { "label": "Steps to reproduce", "items": ["Step one", "Step two"] },
-    { "label": "Expected behavior", "items": ["What should happen"] },
-    { "label": "Actual behavior", "items": ["What is actually happening"] },
-    { "label": "Environment / systems affected", "items": ["Service or system name"] },
-    { "label": "Suggested troubleshooting", "items": ["Check X", "Verify Y"] },
-    { "label": "Development / fix approach", "items": ["Fix Z in service A"] }
-  ],
-  "priority": "Low (no system breakdown) | Medium (unexpected behavior, system functional) | High (large parts collapse) | Critical (full shutdown)"
-}`
-      : `Write an ODI Task description.
-
-Issue type: Task
-Title: ${summary}${context ? `\nContext: ${context}` : ""}
-
-Respond with valid JSON only — no prose, no markdown fences:
-{
-  "needsClarification": false,
-  "questions": [],
-  "overview": "One or two sentences: what is being done and why it matters to the parent story.",
-  "sections": [
-    { "label": "Steps / approach", "items": ["Specific action step 1", "Specific action step 2"] }
-  ]
-}`;
+    // Standards sourced from Confluence: Jira Standards ODI Project Space Standards -
+    // prompt text itself now lives in server/lib/aiInstructions.mjs.
+    const systemPrompt = buildAiDraftSystemPrompt({ isStory, isBug });
+    const userPrompt = buildAiDraftUserPrompt({ summary, context, isStory, isBug });
 
     try {
       log.info(`generating description for ${issueType}: "${summary}"`);
