@@ -1,0 +1,115 @@
+.project-managers-page {
+  margin-top: 1.5rem;
+  margin-bottom: 2rem;
+  max-width: 900px;
+}
+
+.project-managers-page > .ui.segment {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.pm-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.pm-capacity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.85rem;
+}
+
+.pm-capacity-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.pm-capacity-card--over {
+  border-color: #f6c6bd;
+  background: #fdf7f6;
+}
+
+.pm-capacity-card--near {
+  border-color: #fbe3b0;
+  background: #fefaf1;
+}
+
+.pm-capacity-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.pm-capacity-name {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.pm-capacity-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+  background: #eef2f7;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+}
+
+.pm-capacity-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: #334155;
+  margin-bottom: 0.4rem;
+}
+
+.pm-capacity-flag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #d1442d;
+  background: #fdeeec;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+}
+
+.pm-capacity-flag--near {
+  color: #a16207;
+  background: #fef3c7;
+}
+
+.pm-capacity-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.pm-capacity-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #0c93d9;
+  transition: width 0.2s;
+}
+
+.pm-capacity-bar-fill--near {
+  background: #d69e2e;
+}
+
+.pm-capacity-bar-fill--over {
+  background: #d1442d;
+}

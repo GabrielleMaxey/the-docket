@@ -1,10 +1,11 @@
 import React from "react";
-import { Button, Form, Message, Table } from "semantic-ui-react";
+import { Button, Form, Input, Message, Table } from "semantic-ui-react";
 import SettingsSection from "./SettingsSection";
 import {
   createWatchedAssignee,
   deleteWatchedAssignee,
   fetchWatchedAssignees,
+  updateWatchedAssignee,
 } from "../../../services/jiraClient.js";
 import { useFlash } from "../../hooks/useFlash.js";
 
@@ -12,7 +13,10 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
   const [watchedName, setWatchedName] = React.useState("");
   const [watchedJql, setWatchedJql] = React.useState("");
   const [watchType, setWatchType] = React.useState("person");
+  const [watchedCapacity, setWatchedCapacity] = React.useState("");
   const [quickPickValue, setQuickPickValue] = React.useState("");
+  const [capacityDrafts, setCapacityDrafts] = React.useState({});
+  const [savingCapacityId, setSavingCapacityId] = React.useState(null);
   const [flash, setFlash] = useFlash();
   const contributorEntries = watchedAssignees.filter((person) => person.watchType !== "direct_reports");
 
@@ -43,10 +47,17 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
     if (watchType === "jql" && !jql) { onError("JQL is required for a custom query entry."); return; }
     onError("");
     try {
-      await createWatchedAssignee({ displayName, watchType, jql: watchType === "jql" ? jql : "", sortOrder: watchedAssignees.length });
+      await createWatchedAssignee({
+        displayName,
+        watchType,
+        jql: watchType === "jql" ? jql : "",
+        sortOrder: watchedAssignees.length,
+        capacity: watchedCapacity.trim() === "" ? null : watchedCapacity.trim(),
+      });
       setWatchedName("");
       setWatchedJql("");
       setWatchType("person");
+      setWatchedCapacity("");
       setQuickPickValue("");
       setWatchedAssignees(await fetchWatchedAssignees());
       setFlash(watchType === "jql" ? "Custom query added." : "Person added.");
@@ -66,6 +77,53 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
     }
   };
 
+  const capacityDraftFor = (person) =>
+    capacityDrafts[person.id] !== undefined
+      ? capacityDrafts[person.id]
+      : person.capacity === null || person.capacity === undefined
+        ? ""
+        : String(person.capacity);
+
+  const handleCapacityBlur = async (person) => {
+    const draft = capacityDraftFor(person);
+    const nextCapacity = draft.trim() === "" ? null : draft.trim();
+    const currentCapacity = person.capacity === null || person.capacity === undefined ? null : String(person.capacity);
+    if (String(nextCapacity) === String(currentCapacity)) {
+      // No real change - clear the draft so it falls back to the server value.
+      setCapacityDrafts((prev) => {
+        const next = { ...prev };
+        delete next[person.id];
+        return next;
+      });
+      return;
+    }
+
+    setSavingCapacityId(person.id);
+    onError("");
+    try {
+      await updateWatchedAssignee(person.id, {
+        displayName: person.displayName,
+        watchType: person.watchType,
+        jql: person.jql,
+        memberNames: person.memberNames,
+        resolvedAccountId: person.resolvedAccountId,
+        sortOrder: person.sortOrder,
+        capacity: nextCapacity,
+      });
+      setWatchedAssignees(await fetchWatchedAssignees());
+      setCapacityDrafts((prev) => {
+        const next = { ...prev };
+        delete next[person.id];
+        return next;
+      });
+      setFlash("Capacity updated.");
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to update capacity");
+    } finally {
+      setSavingCapacityId(null);
+    }
+  };
+
   return (
     <SettingsSection
       title="Contributor Metrics"
@@ -79,24 +137,44 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
         a quick-select chip on the Dashboard and is separate from the project presets that drive
         the project tabs above.
       </p>
+      <p>
+        <strong>Capacity</strong> (optional) is a target open-issue count — set it to see how each
+        person's or group's current workload compares on the Dashboard. Leave it blank if you don't
+        want a capacity comparison for that entry.
+      </p>
       <Table celled compact>
         <Table.Header>
           <Table.Row>
             <Table.HeaderCell>Type</Table.HeaderCell>
             <Table.HeaderCell>Label</Table.HeaderCell>
             <Table.HeaderCell>JQL</Table.HeaderCell>
+            <Table.HeaderCell>Capacity</Table.HeaderCell>
             <Table.HeaderCell />
           </Table.Row>
         </Table.Header>
         <Table.Body>
           {contributorEntries.length === 0 ? (
-            <Table.Row><Table.Cell colSpan="4">No entries yet.</Table.Cell></Table.Row>
+            <Table.Row><Table.Cell colSpan="5">No entries yet.</Table.Cell></Table.Row>
           ) : (
             contributorEntries.map((person) => (
               <Table.Row key={person.id}>
                 <Table.Cell>{person.watchType === "jql" ? "Custom query" : "Person"}</Table.Cell>
                 <Table.Cell>{person.displayName}</Table.Cell>
                 <Table.Cell>{person.jql || "—"}</Table.Cell>
+                <Table.Cell collapsing>
+                  <Input
+                    size="mini"
+                    type="number"
+                    min="0"
+                    placeholder="Not set"
+                    style={{ width: "90px" }}
+                    value={capacityDraftFor(person)}
+                    loading={savingCapacityId === person.id}
+                    disabled={savingCapacityId === person.id}
+                    onChange={(_e, { value }) => setCapacityDrafts((prev) => ({ ...prev, [person.id]: value }))}
+                    onBlur={() => handleCapacityBlur(person)}
+                  />
+                </Table.Cell>
                 <Table.Cell collapsing>
                   <Button size="mini" negative onClick={() => handleDeleteWatchedAssignee(person.id)}>Remove</Button>
                 </Table.Cell>
@@ -137,6 +215,14 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
               value={watchedJql} onChange={(_e, { value }) => setWatchedJql(value)} />
           </>
         ) : null}
+        <Form.Input
+          label="Capacity (optional)"
+          type="number"
+          min="0"
+          placeholder="e.g. 15 open issues"
+          value={watchedCapacity}
+          onChange={(_e, { value }) => setWatchedCapacity(value)}
+        />
         <Button onClick={handleAddWatchedAssignee}>Add</Button>
         {flash ? <Message positive size="mini" style={{ marginTop: "0.75rem" }}>✓ {flash}</Message> : null}
       </Form>
