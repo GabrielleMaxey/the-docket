@@ -88,6 +88,8 @@ npm run dev:all
 npm run desktop:dev
 ```
 
+Some corporate secure laptops may block Electron windows or local desktop app execution. If this option is unavailable, run browser mode with `npm run dev:all`, then set the browser UI up as its own desktop-style app window from Chrome or Edge; see [END_USER_GUIDE.md](./END_USER_GUIDE.md#install-as-its-own-application-window).
+
 If `better-sqlite3` still fails after `npm install`:
 ```bash
 npm run desktop:rebuild-native
@@ -108,7 +110,7 @@ A successful response looks like:
 
 ---
 
-## 5. Set up presets (required for Dashboard + Chat)
+## 5. Set up presets (required for Metrics + Chat)
 
 **Pilot shortcut:** after `npm install` and a first API start, seed shared ODI presets:
 
@@ -125,7 +127,7 @@ See [pilot-presets.md](./pilot-presets.md) for interactive selection and catalog
    - **Epic preset**: epic key (e.g. `ODI-1234`) + a label
    - **JQL preset**: a saved JQL query + a label
 
-These presets appear in the Dashboard filter panel, the Work Week **Create Issue** modal (epic presets and saved queries — JQL presets can resolve parents from query results when no single epic key is embedded), and the Chat context panel.
+These presets appear in the Metrics filter panel, the Task Management **Create Issue** modal (epic presets and saved queries — JQL presets can resolve parents from query results when no single epic key is embedded), and the Chat context panel.
 
 ---
 
@@ -206,16 +208,16 @@ Each Chat message includes **session context** assembled in the browser and sent
 
 | Included data | Source |
 |---------------|--------|
-| Work Week JQL summaries | `localStorage` (`workWeekTasksJiraLastJqlRuns`) — last Run JQL results |
-| Dashboard metrics summary | `GET /api/dashboard/metrics` — refreshed when Chat loads and on each send |
+| Task Management JQL summaries | `localStorage` (`workWeekTasksJiraLastJqlRuns`) — last Run JQL results |
+| Metrics summary | `GET /api/dashboard/metrics` — refreshed when Chat loads and on each send |
 | Generated artifacts | `localStorage` (`taskManagerChatSessionArtifacts`) — last 8 reports/plans |
 | Past Reports archive | SQLite (`generated_reports`) — all auto-saved reports/plans plus Chat saves |
 
-Artifacts are saved automatically when the user generates a Work Week project report, week plan, or Dashboard audience report (also written to **Past Reports** in SQLite). Chat replies are **not** auto-archived — use **Save to Past Reports** on the assistant bubble. The proxy formats session context into the system prompt via `shared/chatSessionPrompt.mjs` so the model can answer questions like "what did my week plan say?" without re-running Jira searches.
+Artifacts are saved automatically when the user generates a Task Management project report, week plan, or Metrics audience report (also written to **Past Reports** in SQLite). Chat replies are **not** auto-archived — use **Save to Past Reports** on the assistant bubble. The proxy formats session context into the system prompt via `shared/chatSessionPrompt.mjs` so the model can answer questions like "what did my week plan say?" without re-running Jira searches.
 
 Session context stays in the browser and SQLite (dashboard snapshot + archived reports); only the formatted prompt text is sent to your LLM provider (or Rovo) with each chat message.
 
-### OpenAI-compatible providers (Databricks, Azure, LiteLLM, vLLM, etc.)
+### OpenAI-compatible providers
 
 Most enterprise and self-hosted gateways expose an **OpenAI-compatible** `/chat/completions` API. Point the app at that URL — no code changes:
 
@@ -237,24 +239,7 @@ REPORT_OPENAI_BASE_URL=https://<workspace-host>/serving-endpoints/<endpoint>/inv
 REPORT_OPENAI_MODEL=claude-sonnet-...
 ```
 
-### Databricks Model Serving
-
-Databricks endpoints are often **OpenAI-compatible**. No code change is required if your endpoint supports the chat completions API:
-
-```env
-CHAT_PROVIDER=openai
-OPENAI_API_KEY=<databricks-personal-access-token-or-service-principal-token>
-OPENAI_BASE_URL=https://<workspace-host>/serving-endpoints/<endpoint-name>/invocations/v1
-OPENAI_MODEL=<model-name-on-endpoint>
-```
-
-**Before rolling out to other users:**
-
-1. Deploy a model serving endpoint in your Databricks workspace and confirm the OpenAI-compatible URL (see Databricks docs for your workspace region).
-2. Create a PAT or service principal with permission to query that endpoint.
-3. Ensure the machine running the Express proxy can reach the Databricks workspace URL (VPN, firewall, or private link as required).
-4. Set the variables above in `.env` on the proxy host and restart the API.
-5. Test Chat and a dashboard report — reports use the same provider and URL unless `REPORT_PROVIDER` or `REPORT_OPENAI_*` overrides are set.
+For Databricks, Azure, LiteLLM, vLLM, or similar gateways, confirm the endpoint supports chat completions, create a token with permission to call it, ensure the proxy machine can reach the URL, then set the OpenAI-compatible variables above and restart the API.
 
 If your endpoint uses a different request format (not OpenAI chat completions or Anthropic messages), you would need a dedicated provider in `server/lib/llmClient.mjs`.
 
@@ -284,6 +269,8 @@ netstat -ano | findstr :8787
 ## Desktop app (packaged Electron)
 
 The **Task Manager** desktop installer (macOS universal `.dmg` for Intel and Apple Silicon, or Windows NSIS) bundles the UI and starts the Express proxy automatically. No separate `npm run dev:all` step.
+
+Availability depends on local device policy. Some corporate secure laptops may block unsigned Electron installers, local app execution, or the embedded proxy. If the package is unavailable or blocked, use browser mode and install the browser UI as its own desktop-style app window.
 
 ### First launch
 
