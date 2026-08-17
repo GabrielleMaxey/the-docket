@@ -745,6 +745,13 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
 
     const userPrompt = String(req.body?.userPrompt || "").trim();
     const provider = String(req.body?.provider || "").trim();
+    // Historically hardcoded to "chat" since this endpoint only ever had
+    // one caller (Chat's own save button). Now accepts an override so
+    // other pages (e.g. Project Managers) can save through the same
+    // endpoint without every non-chat save being mislabeled as chat in
+    // the archive - defaults to "chat" to keep the existing caller's
+    // behavior exactly as it was.
+    const savedFrom = String(req.body?.savedFrom || "").trim() || "chat";
 
     try {
       const archiveId = insertGeneratedReport(db, {
@@ -754,7 +761,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
         content,
         createdAt: getClientArchiveTimestamp(req),
         meta: {
-          savedFrom: "chat",
+          savedFrom,
           ...getClientArchiveMeta(req),
           ...(userPrompt ? { userPrompt } : {}),
           ...(provider ? { provider } : {}),

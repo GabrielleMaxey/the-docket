@@ -1,10 +1,11 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Container, Header, Message, Segment, Button } from "semantic-ui-react";
-import { fetchCapacityPlanning, fetchWatchedAssignees } from "../services/jiraClient";
+import { fetchCapacityPlanning, fetchWatchedAssignees, saveAdHocReport } from "../services/jiraClient";
 import { getStatusColor } from "../utils/statusScale";
 import { buildWorkWeekHref } from "../utils/workWeekNavigation";
 import { usePersistedState } from "./hooks/usePersistedState";
+import { useFlash } from "./hooks/useFlash";
 import "./projectManagers.css";
 
 // Same backslash-then-quote convention used for JQL string literals
@@ -391,6 +392,89 @@ const KeyLegend = () => {
   );
 };
 
+// The key legend as Markdown - kept as its own function (rather than
+// trying to serialize the KeyLegend JSX) so wording stays independently
+// readable as plain text, but the CONTENT is deliberately kept in sync
+// with KeyLegend's own text by hand - the two describe the same three
+// sections (capacity bar, risk flags, share-of-query conventions).
+const buildKeyMarkdown = () =>
+  [
+    "## Key",
+    "",
+    "**Capacity bar**",
+    "- Within capacity",
+    "- Near capacity (85%+ of target)",
+    "- Over capacity",
+    "",
+    "**Risk flags**",
+    "- ⚠️ Overdue — past its due date",
+    "- 🚧 Blocked — status is Blocked or On Hold",
+    "- 💤 Stale — not updated in 14+ days",
+    "",
+    "**Share of this query, by assignee**",
+    '- Two separate lists — "By status" and "…by assignee" are two different breakdowns of the ' +
+      "same issues, not one continuing list. A single issue counts in one status bucket and one " +
+      "assignee bucket at the same time.",
+    "- **N here** — that person's open issues within this specific query",
+    "- **N total** — all of that person's open issues everywhere, across every project",
+    "- **N/A total** — Jira couldn't resolve a total for that name; it's a data gap, not a real zero",
+  ].join("\n");
+
+// One markdown document covering every card currently on screen, in the
+// same sorted order the page itself shows them (over-capacity first) -
+// a saved/downloaded snapshot should read the same way the live page did
+// at the moment it was captured, not re-sorted differently.
+const buildCapacityReportMarkdown = (sortedItems) => {
+  const lines = [`# Project Managers — Capacity Planning`, "", `_Generated ${new Date().toLocaleString()}_`, ""];
+
+  for (const item of sortedItems) {
+    const { displayName, watchType, capacity, openCount, statusCounts, contributorCounts, contributorTotalCounts } =
+      item;
+    const status = item.error ? null : capacityStatus(openCount, capacity);
+    const hasCapacity = capacity !== null && capacity !== undefined;
+
+    lines.push(`## ${displayName}${watchType === "jql" ? " (custom query)" : ""}`);
+    if (item.error) {
+      lines.push("", `_Error: ${item.error}_`, "");
+      continue;
+    }
+    lines.push(
+      "",
+      hasCapacity
+        ? `${openCount} of ${capacity} open issues${status === "over" ? " — **OVER CAPACITY**" : status === "near" ? " — **Near capacity**" : ""}`
+        : `${openCount} open issues (no capacity target set)`
+    );
+
+    const riskParts = [];
+    if (item.overdueCount) riskParts.push(`⚠️ ${item.overdueCount} overdue`);
+    if (item.blockedCount) riskParts.push(`🚧 ${item.blockedCount} blocked`);
+    if (item.staleCount) riskParts.push(`💤 ${item.staleCount} stale (14d+)`);
+    if (riskParts.length > 0) lines.push("", riskParts.join(" · "));
+
+    const statusEntries = Object.entries(statusCounts || {}).sort((a, b) => b[1] - a[1]);
+    if (statusEntries.length > 0) {
+      lines.push("", "**By status**");
+      for (const [label, count] of statusEntries) lines.push(`- ${label}: ${count}`);
+    }
+
+    const contributorEntries = Object.entries(contributorCounts || {}).sort((a, b) => b[1] - a[1]);
+    if (contributorEntries.length > 1) {
+      lines.push("", "**Share of this query, by assignee**");
+      for (const [name, count] of contributorEntries) {
+        const total = contributorTotalCounts?.[name];
+        const totalPart =
+          name === "Unassigned" ? "" : typeof total === "number" ? ` · ${total} total` : " · N/A total";
+        lines.push(`- ${name}: ${count} here${totalPart}`);
+      }
+    }
+
+    lines.push("");
+  }
+
+  lines.push(buildKeyMarkdown());
+  return lines.join("\n");
+};
+
 const ProjectManagers = () => {
   const [allEntries, setAllEntries] = React.useState([]);
   const [entriesLoaded, setEntriesLoaded] = React.useState(false);
@@ -407,6 +491,8 @@ const ProjectManagers = () => {
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [flash, doFlash] = useFlash();
 
   const loadEntries = React.useCallback(async () => {
     try {
@@ -483,6 +569,39 @@ const ProjectManagers = () => {
 
   const currentSelection = Array.isArray(selectedIds) ? selectedIds : [];
 
+  const handleDownload = () => {
+    if (sortedItems.length === 0) return;
+    const content = buildCapacityReportMarkdown(sortedItems);
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `capacity_planning_${new Date().toISOString().slice(0, 10)}.md`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSaveToReports = async () => {
+    if (sortedItems.length === 0) return;
+    setSaving(true);
+    setError("");
+    try {
+      const content = buildCapacityReportMarkdown(sortedItems);
+      await saveAdHocReport({
+        content,
+        label: `Capacity Planning — ${new Date().toLocaleDateString()}`,
+        savedFrom: "project_managers",
+      });
+      doFlash("Saved to Reports.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save report");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Container className="project-managers-page">
       <Header as="h1">
@@ -541,10 +660,29 @@ const ProjectManagers = () => {
                   overCount > 0 ? ` · ${overCount} over capacity` : ""
                 }${staleTotalCount > 0 ? ` · ${staleTotalCount} stale issues total` : ""}`}
           </span>
-          <Button size="small" basic onClick={load} loading={loading} disabled={loading}>
-            Refresh
-          </Button>
+          <div className="pm-toolbar-actions">
+            <Button
+              size="small"
+              basic
+              onClick={handleSaveToReports}
+              loading={saving}
+              disabled={saving || loading || sortedItems.length === 0}
+            >
+              Save to Reports
+            </Button>
+            <Button size="small" basic onClick={handleDownload} disabled={loading || sortedItems.length === 0}>
+              Download
+            </Button>
+            <Button size="small" basic onClick={load} loading={loading} disabled={loading}>
+              Refresh
+            </Button>
+          </div>
         </div>
+        {flash ? (
+          <Message positive size="mini" style={{ marginTop: "0.75rem" }}>
+            ✓ {flash}
+          </Message>
+        ) : null}
       </Segment>
 
       {error ? (

@@ -704,13 +704,13 @@ export const deleteArchivedReportsBySource = async (source) => {
   });
 };
 
-export const saveAdHocReport = async ({ content, label, userPrompt, provider }) => {
+export const saveAdHocReport = async ({ content, label, userPrompt, provider, savedFrom }) => {
   return requestJson("/api/reports/archive", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ content, label, userPrompt, provider, ...getLocalTimestampPayload() }),
+    body: JSON.stringify({ content, label, userPrompt, provider, savedFrom, ...getLocalTimestampPayload() }),
   });
 };
 
