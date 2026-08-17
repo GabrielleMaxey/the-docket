@@ -196,7 +196,13 @@ const ContributorBreakdown = ({
               <span className="pm-contributor-row-name">{name}</span>
             )}
             <span className="pm-contributor-row-counts">
-              <span title="Open issues within this query">{count} here</span>
+              {href ? (
+                <Link to={href} className="pm-contributor-row-here" title="Open issues within this query">
+                  {count} here
+                </Link>
+              ) : (
+                <span title="Open issues within this query">{count} here</span>
+              )}
               {hasProjectCount ? (
                 <>
                   {" · "}
