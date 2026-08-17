@@ -3,12 +3,15 @@ import { Container, Header, Message, Segment, Button } from "semantic-ui-react";
 import { fetchCapacityPlanning } from "../services/jiraClient";
 import "./projectManagers.css";
 
-// Capacity is a target open-issue count set in Settings -> Contributor
-// Metrics. This page compares it against each entry's current live open
-// count - entries with no capacity configured are never returned by the
-// API at all (fetchCapacityWorkloads skips them server-side), so nothing
-// here needs to handle a "not set" display case.
+// Capacity is an optional target open-issue count set in Settings ->
+// Contributor Metrics. Returns null (not "ok"/"over") when no target is
+// configured - callers must treat that as its own case, not coerce it to
+// 0. A naive `capacity <= 0` check would silently treat null as 0 (JS
+// coerces null to 0 in numeric comparisons), which would flag any entry
+// with open issues and no capacity target as "over capacity" - wrong, and
+// exactly what this app showed before this was caught and fixed.
 const capacityStatus = (openCount, capacity) => {
+  if (capacity === null || capacity === undefined) return null;
   if (capacity <= 0) {
     return openCount > 0 ? "over" : "ok";
   }
@@ -21,7 +24,8 @@ const capacityStatus = (openCount, capacity) => {
 const CapacityCard = ({ item }) => {
   const { displayName, watchType, capacity, openCount, error } = item;
   const status = error ? null : capacityStatus(openCount, capacity);
-  const percent = capacity > 0 ? Math.min(100, Math.round((openCount / capacity) * 100)) : openCount > 0 ? 100 : 0;
+  const hasCapacity = capacity !== null && capacity !== undefined;
+  const percent = hasCapacity && capacity > 0 ? Math.min(100, Math.round((openCount / capacity) * 100)) : 0;
 
   return (
     <div className={`pm-capacity-card${status ? ` pm-capacity-card--${status}` : ""}`}>
@@ -33,7 +37,7 @@ const CapacityCard = ({ item }) => {
         <Message negative size="mini" style={{ margin: "0.4rem 0 0" }}>
           {error}
         </Message>
-      ) : (
+      ) : hasCapacity ? (
         <>
           <div className="pm-capacity-numbers">
             <strong>{openCount}</strong> of <strong>{capacity}</strong> open issues
@@ -44,6 +48,11 @@ const CapacityCard = ({ item }) => {
             <div className={`pm-capacity-bar-fill pm-capacity-bar-fill--${status}`} style={{ width: `${percent}%` }} />
           </div>
         </>
+      ) : (
+        <div className="pm-capacity-numbers pm-capacity-numbers--no-target">
+          <strong>{openCount}</strong> open issues
+          <span className="pm-capacity-no-target-note">No capacity target set</span>
+        </div>
       )}
     </div>
   );
@@ -72,10 +81,18 @@ const ProjectManagers = () => {
   }, [load]);
 
   const overCount = items.filter((item) => !item.error && capacityStatus(item.openCount, item.capacity) === "over").length;
+  const withTargetCount = items.filter((item) => item.capacity !== null && item.capacity !== undefined).length;
+
+  // Over-capacity first, then near, then ok, then no-target entries last
+  // (nothing to rank them by) - within each group, higher open count first.
+  const statusRank = { over: 0, near: 1, ok: 2 };
   const sortedItems = [...items].sort((a, b) => {
-    const aRatio = a.capacity > 0 ? a.openCount / a.capacity : a.openCount > 0 ? Infinity : 0;
-    const bRatio = b.capacity > 0 ? b.openCount / b.capacity : b.openCount > 0 ? Infinity : 0;
-    return bRatio - aRatio;
+    const aStatus = capacityStatus(a.openCount, a.capacity);
+    const bStatus = capacityStatus(b.openCount, b.capacity);
+    const aRank = aStatus === null ? 3 : statusRank[aStatus];
+    const bRank = bStatus === null ? 3 : statusRank[bStatus];
+    if (aRank !== bRank) return aRank - bRank;
+    return b.openCount - a.openCount;
   });
 
   return (
@@ -84,9 +101,10 @@ const ProjectManagers = () => {
         <span aria-hidden="true">📐</span> Project Managers
       </Header>
       <p className="ww-copy">
-        Capacity planning: compares each Contributor Metrics entry's current open-issue count
-        against the capacity target set for it in Settings. Entries with no capacity target aren't
-        shown here — set one in Settings → Contributor Metrics to add it to this view.
+        Capacity planning: shows every Contributor Metrics entry's current open-issue count,
+        compared against a capacity target where one is set in Settings → Contributor Metrics.
+        Entries without a target still show up here with their live count — just without a
+        comparison bar, since there's nothing to compare against yet.
       </p>
 
       <Segment>
@@ -94,7 +112,7 @@ const ProjectManagers = () => {
           <span>
             {loading
               ? "Loading…"
-              : `${items.length} entr${items.length === 1 ? "y" : "ies"} with a capacity target${
+              : `${items.length} entr${items.length === 1 ? "y" : "ies"} · ${withTargetCount} with a capacity target${
                   overCount > 0 ? ` · ${overCount} over capacity` : ""
                 }`}
           </span>
@@ -108,8 +126,9 @@ const ProjectManagers = () => {
         <Message negative>{error}</Message>
       ) : !loading && items.length === 0 ? (
         <Message info>
-          No Contributor Metrics entries have a capacity target set yet. Go to Settings →
-          Contributor Metrics and set a capacity on a person or custom query entry to see it here.
+          No Contributor Metrics entries yet. Go to Settings → Contributor Metrics to add a
+          person, reporter, preset, or custom query — it'll show up here automatically, with or
+          without a capacity target.
         </Message>
       ) : (
         <div className="pm-capacity-grid">

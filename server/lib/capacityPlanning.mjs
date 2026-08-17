@@ -5,15 +5,17 @@
 // planning only needs a current open-issue count per entry, not the full
 // due-date-window/epic-breakdown machinery the Dashboard refresh computes.
 
-import { searchAllIssues, fetchJiraMyself } from "./jiraSearchHelpers.mjs";
-import { buildDirectReportsJql } from "../../shared/directReportsJql.mjs";
+import { searchAllIssues } from "./jiraSearchHelpers.mjs";
 import { splitTrailingOrderBy } from "./epicFilterJql.mjs";
 
 const escapeJqlString = (value) =>
   String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
-// Builds an "open issues" JQL for one watched entry. For jql/direct_reports
-// watches, the entry's own JQL is reused as the assignee scope, with an
+// Builds an "open issues" JQL for one watched entry (person or jql type -
+// direct_reports entries are filtered out by the caller before this is
+// ever called, since that type expands into multiple people elsewhere and
+// doesn't map 1:1 to a single row/card the way these two do). The entry's
+// own JQL is reused as the assignee scope for jql-type watches, with an
 // open-status filter appended (rather than trusting the saved JQL to
 // already be open-only, since some saved queries intentionally aren't).
 //
@@ -24,13 +26,7 @@ const escapeJqlString = (value) =>
 // "reporter = X ORDER BY updated DESC" confirmed this fails with a JQL
 // syntax error otherwise ("Expecting ')' but got 'ORDER'") - caught by
 // actually testing this against Jira, not just by reading the code.
-const buildOpenCountJql = (watched, myself) => {
-  if (watched.watchType === "direct_reports") {
-    const rawJql = buildDirectReportsJql(watched.memberNames, myself);
-    if (!rawJql) return "";
-    const { scope } = splitTrailingOrderBy(rawJql);
-    return `(${scope}) AND statusCategory != Done`;
-  }
+const buildOpenCountJql = (watched) => {
   if (watched.watchType === "jql") {
     const raw = String(watched.jql || "").trim();
     if (!raw) return "";
@@ -42,35 +38,34 @@ const buildOpenCountJql = (watched, myself) => {
 };
 
 // Returns [{ id, displayName, watchType, capacity, openCount, error }] for
-// every watched_assignees row with capacity IS NOT NULL. Entries with no
-// capacity configured are skipped entirely - nothing to compare them against.
+// EVERY watched_assignees row (direct_reports excluded - that type expands
+// into multiple people server-side elsewhere and doesn't map 1:1 to a
+// single row/card the way person/jql entries do). capacity is null for
+// entries with no target configured - the caller decides how to render
+// that (e.g. a plain workload count instead of a capacity comparison bar),
+// rather than this function silently hiding entries with nothing to
+// compare against. Previously filtered to capacity-only rows, which meant
+// a newly-added Contributor Metrics entry appeared to do nothing on the
+// Project Managers page until a capacity was also set - not a bug, but
+// confusing enough in practice to change: every entry should be visible
+// here, with or without a capacity target.
 export const fetchCapacityWorkloads = async ({ watchedRows, jiraRequest, runJiraSearchRequest }) => {
-  const capacityRows = (watchedRows || []).filter(
-    (row) => row.capacity !== null && row.capacity !== undefined
-  );
-  if (capacityRows.length === 0) {
+  const rows = (watchedRows || []).filter((row) => row.watchType !== "direct_reports");
+  if (rows.length === 0) {
     return [];
   }
 
-  let myself = null;
-  if (capacityRows.some((row) => row.watchType === "direct_reports")) {
-    try {
-      myself = await fetchJiraMyself({ jiraRequest });
-    } catch {
-      myself = null;
-    }
-  }
-
   const results = [];
-  for (const watched of capacityRows) {
+  for (const watched of rows) {
+    const hasCapacity = watched.capacity !== null && watched.capacity !== undefined;
     const base = {
       id: watched.id,
       displayName: watched.displayName,
       watchType: watched.watchType,
-      capacity: Number(watched.capacity),
+      capacity: hasCapacity ? Number(watched.capacity) : null,
     };
     try {
-      const jql = buildOpenCountJql(watched, myself);
+      const jql = buildOpenCountJql(watched);
       if (!jql) {
         results.push({ ...base, openCount: 0, error: "No query available for this entry" });
         continue;
