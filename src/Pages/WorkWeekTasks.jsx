@@ -532,8 +532,6 @@ const WorkWeekTasks = () => {
           />
         </CollapsibleSection>
 
-        {jqlRuns.some((r) => r.issues?.length > 0) ? null : null}
-
         {showRestoredJqlBanner && jqlRuns.some(isConfiguredJqlRun) ? (
           <div className="ww-restored-banner">
             <div className="ww-restored-banner-content">
