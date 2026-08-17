@@ -122,3 +122,61 @@
 .pm-capacity-bar-fill--over {
   background: #d1442d;
 }
+
+.pm-risk-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.pm-risk-flag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+}
+
+.pm-risk-flag--overdue {
+  color: #d1442d;
+  background: #fdeeec;
+}
+
+.pm-risk-flag--blocked {
+  color: #a16207;
+  background: #fef3c7;
+}
+
+.pm-risk-flag--stale {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.pm-status-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #f1f5f9;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.pm-status-breakdown-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.pm-status-breakdown-item strong {
+  color: #334155;
+  font-variant-numeric: tabular-nums;
+}
+
+.pm-status-breakdown-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}

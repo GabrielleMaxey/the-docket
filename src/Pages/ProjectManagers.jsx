@@ -1,6 +1,7 @@
 import React from "react";
 import { Container, Header, Message, Segment, Button } from "semantic-ui-react";
 import { fetchCapacityPlanning } from "../services/jiraClient";
+import { getStatusColor } from "../utils/statusScale";
 import "./projectManagers.css";
 
 // Capacity is an optional target open-issue count set in Settings ->
@@ -21,8 +22,47 @@ const capacityStatus = (openCount, capacity) => {
   return "ok";
 };
 
+// Top few status labels by count, most-populated first - a raw open count
+// alone doesn't say whether that work is actually moving. "35 open" reads
+// very differently once it's "28 Backlog, 7 In Progress".
+const StatusBreakdown = ({ statusCounts }) => {
+  const entries = Object.entries(statusCounts || {}).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 0) return null;
+  return (
+    <div className="pm-status-breakdown">
+      {entries.map(([label, count], index) => (
+        <span key={label} className="pm-status-breakdown-item">
+          <span
+            className="pm-status-breakdown-dot"
+            style={{ background: getStatusColor(label, index) }}
+            aria-hidden="true"
+          />
+          {label} <strong>{count}</strong>
+        </span>
+      ))}
+    </div>
+  );
+};
+
+const RiskFlags = ({ overdueCount, blockedCount, staleCount }) => {
+  if (!overdueCount && !blockedCount && !staleCount) return null;
+  return (
+    <div className="pm-risk-flags">
+      {overdueCount > 0 ? (
+        <span className="pm-risk-flag pm-risk-flag--overdue">⚠️ {overdueCount} overdue</span>
+      ) : null}
+      {blockedCount > 0 ? (
+        <span className="pm-risk-flag pm-risk-flag--blocked">🚧 {blockedCount} blocked</span>
+      ) : null}
+      {staleCount > 0 ? (
+        <span className="pm-risk-flag pm-risk-flag--stale">💤 {staleCount} stale (14d+)</span>
+      ) : null}
+    </div>
+  );
+};
+
 const CapacityCard = ({ item }) => {
-  const { displayName, watchType, capacity, openCount, error } = item;
+  const { displayName, watchType, capacity, openCount, statusCounts, overdueCount, blockedCount, staleCount, error } = item;
   const status = error ? null : capacityStatus(openCount, capacity);
   const hasCapacity = capacity !== null && capacity !== undefined;
   const percent = hasCapacity && capacity > 0 ? Math.min(100, Math.round((openCount / capacity) * 100)) : 0;
@@ -37,22 +77,28 @@ const CapacityCard = ({ item }) => {
         <Message negative size="mini" style={{ margin: "0.4rem 0 0" }}>
           {error}
         </Message>
-      ) : hasCapacity ? (
-        <>
-          <div className="pm-capacity-numbers">
-            <strong>{openCount}</strong> of <strong>{capacity}</strong> open issues
-            {status === "over" ? <span className="pm-capacity-flag">Over capacity</span> : null}
-            {status === "near" ? <span className="pm-capacity-flag pm-capacity-flag--near">Near capacity</span> : null}
-          </div>
-          <div className="pm-capacity-bar">
-            <div className={`pm-capacity-bar-fill pm-capacity-bar-fill--${status}`} style={{ width: `${percent}%` }} />
-          </div>
-        </>
       ) : (
-        <div className="pm-capacity-numbers pm-capacity-numbers--no-target">
-          <strong>{openCount}</strong> open issues
-          <span className="pm-capacity-no-target-note">No capacity target set</span>
-        </div>
+        <>
+          {hasCapacity ? (
+            <>
+              <div className="pm-capacity-numbers">
+                <strong>{openCount}</strong> of <strong>{capacity}</strong> open issues
+                {status === "over" ? <span className="pm-capacity-flag">Over capacity</span> : null}
+                {status === "near" ? <span className="pm-capacity-flag pm-capacity-flag--near">Near capacity</span> : null}
+              </div>
+              <div className="pm-capacity-bar">
+                <div className={`pm-capacity-bar-fill pm-capacity-bar-fill--${status}`} style={{ width: `${percent}%` }} />
+              </div>
+            </>
+          ) : (
+            <div className="pm-capacity-numbers pm-capacity-numbers--no-target">
+              <strong>{openCount}</strong> open issues
+              <span className="pm-capacity-no-target-note">No capacity target set</span>
+            </div>
+          )}
+          <RiskFlags overdueCount={overdueCount} blockedCount={blockedCount} staleCount={staleCount} />
+          <StatusBreakdown statusCounts={statusCounts} />
+        </>
       )}
     </div>
   );
@@ -82,6 +128,7 @@ const ProjectManagers = () => {
 
   const overCount = items.filter((item) => !item.error && capacityStatus(item.openCount, item.capacity) === "over").length;
   const withTargetCount = items.filter((item) => item.capacity !== null && item.capacity !== undefined).length;
+  const staleTotalCount = items.reduce((sum, item) => sum + (item.staleCount || 0), 0);
 
   // Over-capacity first, then near, then ok, then no-target entries last
   // (nothing to rank them by) - within each group, higher open count first.
@@ -102,9 +149,10 @@ const ProjectManagers = () => {
       </Header>
       <p className="ww-copy">
         Capacity planning: shows every Contributor Metrics entry's current open-issue count,
-        compared against a capacity target where one is set in Settings → Contributor Metrics.
-        Entries without a target still show up here with their live count — just without a
-        comparison bar, since there's nothing to compare against yet.
+        status breakdown, and risk signals (overdue, blocked, stale) — compared against a
+        capacity target where one is set in Settings → Contributor Metrics. A raw count alone
+        doesn't say whether work is actually moving; the breakdown does. Entries without a
+        capacity target still show up here with their live data, just without a comparison bar.
       </p>
 
       <Segment>
@@ -114,7 +162,7 @@ const ProjectManagers = () => {
               ? "Loading…"
               : `${items.length} entr${items.length === 1 ? "y" : "ies"} · ${withTargetCount} with a capacity target${
                   overCount > 0 ? ` · ${overCount} over capacity` : ""
-                }`}
+                }${staleTotalCount > 0 ? ` · ${staleTotalCount} stale issues total` : ""}`}
           </span>
           <Button size="small" basic onClick={load} loading={loading} disabled={loading}>
             Refresh
