@@ -52,45 +52,29 @@ const buildScopeJql = (watched) => {
 
 const buildOpenCountJql = (scopeJql) => (scopeJql ? `(${scopeJql}) AND statusCategory != Done` : "");
 
-// A PM deciding whether someone can take on new work needs THREE numbers:
-// their share of THIS project/query (computeIssueBreakdown, below), their
-// load within the same Jira PROJECT more broadly (this query might be a
-// narrow slice of a project - e.g. only summary-matching issues - while
-// the project as a whole has more of their work), and their total open
-// workload everywhere else too. This fetches the second and third numbers
-// for the top contributors in ONE batched query (assignee in (...) AND
-// statusCategory != Done, no scope restriction - deliberately
-// cross-project), splitting the same fetched issues into "matches
-// dominantProjectKey" vs. everything, rather than a second batched call -
-// one extra Jira round-trip total, not two, and not one per person, which
-// would multiply calls by contributor count on entries with many people
-// (one real entry here has 20+).
+// A PM deciding whether someone can take on new work needs two numbers:
+// their share of THIS project/query (computeIssueBreakdown, below) and
+// their total open workload everywhere else too - a person could look
+// lightly loaded within one project while already buried elsewhere. This
+// fetches the second number for the top contributors in one batched
+// query (assignee in (...) AND statusCategory != Done, no scope
+// restriction - deliberately cross-project), rather than one query per
+// person, which would multiply calls by contributor count on entries
+// with many people (one real entry here has 20+).
+//
+// A middle "in project" tier was tried between these two (deriving the
+// dominant project from the query's own issue keys) and removed per user
+// feedback - three numbers this close together read as noise, not
+// signal, on a real card. Keeping just the two that were asked for.
 const CONTRIBUTOR_TOTAL_LIMIT = 6;
 
-// Every issue key is "PROJECTKEY-NUMBER" - the project a query is "about"
-// is derived from whichever project key appears most often in that
-// query's own results, not parsed out of the JQL text itself (which can
-// be arbitrarily complex - summary matches, parent lookups, OR chains -
-// and doesn't reliably name a single project in a simple, parseable way).
-const dominantProjectKeyFor = (issues) => {
-  const counts = {};
-  for (const issue of issues || []) {
-    const key = String(issue?.key || "");
-    const projectKey = key.includes("-") ? key.split("-")[0] : "";
-    if (!projectKey) continue;
-    counts[projectKey] = (counts[projectKey] || 0) + 1;
-  }
-  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  return entries.length > 0 ? entries[0][0] : "";
-};
-
-const fetchContributorTotalWorkloads = async ({ contributorCounts, dominantProjectKey, runJiraSearchRequest }) => {
+const fetchContributorTotalWorkloads = async ({ contributorCounts, runJiraSearchRequest }) => {
   const names = Object.keys(contributorCounts || {})
     .filter((name) => name !== "Unassigned")
     .sort((a, b) => contributorCounts[b] - contributorCounts[a])
     .slice(0, CONTRIBUTOR_TOTAL_LIMIT);
   if (names.length === 0) {
-    return { totals: {}, projectTotals: {} };
+    return {};
   }
 
   const nameList = names.map((name) => `"${escapeJqlString(name)}"`).join(", ");
@@ -99,20 +83,16 @@ const fetchContributorTotalWorkloads = async ({ contributorCounts, dominantProje
   try {
     const { issues } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 500 });
     const totals = {};
-    const projectTotals = {};
     for (const issue of issues || []) {
       const assigneeName = String(issue?.fields?.assignee?.displayName || "").trim();
       if (!assigneeName) continue;
       totals[assigneeName] = (totals[assigneeName] || 0) + 1;
-      if (dominantProjectKey && String(issue?.key || "").startsWith(`${dominantProjectKey}-`)) {
-        projectTotals[assigneeName] = (projectTotals[assigneeName] || 0) + 1;
-      }
     }
-    return { totals, projectTotals };
+    return totals;
   } catch {
     // Non-fatal - the card still shows in-scope numbers fine without
     // totals; a failed total-workload lookup shouldn't break the entry.
-    return { totals: {}, projectTotals: {} };
+    return {};
   }
 };
 
@@ -210,8 +190,6 @@ export const fetchCapacityWorkloads = async ({ watchedRows, jiraRequest, runJira
           statusCounts: {},
           contributorCounts: {},
           contributorTotalCounts: {},
-          contributorProjectCounts: {},
-          dominantProjectKey: "",
           overdueCount: 0,
           blockedCount: 0,
           staleCount: 0,
@@ -221,20 +199,15 @@ export const fetchCapacityWorkloads = async ({ watchedRows, jiraRequest, runJira
       }
       const { issues } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 500 });
       const breakdown = computeIssueBreakdown(issues || []);
-      const dominantProjectKey = dominantProjectKeyFor(issues);
-      const { totals: contributorTotalCounts, projectTotals: contributorProjectCounts } =
-        await fetchContributorTotalWorkloads({
-          contributorCounts: breakdown.contributorCounts,
-          dominantProjectKey,
-          runJiraSearchRequest,
-        });
+      const contributorTotalCounts = await fetchContributorTotalWorkloads({
+        contributorCounts: breakdown.contributorCounts,
+        runJiraSearchRequest,
+      });
       results.push({
         ...base,
         openCount: (issues || []).length,
         ...breakdown,
         contributorTotalCounts,
-        contributorProjectCounts,
-        dominantProjectKey,
         error: null,
       });
     } catch (error) {
@@ -244,8 +217,6 @@ export const fetchCapacityWorkloads = async ({ watchedRows, jiraRequest, runJira
         statusCounts: {},
         contributorCounts: {},
         contributorTotalCounts: {},
-        contributorProjectCounts: {},
-        dominantProjectKey: "",
         overdueCount: 0,
         blockedCount: 0,
         staleCount: 0,

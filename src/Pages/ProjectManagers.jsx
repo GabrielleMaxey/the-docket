@@ -136,14 +136,7 @@ const RiskFlags = ({ scopeJql, displayName, overdueCount, blockedCount, staleCou
 // to one person) has nothing to break down.
 const CONTRIBUTOR_BREAKDOWN_LIMIT = 6;
 
-const ContributorBreakdown = ({
-  scopeJql,
-  displayName,
-  contributorCounts,
-  contributorTotalCounts,
-  contributorProjectCounts,
-  dominantProjectKey,
-}) => {
+const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contributorTotalCounts }) => {
   const entries = Object.entries(contributorCounts || {}).sort((a, b) => b[1] - a[1]);
   if (entries.length <= 1) return null;
   const shown = entries.slice(0, CONTRIBUTOR_BREAKDOWN_LIMIT);
@@ -165,24 +158,17 @@ const ContributorBreakdown = ({
         const assigneeClause = name === "Unassigned" ? "assignee is EMPTY" : `assignee = "${escapeJqlString(name)}"`;
         const clause = `${assigneeClause} AND statusCategory != Done`;
         const href = drillDownHref(scopeJql, clause, `${displayName} — ${name}`);
-        // Three tiers, narrowest to broadest: this query's own filters
-        // (e.g. only summary-matching issues), the wider Jira project
-        // this query lives in (dominantProjectKey - a project can hold
-        // plenty of a person's work this query's own filters don't
-        // happen to match), and everywhere with no restriction at all.
-        // Confirmed live these genuinely diverge, not just in theory: one
-        // real person here shows 4 in this specific query, 23 more
-        // broadly in the same project, and 35 total everywhere.
-        const projectCount = contributorProjectCounts?.[name];
+        // Total workload (unscoped - no project/query restriction at all)
+        // is what actually answers "do they have room for new work?" - a
+        // low in-scope number can hide someone who's already buried
+        // elsewhere (confirmed live: one real person here shows 8 in this
+        // query but 43 open everywhere). Only fetched for the top
+        // contributors shown here, not everyone in contributorCounts.
+        // (A middle "in project" tier was tried between these two and
+        // removed per user feedback - three numbers this close together
+        // read as noise, not signal; two clear numbers work better.)
         const total = contributorTotalCounts?.[name];
-        const hasProjectCount = name !== "Unassigned" && dominantProjectKey && typeof projectCount === "number";
         const hasTotal = name !== "Unassigned" && typeof total === "number";
-        const projectHref = hasProjectCount
-          ? buildWorkWeekHref({
-              jql: `assignee = "${escapeJqlString(name)}" AND project = "${escapeJqlString(dominantProjectKey)}" AND statusCategory != Done`,
-              label: `${name} — All open work in ${dominantProjectKey}`,
-            })
-          : null;
         const totalHref = hasTotal
           ? buildWorkWeekHref({ jql: `assignee = "${escapeJqlString(name)}" AND statusCategory != Done`, label: `${name} — All open work` })
           : null;
@@ -203,18 +189,6 @@ const ContributorBreakdown = ({
               ) : (
                 <span title="Open issues within this query">{count} here</span>
               )}
-              {hasProjectCount ? (
-                <>
-                  {" · "}
-                  <Link
-                    to={projectHref}
-                    className="pm-contributor-row-project"
-                    title={`Total open issues in ${dominantProjectKey}`}
-                  >
-                    {projectCount} in {dominantProjectKey}
-                  </Link>
-                </>
-              ) : null}
               {hasTotal ? (
                 <>
                   {" · "}
@@ -242,8 +216,6 @@ const CapacityCard = ({ item }) => {
     statusCounts,
     contributorCounts,
     contributorTotalCounts,
-    contributorProjectCounts,
-    dominantProjectKey,
     overdueCount,
     blockedCount,
     staleCount,
@@ -295,8 +267,6 @@ const CapacityCard = ({ item }) => {
             displayName={displayName}
             contributorCounts={contributorCounts}
             contributorTotalCounts={contributorTotalCounts}
-            contributorProjectCounts={contributorProjectCounts}
-            dominantProjectKey={dominantProjectKey}
           />
         </>
       )}
