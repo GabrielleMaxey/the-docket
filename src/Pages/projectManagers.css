@@ -223,6 +223,8 @@
 }
 
 .pm-contributor-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -238,7 +240,9 @@
 }
 
 .pm-contributor-row-counts {
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  min-width: 148px;
+  text-align: right;
   color: #64748b;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

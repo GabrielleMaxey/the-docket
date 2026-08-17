@@ -221,14 +221,18 @@ const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contri
                 // failing to resolve for this specific person (confirmed
                 // live, and confirmed by the user as an expected quirk
                 // for at least one real name) - saying so plainly beats
-                // guessing at a number that might be wrong.
+                // guessing at a number that might be wrong. "N/A total"
+                // (not just "N/A") keeps the same "<value> total" shape
+                // every other row uses, so the label rhythm down the
+                // column stays consistent even where the value itself
+                // can't be shown.
                 <>
                   {" · "}
                   <span
                     className="pm-contributor-row-total pm-contributor-row-total--unknown"
                     title="Couldn't resolve this person's total workload"
                   >
-                    total unknown
+                    N/A total
                   </span>
                 </>
               )}
