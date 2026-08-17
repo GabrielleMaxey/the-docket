@@ -317,6 +317,63 @@ const CapacityCard = ({ item }) => {
   );
 };
 
+// One legend covering every color/icon/label convention used on these
+// cards, rather than expecting a PM to infer what a color or an
+// abbreviation means from context. Collapsed by default (not persisted -
+// this is a "check when needed" reference, not a preference worth
+// remembering across visits, same treatment as the contributor
+// breakdown's own expand toggle) so it doesn't compete for space with
+// the actual data on repeat visits.
+const KeyLegend = () => {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="pm-key">
+      <button type="button" className="pm-key-toggle" onClick={() => setOpen((v) => !v)}>
+        {open ? "Hide key" : "Show key"}
+      </button>
+      {open ? (
+        <div className="pm-key-body">
+          <div className="pm-key-section">
+            <div className="pm-key-section-label">Capacity bar</div>
+            <div className="pm-key-row">
+              <span className="pm-key-swatch pm-key-swatch--ok" aria-hidden="true" />
+              Within capacity
+            </div>
+            <div className="pm-key-row">
+              <span className="pm-key-swatch pm-key-swatch--near" aria-hidden="true" />
+              Near capacity (85%+ of target)
+            </div>
+            <div className="pm-key-row">
+              <span className="pm-key-swatch pm-key-swatch--over" aria-hidden="true" />
+              Over capacity
+            </div>
+          </div>
+          <div className="pm-key-section">
+            <div className="pm-key-section-label">Risk flags</div>
+            <div className="pm-key-row">⚠️ Overdue — past its due date</div>
+            <div className="pm-key-row">🚧 Blocked — status is Blocked or On Hold</div>
+            <div className="pm-key-row">💤 Stale — not updated in 14+ days</div>
+          </div>
+          <div className="pm-key-section">
+            <div className="pm-key-section-label">Share of this query</div>
+            <div className="pm-key-row">
+              <strong>N here</strong> — that person's open issues within this specific query
+            </div>
+            <div className="pm-key-row">
+              <strong>N total</strong> — all of that person's open issues everywhere, across every
+              project
+            </div>
+            <div className="pm-key-row">
+              <strong>N/A total</strong> — Jira couldn't resolve a total for that name; it's a data
+              gap, not a real zero
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const ProjectManagers = () => {
   const [allEntries, setAllEntries] = React.useState([]);
   const [entriesLoaded, setEntriesLoaded] = React.useState(false);
@@ -421,6 +478,8 @@ const ProjectManagers = () => {
         doesn't say whether work is actually moving; the breakdown does. Entries without a
         capacity target still show up here with their live data, just without a comparison bar.
       </p>
+
+      <KeyLegend />
 
       {allEntries.length > 0 ? (
         <Segment className="pm-selector">
