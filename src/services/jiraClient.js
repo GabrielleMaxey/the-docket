@@ -333,11 +333,6 @@ export const fetchEpicPresets = async () => {
   return data?.items || [];
 };
 
-// Resolves a preset's real scope JQL (epic-key fallback, Jira filter lookup,
-// or hand-authored JQL), with the trailing ORDER BY stripped. Wrap it
-// yourself: `(${scopeJql}) AND <clause>` - preset JQL can be an
-// unparenthesized OR chain, so appending a clause without wrapping only
-// scopes the last OR-branch.
 export const fetchEpicPresetScopeJql = async (epicPresetId) => {
   const id = String(epicPresetId || "").trim();
   if (!id) {
@@ -578,12 +573,7 @@ export const fetchEpicWorkload = async (epicKey) => {
   return requestJson(`/api/jira/epics/${encodeURIComponent(String(epicKey || "").trim())}/workload`);
 };
 
-// selectedIds omitted/null/undefined means "no filter" (fetch every
-// entry - the original, backward-compatible behavior). selectedIds as an
-// explicit empty array means the PM deliberately deselected everything,
-// which must return nothing, not silently fall back to "fetch all" -
-// short-circuits before the request entirely rather than relying on the
-// query-string construction to tell those two cases apart.
+// omitted/null selectedIds = all entries; [] = none (do not fetch).
 export const fetchCapacityPlanning = async (selectedIds) => {
   if (Array.isArray(selectedIds) && selectedIds.length === 0) {
     return [];

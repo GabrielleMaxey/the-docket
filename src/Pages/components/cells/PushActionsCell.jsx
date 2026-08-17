@@ -1,9 +1,5 @@
 import React from "react";
 
-// Push-to-Jira checkbox + "Push note" / "Save to DB" buttons, plus inline
-// status messages for those two async actions. Status/assignee update
-// confirmations are shown locally in StatusCell/AssigneeCell instead —
-// showing them here too would duplicate the same message across the row.
 const PushActionsCell = ({
   issueKey,
   isClosedOrResolved,

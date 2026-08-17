@@ -406,10 +406,7 @@
   margin-top: 0.15rem;
 }
 
-/* StatusPieChart's own CSS lives in Dashboard/dashboard.css, which is only
-   loaded on the Dashboard page - re-scoped here the same way report.css
-   already re-scopes it for Work Week/Past Reports, rather than importing
-   an unrelated page's stylesheet. */
+/* Re-scope Dashboard chart CSS here — dashboard.css is not loaded on Chat. */
 .epic-eval-panel .dashboard-pie-chart {
   display: flex;
   flex-wrap: wrap;
@@ -466,8 +463,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* MetricBar's dashboard-metric-row/dashboard-progress CSS, same re-scoping
-   approach report.css already uses for the same shared component. */
 .epic-eval-panel .dashboard-metric-row {
   margin-bottom: 0.5rem;
 }

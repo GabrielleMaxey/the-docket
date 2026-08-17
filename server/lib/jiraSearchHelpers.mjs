@@ -235,6 +235,7 @@ export const searchAllIssues = async ({ jql, runJiraSearchRequest, batchSize = 1
   const issues = [];
   let nextPageToken = "";
   let jiraTotal = null;
+  let reachedLastPage = false;
 
   while (issues.length < maxTotal) {
     const result = await runJiraSearchRequest(jql, {
@@ -261,23 +262,26 @@ export const searchAllIssues = async ({ jql, runJiraSearchRequest, batchSize = 1
     issues.push(...batch);
 
     if (batch.length === 0 || result.data?.isLast) {
+      reachedLastPage = true;
       break;
     }
 
     nextPageToken = String(result.data?.nextPageToken || "").trim();
     if (!nextPageToken) {
+      reachedLastPage = true;
       break;
     }
   }
 
-  const loaded = issues.length;
+  const loaded = Math.min(issues.length, maxTotal);
   const total = jiraTotal ?? loaded;
-  const isComplete = loaded >= total || loaded >= maxTotal;
+  // Hitting maxTotal is not complete — newer Jira search often omits `total`, so a leftover next page is the "more" signal.
+  const isComplete = reachedLastPage;
 
   return {
     issues: issues.slice(0, maxTotal),
     total,
-    loaded: Math.min(loaded, maxTotal),
+    loaded,
     isComplete,
   };
 };

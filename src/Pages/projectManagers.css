@@ -437,8 +437,6 @@
   flex-shrink: 0;
 }
 
-/* Same colors as .pm-capacity-bar-fill / --near / --over, so the swatch
-   always matches what a PM actually sees on the bars themselves. */
 .pm-key-swatch {
   width: 12px;
   height: 12px;

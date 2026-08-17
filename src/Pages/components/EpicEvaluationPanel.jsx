@@ -5,15 +5,8 @@ import StatusPieChart from "../../Components/StatusPieChart";
 import MetricBar from "../Dashboard/components/MetricBar";
 import { fetchEpicWorkload, searchEpics } from "../../services/jiraClient";
 
-// An exact issue key ("SYNC-41", "ODI-1234") should load directly rather
-// than go through search-as-you-type.
 const EXACT_ISSUE_KEY_RE = /^[A-Z][A-Z0-9]*-\d+$/i;
 
-// Persistent "Evaluate an Epic" panel for Chat: lets the user load a
-// specific Epic's full task tree (workload/timeline/contributors/cross-team
-// blockers) and keeps it visible while they ask follow-up questions in the
-// conversation below. onEpicLoaded/onEpicCleared let the parent Chat page
-// thread the loaded data into each outgoing chat message's epicContext.
 const EpicEvaluationPanel = ({ presets = [], onEpicLoaded, onEpicCleared }) => {
   const [epicKeyInput, setEpicKeyInput] = React.useState("");
   const [loading, setLoading] = React.useState(false);

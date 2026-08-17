@@ -1,10 +1,5 @@
 import React from "react";
 
-// Date/calendar-grid math for the header's mini calendar (the actual
-// rendering lives in TaskManagerHeaderPanel.jsx — this hook just supplies
-// the data). Extracted out of WorkWeekTasks.jsx for the same reason as
-// useJokeTicker: self-contained, unrelated to Jira task management.
-
 const getCalendarCells = (date) => {
   const year = date.getFullYear();
   const month = date.getMonth();

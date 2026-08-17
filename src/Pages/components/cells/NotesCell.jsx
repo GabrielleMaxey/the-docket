@@ -1,6 +1,5 @@
 import React from "react";
 
-// Notes textarea. See StatusCell.jsx for why this was extracted.
 const NotesCell = ({ issueKey, isClosedOrResolved, noteDraft, isNoteAlreadyPushed, onChange }) => (
   <td>
     {isClosedOrResolved ? (

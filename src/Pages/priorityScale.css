@@ -1,29 +1,5 @@
-/* ── Priority colour scale (P1 highest … P20 lowest) ─────────────────────────
-   This file is a DATA ENCODING, not UI chrome.
-
-   Do not fold these values into the general neutral/brand palette, and do not
-   include this file in any find-and-replace pass that retints chrome colours.
-   The scale carries meaning: warm = urgent, cool = deferrable, drained = none.
-   Retinting chrome toward a hue that already appears in this ramp silently
-   corrupts the encoding without breaking anything visibly.
-
-   Hue order and meaning are unchanged from the previous scale:
-   coral → orange → amber → yellow → lime → green → emerald → teal → cyan →
-   sky → blue → indigo → violet → purple → fuchsia → pink → drained neutral.
-
-   Only intensity was retuned. The warm end (P1–P5) now sits on the brand
-   palette (#F95E4A / #FB9429 / #FDD219); the cool mid-range resolves toward
-   brand teal (#2AEDE5) and blue (#0c93d9); P18–P20 drain to a TRUE neutral gray rather
-   than blue-slate, so the lowest band reads as absence of hue and stays clear
-   of both the teal-leaning chrome palette and the P9–P12 cool band.
-
-   Row tints sit at ~92–96% lightness so cell text stays legible.
-   Badge fills are the saturated stops of the same hues.
-
-   Class names are emitted by priorityTierClass() in
-   src/Pages/hooks/useTaskManagerJira.js, bounded by MAX_ISSUE_PRIORITY
-   in shared/issuePriority.mjs. If that constant changes, this file must
-   gain or lose steps to match.
+/* Priority colours are a data encoding, not UI chrome — do not fold into a palette retint.
+   Class names come from priorityTierClass(); keep steps in sync with MAX_ISSUE_PRIORITY.
 */
 
 :root {

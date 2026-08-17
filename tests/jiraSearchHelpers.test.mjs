@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { fetchJiraUserByAccountId, resolveJiraUser } from "../server/lib/jiraSearchHelpers.mjs";
+import { fetchJiraUserByAccountId, resolveJiraUser, searchAllIssues } from "../server/lib/jiraSearchHelpers.mjs";
 
 const ACCOUNT_ID = "712020:b5670baa-3192-4606-903a-8fa037076b6f";
 
@@ -41,5 +41,42 @@ describe("resolveJiraUser", () => {
       jiraRequest: async () => ({ ok: false, data: { errorMessages: ["not found"] } }),
     });
     assert.equal(user, null);
+  });
+});
+
+describe("searchAllIssues", () => {
+  it("marks isComplete false when the cap is hit and Jira has another page", async () => {
+    const result = await searchAllIssues({
+      jql: "project = ODI",
+      maxTotal: 2,
+      batchSize: 2,
+      runJiraSearchRequest: async () => ({
+        ok: true,
+        data: {
+          issues: [{ key: "ODI-1" }, { key: "ODI-2" }],
+          isLast: false,
+          nextPageToken: "next",
+        },
+      }),
+    });
+    assert.equal(result.loaded, 2);
+    assert.equal(result.isComplete, false);
+  });
+
+  it("marks isComplete true when Jira reports the last page", async () => {
+    const result = await searchAllIssues({
+      jql: "project = ODI",
+      maxTotal: 2,
+      batchSize: 2,
+      runJiraSearchRequest: async () => ({
+        ok: true,
+        data: {
+          issues: [{ key: "ODI-1" }],
+          isLast: true,
+        },
+      }),
+    });
+    assert.equal(result.loaded, 1);
+    assert.equal(result.isComplete, true);
   });
 });

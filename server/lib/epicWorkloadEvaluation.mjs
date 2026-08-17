@@ -1,8 +1,3 @@
-// Epic workload/timeline evaluation - fetches an Epic's full descendant
-// tree (Epic -> Story -> Task/Sub-task, matching ODI's three-level Jira
-// hierarchy) and flags cross-team blocker candidates, for Chat's persistent
-// "Evaluate an Epic" panel.
-
 import { searchAllIssues, fetchIssuesByKeys, fetchEpicIssue } from "./jiraSearchHelpers.mjs";
 import { isEpicIssueType } from "../../shared/dashboardMetrics.mjs";
 
@@ -17,19 +12,12 @@ export const buildDescendantFieldIds = (mappingsByRole) =>
     .map((value) => String(value || "").trim())
     .filter(Boolean);
 
-// "ODI-1234" -> "ODI". Used to compare an issue's own project against a
-// linked issue's project, as the cross-team-blocker signal.
 export const getProjectKeyFromIssueKey = (issueKey) => {
   const match = String(issueKey || "").trim().match(/^([A-Z][A-Z0-9_]*)-\d+$/);
   return match ? match[1] : "";
 };
 
-// Cross-team blocker candidates: issue links pointing to a DIFFERENT Jira
-// project than the epic's own. This is a reasonable proxy for "involves
-// another team" - in this org, different Jira project keys generally line
-// up with different teams - but it is a proxy, not certain knowledge: a
-// same-project link can still involve another team, and mentions of another
-// team in free-text comments/descriptions are not checked at all.
+// Cross-project issue links as a proxy for another team — not comments, and not same-project links.
 export const detectCrossTeamLinks = (issue, ownProjectKey) => {
   const links = Array.isArray(issue?.fields?.issuelinks) ? issue.fields.issuelinks : [];
   const found = [];
@@ -59,11 +47,6 @@ export const detectCrossTeamLinks = (issue, ownProjectKey) => {
   return found;
 };
 
-// Fetches every descendant of an Epic (Story -> Task/Sub-task), enriched
-// with the fields needed for workload/timeline/blocker evaluation. Two-step
-// parent walk, matching the app's established three-level hierarchy
-// (Epic -> Story -> Task): direct children first (Epic Link or parent =
-// epic), then grandchildren (parent in <direct Story children>).
 export const fetchEpicDescendants = async ({
   epicKey,
   mappingsByRole,
@@ -110,9 +93,6 @@ export const fetchEpicDescendants = async ({
   return fetchIssuesByKeys({ keys: allKeys, jiraRequest, fields });
 };
 
-// Validates epicKey resolves to a real Epic and returns it with the fields
-// evaluation needs (summary, status, IDD/MRD/PED). Returns null if the key
-// doesn't exist or isn't an Epic - caller decides how to surface that.
 export const fetchAndValidateEpic = async ({ epicKey, mappingsByRole, jiraRequest }) => {
   const key = String(epicKey || "").trim().toUpperCase();
   if (!key) {
