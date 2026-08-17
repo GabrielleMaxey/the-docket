@@ -363,3 +363,77 @@
   color: #0c93d9;
   font-weight: 600;
 }
+
+.pm-key {
+  margin-bottom: 1rem;
+}
+
+.pm-key-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #0c93d9;
+  cursor: pointer;
+}
+
+.pm-key-toggle:hover {
+  text-decoration: underline;
+}
+
+.pm-key-body {
+  margin-top: 0.6rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.pm-key-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-bottom: 0.4rem;
+}
+
+.pm-key-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #475569;
+  line-height: 1.5;
+  margin-bottom: 0.25rem;
+}
+
+.pm-key-row strong {
+  color: #0f172a;
+  flex-shrink: 0;
+}
+
+/* Same colors as .pm-capacity-bar-fill / --near / --over, so the swatch
+   always matches what a PM actually sees on the bars themselves. */
+.pm-key-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.pm-key-swatch--ok {
+  background: #0c93d9;
+}
+
+.pm-key-swatch--near {
+  background: #d69e2e;
+}
+
+.pm-key-swatch--over {
+  background: #d1442d;
+}
