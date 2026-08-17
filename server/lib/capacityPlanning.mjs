@@ -53,13 +53,23 @@ const buildScopeJql = (watched) => {
 const buildOpenCountJql = (scopeJql) => (scopeJql ? `(${scopeJql}) AND statusCategory != Done` : "");
 
 // Computed entirely from fields the default search field set
-// (getJiraSearchFields) already returns - status, duedate, updated - so
-// this adds zero extra Jira calls beyond the one search per entry that
-// already existed. All input issues are open by construction (the JQL
-// itself filters statusCategory != Done), so every issue here counts
-// toward exactly one status bucket, never a "closed" bucket.
+// (getJiraSearchFields) already returns - status, duedate, updated,
+// assignee - so this adds zero extra Jira calls beyond the one search per
+// entry that already existed. All input issues are open by construction
+// (the JQL itself filters statusCategory != Done), so every issue here
+// counts toward exactly one status bucket, never a "closed" bucket.
+//
+// contributorCounts groups the SAME open issues by assignee - this is
+// each person's share of THIS entry's query specifically, not their
+// total workload across every project. A jql-type entry scoped to one
+// initiative (e.g. a specific project or label) will only ever see the
+// slice of a person's work that falls inside that scope; the same person
+// could have a much larger total workload sitting entirely outside it.
+// The client is responsible for labeling this accordingly rather than
+// presenting it as anyone's whole plate.
 const computeIssueBreakdown = (issues) => {
   const statusCounts = {};
+  const contributorCounts = {};
   let overdueCount = 0;
   let blockedCount = 0;
   let staleCount = 0;
@@ -69,6 +79,9 @@ const computeIssueBreakdown = (issues) => {
   for (const issue of issues) {
     const statusName = getIssueStatusName(issue) || "Unknown";
     statusCounts[statusName] = (statusCounts[statusName] || 0) + 1;
+
+    const assigneeName = String(issue?.fields?.assignee?.displayName || "Unassigned").trim() || "Unassigned";
+    contributorCounts[assigneeName] = (contributorCounts[assigneeName] || 0) + 1;
 
     if (BLOCKED_STATUS_PATTERN.test(statusName)) {
       blockedCount += 1;
@@ -91,7 +104,7 @@ const computeIssueBreakdown = (issues) => {
     }
   }
 
-  return { statusCounts, overdueCount, blockedCount, staleCount };
+  return { statusCounts, contributorCounts, overdueCount, blockedCount, staleCount };
 };
 
 // Returns [{ id, displayName, watchType, capacity, openCount, statusCounts,
@@ -131,6 +144,7 @@ export const fetchCapacityWorkloads = async ({ watchedRows, jiraRequest, runJira
           ...base,
           openCount: 0,
           statusCounts: {},
+          contributorCounts: {},
           overdueCount: 0,
           blockedCount: 0,
           staleCount: 0,
@@ -146,6 +160,7 @@ export const fetchCapacityWorkloads = async ({ watchedRows, jiraRequest, runJira
         ...base,
         openCount: 0,
         statusCounts: {},
+        contributorCounts: {},
         overdueCount: 0,
         blockedCount: 0,
         staleCount: 0,
