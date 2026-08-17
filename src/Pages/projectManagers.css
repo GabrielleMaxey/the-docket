@@ -255,6 +255,17 @@
   text-decoration: underline;
 }
 
+.pm-contributor-row-project {
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+}
+
+.pm-contributor-row-project:hover {
+  color: #0c93d9;
+  text-decoration: underline;
+}
+
 .pm-contributor-more {
   font-size: 0.75rem;
   color: #94a3b8;
