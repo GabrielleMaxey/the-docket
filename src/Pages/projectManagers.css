@@ -76,6 +76,15 @@
   margin-bottom: 0.4rem;
 }
 
+.pm-capacity-numbers--no-target {
+  margin-bottom: 0;
+}
+
+.pm-capacity-no-target-note {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
 .pm-capacity-flag {
   font-size: 0.68rem;
   font-weight: 700;
