@@ -152,13 +152,25 @@
   background: #f1f5f9;
 }
 
+.pm-status-breakdown-wrap {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.pm-status-breakdown-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-bottom: 0.4rem;
+}
+
 .pm-status-breakdown {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 0.75rem;
-  margin-top: 0.6rem;
-  padding-top: 0.6rem;
-  border-top: 1px solid #f1f5f9;
   font-size: 0.75rem;
   color: #64748b;
 }
