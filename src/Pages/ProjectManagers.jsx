@@ -50,11 +50,22 @@ const capacityStatus = (openCount, capacity) => {
 // Top few status labels by count, most-populated first - a raw open count
 // alone doesn't say whether that work is actually moving. "35 open" reads
 // very differently once it's "28 Backlog, 7 In Progress".
+//
+// This and ContributorBreakdown below are two independent slices of the
+// SAME open-issue set - one by status, one by assignee - not a sequence
+// where one continues where the other leaves off. A single issue is
+// counted in exactly one bucket here AND exactly one bucket there, at the
+// same time (e.g. an issue can be both "Backlog" here and "Unassigned"
+// below). Without a label distinguishing them, this could easily be
+// misread as items 6+ following on from the status list above it -
+// hence the explicit "By status" / "…by assignee" labels on each.
 const StatusBreakdown = ({ scopeJql, displayName, statusCounts }) => {
   const entries = Object.entries(statusCounts || {}).sort((a, b) => b[1] - a[1]);
   if (entries.length === 0) return null;
   return (
-    <div className="pm-status-breakdown">
+    <div className="pm-status-breakdown-wrap">
+      <div className="pm-status-breakdown-label">By status</div>
+      <div className="pm-status-breakdown">
       {entries.map(([label, count], index) => {
         const href = drillDownHref(scopeJql, `status = "${escapeJqlString(label)}"`, `${displayName} — ${label}`);
         const inner = (
@@ -77,6 +88,7 @@ const StatusBreakdown = ({ scopeJql, displayName, statusCounts }) => {
           </span>
         );
       })}
+      </div>
     </div>
   );
 };
@@ -155,7 +167,7 @@ const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contri
 
   return (
     <div className="pm-contributor-breakdown">
-      <div className="pm-contributor-breakdown-label">Share of this query</div>
+      <div className="pm-contributor-breakdown-label">Share of this query, by assignee</div>
       {shown.map(([name, count]) => {
         // "Unassigned" isn't a literal assignee name in Jira - it must be
         // queried as assignee is EMPTY, not assignee = "Unassigned" (a
@@ -355,7 +367,12 @@ const KeyLegend = () => {
             <div className="pm-key-row">💤 Stale — not updated in 14+ days</div>
           </div>
           <div className="pm-key-section">
-            <div className="pm-key-section-label">Share of this query</div>
+            <div className="pm-key-section-label">Share of this query, by assignee</div>
+            <div className="pm-key-row">
+              <strong>Two separate lists</strong> — "By status" and "…by assignee" are two
+              different breakdowns of the same issues, not one continuing list. A single issue
+              counts in one status bucket and one assignee bucket at the same time.
+            </div>
             <div className="pm-key-row">
               <strong>N here</strong> — that person's open issues within this specific query
             </div>
