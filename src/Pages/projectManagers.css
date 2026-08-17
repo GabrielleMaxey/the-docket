@@ -36,7 +36,7 @@
 .pm-capacity-card {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 0.85rem 1rem;
+  padding: 0.85rem 1rem 1.25rem;
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
