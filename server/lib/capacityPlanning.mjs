@@ -22,13 +22,15 @@ const escapeJqlString = (value) =>
 const STALE_DAYS_THRESHOLD = 14;
 const BLOCKED_STATUS_PATTERN = /blocked|on\s*hold/i;
 
-// Builds an "open issues" JQL for one watched entry (person or jql type -
-// direct_reports entries are filtered out by the caller before this is
-// ever called, since that type expands into multiple people elsewhere and
-// doesn't map 1:1 to a single row/card the way these two do). The entry's
-// own JQL is reused as the assignee scope for jql-type watches, with an
-// open-status filter appended (rather than trusting the saved JQL to
-// already be open-only, since some saved queries intentionally aren't).
+// Builds the bare assignee/reporter/query scope for one watched entry
+// (person or jql type - direct_reports entries are filtered out by the
+// caller before this is ever called, since that type expands into
+// multiple people elsewhere and doesn't map 1:1 to a single row/card the
+// way these two do), WITHOUT any status filter - callers append their own
+// (open-only, a specific status, overdue, etc.) so the same scope can
+// back the open-count query, the status-breakdown drill-down links, and
+// the risk-flag drill-down links, without three different places
+// independently reconstructing what "this entry's issues" means.
 //
 // Any trailing ORDER BY must be stripped before wrapping the scope in
 // parens and appending more conditions - ORDER BY can only appear once,
@@ -37,16 +39,18 @@ const BLOCKED_STATUS_PATTERN = /blocked|on\s*hold/i;
 // "reporter = X ORDER BY updated DESC" confirmed this fails with a JQL
 // syntax error otherwise ("Expecting ')' but got 'ORDER'") - caught by
 // actually testing this against Jira, not just by reading the code.
-const buildOpenCountJql = (watched) => {
+const buildScopeJql = (watched) => {
   if (watched.watchType === "jql") {
     const raw = String(watched.jql || "").trim();
     if (!raw) return "";
     const { scope } = splitTrailingOrderBy(raw);
-    return `(${scope}) AND statusCategory != Done`;
+    return scope;
   }
   const name = String(watched.displayName || "").trim();
-  return name ? `assignee = "${escapeJqlString(name)}" AND statusCategory != Done` : "";
+  return name ? `assignee = "${escapeJqlString(name)}"` : "";
 };
+
+const buildOpenCountJql = (scopeJql) => (scopeJql ? `(${scopeJql}) AND statusCategory != Done` : "");
 
 // Computed entirely from fields the default search field set
 // (getJiraSearchFields) already returns - status, duedate, updated - so
@@ -108,14 +112,20 @@ export const fetchCapacityWorkloads = async ({ watchedRows, jiraRequest, runJira
   const results = [];
   for (const watched of rows) {
     const hasCapacity = watched.capacity !== null && watched.capacity !== undefined;
+    const scopeJql = buildScopeJql(watched);
     const base = {
       id: watched.id,
       displayName: watched.displayName,
       watchType: watched.watchType,
       capacity: hasCapacity ? Number(watched.capacity) : null,
+      // The bare scope (no status filter) - the client builds its own
+      // drill-down JQL from this for each status/risk-flag link, so a
+      // click always reflects exactly the same "who/what" this card
+      // itself is scoped to.
+      scopeJql,
     };
     try {
-      const jql = buildOpenCountJql(watched);
+      const jql = buildOpenCountJql(scopeJql);
       if (!jql) {
         results.push({
           ...base,

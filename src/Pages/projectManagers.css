@@ -180,3 +180,19 @@
   border-radius: 2px;
   flex-shrink: 0;
 }
+
+.pm-status-breakdown-item--link,
+.pm-risk-flag {
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.pm-status-breakdown-item--link:hover {
+  color: #0c93d9;
+  text-decoration: underline;
+}
+
+.pm-risk-flag:hover {
+  filter: brightness(0.95);
+  text-decoration: none;
+}
