@@ -137,10 +137,16 @@ const RiskFlags = ({ scopeJql, displayName, overdueCount, blockedCount, staleCou
 const CONTRIBUTOR_BREAKDOWN_LIMIT = 6;
 
 const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contributorTotalCounts }) => {
+  const [expanded, setExpanded] = React.useState(false);
   const entries = Object.entries(contributorCounts || {}).sort((a, b) => b[1] - a[1]);
   if (entries.length <= 1) return null;
-  const shown = entries.slice(0, CONTRIBUTOR_BREAKDOWN_LIMIT);
-  const remaining = entries.length - shown.length;
+  // Total-workload lookups are only fetched server-side for the top 6
+  // (CONTRIBUTOR_TOTAL_LIMIT in capacityPlanning.mjs), to keep this one
+  // extra Jira call per entry regardless of contributor count - so rows
+  // beyond that, once expanded, correctly show only "N here" with no
+  // "· N total" rather than a fabricated or missing-looking number.
+  const shown = expanded ? entries : entries.slice(0, CONTRIBUTOR_BREAKDOWN_LIMIT);
+  const remaining = entries.length - Math.min(entries.length, CONTRIBUTOR_BREAKDOWN_LIMIT);
 
   return (
     <div className="pm-contributor-breakdown">
@@ -201,7 +207,11 @@ const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contri
           </div>
         );
       })}
-      {remaining > 0 ? <div className="pm-contributor-more">+{remaining} more</div> : null}
+      {remaining > 0 ? (
+        <button type="button" className="pm-contributor-more pm-contributor-more--toggle" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? "Show less" : `+${remaining} more`}
+        </button>
+      ) : null}
     </div>
   );
 };

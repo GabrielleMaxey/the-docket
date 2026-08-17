@@ -271,6 +271,21 @@
   padding-top: 0.2rem;
 }
 
+.pm-contributor-more--toggle {
+  background: none;
+  border: none;
+  padding: 0.2rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0c93d9;
+  cursor: pointer;
+  text-align: left;
+}
+
+.pm-contributor-more--toggle:hover {
+  text-decoration: underline;
+}
+
 .pm-selector {
   border: 1px solid #e2e8f0 !important;
   border-radius: 12px !important;
