@@ -35,6 +35,13 @@ import {
   buildParentDropdownFromCandidates,
   buildQueryIssueDropdownOptions,
 } from "../../../shared/jiraParentCandidates.mjs";
+import {
+  createEmptyAiHelperIntake,
+  listBlankOptionalIntakeFields,
+  normalizeAiHelperIntake,
+  validateAiHelperIntake,
+} from "../../../shared/aiHelperIntake.mjs";
+import AiHelperIntakePanel from "./AiHelperIntakePanel";
 import useCreateIssueManualKey from "../hooks/useCreateIssueManualKey";
 
 const COMPONENT_OPTIONS = toCreateIssueDropdownOptions(ODI_COMPONENT_OPTIONS);
@@ -206,6 +213,10 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   const [bugTrackingValue, setBugTrackingValue] = React.useState("");
   const [clarificationQuestions, setClarificationQuestions] = React.useState([]);
   const [needsClarification, setNeedsClarification] = React.useState(false);
+  const [useAiHelper, setUseAiHelper] = React.useState(false);
+  const [intakeValues, setIntakeValues] = React.useState(() => createEmptyAiHelperIntake("Story"));
+  const [intakeMissingFieldIds, setIntakeMissingFieldIds] = React.useState([]);
+  const [draftedFromIntake, setDraftedFromIntake] = React.useState(false);
   const [creatingSubtasks, setCreatingSubtasks] = React.useState(false);
   const [subtaskResults, setSubtaskResults] = React.useState([]);
 
@@ -375,6 +386,10 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     setBugTrackingValue("");
     setClarificationQuestions([]);
     setNeedsClarification(false);
+    setUseAiHelper(false);
+    setIntakeValues(createEmptyAiHelperIntake("Story"));
+    setIntakeMissingFieldIds([]);
+    setDraftedFromIntake(false);
   }, [open, defaultEpicSelectValue, resetParentState]);
 
   React.useEffect(() => {
@@ -471,6 +486,10 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     if (issueType === "Story") {
       setAssignee("");
     }
+    // Each issue type asks a different set of intake questions, so answers do not carry over.
+    setIntakeValues(createEmptyAiHelperIntake(issueType));
+    setIntakeMissingFieldIds([]);
+    setDraftedFromIntake(false);
   }, [issueType]);
 
   React.useEffect(() => {
@@ -730,7 +749,15 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       setError("Select and validate a parent before generating a description.");
       return;
     }
-    if (!summary.trim()) {
+    if (useAiHelper) {
+      const intakeCheck = validateAiHelperIntake(issueType, intakeValues);
+      if (!intakeCheck.valid) {
+        setIntakeMissingFieldIds(intakeCheck.missingFieldIds);
+        setError(intakeCheck.errors.join(" "));
+        return;
+      }
+      setIntakeMissingFieldIds([]);
+    } else if (!summary.trim()) {
       setError("Enter a title before generating a description.");
       return;
     }
@@ -748,17 +775,21 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
         issueType,
         epicKey: sourceEpicKey || parentKey,
         epicName,
+        intake: useAiHelper ? normalizeAiHelperIntake(issueType, intakeValues) : null,
       });
       if (result?.description) {
         setDescription(result.description);
       }
+      setDraftedFromIntake(useAiHelper);
       setNeedsClarification(Boolean(result?.needsClarification));
       if (Array.isArray(result?.questions) && result.questions.length > 0) {
         setClarificationQuestions(result.questions);
       } else {
         setClarificationQuestions([]);
       }
-      if (issueType === "Story" && result?.summary) {
+      // Story titles are always rewritten to job story format; other types only get a
+      // generated title when the AI helper supplied the raw material for one.
+      if ((issueType === "Story" || useAiHelper) && result?.summary) {
         setSummary(result.summary);
       }
       if (
@@ -918,7 +949,19 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     if (onCreated && createdParentKey) onCreated(createdParentKey);
   };
 
-  const canGenerate = canEditIssueFields && Boolean(summary.trim()) && !generatingDesc && !submitting;
+  const intakeCheck = React.useMemo(
+    () => validateAiHelperIntake(issueType, intakeValues),
+    [issueType, intakeValues]
+  );
+  const blankOptionalIntakeFields = React.useMemo(
+    () => (draftedFromIntake ? listBlankOptionalIntakeFields(issueType, intakeValues) : []),
+    [draftedFromIntake, issueType, intakeValues]
+  );
+  const canGenerate =
+    canEditIssueFields &&
+    (useAiHelper ? intakeCheck.valid : Boolean(summary.trim())) &&
+    !generatingDesc &&
+    !submitting;
   const formLoading = loadingMeta || submitting || generatingDesc || creatingSubtasks;
   const createdIssueUrl = buildJiraBrowseUrl(jiraBaseUrl, createdIssueKey);
 
@@ -937,6 +980,12 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
                 <a href={createdIssueUrl} target="_blank" rel="noopener noreferrer">
                   Open {createdIssueKey} in Jira to add more detail
                 </a>
+              </p>
+            ) : null}
+            {blankOptionalIntakeFields.length > 0 ? (
+              <p style={{ margin: "0.4rem 0", fontSize: "0.82rem", color: "#475569" }}>
+                Finish these on the issue in Jira:{" "}
+                {blankOptionalIntakeFields.map((field) => field.label).join(", ")}.
               </p>
             ) : null}
             {subtaskResults.length > 0 ? (
@@ -1124,17 +1173,69 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             </Message>
           ) : null}
 
-          <Form.Field required>
+          <Form.Field>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "0.5rem",
+                cursor: canEditIssueFields ? "pointer" : "not-allowed",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={useAiHelper}
+                disabled={!canEditIssueFields}
+                onChange={(e) => {
+                  setUseAiHelper(e.target.checked);
+                  setIntakeMissingFieldIds([]);
+                  if (!e.target.checked) {
+                    setDraftedFromIntake(false);
+                  }
+                  if (error) setError("");
+                }}
+                style={{ marginTop: "0.2rem", flexShrink: 0 }}
+              />
+              <span>
+                Use AI helper
+                <span style={{ fontWeight: 400, fontSize: "0.8rem", color: "#64748b" }}>
+                  {" — answer a few guided questions and let AI Draft write the title and description"}
+                </span>
+              </span>
+            </label>
+          </Form.Field>
+
+          {useAiHelper ? (
+            <AiHelperIntakePanel
+              issueType={issueType}
+              values={intakeValues}
+              disabled={!canEditIssueFields}
+              missingFieldIds={intakeMissingFieldIds}
+              onFieldChange={(fieldId, value) => {
+                setIntakeValues((prev) => ({ ...prev, [fieldId]: value }));
+                setIntakeMissingFieldIds((prev) => prev.filter((id) => id !== fieldId));
+                if (error) setError("");
+              }}
+            />
+          ) : null}
+
+          <Form.Field required={!useAiHelper}>
             <label>Title</label>
             <input type="text" value={summary} disabled={!canEditIssueFields}
               onChange={(e) => {
                 setSummary(e.target.value);
                 if (error) setError("");
               }}
-              placeholder={issueType === "Story"
+              placeholder={useAiHelper
+                ? "Optional — AI Draft writes this from your answers above"
+                : issueType === "Story"
                 ? "When <situation>, I want <motivation>, so I can <outcome>."
                 : "Short, specific title"} />
-            {issueType === "Story" ? (
+            {useAiHelper ? (
+              <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+                Leave blank and run AI Draft, or type your own — anything you write here is kept and used as context.
+              </p>
+            ) : issueType === "Story" ? (
               <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.25rem" }}>
                 ODI standard: Job Story with a clear ask and goal outcome. AI Draft asks 2–3 questions if those are not defined.
               </p>
@@ -1270,7 +1371,9 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
                 ))}
               </ul>
               <p style={{ margin: "0.45rem 0 0", color: "#475569", fontSize: "0.82rem" }}>
-                {issueType === "Story"
+                {useAiHelper
+                  ? "Answer these in the guided questions above, then click AI Draft again."
+                  : issueType === "Story"
                   ? "Answer these in the title or description (situation, ask, and result/goal), then click AI Draft again. Subtasks are suggested only after the story is fully defined."
                   : "Answer these in the title or description, then click AI Draft again."}
               </p>

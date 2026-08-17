@@ -173,7 +173,13 @@ The modal pre-selects a preset when you open it from an active Task Management J
 
 **3. Fill in details**
 
-- **Title** — required. Stories should use Job Story format; AI Draft can rewrite and ask 2–3 clarification questions if the ask/goal is unclear.
+- **Use AI helper** — optional checkbox above the Title. Ticking it opens a guided form so you can answer the standard prompts in your own words instead of writing a title from scratch:
+  - **Story** — *As a*, *I want*, *So that* are required; goal/why now, success criteria, in/out of scope, constraints, systems affected, and open questions are optional.
+  - **Bug** — what is broken, expected, and actual behavior are required; steps, environment, impact, and workaround are optional.
+  - **Task** — what needs doing and why it matters are required; definition of done, constraints, and components touched are optional.
+
+  Only the basic ask is required — leave any optional prompt blank and the AI omits that section rather than guessing. Blank prompts are listed back to you as a reminder to finish them on the Jira issue after it is created. With the helper on, **Title** becomes optional: click **✦ AI Draft** and the AI writes the title (Job Story format for Stories) and description from your answers. Everything it produces stays editable before you create.
+- **Title** — required unless the AI helper is on. Stories should use Job Story format; AI Draft can rewrite and ask 2–3 clarification questions if the ask/goal is unclear.
 - **Components**, **Vertical Components** — choose from the dropdown. **Components** must already exist on the ODI Jira project (free-text names are rejected).
 - **BUG Tracking** (Bug only) — pick a default or type a custom value.
 - **Description** — use **✦ AI Draft** or write your own. Description and goal validation errors (including “story not fully defined”) appear **below the Description field**, not at the top of the modal.
