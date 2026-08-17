@@ -182,16 +182,17 @@ function SectionPanel({ section }: { section: SectionId }) {
           holds credentials and SQLite data.
         </Text>
         <Grid columns={4} gap={12}>
-          <Stat value="5" label="JQL slots (Work Week)" />
-          <Stat value="5" label="App pages" tone="info" />
+          <Stat value="5" label="JQL slots (Task Management)" />
+          <Stat value="6" label="App tabs" tone="info" />
           <Stat value="5173" label="Vite dev UI port" tone="info" />
           <Stat value="8787" label="Express proxy (default)" tone="info" />
         </Grid>
         <Table
           headers={["Nav route", "Page", "Role"]}
           rows={[
-            ["/work-week", "Work Week", "Daily JQL run + issue table (default home)"],
-            ["/dashboard", "Dashboard", "Multi-preset metrics snapshot + reports"],
+            ["/work-week", "Task Management", "Daily JQL run + issue table (default home)"],
+            ["/dashboard", "Metrics", "Multi-preset metrics snapshot + reports"],
+            ["/project-managers", "Project Managers", "Capacity planning from Contributor Metrics entries"],
             ["/reports", "Past Reports", "Archived AI outputs + saved Chat replies"],
             ["/chat", "Chat", "Natural-language Jira Q&A with session context"],
             ["/settings", "Settings", "Presets, field mapping, chat config"],
@@ -202,7 +203,7 @@ function SectionPanel({ section }: { section: SectionId }) {
           <Text>
             Shared program priority (NORA, Ask Greg) will live in team Postgres/MySQL
             via a team API — spec in{" "}
-            <Text weight="semibold">docs/specs/team-priority-sync.md</Text>. Work Week
+            <Text weight="semibold">docs/specs/team-priority-sync.md</Text>. Task Management
             slots link explicitly to a shared program for team mode; all other slots
             stay local-only.
           </Text>
@@ -241,14 +242,14 @@ function SectionPanel({ section }: { section: SectionId }) {
           is for and where AI appears.
         </Text>
         <CollapsibleSection
-          title="Work Week"
+          title="Task Management"
           leading={<Swatch color="blue" />}
           defaultOpen
         >
           <Stack gap={8}>
             <Text>
               Up to <Text weight="semibold">5</Text> side-by-side JQL slots.
-              Table: status, assignee (Jira user search), P0–P10 priority, MRD
+              Table: status, assignee (Jira user search), P1–P20 priority, MRD
               column, notes, push-to-Jira comments.
             </Text>
             <Text size="small" tone="secondary">
@@ -261,7 +262,7 @@ function SectionPanel({ section }: { section: SectionId }) {
               overlapping issues.
             </Text>
             <Text size="small" tone="secondary">
-              AI: My Metrics · week plan · Create Issue AI Draft · Dashboard
+              AI: My Metrics · week plan · Create Issue AI Draft · Metrics
               drill-down (?key=, ?assignee=)
             </Text>
             <FileRow
@@ -270,7 +271,7 @@ function SectionPanel({ section }: { section: SectionId }) {
             />
           </Stack>
         </CollapsibleSection>
-        <CollapsibleSection title="Dashboard" leading={<Swatch color="green" />}>
+        <CollapsibleSection title="Metrics" leading={<Swatch color="green" />}>
           <Stack gap={8}>
             <Text>
               Select epic/JQL presets → Refresh status → snapshot metrics:
@@ -279,7 +280,7 @@ function SectionPanel({ section }: { section: SectionId }) {
               (no LLM).
             </Text>
             <Text size="small" tone="secondary">
-              Links drill to Work Week with hash-router query params.
+              Links drill to Task Management with hash-router query params.
             </Text>
             <FileRow
               label="Dashboard/index.jsx"
@@ -287,11 +288,23 @@ function SectionPanel({ section }: { section: SectionId }) {
             />
           </Stack>
         </CollapsibleSection>
+        <CollapsibleSection title="Project Managers" leading={<Swatch color="green" />}>
+          <Stack gap={8}>
+            <Text>
+              Capacity planning for Contributor Metrics entries: open workload,
+              optional capacity targets, status/assignee breakdowns, and risk signals.
+            </Text>
+            <FileRow
+              label="ProjectManagers.jsx"
+              path={`src/Pages/ProjectManagers.jsx`}
+            />
+          </Stack>
+        </CollapsibleSection>
         <CollapsibleSection title="Past Reports" leading={<Swatch color="purple" />}>
           <Stack gap={8}>
             <Text>
               Browse <Text weight="semibold">generated_reports</Text> in SQLite:
-              Work Week (project reports + week plans), Dashboard audience reports,
+              Task Management (project reports + week plans), Metrics audience reports,
               Ad-hoc Chat saves.
             </Text>
             <FileRow
@@ -375,6 +388,7 @@ function SectionPanel({ section }: { section: SectionId }) {
             ["jiraIssueRoutes.mjs", "Status, assignee, comments, create issue, AI description"],
             ["issueMetadataRoutes.mjs", "SQLite notes + priority bulk/read/write"],
             ["appConfigRoutes.mjs", "Settings, presets, field mappings, watched assignees"],
+            ["capacityPlanningRoutes.mjs", "Project Managers capacity endpoint"],
             ["dashboardRoutes.mjs", "POST refresh, GET metrics"],
             ["reportRoutes.mjs", "Generate report, project report, week plan, weekly digest, archive"],
             ["chatRoutes.mjs", "Chat, Rovo OAuth"],
@@ -414,10 +428,10 @@ function SectionPanel({ section }: { section: SectionId }) {
         <Table
           headers={["Table", "Purpose"]}
           rows={[
-            ["issue_metadata", "Local note + personal P0–P10 (all non-team slots)"],
+            ["issue_metadata", "Local note + personal P1–P20 (P0 = unranked)"],
             ["team_priority_cache (planned)", "TTL cache of last team bulk fetch when API down"],
-            ["epic_presets", "Saved epic/JQL presets (Settings, Dashboard, Chat)"],
-            ["dashboard_snapshots", "Cached metrics from last Dashboard refresh"],
+            ["epic_presets", "Saved epic/JQL presets (Settings, Metrics, Chat)"],
+            ["dashboard_snapshots", "Cached metrics from last Metrics refresh"],
             ["dashboard_epic_metrics", "Per-preset epic metrics rows"],
             ["dashboard_assignee_metrics", "Contributor metric rows"],
             ["field_mappings", "Jira custom field ID ↔ app date roles"],
@@ -491,7 +505,7 @@ function SectionPanel({ section }: { section: SectionId }) {
           High-signal paths from DEVELOPER_GUIDE.md — click to open in the editor.
         </Text>
         <CollapsibleSection
-          title="Work Week UI"
+          title="Task Management UI"
           count={6}
           leading={<Swatch color="blue" />}
           defaultOpen
@@ -505,12 +519,17 @@ function SectionPanel({ section }: { section: SectionId }) {
             <FileRow label="cells/ (Status, Assignee, Notes, Priority, Push)" path={`src/Pages/components/cells/AssigneeCell.jsx`} />
           </Stack>
         </CollapsibleSection>
-        <CollapsibleSection title="Dashboard" count={4} leading={<Swatch color="green" />}>
+        <CollapsibleSection title="Metrics" count={4} leading={<Swatch color="green" />}>
           <Stack gap={4}>
             <FileRow label="Dashboard/index.jsx" path={`src/Pages/Dashboard/index.jsx`} />
             <FileRow label="useDashboardRefresh.js" path={`src/Pages/Dashboard/hooks/useDashboardRefresh.js`} />
             <FileRow label="DueByHierarchicalList.jsx" path={`src/Pages/Dashboard/components/DueByHierarchicalList.jsx`} />
             <FileRow label="WeeklyDigestPanel.jsx" path={`src/Pages/Dashboard/components/WeeklyDigestPanel.jsx`} />
+          </Stack>
+        </CollapsibleSection>
+        <CollapsibleSection title="Project Managers" count={1} leading={<Swatch color="green" />}>
+          <Stack gap={4}>
+            <FileRow label="ProjectManagers.jsx" path={`src/Pages/ProjectManagers.jsx`} />
           </Stack>
         </CollapsibleSection>
         <CollapsibleSection title="Shared / context" count={5} leading={<Swatch color="purple" />}>
@@ -552,7 +571,7 @@ function SectionPanel({ section }: { section: SectionId }) {
               regular JQL snapshot in localStorage.
             </Text>
             <Text>
-              Clear report on Work Week/Dashboard removes on-page display only —
+              Clear report on Task Management/Metrics removes on-page display only —
               Past Reports archive rows are untouched.
             </Text>
           </Stack>
@@ -591,7 +610,7 @@ function SectionPanel({ section }: { section: SectionId }) {
           <Stack gap={4}>
             <Text>
               <Text weight="semibold">npm run dev:ui</Text> alone skips the proxy —
-              JQL, metadata, Chat, and Dashboard refresh all need{" "}
+              JQL, metadata, Chat, and Metrics refresh all need{" "}
               <Text weight="semibold">dev:api</Text> or <Text weight="semibold">dev:all</Text>.
             </Text>
             <Text>
@@ -618,7 +637,7 @@ function SectionPanel({ section }: { section: SectionId }) {
             dispatch({
               type: "newComposerChat",
               userPrompt:
-                "Walk me through npm run dev:all setup for Task Manager: Jira .env, optional CHAT_PROVIDER, and smoke tests for Work Week + Dashboard.",
+                "Walk me through npm run dev:all setup for Task Manager: Jira .env, optional CHAT_PROVIDER, and smoke tests for Task Management + Metrics.",
             })
           }
         >

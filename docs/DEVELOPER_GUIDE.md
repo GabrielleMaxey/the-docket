@@ -6,14 +6,9 @@ Internal reference for code structure, data flow, scripts, and extension points.
 
 ## For Cursor users
 
-The markdown files in `docs/` (including this guide) are the **canonical** documentation for everyone—GitHub, packaged desktop, and editors other than Cursor.
+The markdown files in `docs/` are canonical for GitHub, packaged desktop, and non-Cursor editors.
 
-If you use **Cursor** with the Docs Canvas plugin, an optional navigable summary is versioned at [`docs/canvases/task-manager-docs.canvas.tsx`](./canvases/task-manager-docs.canvas.tsx). Cursor only runs `.canvas.tsx` files from its project **`canvases/` folder** (outside git), so to open the live panel:
-
-1. Copy `docs/canvases/task-manager-docs.canvas.tsx` into `~/.cursor/projects/<your-workspace>/canvases/` (keep the same filename), **or** ask the agent: *“Open the Task Manager docs canvas from docs/canvases/”*
-2. Open that file beside chat (click the path in the agent reply or from the canvases folder).
-
-See [`docs/canvases/README.md`](./canvases/README.md) for the one-line install note. Edit this guide for long-form changes; update the canvas mirror when pages, data model, or architecture change materially.
+Cursor users can optionally mirror the docs canvas from [`docs/canvases/task-manager-docs.canvas.tsx`](./canvases/task-manager-docs.canvas.tsx). See [`docs/canvases/README.md`](./canvases/README.md) for the install note. Edit this guide for long-form changes; update the canvas mirror only when pages, data model, or architecture change materially.
 
 **PR write-ups:** Cursor agents follow [`.cursor/rules/pr-writeups.mdc`](../.cursor/rules/pr-writeups.mdc). Human process and template → [§ PR write-ups](#pr-write-ups) below.
 
@@ -29,6 +24,21 @@ See [`docs/canvases/README.md`](./canvases/README.md) for the one-line install n
 | Database | better-sqlite3 → `data/workweek.sqlite` |
 | AI providers | Anthropic, OpenAI, Ollama, or Rovo via `llmClient.mjs` — explicit `CHAT_PROVIDER` in `.env` |
 | CSS | Global design system in `workWeekTaskElements.css` + `dashboard.css`; `ww-` namespace prefix |
+
+---
+
+## Page naming
+
+Some code and persisted keys use older feature names. Prefer the current nav labels in user-facing docs.
+
+| Nav label | Route | Code / legacy name |
+|-----------|-------|--------------------|
+| Task Management | `/work-week` | Work Week |
+| Metrics | `/dashboard` | Dashboard |
+| Project Managers | `/project-managers` | Capacity planning |
+| Past Reports | `/reports` | ReportArchive |
+| Chat | `/chat` | Chat |
+| Settings | `/settings` | Settings |
 
 ---
 
@@ -75,6 +85,7 @@ taskManager/
 │   │   └── jiraSearch*.mjs   # Jira REST helpers
 │   └── routes/
 │       ├── appConfigRoutes.mjs    # Settings, field mappings, presets
+│       ├── capacityPlanningRoutes.mjs # Project Managers capacity endpoint
 │       ├── chatRoutes.mjs         # /api/chat/*
 │       ├── dashboardRoutes.mjs    # /api/dashboard/*
 │       ├── issueMetadataRoutes.mjs# Notes + priority (SQLite)
@@ -123,6 +134,7 @@ taskManager/
 │   │   │       └── ChatAssistantSection.jsx  # Chat instructions + provider status
 │   │   ├── Settings.jsx            # Re-exports Settings/index
 │   │   ├── Chat.jsx                # Chat page (+ Save to Past Reports)
+│   │   ├── ProjectManagers.jsx     # Capacity planning from Contributor Metrics entries
 │   │   ├── ReportArchive.jsx       # Past Reports page (Work Week / Dashboard / Ad-hoc tabs)
 │   │   ├── workWeekTaskElements.css
 │   │   ├── priorityScale.css               # Priority colour data encoding (P1–P20, do not retint)
@@ -150,7 +162,7 @@ taskManager/
 │   │       └── useCalendarData.js
 │   ├── Components/
 │   │   ├── BackgroundJobIndicator.jsx  # Nav pill for in-flight background jobs
-│   │   ├── CollapsibleSection.jsx      # Shared collapsible (Work Week + Dashboard)
+│   │   ├── CollapsibleSection.jsx      # Shared collapsible (Task Management + Metrics)
 │   │   ├── collapsible.css
 │   │   ├── ReportOutput.jsx
 │   │   └── StatusPieChart.jsx          # Pie / bar chart (no external library)
@@ -200,9 +212,9 @@ taskManager/
 
 **Multi-user / shared projects (today):** `issue_metadata` is **per machine** for personal slots. Slots linked to a shared program use Atlas (`TEAM_PRIORITY_MONGODB_URI`) for priority; production target is MySQL (see below).
 
-**Planned — team priority DB:** Shared program priority in team **MySQL**. Prefer **`jiraProxy` → MySQL** when a connection is available; optional Team Priority API only if DB access cannot be granted. Epic-root scope on writes; Work Week slots **link explicitly** to a shared program for team mode — all other slots stay local-only. Priority range **1–20**. Spec → **[specs/team-priority-sync.md](./specs/team-priority-sync.md)**; DDL → **[specs/team-priority-sync-mysql.sql](./specs/team-priority-sync-mysql.sql)**.
+**Planned — team priority DB:** Shared program priority in team **MySQL**. Prefer **`jiraProxy` → MySQL** when a connection is available; optional Team Priority API only if DB access cannot be granted. Epic-root scope on writes; Task Management slots **link explicitly** to a shared program for team mode — all other slots stay local-only. Priority range **1–20**. Spec → **[specs/team-priority-sync.md](./specs/team-priority-sync.md)**; DDL → **[specs/team-priority-sync-mysql.sql](./specs/team-priority-sync-mysql.sql)**.
 
-**Current priority sources:** Local SQLite (`issue_metadata`) for personal Work Week slots; Atlas team DB for slots linked to a shared program. Jira comment text is **not** parsed for priority. NORA CSV import seeds local and/or Atlas. Clamp helper: `shared/issuePriority.mjs`. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
+**Current priority sources:** Local SQLite (`issue_metadata`) for personal Task Management slots; Atlas team DB for slots linked to a shared program. Jira comment text is **not** parsed for priority. NORA CSV import seeds local and/or Atlas. Clamp helper: `shared/issuePriority.mjs`. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
 
 **`epic_presets`** — saved JQL/epic presets
 
@@ -438,7 +450,7 @@ UI: `ReportArchive.jsx` — three tabs, list + `ReportOutput` viewer. Dashboard 
 
 ### On-page report clear (not archive delete)
 
-`src/utils/pageReportPersistence.js` — loads/saves Dashboard report, Work Week project reports (per run key), and week plan to `localStorage`. **Clear report** calls `clearDashboardReportState`, `clearWorkWeekProjectReport`, or `clearWeekPlanReportOnly` — removes on-page display only; `generated_reports` rows are untouched.
+`src/utils/pageReportPersistence.js` — loads/saves Metrics report, Task Management project reports (per run key), and week plan to `localStorage`. **Clear report** calls `clearDashboardReportState`, `clearWorkWeekProjectReport`, or `clearWeekPlanReportOnly` — removes on-page display only; `generated_reports` rows are untouched.
 
 `ReportOutput.jsx` accepts optional `onClear` for the header button.
 
@@ -502,7 +514,8 @@ All routes mounted by `server/jiraProxy.mjs`.
 | GET/PUT | `/api/jira/field-mappings` | Date field role mappings |
 | POST | `/api/jira/field-mappings/sync` | Sync mappings from Jira |
 | GET/PUT | `/api/settings` | App settings key-value |
-| GET/POST/PUT/DELETE | `/api/watched-assignees` | Watched people/JQL for Dashboard |
+| GET/POST/PUT/DELETE | `/api/watched-assignees` | Contributor Metrics entries, including capacity targets |
+| GET | `/api/project-managers/capacity` | Capacity planning data for selected Contributor Metrics entries |
 | POST | `/api/dashboard/refresh` | Pull + store metrics snapshot |
 | GET | `/api/dashboard/metrics` | Read stored snapshot |
 | POST | `/api/report/generate` | Dashboard AI report (Executive/PO/Developer) |
@@ -594,7 +607,7 @@ Ad-hoc Chat saves use `saveAdHocReport()` → `POST /api/reports/archive` (not a
 | Work Week drill-down runs | `sessionStorage` | `workWeekTasksJiraDrillDownRuns` |
 | Jira notes + row priorities (UI cache) | `localStorage` | `workWeekTasksJiraNotes`, `workWeekTasksJiraRowPriorities` |
 | Chat session artifacts (reports/plans for Chat context) | `localStorage` | `taskManagerChatSessionArtifacts` |
-| On-page Dashboard report | `localStorage` | `taskManagerPersistedDashboardReport` |
+| On-page Metrics report | `localStorage` | `taskManagerPersistedDashboardReport` |
 | On-page Work Week project reports | `localStorage` | `taskManagerPersistedWorkWeekProjectReports` |
 | On-page week plan | `localStorage` | `taskManagerPersistedWeekPlan` |
 | Work Week notes-on-run preference | `localStorage` | `workWeekTasksJiraPreferences` → `pullLatestComment` |
