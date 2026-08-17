@@ -860,7 +860,6 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       });
       createdParentKey = result?.issueKey || "";
       setCreatedIssueKey(createdParentKey);
-      if (onCreated && createdParentKey) onCreated(createdParentKey);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to create issue");
       setSubmitting(false);
@@ -916,6 +915,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       setSubmitting(false);
       setSuccess(createdParentKey ? `Created ${createdParentKey}` : "Issue created.");
     }
+    if (onCreated && createdParentKey) onCreated(createdParentKey);
   };
 
   const canGenerate = canEditIssueFields && Boolean(summary.trim()) && !generatingDesc && !submitting;
