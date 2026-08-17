@@ -4,70 +4,56 @@
 
 ---
 
-## What it is
+## Overview
 
-Task Manager is a private desktop (and browser) app that sits on top of your Jira instance, built to replace the friction of jumping between Jira views, Excel trackers, and status-update emails.
+Task Manager is a private desktop and browser app for Jira-heavy work. It replaces the daily shuffle between Jira views, Excel trackers, and status-update drafts with one local workspace.
 
-Everything in the app talks to **your own Jira project (ODI)** through a local proxy — no third-party cloud service ever sees your Jira credentials.
-
----
-
-## What it does
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                         Task Manager                             │
-│                                                                  │
-│  Work Week  │  Dashboard  │  Past Reports  │  Chat  │  Settings │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### Work Week *(daily driver)*
-Run up to five saved JQL queries side-by-side and manage every issue in one table.
-
-- **Run JQL** — pulls live results from Jira into the table; optional **Notes on run** (keep local notes or pull the latest Jira comment into each row)
-- **Task table** — update status, assignee (type display name, email, or username with Jira search), and priority; **MRD** column (Most Recent Done Date, with parent-chain inheritance); write notes; push notes to Jira as comments (shared projects: use `PRIORITY P#` prefix — see [END_USER_GUIDE.md](./docs/END_USER_GUIDE.md))
-- **My Metrics** — per-query progress summary with issue counts and a per-project AI report (written for you, the assignee, in second person); **Clear report** removes the on-page copy only
-- **Help me plan my week** — answers 4 quick questions, then generates a day-by-day Monday–Friday plan based on your actual open issues
-- **Create Issue** — creates a new Jira issue from a modal with epic/parent selection (including saved JQL presets without a fixed epic key), ODI field defaults (project components validated against Jira), **✦ AI Draft** for ODI-standard descriptions, optional subtask assignee on Story create, and a link to open the new issue in Jira after create; Stories get suggested sub-tasks (Task type, parent-linked to the new story, editable checkboxes, created automatically on submit), Bugs get a suggested priority based on ODI severity definitions
-- **Dashboard drill-down** — links from Dashboard open assignee or issue deep links (`?assignee=`, `?key=`, plus `?epicPresetId=` so an **Unassigned** link scopes to the project card it came from); drill-down tabs persist for the current browser session and can be cleared one at a time
-
-### Dashboard *(project-level view)*
-Select one or more saved Epic or JQL presets and get a metrics snapshot across all of them.
-
-- **Overall Status** — aggregate % resolved, % in progress, % in backlog, % complete, and % overdue across selected projects, plus issue/overdue/resolved/backlog count chips
-- **Project Metrics** — per-epic cards showing issue %, in-progress %, backlog %, epic %, overdue %, status breakdown (pie or bar chart), and deadline dates
-- **Upcoming Due Dates** — optional card: open tasks due from today through a chosen window (7d–90d or custom date), grouped by project → assignee; issue type shown per row
-- **Past Due in lookback** — optional card: missed deadlines within a 1–3 year lookback when Past Due Projects is enabled
-- **Individual Contributor Metrics** — per-person workload cards (open, in progress, overdue, backlog); names link to Work Week assignee drill-down
-- **Generate Report** — AI-written report in Executive Summary, Product Owner, or Developer format; optional status chart; copy, download, or **Clear report** (on-page only)
-- **Weekly digest** — snapshot-based stand-up brief without LLM
-
-### Past Reports *(archive)*
-Browse reports saved to the local database: Work Week project reports and week plans, Dashboard audience reports (auto-saved on generate), and Chat replies you saved with **Save to Past Reports** (Ad-hoc tab).
-
-### Chat *(Jira Q&A)*
-Ask natural-language questions about selected epics, your Work Week JQL results, Dashboard metrics, and reports or week plans you already generated. The assistant searches Jira when needed and cites session context for prior queries and AI outputs. **Save to Past Reports** on any assistant reply. Works with Anthropic, OpenAI, Ollama, or opt-in Rovo — configured in `.env`.
-
-### Settings *(one-time configuration)*
-- **Epic & JQL presets** — the named queries used on Dashboard, Work Week, and Chat; each preset becomes a project tab and quick-pick option
-- **Jira field mapping** — maps custom Jira date fields (Initial Done Date, Most Recent Done Date, etc.) to the app's roles
-- **Past due rules** — controls which date field triggers the "past due" badge on epics
-- **Contributor Metrics** — saved people and custom JQL queries for the Dashboard's Individual Contributor Metrics section; person entries track by display name, custom queries can scope any group by project, team, label, or combination
-- **Chat instructions** — personal system-prompt additions layered on top of built-in rules
-- **Test Jira Connection** — verifies `.env` credentials before you change anything else
+The app talks to **your Jira project (ODI)** through a local Express proxy. Jira credentials stay in your local `.env`; no third-party cloud service receives them.
 
 ---
 
-## Pages at a glance
+## App tabs
 
-| Page | Primary purpose | AI features |
-|------|----------------|-------------|
-| Work Week | Daily JQL run + issue management | Per-project report, week planner |
-| Dashboard | Multi-project metrics snapshot | Executive / PM / Developer reports, weekly digest |
-| Past Reports | Archived reports and saved Chat replies | View/copy/download prior outputs |
-| Chat | Natural-language Jira Q&A + session context | Conversation with Jira tool access; optional save to Ad-hoc archive |
-| Settings | Configuration | Custom chat instructions |
+| Tab | Use it for | Key outputs |
+|-----|------------|-------------|
+| Task Management | Daily JQL runs, issue edits, notes, priorities, create issue | Per-query metrics, project reports, week plans |
+| Metrics | Project and contributor health across saved epics/JQL presets | Metrics snapshot, audience reports, weekly digest |
+| Project Managers | Capacity planning from Contributor Metrics entries | Capacity cards, `.md` / `.csv` exports, saved reports |
+| Past Reports | Archived generated outputs and saved Chat replies | View, copy, download, or delete local report records |
+| Chat | Natural-language Jira questions with app session context | Jira-backed answers, optional save to Past Reports |
+| Settings | Jira setup, presets, field mappings, report/chat preferences | Shared preset packs and connection checks |
+
+**Task Management** is the daily driver. Run up to five saved JQL queries, update status or assignee, set P1-P20 priority, write notes, push notes to Jira, create ODI issues, and generate AI reports or week plans from the loaded work.
+
+**Metrics** is the project view. Pick saved Epic/JQL presets, refresh a Jira snapshot, review overall/project/contributor metrics, inspect due-date lists, and generate leadership or team-facing reports.
+
+**Project Managers** turns Contributor Metrics entries into a capacity view. It compares open issue counts against optional capacity targets, highlights overdue/blocked/stale work, and exports planning summaries.
+
+**Past Reports** is the local archive for generated Task Management reports, week plans, Metrics reports, and Chat replies saved with **Save to Past Reports**.
+
+**Chat** answers Jira questions using selected presets, recent Task Management JQL results, the latest Metrics snapshot, and generated reports/plans already in the session. Chat works with Anthropic, OpenAI-compatible providers, Ollama, or opt-in Rovo.
+
+**Settings** is where you configure Jira credentials checks, Epic/JQL presets, Jira date-field mappings, past-due rules, Contributor Metrics entries, Work Week header preferences, and custom Chat instructions.
+
+---
+
+## Example views
+
+Actual screenshots from the running app with project and contributor names redacted. Content may vary by local Jira presets, saved browser state, and connection settings.
+
+![Task Management screen](./docs/images/readme-task-management.png)
+
+![Metrics screen](./docs/images/readme-metrics.png)
+
+![Metrics report screen](./docs/images/readme-metrics-report.png)
+
+![Project Managers screen](./docs/images/readme-project-managers.png)
+
+![Past Reports screen](./docs/images/readme-past-reports.png)
+
+![Chat screen](./docs/images/readme-chat.png)
+
+![Settings screen](./docs/images/readme-settings.png)
 
 ---
 
@@ -124,7 +110,9 @@ npm run dev:all
 npm run desktop:dev
 ```
 
-**Packaged desktop (no Node required):** install the universal Mac `.dmg` (Intel or Apple Silicon) or Windows NSIS installer, edit `.env`  — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) § Desktop app.
+Some corporate secure laptops may block Electron windows, unsigned installers, local desktop apps, or the embedded proxy. If `npm run desktop:dev` or the packaged app is unavailable, run `npm run dev:all` and install the browser UI as its own desktop-style app window; see [END_USER_GUIDE.md](./docs/END_USER_GUIDE.md#install-as-its-own-application-window).
+
+**Packaged desktop (no Node required):** install the universal Mac `.dmg` (Intel or Apple Silicon) or Windows NSIS installer, edit `.env` — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) § Desktop app.
 
 Full setup details → **[JIRA_SETUP.md](./docs/JIRA_SETUP.md)**
 Code architecture → **[DEVELOPER_GUIDE.md](./docs/DEVELOPER_GUIDE.md)**
@@ -137,14 +125,14 @@ Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 | What | Where stored | Leaves your machine? |
 |------|-------------|----------------------|
 | JQL text, labels, last table snapshot | Browser `localStorage` | No |
-| Work Week drill-down tabs | Browser `sessionStorage` | No |
+| Task Management drill-down tabs | Browser `sessionStorage` | No |
 | Chat session artifacts (reports/plans for context) | Browser `localStorage` | No |
-| On-page reports/plans (Work Week + Dashboard) | Browser `localStorage` | No |
+| On-page reports/plans (Task Management + Metrics) | Browser `localStorage` | No |
 | **Past Reports** archive | `data/workweek.sqlite` → `generated_reports`; saved under your browser's local timestamp/timezone | No |
 | Header reminders | Browser `localStorage` | No |
 | Per-issue notes + P1–P20 priority | `data/workweek.sqlite` (local file) | No |
 | Status/assignee changes, pushed comments | Jira (your Atlassian instance) | Yes — visible in Jira to anyone with access |
-| Dashboard metrics snapshot | `data/workweek.sqlite` (dev) or user data folder (packaged desktop) | No |
+| Metrics snapshot | `data/workweek.sqlite` (dev) or user data folder (packaged desktop) | No |
 | Desktop `.env` + local DB (packaged app) | OS user data folder — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) | No |
 | Jira credentials | `.env` file on this machine | No — only the local proxy reads them |
 | Chat message content | Your configured LLM provider (Anthropic/OpenAI/etc.) when you send a message | Yes — to that provider's API |

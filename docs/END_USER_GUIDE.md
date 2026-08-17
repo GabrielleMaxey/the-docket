@@ -6,7 +6,7 @@ This guide covers how to use the app day-to-day. No programming knowledge needed
 
 ## Using Task Manager in the browser (when the desktop app is unavailable)
 
-If the packaged desktop app or Electron window is blocked (for example by macOS or work security software), use the **browser UI** instead. You get the same pages; only the window chrome is different.
+If the packaged desktop app or Electron window is unavailable or blocked (for example on a corporate secure laptop, by macOS, or by work security software), use the **browser UI** instead and install it as its own application window. You get the same pages; only the window chrome is different.
 
 ### Start the app
 
@@ -47,10 +47,10 @@ With the site open: **File → Add to Dock** (label may vary by macOS version).
 
 ---
 
-## The five pages
+## The six tabs
 
 ```
-Work Week  |  Dashboard  |  Past Reports  |  Chat  |  Settings
+Task Management  |  Metrics  |  Project Managers  |  Past Reports  |  Chat  |  Settings
 ```
 
 Navigate between them using the menu at the top of the screen.
@@ -74,12 +74,12 @@ Then in the app:
 
 1. Go to **Settings**
 2. Click **Test Jira Connection**
-3. If it shows ✓ Connected — you're good. Skip to Work Week below.
+3. If it shows ✓ Connected — you're good. Skip to Task Management below.
 4. If it fails, check that your `.env` file has the right values (see [JIRA_SETUP.md](./JIRA_SETUP.md)).
 
 ### Epic & JQL presets
 
-These are the named saved searches that power everything else. Add them once in Settings; they'll appear in Work Week, Dashboard, and Chat.
+These are the named saved searches that power everything else. Add them once in Settings; they'll appear in Task Management, Metrics, and Chat.
 
 | Preset type | Use when |
 |-------------|----------|
@@ -95,7 +95,7 @@ To add a preset:
 
 ### Contributor Metrics
 
-Add team members here by Jira display name so the Dashboard's **Individual Contributor Metrics** section tracks their workload and overdue rate. You can also add a **Custom query** — a JQL expression that scopes a group by project, team, label, or any combination — useful when a person's display name doesn't match Jira exactly, or when you want to track a whole team or project slice rather than one person.
+Add team members here by Jira display name so **Metrics** can track workload and overdue rate. You can also add reporter watches, saved preset watches, or custom JQL groups. Optional capacity targets appear on the **Project Managers** tab.
 
 ### Chat instructions
 
@@ -106,9 +106,9 @@ Keep answers short. Always include the issue key. Use bullet points.
 
 ---
 
-## Work Week (nav label: "Task Management") — daily driver
+## Task Management — daily driver
 
-This is the main screen for managing your open work.
+This is the main screen for managing your open work. Some older docs and code still call this page "Work Week."
 
 ```
 ┌──────────────────────────────────────┐
@@ -130,7 +130,7 @@ This is the main screen for managing your open work.
 
 ### Header
 
-- **Header banners** (optional) — at the top of Work Week, toggle **Joke ticker** and/or **My upcoming due dates**. The due-date banner lists **only your** assigned issues (matched by your Jira display name) from the latest Dashboard snapshot's upcoming due-date window. Refresh Dashboard after changing due-date filters or if the banner is empty when you expect tasks. Same toggles in **Settings → Work Week header**.
+- **Header banners** (optional) — at the top of Task Management, toggle **Joke ticker** and/or **My upcoming due dates**. The due-date banner lists **only your** assigned issues (matched by your Jira display name) from the latest Metrics snapshot's upcoming due-date window. Refresh Metrics after changing due-date filters or if the banner is empty when you expect tasks. Same toggles in **Settings → Work Week header**.
 - **Date & calendar** — shows today; useful when planning.
 - **Reminders** — four short text lines, for your eyes only. Check the box to mark done (greyed out). They are never sent to Jira.
 
@@ -151,7 +151,7 @@ This is the main screen for managing your open work.
 
 ### Create Issue
 
-Use **Create Issue** on Work Week when you want a new Story, Task, or Bug in ODI without leaving the app.
+Use **Create Issue** on Task Management when you want a new Story, Task, or Bug in ODI without leaving the app.
 
 **1. Choose a starting point (Epic preset dropdown)**
 
@@ -161,7 +161,7 @@ Use **Create Issue** on Work Week when you want a new Story, Task, or Bug in ODI
 | **Saved query (JQL preset)** | Runs the preset's JQL (e.g. Dev Team, My Current Issues), lists matching issues, and derives parent chains (Task → Story → Epic). Pick an issue from the query, an epic/story parent, or enter a parent key manually. |
 | **Enter issue key manually** | Type an ODI key: Epic for Story/Bug, Story for Task. The app validates the key before unlocking the form. |
 
-The modal pre-selects a preset when you open it from an active Work Week JQL tab that matches a saved preset.
+The modal pre-selects a preset when you open it from an active Task Management JQL tab that matches a saved preset.
 
 **2. Parent rules (ODI)**
 
@@ -186,7 +186,7 @@ On success, use **Add more detail in Jira** to open the new issue in your browse
 
 **If create fails:** fix errors shown in the modal — parent/title issues at the top; description/goal issues under Description — then click **Create** again. The button stays available after validation errors once a valid parent and title are set.
 
-> **Background work:** Dashboard refresh, report generation, week plan, project report, and **Run JQL** keep running if you switch pages. A yellow status pill in the top nav shows what's in progress. Return to the page when it finishes — results are saved automatically.
+> **Background work:** Metrics refresh, report generation, week plan, project report, and **Run JQL** keep running if you switch pages. A yellow status pill in the top nav shows what's in progress. Return to the page when it finishes — results are saved automatically.
 
 > **Tip:** Click the **🗂️ Task Manager** header to collapse/expand the whole section once your queries are saved.
 
@@ -195,7 +195,7 @@ On success, use **Add more detail in Jira** to open the new issue in your browse
 Appears after you Run JQL and get results. Shows:
 - Issue count chips (total, open, overdue, in progress) per query
 - A **📄 Project Report** section inside each query — click to expand, choose a **report scope**, a **report type**, then **Generate Report**:
-  - **Report scope** — what data the report is built from: **Current query results** (this slot, as loaded), **All my assigned work** (past 3/6/12 months — includes an issue if it had a status change, a reassignment, a note added in this app, or a comment added directly in Jira within that window; not just any Jira field update, and not limited to activity made through this app), or any other configured query slot on this Work Week page. Choosing a scope other than "Current query results" runs its own fresh Jira search rather than reusing what's already loaded.
+  - **Report scope** — what data the report is built from: **Current query results** (this slot, as loaded), **All my assigned work** (past 3/6/12 months — includes an issue if it had a status change, a reassignment, a note added in this app, or a comment added directly in Jira within that window; not just any Jira field update, and not limited to activity made through this app), or any other configured query slot on this page. Choosing a scope other than "Current query results" runs its own fresh Jira search rather than reusing what's already loaded.
   - **Status Report** *(default)* — AI-written summary *from your perspective as the assignee*: how the project is tracking, what needs attention, next steps. Reads the scope's label and JQL to frame the report correctly — a closed-work scope gets a completed-work recap instead of being asked about "what needs attention"
   - **1:1 Prep** — talking points for discussing your work with management (direct, skip-level, or otherwise) in a weekly or biweekly 1:1: workload, consistency, completion rate, potential blockers, and items to discuss now vs. coming up. Upward-facing, not a personal daily-standup recap
   - **PWB Review** — first-person self-assessment prose for a quarterly, mid-year, or yearly PWB review (choose the period once selected)
@@ -240,16 +240,16 @@ Each row is one Jira issue. What you can do per row:
 
 **Load status:** After **Run JQL**, the line above the table shows **Loaded X of Y matched** (how many rows are in the table vs how many Jira matched). If your query returns more than the first batch, click **Load remaining** to fetch the rest (up to a documented safe cap).
 
-**Deep links from Dashboard:** Opening Work Week from Dashboard (`?key=ODI-123` or `?assignee=Name`) applies table filters automatically.
+**Deep links from Metrics:** Opening Task Management from Metrics (`?key=ODI-123` or `?assignee=Name`) applies table filters automatically.
 
 - **Issue key** — the app fetches that issue from Jira and opens a green **Drill-down: ODI-123** tab (first tab), even if the issue also appears in your saved JQL results.
 - **Assignee name** — if that person is not already in your saved JQL results, the app runs `assignee = "Name"` in Jira and opens a **Drill-down: Name** tab with their tasks. If their issues are already loaded in a JQL tab, that tab is selected and filtered by assignee instead.
 
-A green banner confirms the active drill-down. Use **Clear filter** to remove the Dashboard filter from the URL while keeping any drill-down tabs you opened in this browser session. Use the small **x** on an individual green drill-down tab to remove only that tab.
+A green banner confirms the active drill-down. Use **Clear filter** to remove the Metrics filter from the URL while keeping any drill-down tabs you opened in this browser session. Use the small **x** on an individual green drill-down tab to remove only that tab.
 
-**MRD column:** The header shows **MRD** (hover for “Most Recent Done Date”). It displays the issue’s automated Most Recent Done Date when that field is set on the task. When the task has no MRD, the app walks the **parent chain** (for example Story → Epic) and shows the first ancestor that has an MRD. This uses the same ODI field mapping as Dashboard (`customfield_10009` by default). Standard Jira **Due date** is not shown in the table, but if a task has one, it takes priority over the epic-level fallback for **My Metrics**’ overdue count (see below) and Chat context; most teams in this space don’t use per-task due dates today, so this is effectively the epic-level MRD/IDD in practice.
+**MRD column:** The header shows **MRD** (hover for “Most Recent Done Date”). It displays the issue’s automated Most Recent Done Date when that field is set on the task. When the task has no MRD, the app walks the **parent chain** (for example Story → Epic) and shows the first ancestor that has an MRD. This uses the same ODI field mapping as Metrics (`customfield_10009` by default). Standard Jira **Due date** is not shown in the table, but if a task has one, it takes priority over the epic-level fallback for **My Metrics**’ overdue count (see below) and Chat context; most teams in this space don’t use per-task due dates today, so this is effectively the epic-level MRD/IDD in practice.
 
-On **shared projects**, link a Work Week slot to a **Shared program** (when the Atlas demo or future MySQL team DB is configured) so priorities sync across machines. Otherwise use local priority + NORA CSV import — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
+On **shared projects**, link a Task Management slot to a **Shared program** (when the Atlas demo or future MySQL team DB is configured) so priorities sync across machines. Otherwise use local priority + NORA CSV import — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
 
 **Closed/resolved issues are read-only** — you can read them but not edit them.
 
@@ -257,9 +257,9 @@ On **shared projects**, link a Work Week slot to a **Shared program** (when the 
 
 ---
 
-## Dashboard (nav label: "Metrics") — project-level view
+## Metrics — project-level view
 
-Use Dashboard when you want to see how a whole project (or several) is tracking, not individual issue management.
+Use Metrics when you want to see how a whole project (or several) is tracking, not individual issue management. Some older docs and code still call this page "Dashboard."
 
 ### How to use it
 
@@ -271,16 +271,16 @@ Use Dashboard when you want to see how a whole project (or several) is tracking,
 
 The stored snapshot stays until you click **Refresh status** again. The page loads from the last snapshot even if Jira is slow. You can navigate away while refresh runs — watch the top nav for **Refreshing dashboard** and return when it finishes.
 
-### Jump to Work Week from Dashboard (via the "Task Management" nav link)
+### Jump to Task Management from Metrics
 
-Many Dashboard lists link into **Work Week** with filters already applied:
+Many Metrics lists link into **Task Management** with filters already applied:
 
-| Where you click | What opens in Work Week |
+| Where you click | What opens in Task Management |
 |-----------------|-------------------------|
 | Issue key (upcoming / past-due lists, overdue items) | Table filtered to that key |
 | Assignee name | Table filtered to that person |
 | **Unassigned** (on a Project Metrics card) | Table filtered to unassigned tasks *within that project's card* — not every unassigned task app-wide |
-| **Work Week** link on an epic or contributor | Filtered to that epic key or assignee |
+| **Task Management** link on an epic or contributor | Filtered to that epic key or assignee |
 
 Jira browse links (↗) still open the issue in Jira in a new tab.
 
@@ -321,7 +321,7 @@ Blue-accent card listing open tasks with due dates from **today through** your s
 Coral-accent card listing open tasks that missed their deadline within the selected lookback (1–3 years). Populated only when **Past Due Projects** is enabled. Empty state explains how to enable it.
 
 **Individual Contributor Metrics**  
-One card per person or custom query configured in Settings → **Contributor Metrics** (or names you add directly in the Dashboard filter panel). The section appears as soon as people are selected — click **Refresh status** to load metrics. After refresh: open workload, overdue count, and status breakdown per person. Person names link to Work Week with an assignee drill-down.
+One card per person or custom query configured in Settings → **Contributor Metrics** (or names you add directly in the Metrics filter panel). The section appears as soon as people are selected — click **Refresh status** to load metrics. After refresh: open workload, overdue count, and status breakdown per person. Person names link to Task Management with an assignee drill-down.
 
 - **Person watches** — full Jira assignee workload (`assignee = "…"` search), not limited to the projects selected in step 1.
 - **Custom query watches** — metrics come from the watch JQL as written (same scope you defined in Settings).
@@ -336,10 +336,24 @@ Choose an audience and click Generate:
 | Product Owner Report | Feature delivery, backlog health, blockers |
 | Developer Report | Team workload, overdue by person, WIP |
 
-Reports include an optional status chart when Dashboard data supports it. Use **Copy**, **Download .md**, or **Clear report** (removes the report from this page only — archived copies remain in **Past Reports**). Generation continues in the background if you leave the page.
+Reports include an optional status chart when Metrics data supports it. Use **Copy**, **Download .md**, or **Clear report** (removes the report from this page only — archived copies remain in **Past Reports**). Generation continues in the background if you leave the page.
 
 **Weekly digest** (same section, below the LLM reports)  
-Snapshot-based stand-up brief — overdue/upcoming highlights, contributor load, and project health. **No LLM required.** Click **Generate weekly digest** after a Dashboard refresh, then copy, download, or **Clear report**.
+Snapshot-based stand-up brief — overdue/upcoming highlights, contributor load, and project health. **No LLM required.** Click **Generate weekly digest** after a Metrics refresh, then copy, download, or **Clear report**.
+
+---
+
+## Project Managers — capacity planning
+
+Use **Project Managers** when you need a quick capacity view for people, reporter watches, saved presets, or custom JQL groups.
+
+1. Add entries in **Settings → Contributor Metrics**.
+2. Optionally set a **Capacity** target and **Due / overdue basis** for each entry.
+3. Open **Project Managers**, choose which entries to show, then click **Refresh**.
+
+Each card shows open issue count, capacity status, status/assignee breakdowns, and risk signals such as overdue, blocked, or stale work. Entries without a capacity target still appear; they just do not show an over/near/ok comparison.
+
+Use **Save to Reports** to archive the current view, or download the planning summary as `.md` or `.csv`.
 
 ---
 
@@ -360,7 +374,7 @@ For each tab: pick a row → **View** → expand the report to read, copy, or do
 
 **CoWork weekly plans:** When Claude CoWork writes `weekly-plan-<date>.md` into the Task Manager `data/` folder, those files show under **Files**. Content is read live from disk until you click **Save to archive**, which copies it into the local Past Reports database as a week plan (so it remains after the file is moved or deleted).
 
-**Clear report** on Work Week or Dashboard removes the on-page copy and browser cache only — it does **not** delete items already listed here.
+**Clear report** on Task Management or Metrics removes the on-page copy and browser cache only — it does **not** delete items already listed here.
 
 ---
 
@@ -368,10 +382,10 @@ For each tab: pick a row → **View** → expand the report to read, copy, or do
 
 Chat lets you ask natural-language questions about your Jira data. Each message sends:
 
-- **Epic filter selection** — same presets as Dashboard (scopes live Jira searches)
-- **Work Week JQL results** — cached from the last time you ran JQL on Work Week (labels, counts, top open issues; past due vs upcoming tagged separately)
-- **Dashboard snapshot** — metrics from the last Dashboard **Refresh status** (refreshed when you send a Chat message)
-- **Generated reports and plans** — project reports, dashboard reports, and week plans you generated in this browser (last 8)
+- **Epic filter selection** — same presets as Metrics (scopes live Jira searches)
+- **Task Management JQL results** — cached from the last time you ran JQL (labels, counts, top open issues; past due vs upcoming tagged separately)
+- **Metrics snapshot** — data from the last **Refresh status** (refreshed when you send a Chat message)
+- **Generated reports and plans** — project reports, Metrics reports, and week plans you generated in this browser (last 8)
 
 ### How to use it
 
@@ -380,16 +394,16 @@ Chat lets you ask natural-language questions about your Jira data. Each message 
 3. Type a question and press Enter or click **Send**
 4. On any assistant reply, click **Save to Past Reports** to archive it under **Past Reports → Ad-hoc** (optional — Chat does not auto-save replies)
 
-For the best experience, run JQL on Work Week, refresh Dashboard, or generate a report/plan **before** asking Chat to summarize or reference that work.
+For the best experience, run JQL on Task Management, refresh Metrics, or generate a report/plan **before** asking Chat to summarize or reference that work.
 
 **Example questions:**
 - "Which epics are past due?"
-- "How many upcoming vs past due tasks are in my dashboard snapshot?"
+- "How many upcoming vs past due tasks are in my metrics snapshot?"
 - "Summarize open work for the selected epics"
 - "Who has the most overdue tasks in my My Work query?"
 - "What's the status of ODI-1234?"
 - "What did my week plan say about Tuesday?"
-- "Summarize the executive report I generated on Dashboard"
+- "Summarize the executive report I generated on Metrics"
 
 The assistant uses session context first when you ask about reports or queries you already ran. For anything outside that context, it searches Jira directly and will say when it does not have data rather than guessing.
 
@@ -430,14 +444,14 @@ Some teams used a shared Excel tracker so everyone sees the same ranking. In Tas
 | Notes you **push** as Jira comments | Yes — visible on the issue in Jira (text and inline attachments) |
 | Local **Notes** box (before push) | No — your machine only |
 | Note **attachments** (before push) | No — your machine only unless **Keep on this machine** is on |
-| **Priority** on a personal Work Week slot | No — local SQLite on this machine |
+| **Priority** on a personal Task Management slot | No — local SQLite on this machine |
 | **Priority** on a slot linked to a **Shared program** | Yes — Atlas demo today (Team badge); MySQL long-term |
 
 ### Shared-program slots (recommended for team ranking)
 
 1. Configure the team priority demo (`TEAM_PRIORITY_MONGODB_URI`) or wait for production MySQL sync.
 2. In Settings, seed shared programs if needed; optionally **Import team priorities** with target **Atlas (demo)** or **Seed from local priorities**.
-3. On Work Week, set the slot’s **Shared program** (e.g. NORA).
+3. On Task Management, set the slot’s **Shared program** (e.g. NORA).
 4. Change **Priority** as usual — it saves to the shared store immediately. Rows show a **Team** badge when priority comes from that store.
 5. **Run JQL** on that slot loads priorities from the shared store (not from Jira comments).
 
@@ -454,7 +468,7 @@ PMs can keep rankings in the NORA spreadsheet and share a **CSV** export:
 1. In Excel: **File → Save As → CSV UTF-8** (columns: `Priority`, `ODI`, `Developer`, `Jira Status`, `notes`).
 2. In Task Manager: **Settings → Import team priorities** → choose target (**This machine** or **Atlas (demo)** when connected) → **Import CSV**.
 3. Matching `ODI` keys overwrite priority for that target. **Notes** fill in only when importing to this machine and the local note is empty.
-4. Re-import when spreadsheet rankings change. Reload Work Week (or re-run JQL) if that page is already open.
+4. Re-import when spreadsheet rankings change. Reload Task Management (or re-run JQL) if that page is already open.
 
 **Developers:** Manual export/backup of SQLite is documented in [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) — that is for backup or handoff, not live multi-user editing.
 
@@ -465,7 +479,7 @@ PMs can keep rankings in the NORA spreadsheet and share a **CSV** export:
 | Data | Stored where | Shared with Jira? |
 |------|-------------|-------------------|
 | JQL inputs, labels, table snapshot | This browser only (`localStorage`) | No |
-| Work Week drill-down tabs | This browser session only (`sessionStorage`) | No |
+| Task Management drill-down tabs | This browser session only (`sessionStorage`) | No |
 | On-page report/plan display (before archive) | This browser only (`localStorage`) | No |
 | **Past Reports** archive | Local file (`data/workweek.sqlite` → `generated_reports`), saved with your browser's local timestamp/timezone | No |
 | Chat session artifacts (for Chat context) | This browser only (`localStorage`) | No |
@@ -474,7 +488,7 @@ PMs can keep rankings in the NORA spreadsheet and share a **CSV** export:
 | Issue notes + priorities (P1–P20) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL | No for personal slots — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) |
 | Note attachments (**Keep on this machine**) | Local file (`data/note-images/` + SQLite) | No — cleared after a successful **Push note** |
 | Epic/JQL preset team pack (export/import) | JSON file you save/share | No |
-| Dashboard metrics snapshot | Local file (`data/workweek.sqlite`) | No |
+| Metrics snapshot | Local file (`data/workweek.sqlite`) | No |
 | Status/assignee changes | Jira | Yes |
 | Notes you push as comments | Jira | Yes — text and attachments; priority is not read from comments |
 
@@ -486,7 +500,7 @@ PMs can keep rankings in the NORA spreadsheet and share a **CSV** export:
 Your JQL returned no results, or filters are hiding rows. Check **Loaded X of Y** — if Y > X, click **Load remaining**. Try widening the JQL in Jira's own search first to confirm issues exist.
 
 **I left the page while a refresh or report was running**
-That's fine — work continues in the background. Look for the yellow pill in the top nav. Return to Dashboard or Work Week when it finishes; refresh updates the stored snapshot, and reports/plans are saved to this browser.
+That's fine — work continues in the background. Look for the yellow pill in the top nav. Return to Metrics or Task Management when it finishes; refresh updates the stored snapshot, and reports/plans are saved to this browser.
 
 **How do we share the same epic/JQL presets across the team?**
 One person exports a **team pack** from Settings; others **Import team pack** (merge or replace). See [Epic & JQL presets](#epic--jql-presets) above.
@@ -495,24 +509,24 @@ One person exports a **team pack** from Settings; others **Import team pack** (m
 That's normal — the table was restored from the last time you ran JQL. Click **Run JQL** to get fresh data.
 
 **My notes disappeared on another computer**
-Expected. Notes are stored in a local file on the machine you started the app on. Use one machine, or ask a developer about exporting the SQLite file. For **shared ranking**, link a Work Week slot to a Shared program (or import CSV to Atlas) — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
+Expected. Notes are stored in a local file on the machine you started the app on. Use one machine, or ask a developer about exporting the SQLite file. For **shared ranking**, link a Task Management slot to a Shared program (or import CSV to Atlas) — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
 
 **How do we share priority on a project like we did in Excel?**
-Link the Work Week slot to a **Shared program** so priority reads/writes the team store (Atlas demo today). Or **Settings → Import team priorities** from the NORA CSV (local or Atlas). See [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
+Link the Task Management slot to a **Shared program** so priority reads/writes the team store (Atlas demo today). Or **Settings → Import team priorities** from the NORA CSV (local or Atlas). See [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
 
 **The Push note button is greyed out**
 You've already pushed that exact note (text and attachments) as a comment. Edit the note or change attached files and the button will re-enable.
 
 **Chat gave a generic answer about my report**
-Generate the report or week plan first on Work Week or Dashboard, then ask Chat in the same browser. Session context is stored locally when you click Generate — it is not sent to a third-party cloud beyond your configured LLM provider.
+Generate the report or week plan first on Task Management or Metrics, then ask Chat in the same browser. Session context is stored locally when you click Generate — it is not sent to a third-party cloud beyond your configured LLM provider.
 
 **What's the difference between Clear report and Past Reports?**
-**Clear report** removes the report from the Work Week or Dashboard page (and its browser cache). **Past Reports** keeps everything saved to the local database when you generated a report/plan, or when you clicked **Save to Past Reports** on a Chat reply. Clearing on-page does not delete archived rows.
+**Clear report** removes the report from the Task Management or Metrics page (and its browser cache). **Past Reports** keeps everything saved to the local database when you generated a report/plan, or when you clicked **Save to Past Reports** on a Chat reply. Clearing on-page does not delete archived rows.
 
 **Chat says it's not ready**
 For Anthropic/OpenAI/Ollama: set `CHAT_PROVIDER` and the matching API key in `.env` on the proxy host. For Rovo: set OAuth vars, sign in with Atlassian from Chat, or configure an LLM fallback key. See [JIRA_SETUP.md](./JIRA_SETUP.md) §8.
 
-**Dashboard metrics look stale**
+**Metrics look stale**
 Click **Refresh status** after changing presets, due-date options, or watched people. A banner appears when filters differ from the stored snapshot.
 
 **I only see upcoming tasks, not past due**
