@@ -628,10 +628,7 @@ export const useTaskManagerJira = () => {
     setNoteImageErrorsByKey((prev) => removeIssueKeyed(prev, issueKey));
   };
 
-  // Restores images that were kept on this machine (disk + SQLite) into the
-  // same ephemeral shape as picked/pasted images, so push works unchanged.
-  // Runs at most once per issueKey per session — later bulk-metadata refreshes
-  // shouldn't clobber images the user has since edited locally.
+  // Hydrate kept images once per issueKey; later metadata refreshes must not clobber local edits.
   const hydrateKeptNoteImages = React.useCallback((issueKey, { keepNoteImages, images } = {}) => {
     setKeepNoteImagesByKey((prev) => patchIssueKeyed(prev, issueKey, Boolean(keepNoteImages)));
 

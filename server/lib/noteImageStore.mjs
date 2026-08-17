@@ -1,7 +1,3 @@
-// Disk + SQLite CRUD for "Keep on this machine" note image drafts.
-// Images live under `<baseDir>/<sanitized issue key>/` with metadata in
-// issue_note_images.
-
 import fs from "fs";
 import path from "path";
 
@@ -52,9 +48,7 @@ export const deleteAllNoteImages = (db, baseDir, issueKey) => {
   fs.rmSync(noteImagesDirFor(baseDir, issueKey), { recursive: true, force: true });
 };
 
-// Replaces the full kept-image set for an issue: deletes any previously kept
-// images, then writes the given files. Keep-on is a snapshot of the current
-// ephemeral images, not an incremental sync.
+// Snapshot replace, not incremental sync.
 export const replaceNoteImages = (db, baseDir, issueKey, files) => {
   deleteAllNoteImages(db, baseDir, issueKey);
 

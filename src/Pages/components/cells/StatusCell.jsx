@@ -1,9 +1,5 @@
 import React from "react";
 
-// One editable cell from JiraResultsTable's <tbody> — status dropdown +
-// "Update Status" button. Extracted along with the other ww-edit-cell
-// columns (Assignee/Priority/Notes/PushActions) to cut down the size of
-// the giant inline row markup in JiraResultsTable.jsx.
 const StatusCell = ({
   issueKey,
   status,

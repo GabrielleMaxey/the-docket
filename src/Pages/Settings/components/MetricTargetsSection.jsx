@@ -4,46 +4,33 @@ import SettingsSection from "./SettingsSection";
 import {
   createWatchedAssignee,
   deleteWatchedAssignee,
+  fetchEpicPresetScopeJql,
   fetchWatchedAssignees,
   updateWatchedAssignee,
 } from "../../../services/jiraClient.js";
 import { useFlash } from "../../hooks/useFlash.js";
+import {
+  DEFAULT_OVERDUE_DATE_BASIS,
+  OVERDUE_DATE_BASIS_OPTIONS,
+  normalizeOverdueDateBasis,
+  overdueDateBasisShortLabel,
+} from "../../../../shared/overdueDateBasis.mjs";
 
-// Same backslash-then-quote convention already used for JQL string literals
-// elsewhere in this app (epicFilterJql.mjs, directReportsJql.mjs).
 const escapeJqlString = (value) => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
-// "Reporter" isn't its own backend watch_type - PMs want "issues this
-// person reported", which is really just a JQL scope. Generating it here
-// and storing it as watchType "jql" means every other system that already
-// understands jql-type watches (Dashboard refresh, Capacity Planning)
-// works with it unmodified - no new type to teach those systems about.
-// Unfiltered by status, matching how the "person" (assignee) watch type
-// behaves - fetches everything and lets the existing metrics computation
-// split it into open/resolved/overdue, rather than only ever seeing open
-// issues here. This is only the FALLBACK shape when no preset is picked -
-// picking a preset (e.g. the existing "Reporter's Current Issues" preset)
-// replaces this with that preset's own filtering/ordering instead, since
-// PMs may already have a preferred shape for this (resolution = Unresolved,
-// priority-ordered) that shouldn't be overridden by a different default.
+// Stored as watchType "jql" so Dashboard/capacity treat it like any other query.
 const buildReporterJql = (displayName) => `reporter = "${escapeJqlString(displayName)}" ORDER BY updated DESC`;
 
-// Detects a reporter-type entry purely from whether its stored JQL
-// references the "reporter" field at all, not an exact-match on one
-// specific template - a preset-derived reporter JQL (e.g. substituted from
-// "Reporter's Current Issues") won't match buildReporterJql's own shape,
-// but is still fundamentally a reporter-scoped query, so the table should
-// still label it "Reporter" rather than a generic "Custom query".
 const isReporterWatchJql = (jql) => /(^|[\s(])reporter\s*=/.test(String(jql || ""));
 
-// Substitutes currentUser() in a preset's JQL for a specific named person,
-// so a PM-facing preset like "reporter = currentUser() AND resolution =
-// Unresolved ORDER BY priority DESC, updated DESC" becomes a query for
-// someone else's reported work, not just the person currently logged in.
-// Presets that don't reference currentUser() at all are returned unchanged -
-// a PM can still pick any preset, not just reporter-shaped ones.
 const substituteCurrentUser = (jql, displayName) =>
   String(jql || "").replace(/currentUser\(\)/g, `"${escapeJqlString(displayName)}"`);
+
+// Resolve through the API — a local `parent = KEY` stand-in would save a different query than the project tab.
+const jqlForPreset = (preset) => {
+  if (!preset?.id) return Promise.resolve("");
+  return fetchEpicPresetScopeJql(preset.id);
+};
 
 const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, epicPresets = [] }) => {
   const [watchedName, setWatchedName] = React.useState("");
@@ -52,19 +39,14 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
   const [watchedPresetId, setWatchedPresetId] = React.useState("");
   const [watchType, setWatchType] = React.useState("person");
   const [watchedCapacity, setWatchedCapacity] = React.useState("");
+  const [watchedOverdueDateBasis, setWatchedOverdueDateBasis] = React.useState(DEFAULT_OVERDUE_DATE_BASIS);
   const [quickPickValue, setQuickPickValue] = React.useState("");
   const [editingId, setEditingId] = React.useState(null);
   const [capacityDrafts, setCapacityDrafts] = React.useState({});
   const [savingCapacityId, setSavingCapacityId] = React.useState(null);
   const [flash, setFlash] = useFlash();
+  const quickPickRequestRef = React.useRef(0);
   const contributorEntries = watchedAssignees.filter((person) => person.watchType !== "direct_reports");
-
-  // Same epic-preset -> JQL conversion Quick Pick already uses (jql-type
-  // presets: their own JQL; epic-type presets: parent = <epicKey>), reused
-  // here so "From a saved preset" behaves identically to picking the same
-  // preset via Quick Pick, just without the extra type-then-quick-pick step.
-  const jqlForPreset = (preset) =>
-    preset.presetType === "jql" ? String(preset.jql || "").trim() : preset.epicKey ? `parent = ${preset.epicKey}` : "";
 
   const handlePresetTypeSelect = (presetId) => {
     setWatchedPresetId(presetId);
@@ -76,22 +58,28 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
     }
   };
 
-  const handleQuickPickSelect = (presetId) => {
+  const handleQuickPickSelect = async (presetId) => {
     setQuickPickValue(presetId);
     if (!presetId) return;
     const preset = epicPresets.find((p) => String(p.id) === String(presetId));
     if (!preset) return;
-    const jql = jqlForPreset(preset);
-    if (jql) {
-      if (watchType === "reporter") {
-        // Substitute the picked preset's currentUser() for the name already
-        // typed above - if no name is typed yet, this leaves an empty ""
-        // placeholder the PM can fill in by typing the name and it'll be
-        // regenerated on blur, or they can just edit the JQL directly.
-        setWatchedReporterJql(substituteCurrentUser(jql, watchedName.trim()));
+    const requestId = (quickPickRequestRef.current += 1);
+    onError("");
+    try {
+      const jql = await jqlForPreset(preset);
+      if (requestId !== quickPickRequestRef.current) return;
+      if (jql) {
+        if (watchType === "reporter") {
+          setWatchedReporterJql(substituteCurrentUser(jql, watchedName.trim()));
+        } else {
+          setWatchedJql(jql);
+        }
       } else {
-        setWatchedJql(jql);
+        onError("No JQL configured for this epic preset.");
       }
+    } catch (err) {
+      if (requestId !== quickPickRequestRef.current) return;
+      onError(err instanceof Error ? err.message : "Failed to resolve preset JQL");
     }
     if (!watchedName.trim() && preset.label) {
       setWatchedName(preset.label);
@@ -99,12 +87,6 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
     setQuickPickValue("");
   };
 
-  // Reporter mode's JQL box auto-fills when the name field is left (blur),
-  // using whatever's already in the box as a hint: if it looks like a
-  // preset-derived query (references currentUser() or already has this
-  // person's old name in it), just re-substitute the new name into the
-  // same shape rather than resetting to the plain default template -
-  // preserves a PM's preset choice across renaming the target person.
   const regenerateReporterJql = (nextName) => {
     const name = nextName.trim();
     if (!name) return;
@@ -123,24 +105,19 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
     setWatchedPresetId("");
     setWatchType("person");
     setWatchedCapacity("");
+    setWatchedOverdueDateBasis(DEFAULT_OVERDUE_DATE_BASIS);
     setQuickPickValue("");
     setEditingId(null);
   };
 
-  // Loads an existing entry's fields into the same form used for adding,
-  // so changing anything about it (label, query, capacity) is one Update
-  // click instead of deleting and re-adding - which duplicated effort and
-  // risked ending up with two rows for the same person if the delete was
-  // missed. "preset" mode is never inferred here even if the entry's JQL
-  // happens to match a saved preset exactly - there's no reliable way to
-  // tell that from the stored data, and "Custom query" with the JQL
-  // pre-filled is the safe, always-correct edit path for any jql-type entry.
+  // Do not infer "preset" from stored JQL — Custom query with the JQL pre-filled is the reliable edit path.
   const handleEditClick = (person) => {
     setEditingId(person.id);
     setWatchedName(person.displayName);
     setWatchedPresetId("");
     setQuickPickValue("");
     setWatchedCapacity(person.capacity === null || person.capacity === undefined ? "" : String(person.capacity));
+    setWatchedOverdueDateBasis(normalizeOverdueDateBasis(person.overdueDateBasis));
     if (person.watchType === "jql" && isReporterWatchJql(person.jql)) {
       setWatchType("reporter");
       setWatchedReporterJql(person.jql || "");
@@ -162,22 +139,30 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
     const isPreset = watchType === "preset";
     const isEditing = editingId !== null;
     const selectedPreset = isPreset ? epicPresets.find((p) => String(p.id) === String(watchedPresetId)) : null;
-    const jql = isReporter
+    if (!displayName) return;
+    if (isPreset && !selectedPreset) { onError("Pick a saved preset first."); return; }
+    let jql = isReporter
       ? watchedReporterJql.trim() || buildReporterJql(displayName)
       : isPreset
-        ? selectedPreset
-          ? jqlForPreset(selectedPreset)
-          : ""
+        ? ""
         : watchedJql.trim();
-    if (!displayName) return;
+    if (isPreset) {
+      try {
+        jql = String(await jqlForPreset(selectedPreset) || "").trim();
+      } catch (err) {
+        onError(err instanceof Error ? err.message : "Failed to resolve preset JQL");
+        return;
+      }
+    }
     if (watchType === "jql" && !jql) { onError("JQL is required for a custom query entry."); return; }
-    if (isPreset && !jql) { onError("Pick a saved preset first."); return; }
+    if (isPreset && !jql) { onError("No JQL configured for this epic preset."); return; }
     onError("");
     const payload = {
       displayName,
       watchType: isReporter || isPreset ? "jql" : watchType,
       jql: watchType === "jql" || isReporter || isPreset ? jql : "",
       capacity: watchedCapacity.trim() === "" ? null : watchedCapacity.trim(),
+      overdueDateBasis: watchedOverdueDateBasis,
     };
     try {
       if (isEditing) {
@@ -235,7 +220,6 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
     const nextCapacity = draft.trim() === "" ? null : draft.trim();
     const currentCapacity = person.capacity === null || person.capacity === undefined ? null : String(person.capacity);
     if (String(nextCapacity) === String(currentCapacity)) {
-      // No real change - clear the draft so it falls back to the server value.
       setCapacityDrafts((prev) => {
         const next = { ...prev };
         delete next[person.id];
@@ -255,6 +239,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
         resolvedAccountId: person.resolvedAccountId,
         sortOrder: person.sortOrder,
         capacity: nextCapacity,
+        overdueDateBasis: person.overdueDateBasis,
       });
       setWatchedAssignees(await fetchWatchedAssignees());
       setCapacityDrafts((prev) => {
@@ -287,8 +272,16 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
       </p>
       <p>
         <strong>Capacity</strong> (optional) is a target open-issue count — set it to see how each
-        person's or group's current workload compares on the Dashboard. Leave it blank if you don't
-        want a capacity comparison for that entry.
+        person's or group's current workload compares on the Project Managers page. Leave it blank
+        if you don't want a capacity comparison for that entry.
+      </p>
+      <p>
+        <strong>Due / overdue basis</strong> controls how Project Managers counts overdue work for
+        that entry. Use <strong>Epic done dates</strong> for ODI-style groups (dates live on the
+        parent Epic). Use <strong>Task due date</strong> when the team dates the task itself.{" "}
+        <strong>Either</strong> uses the issue's Due date if set, otherwise its done dates, otherwise
+        the parent Epic — a mixed catch-all. Stale task due dates still win on Either, so ODI
+        watches should not use it.
       </p>
       <Table celled compact>
         <Table.Header>
@@ -296,13 +289,14 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
             <Table.HeaderCell>Type</Table.HeaderCell>
             <Table.HeaderCell>Label</Table.HeaderCell>
             <Table.HeaderCell>JQL</Table.HeaderCell>
+            <Table.HeaderCell>Due / overdue</Table.HeaderCell>
             <Table.HeaderCell>Capacity</Table.HeaderCell>
             <Table.HeaderCell />
           </Table.Row>
         </Table.Header>
         <Table.Body>
           {contributorEntries.length === 0 ? (
-            <Table.Row><Table.Cell colSpan="5">No entries yet.</Table.Cell></Table.Row>
+            <Table.Row><Table.Cell colSpan="6">No entries yet.</Table.Cell></Table.Row>
           ) : (
             contributorEntries.map((person) => (
               <Table.Row key={person.id}>
@@ -315,6 +309,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
                 </Table.Cell>
                 <Table.Cell>{person.displayName}</Table.Cell>
                 <Table.Cell>{person.jql || "—"}</Table.Cell>
+                <Table.Cell collapsing>{overdueDateBasisShortLabel(person.overdueDateBasis)}</Table.Cell>
                 <Table.Cell collapsing>
                   <Input
                     size="mini"
@@ -328,14 +323,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
                     onChange={(_e, { value }) => setCapacityDrafts((prev) => ({ ...prev, [person.id]: value }))}
                     onBlur={() => handleCapacityBlur(person)}
                     onKeyDown={(event) => {
-                      // This Input isn't inside a <form>, so Enter does
-                      // nothing by default - it doesn't trigger onBlur, and
-                      // there's no submit to catch it. Without this, typing
-                      // a new capacity and pressing Enter (the natural way
-                      // to "confirm" a number field) silently does nothing:
-                      // the draft never saves, the row still shows the old
-                      // value, and it looks like the save just failed
-                      // rather than never having been triggered at all.
+                      // Not in a <form>; Enter does not blur/submit on its own.
                       if (event.key === "Enter") {
                         event.currentTarget.blur();
                       }
@@ -419,6 +407,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
               <Form.Select
                 label="Quick pick (optional)"
                 placeholder="Choose a saved preset to fill in the JQL below…"
+                selectOnBlur={false}
                 options={epicPresets.map((preset) => ({
                   key: preset.id,
                   value: preset.id,
@@ -442,6 +431,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
               <Form.Select
                 label="Quick pick (optional)"
                 placeholder="Choose a saved preset to fill in the JQL below…"
+                selectOnBlur={false}
                 options={epicPresets.map((preset) => ({
                   key: preset.id,
                   value: preset.id,
@@ -462,6 +452,17 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
           placeholder="e.g. 15 open issues"
           value={watchedCapacity}
           onChange={(_e, { value }) => setWatchedCapacity(value)}
+        />
+        <Form.Select
+          label="Due / overdue basis"
+          selectOnBlur={false}
+          options={OVERDUE_DATE_BASIS_OPTIONS.map((option) => ({
+            key: option.value,
+            value: option.value,
+            text: option.text,
+          }))}
+          value={watchedOverdueDateBasis}
+          onChange={(_e, { value }) => setWatchedOverdueDateBasis(normalizeOverdueDateBasis(value))}
         />
         <Button primary={editingId !== null} onClick={handleSubmit}>
           {editingId !== null ? "Update" : "Add"}

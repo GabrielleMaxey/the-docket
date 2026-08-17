@@ -84,11 +84,6 @@ const Chat = () => {
     [presets, selectedPresetIds]
   );
 
-  // Idea prompts shown before the first message: a couple grounded in
-  // whatever is actually loaded right now (the evaluated epic, or the
-  // selected epic/JQL presets), filled out with general starters so the
-  // list never looks sparse. Capped at 5 so it stays a quick scan, not
-  // another wall to read.
   const ideaPrompts = React.useMemo(() => {
     const prompts = [];
     if (epicEvaluation?.epic?.key) {
@@ -133,9 +128,6 @@ const Chat = () => {
     }
   };
 
-  // Accepts an optional override so idea-prompt clicks can send immediately
-  // without hitting the stale-state race of setInput(text) followed
-  // synchronously by handleSend() reading the not-yet-updated input state.
   const handleSend = async (overrideText) => {
     const text = String(overrideText ?? input).trim();
     if (!text || sending) {

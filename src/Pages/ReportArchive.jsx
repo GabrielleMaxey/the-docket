@@ -189,11 +189,6 @@ const ReportArchivePanel = ({
   const [saveMessage, setSaveMessage] = React.useState("");
   const [deletingId, setDeletingId] = React.useState(null);
   const [deletingAll, setDeletingAll] = React.useState(false);
-  // Files tab only: filename -> archived (generated_reports) row id, for
-  // files that have already been "Saved to archive". Lets Files show
-  // "Remove from archive" (deletes the DB copy) instead of touching the
-  // live file on disk, and only for rows that actually have a DB copy to
-  // remove.
   const [archivedByFilename, setArchivedByFilename] = React.useState({});
 
   const loadArchivedLookup = React.useCallback(async () => {
@@ -266,12 +261,6 @@ const ReportArchivePanel = ({
   const reloadList = React.useCallback(async () => {
     setLoading(true);
     setError("");
-    // Deliberately does NOT clear saveMessage - every caller already clears
-    // its own saveMessage at the start of its own handler, and several
-    // callers set a NEW message before calling this (e.g. "Saved to
-    // archive", "Removed the archived copy") that needs to survive the
-    // reload that follows it. Clearing it here would wipe that message the
-    // instant reloadList runs, before it was ever shown.
 
     try {
       if (coworkOnly) {

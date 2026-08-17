@@ -71,9 +71,6 @@ export const insertGeneratedReport = (
   return Number(result.lastInsertRowid);
 };
 
-// Shared by listGeneratedReports and deleteGeneratedReportsBySource, so
-// "Delete All" in a given Past Reports tab always matches exactly the same
-// set of rows that tab's list query would return - the two can't drift.
 const buildSourceWhereClause = (source) => {
   const normalizedSource = String(source || "").trim();
   if (normalizedSource === REPORT_SOURCES.WORK_WEEK) {

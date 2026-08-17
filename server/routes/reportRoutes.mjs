@@ -496,11 +496,6 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
       if (parts) contextLines.push(`- Status breakdown: ${parts}`);
     }
     if (Array.isArray(summary.topPriorities) && summary.topPriorities.length > 0) {
-      // A Backlog-status issue with a recent Jira comment usually means real
-      // work is happening but the status was never updated to reflect it -
-      // exactly the kind of gap that makes "0 In Progress" look like a lull
-      // when it might not be one. Checked only for Backlog items (not all
-      // topPriorities) to keep the added Jira calls bounded.
       const backlogKeys = summary.topPriorities
         .filter((issue) => String(issue.status || "").trim().toLowerCase() === "backlog")
         .map((issue) => issue.key)
@@ -745,12 +740,6 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
 
     const userPrompt = String(req.body?.userPrompt || "").trim();
     const provider = String(req.body?.provider || "").trim();
-    // Historically hardcoded to "chat" since this endpoint only ever had
-    // one caller (Chat's own save button). Now accepts an override so
-    // other pages (e.g. Project Managers) can save through the same
-    // endpoint without every non-chat save being mislabeled as chat in
-    // the archive - defaults to "chat" to keep the existing caller's
-    // behavior exactly as it was.
     const savedFrom = String(req.body?.savedFrom || "").trim() || "chat";
 
     try {
@@ -819,11 +808,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     }
   });
 
-  // Bulk-delete every report in one Past Reports tab. `source` is required
-  // and must be a known value - unlike the list endpoint, where an empty
-  // filter harmlessly means "show everything", an empty filter here would
-  // mean "delete everything in the table", so that's refused rather than
-  // silently allowed.
+  // Require source so an empty filter cannot delete every archived report.
   app.delete("/api/reports/archive", (req, res) => {
     const source = String(req.query?.source || "").trim();
     if (!Object.values(REPORT_SOURCES).includes(source)) {

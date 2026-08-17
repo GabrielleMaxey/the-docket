@@ -1,8 +1,3 @@
-// Epic workload/timeline evaluation for Chat's persistent "Evaluate an
-// Epic" panel: fetches an Epic's full descendant tree and returns
-// workload totals, per-contributor breakdown, and cross-team blocker
-// candidates in one response.
-
 import { createLogger } from "../lib/logger.mjs";
 import { buildFieldMappingsMap } from "../lib/epicFilterJql.mjs";
 import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
@@ -23,9 +18,6 @@ import {
 
 const log = createLogger("epic-workload");
 
-// Same backslash-then-quote escaping convention already used for JQL string
-// literals elsewhere in this app (server/lib/epicFilterJql.mjs,
-// shared/directReportsJql.mjs).
 const escapeJqlString = (value) => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 export const registerEpicWorkloadRoutes = (app, { db, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
@@ -36,11 +28,6 @@ export const registerEpicWorkloadRoutes = (app, { db, jiraRequest, runJiraSearch
     return buildFieldMappingsMap(rows);
   };
 
-  // Search-by-text for the "Evaluate an Epic" panel's search field - lets
-  // someone find an epic by (partial) name instead of needing to already
-  // know its exact key. Deliberately searches summary only, not full text
-  // (which would also match comments/descriptions and return noisier
-  // results for what's meant to be a quick picker, not a general search).
   app.get("/api/jira/epics/search", async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
@@ -99,14 +86,7 @@ export const registerEpicWorkloadRoutes = (app, { db, jiraRequest, runJiraSearch
         runJiraSearchRequest,
       });
 
-      // Overdue here is deliberately based on each task's own raw Jira
-      // duedate only (not epic-level MRD/IDD fallback) - MRD/IDD represent
-      // when something WAS completed, not when a task is due, so folding
-      // them in as an "extra overdue field" for individual tasks would be
-      // a category error. In spaces that don't set per-task due dates,
-      // this will often read 0 - that's an honest reflection of the data,
-      // not a bug; the epic-level timeline read below uses PED/MRD/IDD
-      // instead, where those fields are actually meaningful.
+      // Task overdue uses raw duedate only — MRD/IDD are completion dates, not due dates.
       const workload = computeChildIssueMetrics(descendants, epicKey, "duedate", null);
       const contributors = computeContributorMetricsFromIssues(descendants, "duedate");
 
