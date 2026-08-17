@@ -87,12 +87,6 @@ export const formatChatSessionContext = (sessionContext) => {
   return lines.join("\n").trim();
 };
 
-// Formats the currently-loaded "Evaluate an Epic" panel data (see
-// EpicEvaluationPanel.jsx / GET /api/jira/epics/:epicKey/workload) for the
-// chat system prompt, so follow-up questions about that epic can be
-// answered from real fetched data instead of the thin selectedEpics
-// key/name/JQL context. The client passes the SAME data it already fetched
-// to render the panel - no server re-fetch needed.
 export const formatEpicEvaluationContext = (epicEvaluation) => {
   if (!epicEvaluation || typeof epicEvaluation !== "object" || !epicEvaluation.epic?.key) {
     return "";

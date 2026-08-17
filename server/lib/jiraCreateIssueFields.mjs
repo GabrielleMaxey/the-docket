@@ -170,8 +170,7 @@ export const resolveIssueTypeMeta = ({
     return null;
   }
 
-  // ODI: Story children are Jira Sub-tasks. Task issuetype parents to Epic only —
-  // createmeta still exposes parent on Task, so do not keep Task for story parents.
+  // ODI: Story children are Sub-tasks. createmeta still exposes parent on Task — do not keep Task for story parents.
   if (wantsStoryParent({ issueTypeName, parentRole, isSubtask })) {
     return findSubtaskIssueTypeMeta(project) || requested;
   }

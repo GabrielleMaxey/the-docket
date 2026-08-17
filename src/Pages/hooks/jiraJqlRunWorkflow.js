@@ -17,8 +17,6 @@ import {
 const errorMessage = (error, fallback) =>
   error instanceof Error ? error.message : fallback;
 
-// Fallback project when no preset scope is available. Matches the default
-// used in CreateIssueModal.jsx - this app targets a single Jira project.
 const UNASSIGNED_DRILLDOWN_PROJECT_KEY = "ODI";
 
 const mergeIssueMapsPreferExisting = (previous, additions) => {
@@ -68,12 +66,6 @@ const applyTeamPriorityState = async ({
     const teamItems = await fetchTeamPriorityBulk(keys);
     const teamPriorities = {};
     const teamSource = {};
-    // Only issues actually present in the shared team-priority DB response
-    // get marked "team-db" - previously every requested key was marked
-    // team-db unconditionally before this check, regardless of whether
-    // bulkGetTeamPriorities actually had a stored priority for it, which
-    // put a "Team" badge on every row in the table whether or not it had
-    // ever been shared to the team DB.
     Object.entries(teamItems || {}).forEach(([issueKey, item]) => {
       if (!item || item.priority === undefined) {
         return;

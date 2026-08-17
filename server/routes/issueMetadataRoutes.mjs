@@ -38,8 +38,6 @@ const uploadNoteImages = multer({
   },
 });
 
-// Handles multer upload errors (oversize file, too many files, bad mime from
-// fileFilter) so they return JSON 400 instead of an unhandled 500/HTML error.
 const handleNoteImageUploadError = (err, _req, res, next) => {
   if (!err) {
     return next();
@@ -363,11 +361,6 @@ export const registerIssueMetadataRoutes = (
     return res.json({ items });
   });
 
-  // Issue keys whose local note was added/edited on or after `since` (a
-  // YYYY-MM-DD date). Used by Work Week's "All my assigned work" report
-  // scope to treat a locally-noted issue as "touched", alongside Jira's own
-  // status/assignee change history - a note is a real signal of engagement
-  // even when it doesn't show up as a Jira changelog event.
   app.get("/api/jira/issue-metadata/recent-notes", (req, res) => {
     const since = String(req.query?.since || "").trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {

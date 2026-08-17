@@ -508,8 +508,6 @@ export const registerJiraIssueRoutes = (
     }
     const context = contextParts.join(" | ");
 
-    // Standards sourced from Confluence: Jira Standards ODI Project Space Standards -
-    // prompt text itself now lives in server/lib/aiInstructions.mjs.
     const systemPrompt = buildAiDraftSystemPrompt({ isStory, isBug });
     const userPrompt = buildAiDraftUserPrompt({ summary, context, isStory, isBug });
 
