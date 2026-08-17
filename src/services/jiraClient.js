@@ -578,6 +578,22 @@ export const fetchEpicWorkload = async (epicKey) => {
   return requestJson(`/api/jira/epics/${encodeURIComponent(String(epicKey || "").trim())}/workload`);
 };
 
+// selectedIds omitted/null/undefined means "no filter" (fetch every
+// entry - the original, backward-compatible behavior). selectedIds as an
+// explicit empty array means the PM deliberately deselected everything,
+// which must return nothing, not silently fall back to "fetch all" -
+// short-circuits before the request entirely rather than relying on the
+// query-string construction to tell those two cases apart.
+export const fetchCapacityPlanning = async (selectedIds) => {
+  if (Array.isArray(selectedIds) && selectedIds.length === 0) {
+    return [];
+  }
+  const idList = Array.isArray(selectedIds) ? selectedIds.filter((id) => id !== null && id !== undefined) : null;
+  const query = idList && idList.length > 0 ? `?ids=${idList.map((id) => encodeURIComponent(id)).join(",")}` : "";
+  const data = await requestJson(`/api/project-managers/capacity${query}`);
+  return data?.items || [];
+};
+
 export const searchEpics = async (query) => {
   const q = String(query || "").trim();
   if (q.length < 2) {
@@ -688,13 +704,13 @@ export const deleteArchivedReportsBySource = async (source) => {
   });
 };
 
-export const saveAdHocReport = async ({ content, label, userPrompt, provider }) => {
+export const saveAdHocReport = async ({ content, label, userPrompt, provider, savedFrom }) => {
   return requestJson("/api/reports/archive", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ content, label, userPrompt, provider, ...getLocalTimestampPayload() }),
+    body: JSON.stringify({ content, label, userPrompt, provider, savedFrom, ...getLocalTimestampPayload() }),
   });
 };
 
