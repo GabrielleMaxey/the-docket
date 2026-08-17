@@ -1,9 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Container, Header, Message, Segment, Button } from "semantic-ui-react";
-import { fetchCapacityPlanning } from "../services/jiraClient";
+import { fetchCapacityPlanning, fetchWatchedAssignees } from "../services/jiraClient";
 import { getStatusColor } from "../utils/statusScale";
 import { buildWorkWeekHref } from "../utils/workWeekNavigation";
+import { usePersistedState } from "./hooks/usePersistedState";
 import "./projectManagers.css";
 
 // Same backslash-then-quote convention used for JQL string literals
@@ -265,26 +266,78 @@ const CapacityCard = ({ item }) => {
 };
 
 const ProjectManagers = () => {
+  const [allEntries, setAllEntries] = React.useState([]);
+  const [entriesLoaded, setEntriesLoaded] = React.useState(false);
+  // null (not yet in localStorage) means "not initialized yet" - once
+  // allEntries loads, this defaults to every entry selected so existing
+  // users don't lose visibility of anything they already had. From then
+  // on it's always a real array, including an explicitly empty one if
+  // the PM deselects everything - that must show nothing, not silently
+  // fall back to "show everything" (fetchCapacityPlanning enforces the
+  // same distinction server-side).
+  const [selectedIds, setSelectedIds] = usePersistedState("pm-selected-entry-ids", null, {
+    sanitize: (parsed) => (Array.isArray(parsed) ? parsed.filter((id) => Number.isFinite(id)) : null),
+  });
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
 
+  const loadEntries = React.useCallback(async () => {
+    try {
+      const data = await fetchWatchedAssignees();
+      const selectable = (data || []).filter((entry) => entry.watchType !== "direct_reports");
+      setAllEntries(selectable);
+    } catch {
+      setAllEntries([]);
+    } finally {
+      setEntriesLoaded(true);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadEntries();
+  }, [loadEntries]);
+
+  // Only runs once, the first time allEntries is available AND no
+  // selection has ever been persisted - initializes to "everything on",
+  // then this effect never fires again since selectedIds is no longer null.
+  React.useEffect(() => {
+    if (entriesLoaded && selectedIds === null) {
+      setSelectedIds(allEntries.map((entry) => entry.id));
+    }
+  }, [entriesLoaded, selectedIds, allEntries, setSelectedIds]);
+
   const load = React.useCallback(async () => {
+    if (selectedIds === null) {
+      // Still waiting on the entries list / initial selection - avoid a
+      // flash of "no entries selected" before that resolves.
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      const data = await fetchCapacityPlanning();
+      const data = await fetchCapacityPlanning(selectedIds);
       setItems(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load capacity data");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedIds]);
 
   React.useEffect(() => {
     void load();
   }, [load]);
+
+  const toggleEntry = (id) => {
+    setSelectedIds((prev) => {
+      const current = Array.isArray(prev) ? prev : [];
+      return current.includes(id) ? current.filter((existing) => existing !== id) : [...current, id];
+    });
+  };
+
+  const selectAllEntries = () => setSelectedIds(allEntries.map((entry) => entry.id));
+  const clearAllEntries = () => setSelectedIds([]);
 
   const overCount = items.filter((item) => !item.error && capacityStatus(item.openCount, item.capacity) === "over").length;
   const withTargetCount = items.filter((item) => item.capacity !== null && item.capacity !== undefined).length;
@@ -302,25 +355,61 @@ const ProjectManagers = () => {
     return b.openCount - a.openCount;
   });
 
+  const currentSelection = Array.isArray(selectedIds) ? selectedIds : [];
+
   return (
     <Container className="project-managers-page">
       <Header as="h1">
         <span aria-hidden="true">📐</span> Project Managers
       </Header>
       <p className="ww-copy">
-        Capacity planning: shows every Contributor Metrics entry's current open-issue count,
-        status breakdown, and risk signals (overdue, blocked, stale) — compared against a
+        Capacity planning: shows every selected Contributor Metrics entry's current open-issue
+        count, status breakdown, and risk signals (overdue, blocked, stale) — compared against a
         capacity target where one is set in Settings → Contributor Metrics. A raw count alone
         doesn't say whether work is actually moving; the breakdown does. Entries without a
         capacity target still show up here with their live data, just without a comparison bar.
       </p>
+
+      {allEntries.length > 0 ? (
+        <Segment className="pm-selector">
+          <div className="pm-selector-head">
+            <span className="pm-selector-title">
+              Show ({currentSelection.length} of {allEntries.length})
+            </span>
+            <span className="pm-selector-actions">
+              <button type="button" className="pm-selector-action" onClick={selectAllEntries}>
+                Select all
+              </button>
+              <button type="button" className="pm-selector-action" onClick={clearAllEntries}>
+                Clear
+              </button>
+            </span>
+          </div>
+          <div className="pm-selector-chips">
+            {allEntries.map((entry) => {
+              const active = currentSelection.includes(entry.id);
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  className={`pm-selector-chip${active ? " pm-selector-chip--active" : ""}`}
+                  onClick={() => toggleEntry(entry.id)}
+                  aria-pressed={active}
+                >
+                  {entry.displayName}
+                </button>
+              );
+            })}
+          </div>
+        </Segment>
+      ) : null}
 
       <Segment>
         <div className="pm-toolbar">
           <span>
             {loading
               ? "Loading…"
-              : `${items.length} entr${items.length === 1 ? "y" : "ies"} · ${withTargetCount} with a capacity target${
+              : `${items.length} entr${items.length === 1 ? "y" : "ies"} shown · ${withTargetCount} with a capacity target${
                   overCount > 0 ? ` · ${overCount} over capacity` : ""
                 }${staleTotalCount > 0 ? ` · ${staleTotalCount} stale issues total` : ""}`}
           </span>
@@ -332,11 +421,11 @@ const ProjectManagers = () => {
 
       {error ? (
         <Message negative>{error}</Message>
-      ) : !loading && items.length === 0 ? (
+      ) : !loading && currentSelection.length === 0 && entriesLoaded ? (
         <Message info>
-          No Contributor Metrics entries yet. Go to Settings → Contributor Metrics to add a
-          person, reporter, preset, or custom query — it'll show up here automatically, with or
-          without a capacity target.
+          {allEntries.length === 0
+            ? "No Contributor Metrics entries yet. Go to Settings → Contributor Metrics to add a person, reporter, preset, or custom query — it'll show up here automatically, with or without a capacity target."
+            : "Nothing selected above. Pick one or more entries to see their capacity data."}
         </Message>
       ) : (
         <div className="pm-capacity-grid">
