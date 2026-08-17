@@ -53,6 +53,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
   const [watchType, setWatchType] = React.useState("person");
   const [watchedCapacity, setWatchedCapacity] = React.useState("");
   const [quickPickValue, setQuickPickValue] = React.useState("");
+  const [editingId, setEditingId] = React.useState(null);
   const [capacityDrafts, setCapacityDrafts] = React.useState({});
   const [savingCapacityId, setSavingCapacityId] = React.useState(null);
   const [flash, setFlash] = useFlash();
@@ -115,10 +116,51 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
     });
   };
 
-  const handleAddWatchedAssignee = async () => {
+  const resetForm = () => {
+    setWatchedName("");
+    setWatchedJql("");
+    setWatchedReporterJql("");
+    setWatchedPresetId("");
+    setWatchType("person");
+    setWatchedCapacity("");
+    setQuickPickValue("");
+    setEditingId(null);
+  };
+
+  // Loads an existing entry's fields into the same form used for adding,
+  // so changing anything about it (label, query, capacity) is one Update
+  // click instead of deleting and re-adding - which duplicated effort and
+  // risked ending up with two rows for the same person if the delete was
+  // missed. "preset" mode is never inferred here even if the entry's JQL
+  // happens to match a saved preset exactly - there's no reliable way to
+  // tell that from the stored data, and "Custom query" with the JQL
+  // pre-filled is the safe, always-correct edit path for any jql-type entry.
+  const handleEditClick = (person) => {
+    setEditingId(person.id);
+    setWatchedName(person.displayName);
+    setWatchedPresetId("");
+    setQuickPickValue("");
+    setWatchedCapacity(person.capacity === null || person.capacity === undefined ? "" : String(person.capacity));
+    if (person.watchType === "jql" && isReporterWatchJql(person.jql)) {
+      setWatchType("reporter");
+      setWatchedReporterJql(person.jql || "");
+      setWatchedJql("");
+    } else if (person.watchType === "jql") {
+      setWatchType("jql");
+      setWatchedJql(person.jql || "");
+      setWatchedReporterJql("");
+    } else {
+      setWatchType("person");
+      setWatchedJql("");
+      setWatchedReporterJql("");
+    }
+  };
+
+  const handleSubmit = async () => {
     const displayName = watchedName.trim();
     const isReporter = watchType === "reporter";
     const isPreset = watchType === "preset";
+    const isEditing = editingId !== null;
     const selectedPreset = isPreset ? epicPresets.find((p) => String(p.id) === String(watchedPresetId)) : null;
     const jql = isReporter
       ? watchedReporterJql.trim() || buildReporterJql(displayName)
@@ -131,33 +173,39 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
     if (watchType === "jql" && !jql) { onError("JQL is required for a custom query entry."); return; }
     if (isPreset && !jql) { onError("Pick a saved preset first."); return; }
     onError("");
+    const payload = {
+      displayName,
+      watchType: isReporter || isPreset ? "jql" : watchType,
+      jql: watchType === "jql" || isReporter || isPreset ? jql : "",
+      capacity: watchedCapacity.trim() === "" ? null : watchedCapacity.trim(),
+    };
     try {
-      await createWatchedAssignee({
-        displayName,
-        watchType: isReporter || isPreset ? "jql" : watchType,
-        jql: watchType === "jql" || isReporter || isPreset ? jql : "",
-        sortOrder: watchedAssignees.length,
-        capacity: watchedCapacity.trim() === "" ? null : watchedCapacity.trim(),
-      });
-      setWatchedName("");
-      setWatchedJql("");
-      setWatchedReporterJql("");
-      setWatchedPresetId("");
-      setWatchType("person");
-      setWatchedCapacity("");
-      setQuickPickValue("");
+      if (isEditing) {
+        const existing = watchedAssignees.find((p) => p.id === editingId);
+        await updateWatchedAssignee(editingId, {
+          ...payload,
+          memberNames: existing?.memberNames,
+          resolvedAccountId: existing?.resolvedAccountId,
+          sortOrder: existing?.sortOrder ?? watchedAssignees.length,
+        });
+      } else {
+        await createWatchedAssignee({ ...payload, sortOrder: watchedAssignees.length });
+      }
+      resetForm();
       setWatchedAssignees(await fetchWatchedAssignees());
       setFlash(
-        watchType === "jql"
-          ? "Custom query added."
-          : isReporter
-            ? "Reporter watch added."
-            : isPreset
-              ? "Added from preset."
-              : "Person added."
+        isEditing
+          ? "Entry updated."
+          : watchType === "jql"
+            ? "Custom query added."
+            : isReporter
+              ? "Reporter watch added."
+              : isPreset
+                ? "Added from preset."
+                : "Person added."
       );
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Failed to add entry");
+      onError(err instanceof Error ? err.message : `Failed to ${isEditing ? "update" : "add"} entry`);
     }
   };
 
@@ -165,6 +213,9 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
     onError("");
     try {
       await deleteWatchedAssignee(id);
+      if (editingId === id) {
+        resetForm();
+      }
       setWatchedAssignees(await fetchWatchedAssignees());
       setFlash("Entry removed.");
     } catch (err) {
@@ -279,6 +330,9 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
                   />
                 </Table.Cell>
                 <Table.Cell collapsing>
+                  <Button size="mini" basic onClick={() => handleEditClick(person)} disabled={editingId === person.id}>
+                    {editingId === person.id ? "Editing…" : "Edit"}
+                  </Button>{" "}
                   <Button size="mini" negative onClick={() => handleDeleteWatchedAssignee(person.id)}>Remove</Button>
                 </Table.Cell>
               </Table.Row>
@@ -286,6 +340,12 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
           )}
         </Table.Body>
       </Table>
+      {editingId !== null ? (
+        <Message size="small" style={{ marginTop: "1rem", marginBottom: 0 }}>
+          Editing <strong>{watchedAssignees.find((p) => p.id === editingId)?.displayName}</strong> — change
+          anything below and click Update, or Cancel to discard.
+        </Message>
+      ) : null}
       <Form style={{ marginTop: "1rem" }} onSubmit={(e) => e.preventDefault()}>
         <Form.Select
           label="Type"
@@ -390,7 +450,14 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
           value={watchedCapacity}
           onChange={(_e, { value }) => setWatchedCapacity(value)}
         />
-        <Button onClick={handleAddWatchedAssignee}>Add</Button>
+        <Button primary={editingId !== null} onClick={handleSubmit}>
+          {editingId !== null ? "Update" : "Add"}
+        </Button>
+        {editingId !== null ? (
+          <Button basic style={{ marginLeft: "0.5rem" }} onClick={resetForm}>
+            Cancel
+          </Button>
+        ) : null}
         {flash ? <Message positive size="mini" style={{ marginTop: "0.75rem" }}>✓ {flash}</Message> : null}
       </Form>
     </SettingsSection>
