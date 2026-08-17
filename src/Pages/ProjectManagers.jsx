@@ -204,14 +204,34 @@ const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contri
               ) : (
                 <span title="Open issues within this query">{count} here</span>
               )}
-              {hasTotal ? (
+              {name === "Unassigned" ? null : hasTotal ? (
                 <>
                   {" · "}
                   <Link to={totalHref} className="pm-contributor-row-total" title="Total open issues everywhere">
                     {total} total
                   </Link>
                 </>
-              ) : null}
+              ) : (
+                // Not 0 - that would claim they have no open work at all,
+                // which is false (their "here" count alone disproves it).
+                // Not their in-scope count either - that's already shown
+                // right next to this and would just look like the same
+                // number repeated under a different, misleading label.
+                // This is Jira's own assignee="display name" JQL lookup
+                // failing to resolve for this specific person (confirmed
+                // live, and confirmed by the user as an expected quirk
+                // for at least one real name) - saying so plainly beats
+                // guessing at a number that might be wrong.
+                <>
+                  {" · "}
+                  <span
+                    className="pm-contributor-row-total pm-contributor-row-total--unknown"
+                    title="Couldn't resolve this person's total workload"
+                  >
+                    total unknown
+                  </span>
+                </>
+              )}
             </span>
           </div>
         );
