@@ -64,8 +64,8 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
   );
   const getWatchedAssigneeStmt = db.prepare("SELECT * FROM watched_assignees WHERE id = ?");
   const insertWatchedAssigneeStmt = db.prepare(`
-    INSERT INTO watched_assignees (display_name, resolved_account_id, watch_type, jql, member_names_json, sort_order)
-    VALUES (@displayName, @resolvedAccountId, @watchType, @jql, @memberNamesJson, @sortOrder)
+    INSERT INTO watched_assignees (display_name, resolved_account_id, watch_type, jql, member_names_json, sort_order, capacity)
+    VALUES (@displayName, @resolvedAccountId, @watchType, @jql, @memberNamesJson, @sortOrder, @capacity)
   `);
   const updateWatchedAssigneeStmt = db.prepare(`
     UPDATE watched_assignees SET
@@ -74,7 +74,8 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
       watch_type = @watchType,
       jql = @jql,
       member_names_json = @memberNamesJson,
-      sort_order = @sortOrder
+      sort_order = @sortOrder,
+      capacity = @capacity
     WHERE id = @id
   `);
   const deleteWatchedAssigneeStmt = db.prepare("DELETE FROM watched_assignees WHERE id = ?");
@@ -164,6 +165,16 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
       return { error: "Add at least one contributor name" };
     }
 
+    // Capacity is optional and nullable (no target configured), never
+    // undefined - better-sqlite3 requires an explicit value or null for a
+    // bound named parameter. Explicit "" or null in the request clears an
+    // existing target rather than falling back to it.
+    const rawCapacity = body?.capacity !== undefined ? body.capacity : existing?.capacity;
+    const capacity =
+      rawCapacity === null || rawCapacity === "" || rawCapacity === undefined
+        ? null
+        : Math.max(0, Math.round(Number(rawCapacity)) || 0);
+
     return {
       displayName,
       watchType,
@@ -171,6 +182,7 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
       memberNamesJson: watchType === "direct_reports" ? JSON.stringify(memberNames) : "[]",
       resolvedAccountId: String(body?.resolvedAccountId ?? existing?.resolved_account_id ?? "").trim(),
       sortOrder: Number(body?.sortOrder ?? existing?.sort_order ?? 0),
+      capacity,
     };
   };
 

@@ -106,7 +106,7 @@ Keep answers short. Always include the issue key. Use bullet points.
 
 ---
 
-## Work Week (nav label: "My Tasks") — daily driver
+## Work Week (nav label: "Task Management") — daily driver
 
 This is the main screen for managing your open work.
 
@@ -271,7 +271,7 @@ Use Dashboard when you want to see how a whole project (or several) is tracking,
 
 The stored snapshot stays until you click **Refresh status** again. The page loads from the last snapshot even if Jira is slow. You can navigate away while refresh runs — watch the top nav for **Refreshing dashboard** and return when it finishes.
 
-### Jump to Work Week from Dashboard (via the "My Tasks" nav link)
+### Jump to Work Week from Dashboard (via the "Task Management" nav link)
 
 Many Dashboard lists link into **Work Week** with filters already applied:
 

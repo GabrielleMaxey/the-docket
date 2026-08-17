@@ -547,10 +547,10 @@ const ReportArchivePanel = ({
 const ReportArchive = () => {
   const panes = [
     {
-      menuItem: "My Tasks",
+      menuItem: "Task Management",
       render: () => (
         <Tab.Pane attached={false}>
-          <ReportArchivePanel source="work_week" title="My Tasks reports" />
+          <ReportArchivePanel source="work_week" title="Task Management reports" />
         </Tab.Pane>
       ),
     },
