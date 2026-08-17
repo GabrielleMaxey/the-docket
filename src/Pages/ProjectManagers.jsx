@@ -123,6 +123,61 @@ const RiskFlags = ({ scopeJql, displayName, overdueCount, blockedCount, staleCou
   );
 };
 
+// Each person's share of THIS entry's own query - not their total
+// workload. A jql-type entry scoped to one project/initiative only ever
+// sees the slice of a person's work that falls inside it; the same
+// person could carry a much larger load entirely outside this scope.
+// Explicitly labeled "Share of this query" rather than anything implying
+// it's someone's whole plate - a flat "workload" label here would be
+// actively misleading for anyone also working outside this entry's scope.
+// Only rendered for entries with more than one distinct contributor -
+// a Person/Reporter-type entry (or a jql entry that happens to resolve
+// to one person) has nothing to break down.
+const CONTRIBUTOR_BREAKDOWN_LIMIT = 6;
+
+const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts }) => {
+  const entries = Object.entries(contributorCounts || {}).sort((a, b) => b[1] - a[1]);
+  if (entries.length <= 1) return null;
+  const shown = entries.slice(0, CONTRIBUTOR_BREAKDOWN_LIMIT);
+  const remaining = entries.length - shown.length;
+
+  return (
+    <div className="pm-contributor-breakdown">
+      <div className="pm-contributor-breakdown-label">Share of this query</div>
+      {shown.map(([name, count]) => {
+        // "Unassigned" isn't a literal assignee name in Jira - it must be
+        // queried as assignee is EMPTY, not assignee = "Unassigned" (a
+        // literal string match against a field with no value there would
+        // just fail to match anything at all). statusCategory != Done is
+        // required too, or this link would show that person's closed
+        // issues in scope as well - which would silently disagree with
+        // the open-only count displayed right next to it (confirmed live:
+        // a real person here has 8 open issues but 10 total, so the two
+        // clauses genuinely diverge, not just in theory).
+        const assigneeClause = name === "Unassigned" ? "assignee is EMPTY" : `assignee = "${escapeJqlString(name)}"`;
+        const clause = `${assigneeClause} AND statusCategory != Done`;
+        const href = drillDownHref(scopeJql, clause, `${displayName} — ${name}`);
+        const inner = (
+          <>
+            <span>{name}</span>
+            <strong>{count}</strong>
+          </>
+        );
+        return href ? (
+          <Link key={name} to={href} className="pm-contributor-row pm-contributor-row--link">
+            {inner}
+          </Link>
+        ) : (
+          <div key={name} className="pm-contributor-row">
+            {inner}
+          </div>
+        );
+      })}
+      {remaining > 0 ? <div className="pm-contributor-more">+{remaining} more</div> : null}
+    </div>
+  );
+};
+
 const CapacityCard = ({ item }) => {
   const {
     displayName,
@@ -131,6 +186,7 @@ const CapacityCard = ({ item }) => {
     openCount,
     scopeJql,
     statusCounts,
+    contributorCounts,
     overdueCount,
     blockedCount,
     staleCount,
@@ -177,6 +233,7 @@ const CapacityCard = ({ item }) => {
             staleCount={staleCount}
           />
           <StatusBreakdown scopeJql={scopeJql} displayName={displayName} statusCounts={statusCounts} />
+          <ContributorBreakdown scopeJql={scopeJql} displayName={displayName} contributorCounts={contributorCounts} />
         </>
       )}
     </div>

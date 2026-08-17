@@ -196,3 +196,50 @@
   filter: brightness(0.95);
   text-decoration: none;
 }
+
+.pm-contributor-breakdown {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.pm-contributor-breakdown-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-bottom: 0.4rem;
+}
+
+.pm-contributor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #334155;
+  padding: 0.15rem 0;
+}
+
+.pm-contributor-row strong {
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.pm-contributor-row--link {
+  cursor: pointer;
+}
+
+.pm-contributor-row--link:hover {
+  color: #0c93d9;
+}
+
+.pm-contributor-row--link:hover strong {
+  color: #0c93d9;
+}
+
+.pm-contributor-more {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  padding-top: 0.2rem;
+}
