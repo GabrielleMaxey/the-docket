@@ -140,11 +140,16 @@ const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contri
   const [expanded, setExpanded] = React.useState(false);
   const entries = Object.entries(contributorCounts || {}).sort((a, b) => b[1] - a[1]);
   if (entries.length <= 1) return null;
-  // Total-workload lookups are only fetched server-side for the top 6
-  // (CONTRIBUTOR_TOTAL_LIMIT in capacityPlanning.mjs), to keep this one
-  // extra Jira call per entry regardless of contributor count - so rows
-  // beyond that, once expanded, correctly show only "N here" with no
-  // "· N total" rather than a fabricated or missing-looking number.
+  // Total-workload lookups now cover every distinct contributor, not just
+  // the top 6 (see fetchContributorTotalWorkloads in capacityPlanning.mjs
+  // for why the earlier top-6 cutoff was removed) - so once expanded,
+  // rows beyond the initial 6 should have a total too, same as the rest.
+  // A handful of names can still legitimately end up without one if
+  // Jira's own name-based JQL matching can't resolve them (a pre-existing
+  // limitation of assignee="display name" lookups used throughout this
+  // feature, not something specific to this list) - hasTotal below uses
+  // a strict typeof check so those rows just show "N here" with nothing
+  // false or fabricated next to it, rather than a misleading "0 total".
   const shown = expanded ? entries : entries.slice(0, CONTRIBUTOR_BREAKDOWN_LIMIT);
   const remaining = entries.length - Math.min(entries.length, CONTRIBUTOR_BREAKDOWN_LIMIT);
 
@@ -168,8 +173,12 @@ const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contri
         // is what actually answers "do they have room for new work?" - a
         // low in-scope number can hide someone who's already buried
         // elsewhere (confirmed live: one real person here shows 8 in this
-        // query but 43 open everywhere). Only fetched for the top
-        // contributors shown here, not everyone in contributorCounts.
+        // query but 43 open everywhere), and just as importantly, the
+        // reverse: a low total means real availability regardless of how
+        // small their in-scope share looks. Fetched for every distinct
+        // contributor, not just the ones shown before expanding - a PM
+        // comparing availability needs this across everyone, not only
+        // whoever happens to have the most in-scope work already.
         // (A middle "in project" tier was tried between these two and
         // removed per user feedback - three numbers this close together
         // read as noise, not signal; two clear numbers work better.)
