@@ -17,6 +17,13 @@
   gap: 0.75rem;
   font-size: 0.85rem;
   color: #334155;
+  flex-wrap: wrap;
+}
+
+.pm-toolbar-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .pm-capacity-grid {
