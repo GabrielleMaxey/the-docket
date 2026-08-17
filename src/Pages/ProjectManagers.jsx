@@ -135,7 +135,7 @@ const RiskFlags = ({ scopeJql, displayName, overdueCount, blockedCount, staleCou
 // to one person) has nothing to break down.
 const CONTRIBUTOR_BREAKDOWN_LIMIT = 6;
 
-const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts }) => {
+const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contributorTotalCounts }) => {
   const entries = Object.entries(contributorCounts || {}).sort((a, b) => b[1] - a[1]);
   if (entries.length <= 1) return null;
   const shown = entries.slice(0, CONTRIBUTOR_BREAKDOWN_LIMIT);
@@ -157,19 +157,37 @@ const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts }) => {
         const assigneeClause = name === "Unassigned" ? "assignee is EMPTY" : `assignee = "${escapeJqlString(name)}"`;
         const clause = `${assigneeClause} AND statusCategory != Done`;
         const href = drillDownHref(scopeJql, clause, `${displayName} — ${name}`);
-        const inner = (
-          <>
-            <span>{name}</span>
-            <strong>{count}</strong>
-          </>
-        );
-        return href ? (
-          <Link key={name} to={href} className="pm-contributor-row pm-contributor-row--link">
-            {inner}
-          </Link>
-        ) : (
+        // Total workload (unscoped - no project/query restriction at all)
+        // is what actually answers "do they have room for new work?" - a
+        // low in-scope number can hide someone who's already buried
+        // elsewhere (confirmed live: one real person here shows 8 in this
+        // query but 43 open everywhere). Only fetched for the top
+        // contributors shown here, not everyone in contributorCounts.
+        const total = contributorTotalCounts?.[name];
+        const hasTotal = name !== "Unassigned" && typeof total === "number";
+        const totalHref = hasTotal
+          ? buildWorkWeekHref({ jql: `assignee = "${escapeJqlString(name)}" AND statusCategory != Done`, label: `${name} — All open work` })
+          : null;
+        return (
           <div key={name} className="pm-contributor-row">
-            {inner}
+            {href ? (
+              <Link to={href} className="pm-contributor-row-name pm-contributor-row-name--link">
+                {name}
+              </Link>
+            ) : (
+              <span className="pm-contributor-row-name">{name}</span>
+            )}
+            <span className="pm-contributor-row-counts">
+              <span title="Open issues within this query">{count} here</span>
+              {hasTotal ? (
+                <>
+                  {" · "}
+                  <Link to={totalHref} className="pm-contributor-row-total" title="Total open issues everywhere">
+                    {total} total
+                  </Link>
+                </>
+              ) : null}
+            </span>
           </div>
         );
       })}
@@ -187,6 +205,7 @@ const CapacityCard = ({ item }) => {
     scopeJql,
     statusCounts,
     contributorCounts,
+    contributorTotalCounts,
     overdueCount,
     blockedCount,
     staleCount,
@@ -233,7 +252,12 @@ const CapacityCard = ({ item }) => {
             staleCount={staleCount}
           />
           <StatusBreakdown scopeJql={scopeJql} displayName={displayName} statusCounts={statusCounts} />
-          <ContributorBreakdown scopeJql={scopeJql} displayName={displayName} contributorCounts={contributorCounts} />
+          <ContributorBreakdown
+            scopeJql={scopeJql}
+            displayName={displayName}
+            contributorCounts={contributorCounts}
+            contributorTotalCounts={contributorTotalCounts}
+          />
         </>
       )}
     </div>

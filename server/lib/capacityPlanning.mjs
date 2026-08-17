@@ -52,6 +52,45 @@ const buildScopeJql = (watched) => {
 
 const buildOpenCountJql = (scopeJql) => (scopeJql ? `(${scopeJql}) AND statusCategory != Done` : "");
 
+// A PM deciding whether someone can take on new work needs two different
+// numbers: their share of THIS project/query (computeIssueBreakdown,
+// below) and their total open workload everywhere else too - a person
+// could look lightly loaded within one project while already buried
+// elsewhere. This fetches the second number for the top contributors in
+// one batched query (assignee in (...) AND statusCategory != Done, no
+// scope restriction - deliberately cross-project), rather than one query
+// per person, which would multiply Jira calls by contributor count on
+// entries with many people (one real entry here has 20+).
+const CONTRIBUTOR_TOTAL_LIMIT = 6;
+
+const fetchContributorTotalWorkloads = async ({ contributorCounts, runJiraSearchRequest }) => {
+  const names = Object.keys(contributorCounts || {})
+    .filter((name) => name !== "Unassigned")
+    .sort((a, b) => contributorCounts[b] - contributorCounts[a])
+    .slice(0, CONTRIBUTOR_TOTAL_LIMIT);
+  if (names.length === 0) {
+    return {};
+  }
+
+  const nameList = names.map((name) => `"${escapeJqlString(name)}"`).join(", ");
+  const jql = `assignee in (${nameList}) AND statusCategory != Done`;
+
+  try {
+    const { issues } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 500 });
+    const totals = {};
+    for (const issue of issues || []) {
+      const assigneeName = String(issue?.fields?.assignee?.displayName || "").trim();
+      if (!assigneeName) continue;
+      totals[assigneeName] = (totals[assigneeName] || 0) + 1;
+    }
+    return totals;
+  } catch {
+    // Non-fatal - the card still shows in-scope numbers fine without
+    // totals; a failed total-workload lookup shouldn't break the entry.
+    return {};
+  }
+};
+
 // Computed entirely from fields the default search field set
 // (getJiraSearchFields) already returns - status, duedate, updated,
 // assignee - so this adds zero extra Jira calls beyond the one search per
@@ -145,6 +184,7 @@ export const fetchCapacityWorkloads = async ({ watchedRows, jiraRequest, runJira
           openCount: 0,
           statusCounts: {},
           contributorCounts: {},
+          contributorTotalCounts: {},
           overdueCount: 0,
           blockedCount: 0,
           staleCount: 0,
@@ -154,13 +194,24 @@ export const fetchCapacityWorkloads = async ({ watchedRows, jiraRequest, runJira
       }
       const { issues } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 500 });
       const breakdown = computeIssueBreakdown(issues || []);
-      results.push({ ...base, openCount: (issues || []).length, ...breakdown, error: null });
+      const contributorTotalCounts = await fetchContributorTotalWorkloads({
+        contributorCounts: breakdown.contributorCounts,
+        runJiraSearchRequest,
+      });
+      results.push({
+        ...base,
+        openCount: (issues || []).length,
+        ...breakdown,
+        contributorTotalCounts,
+        error: null,
+      });
     } catch (error) {
       results.push({
         ...base,
         openCount: 0,
         statusCounts: {},
         contributorCounts: {},
+        contributorTotalCounts: {},
         overdueCount: 0,
         blockedCount: 0,
         staleCount: 0,
