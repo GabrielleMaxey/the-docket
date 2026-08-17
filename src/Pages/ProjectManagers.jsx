@@ -475,6 +475,98 @@ const buildCapacityReportMarkdown = (sortedItems) => {
   return lines.join("\n");
 };
 
+// Standard CSV field escaping: wrap in quotes if the field contains a
+// comma, quote, or newline, doubling any embedded quotes - the minimum
+// needed for a CSV that any spreadsheet app will parse correctly rather
+// than mis-splitting on a comma inside a JQL snippet or issue summary.
+const escapeCsvField = (value) => {
+  const str = String(value === null || value === undefined ? "" : value);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+};
+
+const csvRow = (fields) => fields.map(escapeCsvField).join(",");
+
+// CSV is inherently flat, so this picks the most useful single unit to
+// put one row per: a (entry, contributor) pair, since that's what a PM
+// actually wants to sort/filter/pivot on in a spreadsheet (e.g. "show me
+// everyone with more than 20 total open issues, across every entry").
+// Entry-level fields (capacity, open count, risk counts) repeat on every
+// row for that entry so each row is self-contained and still makes sense
+// filtered or sorted in isolation from the rest of the file. Entries with
+// only one contributor (Person/Reporter types, or a jql entry that
+// happens to resolve to one person) still get exactly one row, with the
+// contributor columns describing that one person - never a blank row
+// just because there's nothing to "break down" in the UI sense.
+// The key is appended as extra rows after a blank separator, using the
+// same shape (label in column 1, description in column 2, rest blank)
+// so it stays valid CSV rather than a differently-shaped tail.
+const CSV_HEADER = [
+  "Entry",
+  "Type",
+  "Open Count",
+  "Capacity",
+  "Capacity Status",
+  "Overdue",
+  "Blocked",
+  "Stale (14d+)",
+  "Assignee",
+  "Here",
+  "Total",
+];
+
+const buildCapacityReportCsv = (sortedItems) => {
+  const rows = [csvRow(CSV_HEADER)];
+
+  for (const item of sortedItems) {
+    const { displayName, watchType, capacity, openCount, contributorCounts, contributorTotalCounts } = item;
+    if (item.error) {
+      rows.push(csvRow([displayName, watchType, "", "", "", "", "", "", "", "", `Error: ${item.error}`]));
+      continue;
+    }
+    const status = capacityStatus(openCount, capacity);
+    const hasCapacity = capacity !== null && capacity !== undefined;
+    const entryFields = [
+      displayName,
+      watchType === "jql" ? "Custom query" : "Person",
+      openCount,
+      hasCapacity ? capacity : "",
+      hasCapacity ? status : "No target",
+      item.overdueCount || 0,
+      item.blockedCount || 0,
+      item.staleCount || 0,
+    ];
+
+    const contributorEntries = Object.entries(contributorCounts || {}).sort((a, b) => b[1] - a[1]);
+    if (contributorEntries.length === 0) {
+      rows.push(csvRow([...entryFields, "", "", ""]));
+      continue;
+    }
+    for (const [name, count] of contributorEntries) {
+      const total = contributorTotalCounts?.[name];
+      const totalField = name === "Unassigned" ? "" : typeof total === "number" ? total : "N/A";
+      rows.push(csvRow([...entryFields, name, count, totalField]));
+    }
+  }
+
+  rows.push("");
+  rows.push(csvRow(["Key", ""]));
+  rows.push(csvRow(["Capacity bar", "Within capacity"]));
+  rows.push(csvRow(["Capacity bar", "Near capacity (85%+ of target)"]));
+  rows.push(csvRow(["Capacity bar", "Over capacity"]));
+  rows.push(csvRow(["Risk flag", "Overdue - past its due date"]));
+  rows.push(csvRow(["Risk flag", "Blocked - status is Blocked or On Hold"]));
+  rows.push(csvRow(["Risk flag", "Stale - not updated in 14+ days"]));
+  rows.push(
+    csvRow([
+      "Column",
+      'Here = open issues within that entry\'s specific query. Total = all open issues everywhere for that person. "By status" and "by assignee" are two independent breakdowns of the same issues, not sequential.',
+    ])
+  );
+  rows.push(csvRow(["Column", "N/A total = Jira could not resolve a total for that name; a data gap, not a real zero."]));
+
+  return rows.join("\r\n");
+};
+
 const ProjectManagers = () => {
   const [allEntries, setAllEntries] = React.useState([]);
   const [entriesLoaded, setEntriesLoaded] = React.useState(false);
@@ -583,6 +675,24 @@ const ProjectManagers = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadCsv = () => {
+    if (sortedItems.length === 0) return;
+    const content = buildCapacityReportCsv(sortedItems);
+    // \ufeff (UTF-8 BOM) so Excel opens accented/unicode characters (the
+    // — em dashes and non-ASCII names throughout this data) correctly
+    // instead of mangling them - a real issue with plain UTF-8 CSVs in
+    // Excel specifically, not a hypothetical one.
+    const blob = new Blob([`\ufeff${content}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `capacity_planning_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
   const handleSaveToReports = async () => {
     if (sortedItems.length === 0) return;
     setSaving(true);
@@ -671,7 +781,10 @@ const ProjectManagers = () => {
               Save to Reports
             </Button>
             <Button size="small" basic onClick={handleDownload} disabled={loading || sortedItems.length === 0}>
-              Download
+              Download (.md)
+            </Button>
+            <Button size="small" basic onClick={handleDownloadCsv} disabled={loading || sortedItems.length === 0}>
+              Download (.csv)
             </Button>
             <Button size="small" basic onClick={load} loading={loading} disabled={loading}>
               Refresh
