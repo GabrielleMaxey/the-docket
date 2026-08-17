@@ -616,11 +616,23 @@ export const createJiraIssue = async (payload) => {
   });
 };
 
-export const generateIssueDescription = async ({ summary, issueType, epicKey, epicName }) => {
+export const generateIssueDescription = async ({
+  summary,
+  issueType,
+  epicKey,
+  epicName,
+  intake,
+}) => {
   return requestJson("/api/jira/issues/generate-description", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ summary, issueType, epicKey: epicKey || "", epicName: epicName || "" }),
+    body: JSON.stringify({
+      summary,
+      issueType,
+      epicKey: epicKey || "",
+      epicName: epicName || "",
+      intake: intake || null,
+    }),
   });
 };
 

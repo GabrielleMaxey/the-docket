@@ -380,7 +380,12 @@ export const STORY_EVALUATION_RULES = `Story goal evaluation (required):
 - When needsClarification is true: ask exactly 2–3 targeted questions (never more than 3), return "subtasks": [], and still return your best partial summary/overview draft.
 - Only propose subtasks when the story is fully defined.`;
 
-export const buildAiDraftSystemPrompt = ({ isStory, isBug }) =>
+export const buildAiDraftSystemPrompt = ({ isStory, isBug, hasIntake = false }) => {
+  const base = buildAiDraftBaseSystemPrompt({ isStory, isBug });
+  return hasIntake ? `${base}\n\n${AI_HELPER_INTAKE_RULES}` : base;
+};
+
+const buildAiDraftBaseSystemPrompt = ({ isStory, isBug }) =>
     isStory
       ? `You are a Jira issue writer for the Operations Devops Itential (ODI) program at Lumen.
 
@@ -426,12 +431,28 @@ ODI Task standards:
 
 ${DESCRIPTION_FORMAT_RULES}`;
 
-export const buildAiDraftUserPrompt = ({ summary, context, isStory, isBug }) =>
-    isStory
+export const AI_HELPER_INTAKE_RULES = `Guided intake rules:
+- The intake answers below are the author's own words. Build the draft from them — do not contradict or water them down.
+- Where the author answered, reuse their wording and specifics rather than paraphrasing into generic language.
+- Where the author left a prompt blank, omit that section. Never invent scope, criteria, constraints, or systems that were not provided.
+- If the required answers still leave the ask or outcome unclear, set "needsClarification": true and ask 2–3 targeted questions.`;
+
+const TITLE_FROM_INTAKE_INSTRUCTION = `
+
+Also return "summary": a short, specific title (under 15 words) drawn from the intake answers. If a title was already provided, return it unchanged.`;
+
+export const buildAiDraftUserPrompt = ({ summary, context, isStory, isBug, intakeBlock = "" }) => {
+  const intakeText = String(intakeBlock || "").trim();
+  const intakeSection = intakeText ? `\n\n${intakeText}` : "";
+  const titleLine = String(summary || "").trim()
+    ? `Title provided: ${summary}`
+    : "Title provided: (none — derive the title from the intake answers below)";
+
+  return isStory
       ? `Write an ODI-standard Jira Story draft.
 
 Issue type: Story
-Title provided: ${summary}${context ? `\nContext: ${context}` : ""}
+${titleLine}${context ? `\nContext: ${context}` : ""}${intakeSection}
 
 Respond with valid JSON only — no prose, no markdown fences:
 {
@@ -445,12 +466,21 @@ Respond with valid JSON only — no prose, no markdown fences:
     { "label": "Development work", "items": ["Concrete step tied to the goal"] }
   ],
   "subtasks": ["Imperative task title 1", "Imperative task title 2"]
+}${
+  intakeText
+    ? `
+
+Because guided intake answers were provided, make the first section:
+  { "label": "User story", "items": ["As a <who>", "I want <ask>", "So that <outcome>"] }
+built from the author's "As a" / "I want" / "So that" answers, then continue with the sections above.
+The "summary" must still use the ODI job story format ("When <situation>, I want <ask>, so I can <outcome>.") even though the intake uses As a / I want / So that.`
+    : ""
 }`
       : isBug
       ? `Write an ODI-standard Jira Bug draft.
 
 Issue type: Bug
-Title: ${summary}${context ? `\nContext: ${context}` : ""}
+${titleLine}${context ? `\nContext: ${context}` : ""}${intakeSection}
 
 Respond with valid JSON only — no prose, no markdown fences:
 {
@@ -466,11 +496,11 @@ Respond with valid JSON only — no prose, no markdown fences:
     { "label": "Development / fix approach", "items": ["Fix Z in service A"] }
   ],
   "priority": "Low (no system breakdown) | Medium (unexpected behavior, system functional) | High (large parts collapse) | Critical (full shutdown)"
-}`
+}${intakeText ? TITLE_FROM_INTAKE_INSTRUCTION : ""}`
       : `Write an ODI Task description.
 
 Issue type: Task
-Title: ${summary}${context ? `\nContext: ${context}` : ""}
+${titleLine}${context ? `\nContext: ${context}` : ""}${intakeSection}
 
 Respond with valid JSON only — no prose, no markdown fences:
 {
@@ -480,4 +510,5 @@ Respond with valid JSON only — no prose, no markdown fences:
   "sections": [
     { "label": "Steps / approach", "items": ["Specific action step 1", "Specific action step 2"] }
   ]
-}`;
+}${intakeText ? TITLE_FROM_INTAKE_INSTRUCTION : ""}`;
+};
