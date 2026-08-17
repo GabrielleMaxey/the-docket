@@ -89,7 +89,7 @@ const Settings = () => {
   }
 
   return (
-    <Container style={{ marginTop: "1.5rem", marginBottom: "2rem", maxWidth: "1500px", width: "100%", paddingLeft: "1rem", paddingRight: "1rem" }}>
+    <Container style={{ marginTop: "1.5rem", marginBottom: "2rem", maxWidth: "1500px", width: "100%", paddingLeft: "1rem", paddingRight: "1rem", paddingBottom: "4rem" }}>
       <Header as="h1">Settings</Header>
       <p>Manage epic presets, Jira date field mappings, past-due rules, contributor metrics, and direct reports queries.</p>
 

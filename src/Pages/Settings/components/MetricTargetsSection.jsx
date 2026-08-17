@@ -314,7 +314,6 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
                   key: preset.id,
                   value: preset.id,
                   text: preset.label,
-                  description: preset.presetType === "jql" ? preset.jql : preset.epicKey,
                 }))}
                 value={watchedPresetId}
                 onChange={(_e, { value }) => handlePresetTypeSelect(value)}
@@ -351,7 +350,6 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
                   key: preset.id,
                   value: preset.id,
                   text: preset.label,
-                  description: preset.presetType === "jql" ? preset.jql : preset.epicKey,
                 }))}
                 value={quickPickValue}
                 onChange={(_e, { value }) => handleQuickPickSelect(value)}
@@ -375,7 +373,6 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
                   key: preset.id,
                   value: preset.id,
                   text: preset.label,
-                  description: preset.presetType === "jql" ? preset.jql : preset.epicKey,
                 }))}
                 value={quickPickValue}
                 onChange={(_e, { value }) => handleQuickPickSelect(value)}
