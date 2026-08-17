@@ -327,6 +327,19 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
                     disabled={savingCapacityId === person.id}
                     onChange={(_e, { value }) => setCapacityDrafts((prev) => ({ ...prev, [person.id]: value }))}
                     onBlur={() => handleCapacityBlur(person)}
+                    onKeyDown={(event) => {
+                      // This Input isn't inside a <form>, so Enter does
+                      // nothing by default - it doesn't trigger onBlur, and
+                      // there's no submit to catch it. Without this, typing
+                      // a new capacity and pressing Enter (the natural way
+                      // to "confirm" a number field) silently does nothing:
+                      // the draft never saves, the row still shows the old
+                      // value, and it looks like the save just failed
+                      // rather than never having been triggered at all.
+                      if (event.key === "Enter") {
+                        event.currentTarget.blur();
+                      }
+                    }}
                   />
                 </Table.Cell>
                 <Table.Cell collapsing>
