@@ -239,6 +239,8 @@ const formatJqlRefreshNotice = ({ unsavedAssigneeCount, pullLatestComment }) => 
 const errorMessage = (error, fallback) =>
   error instanceof Error ? error.message : fallback;
 
+const NOTE_AUTOSAVE_DELAY_MS = 350;
+
 export const useTaskManagerJira = () => {
   const stored = loadStoredPreferences();
   const storedNotes = readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraNotes);
@@ -283,10 +285,17 @@ export const useTaskManagerJira = () => {
   const noteImagesRef = React.useRef({});
   const hydratedNoteImageKeysRef = React.useRef(new Set());
   const pendingNoteImageKeepSyncKeysRef = React.useRef(new Set());
+  const latestNoteDraftsRef = React.useRef(storedNotes);
+  const noteAutosaveTimersRef = React.useRef({});
+  const noteAutosaveInFlightRef = React.useRef({});
 
   React.useEffect(() => {
     noteImagesRef.current = noteImagesByKey;
   }, [noteImagesByKey]);
+
+  React.useEffect(() => {
+    latestNoteDraftsRef.current = jiraNotes;
+  }, [jiraNotes]);
 
   React.useEffect(() => {
     const issueKeys = [...pendingNoteImageKeepSyncKeysRef.current];
@@ -307,6 +316,9 @@ export const useTaskManagerJira = () => {
 
   React.useEffect(
     () => () => {
+      Object.values(noteAutosaveTimersRef.current).forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
       Object.values(noteImagesRef.current)
         .flat()
         .forEach((image) => URL.revokeObjectURL(image.previewUrl));
@@ -499,7 +511,7 @@ export const useTaskManagerJira = () => {
         setKeepNoteImagesByKey((prev) => removeIssueKeyed(prev, issueKey));
       }
       setLastPushedJiraNoteByKey((prev) =>
-        patchIssueKeyed(prev, issueKey, buildNotePushFingerprint({ note, images }))
+        patchIssueKeyed(prev, issueKey, buildNotePushFingerprint({ note, images: [] }))
       );
       setPushState((prev) => ({
         ...prev,
@@ -552,12 +564,46 @@ export const useTaskManagerJira = () => {
     }
   };
 
-  const handleNoteChange = (issueKey, note) => {
-    setJiraNotes((prev) => patchIssueKeyed(prev, issueKey, note));
+  const persistLatestNote = React.useCallback((issueKey) => {
+    if (noteAutosaveInFlightRef.current[issueKey]) {
+      return;
+    }
 
-    saveIssueMetadata({ issueKey, note }).catch((error) => {
-      console.error("Failed to persist note", issueKey, error);
-    });
+    const noteAtStart = String(latestNoteDraftsRef.current[issueKey] || "");
+    noteAutosaveInFlightRef.current[issueKey] = true;
+
+    saveIssueMetadata({ issueKey, note: noteAtStart })
+      .catch((error) => {
+        console.error("Failed to persist note", issueKey, error);
+      })
+      .finally(() => {
+        delete noteAutosaveInFlightRef.current[issueKey];
+        if (String(latestNoteDraftsRef.current[issueKey] || "") !== noteAtStart) {
+          persistLatestNote(issueKey);
+        }
+      });
+  }, []);
+
+  const scheduleNoteAutosave = React.useCallback(
+    (issueKey) => {
+      if (typeof window === "undefined") {
+        persistLatestNote(issueKey);
+        return;
+      }
+
+      window.clearTimeout(noteAutosaveTimersRef.current[issueKey]);
+      noteAutosaveTimersRef.current[issueKey] = window.setTimeout(() => {
+        delete noteAutosaveTimersRef.current[issueKey];
+        persistLatestNote(issueKey);
+      }, NOTE_AUTOSAVE_DELAY_MS);
+    },
+    [persistLatestNote]
+  );
+
+  const handleNoteChange = (issueKey, note) => {
+    latestNoteDraftsRef.current = patchIssueKeyed(latestNoteDraftsRef.current, issueKey, note);
+    setJiraNotes((prev) => patchIssueKeyed(prev, issueKey, note));
+    scheduleNoteAutosave(issueKey);
   };
 
   const handleNoteImagesAdd = (issueKey, files) => {

@@ -498,7 +498,7 @@ export const registerIssueMetadataRoutes = (
           filename: file.originalname,
         }))
       );
-      setKeepNoteImagesStmt.run({ issueKey, keepNoteImages: 1 });
+      setKeepNoteImagesStmt.run({ issueKey, keepNoteImages: images.length > 0 ? 1 : 0 });
 
       log.info(`kept ${images.length} note image(s) on this machine for ${issueKey}`);
       return res.json({ ok: true, issueKey, images });

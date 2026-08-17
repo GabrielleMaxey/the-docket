@@ -49,10 +49,14 @@ export const useAttachBackgroundJob = (jobId, handlers) => {
   const handlersRef = React.useRef(handlers);
   handlersRef.current = handlers;
   const attachedPromiseRef = React.useRef(null);
+  const mountedAtRef = React.useRef(Date.now());
 
   const tryAttach = React.useCallback(() => {
     const job = getBackgroundJob(jobId);
     if (!job?.promise || job.status !== "running") {
+      return;
+    }
+    if (job.startedAt > mountedAtRef.current) {
       return;
     }
     if (attachedPromiseRef.current === job.promise) {
