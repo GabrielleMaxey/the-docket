@@ -258,8 +258,7 @@ export const buildIssueEpicContext = async ({ issues, mappingsByRole, jiraReques
 
 export const resolveCandidateFieldIds = (dueByField, { dueFieldId, mrdFieldId, iddFieldId, pedFieldId }) => {
   if (dueByField === "due_date") {
-    // For epic-level date inheritance: prefer standard duedate, fall back to
-    // MRD / IDD / PED since ODI epics don't use the standard duedate field.
+    // ODI epics rarely use standard duedate; fall back to MRD / IDD / PED.
     return [dueFieldId, mrdFieldId, iddFieldId, pedFieldId].filter(Boolean);
   }
   if (dueByField === "initial_done_date") {

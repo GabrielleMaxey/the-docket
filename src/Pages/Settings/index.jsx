@@ -21,8 +21,6 @@ import TeamPriorityImportSection from "./components/TeamPriorityImportSection";
 import TeamPriorityDemoSection from "./components/TeamPriorityDemoSection";
 
 const Settings = () => {
-  // Presets come from the shared context — mutations call reloadPresets so
-  // the updated list is immediately visible on Work Week and Dashboard too.
   const { presets: epicPresets, reloadPresets } = useEpicFilters();
 
   const [loading, setLoading] = React.useState(true);

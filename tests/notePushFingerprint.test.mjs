@@ -10,9 +10,7 @@ describe("buildNotePushFingerprint", () => {
     });
     const afterPush = buildNotePushFingerprint({ note: "Fixed the bug", images: [] });
 
-    // Simulates the already-pushed guard: after a successful push, images are
-    // cleared, so the stored fingerprint must be built from the post-clear
-    // state to match what the UI recomputes on the next render.
+    // After push, images are cleared — fingerprint must use that post-clear state.
     assert.notEqual(beforePush, afterPush);
     const lastPushedFingerprint = afterPush;
     const currentFingerprint = buildNotePushFingerprint({ note: "Fixed the bug", images: [] });

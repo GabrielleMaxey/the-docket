@@ -1,4 +1,5 @@
 import { normalizePastDueLookbackYears } from "../../shared/dashboardMetrics.mjs";
+import { normalizeOverdueDateBasis } from "../../shared/overdueDateBasis.mjs";
 
 const DEFAULT_FIELD_MAPPINGS = [
   { role: "initial_done_date", fieldName: "Initial Done Date", fieldId: "customfield_10008" },
@@ -143,9 +144,6 @@ export const initDatabase = (db) => {
     CREATE INDEX IF NOT EXISTS idx_issue_note_images_issue_key ON issue_note_images(issue_key);
   `);
 
-  // Run schema migrations before seed inserts so legacy DBs gain required
-  // columns (for example app_settings.updated_at) before INSERT statements
-  // reference them.
   migrateDatabase(db);
   seedFieldMappings(db);
   seedAppSettings(db);
@@ -186,12 +184,9 @@ const migrateDatabase = (db) => {
   ensureColumn(db, "dashboard_assignee_metrics", "epic_breakdown_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "app_settings", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
   ensureColumn(db, "issue_metadata", "keep_note_images", "INTEGER NOT NULL DEFAULT 0");
-  // Capacity planning: an optional per-entry workload ceiling (open-issue
-  // count) set in Settings -> Contributor Metrics. NULL means "not set" -
-  // distinct from 0, which would mean "this person/team has zero capacity
-  // right now" - so capacity comparisons must treat NULL as "no target
-  // configured", not as zero.
+  // NULL capacity = no target; 0 = zero capacity.
   ensureColumn(db, "watched_assignees", "capacity", "INTEGER");
+  ensureColumn(db, "watched_assignees", "overdue_date_basis", "TEXT NOT NULL DEFAULT 'either'");
 
   db.prepare(
     "UPDATE jira_field_mappings SET field_id = 'customfield_10008' WHERE role = 'initial_done_date' AND TRIM(field_id) = ''"
@@ -464,6 +459,7 @@ export const mapWatchedAssigneeRow = (row) => {
     // null/undefined means "no capacity target configured" - kept distinct
     // from 0 (a real, deliberate "zero capacity right now" value).
     capacity: row.capacity === null || row.capacity === undefined ? null : Number(row.capacity),
+    overdueDateBasis: normalizeOverdueDateBasis(row.overdue_date_basis),
     createdAt: row.created_at,
   };
 };

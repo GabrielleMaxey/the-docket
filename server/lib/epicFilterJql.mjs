@@ -29,10 +29,6 @@ export const buildFieldMappingsMap = (rows) => {
   return map;
 };
 
-// Replaces the contents of every quoted string in `text` with "x" (keeping
-// the quote characters and overall length/positions intact), so a regex
-// search on the result can't match text that only exists inside a JQL
-// string literal. Handles backslash-escaped quotes.
 const maskQuotedStrings = (text) => {
   let masked = "";
   let quoteChar = null;
@@ -58,11 +54,7 @@ const maskQuotedStrings = (text) => {
   return masked;
 };
 
-// Splits a JQL string into its scope clause and trailing ORDER BY clause.
-// Searches a quote-masked copy of the string so a summary/text-search term
-// like `summary ~ "purchase order by region"` can't be mistaken for the
-// query's real ORDER BY - a naive regex match on the raw string would cut
-// the scope off mid-literal in that case.
+// Split on a quote-masked copy so `summary ~ "purchase order by region"` is not treated as ORDER BY.
 export const splitTrailingOrderBy = (jql) => {
   const source = String(jql || "").trim();
   if (!source) {

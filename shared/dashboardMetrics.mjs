@@ -381,10 +381,6 @@ export const isTaskDueInFuture = (issue, dueFieldId = "duedate", extraOverdueFie
   return false;
 };
 
-// Counts open issues due strictly between today and a future cutoff date.
-// Past-due issues (dueDate < today) are excluded from this count — they
-// already appear in the overdue count. Use isTaskDueOrOverdue (below) to
-// include them in a list.
 export const isTaskDueBy = (issue, dueFieldId, targetDate) => {
   if (!isIssueOpen(issue)) {
     return false;

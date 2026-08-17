@@ -918,8 +918,7 @@
   color: #0f172a;
 }
 
-/* ── closed / resolved row highlight ── */
-/* Closed/done: warm stone + left bar so it does not collide with blue P11–P12 tints. */
+/* Warm stone + left bar so closed rows do not collide with blue P11–P12 tints. */
 .work-week-page .ww-results-table tbody .ww-row-closed {
   background-color: #f3eee6;
   box-shadow: inset 4px 0 0 #78716c;
@@ -929,20 +928,12 @@
   color: #57534e;
 }
 
-/* ── row banding ──
-   Only unprioritised rows band, so a priority tint reads as its own value
-   rather than alternating with a stripe. Higher specificity than the
-   priority rules in priorityScale.css guarantees these win regardless of
-   import order. */
+/* Unprioritised rows only — higher specificity than priorityScale.css regardless of import order. */
 .work-week-page .ww-results-table tbody tr.ww-row-priority-0:nth-child(even),
 .work-week-page .ww-results-table tbody tr.ww-row-priority-neutral:nth-child(even) {
   background-color: #fbfdfd;
 }
 
-/* ── row hover ──
-   Interactive elements only, not the whole row: links get a colour shift,
-   inputs/selects/textareas get a border highlight, buttons get a slight
-   brightness change. No outline/background on the row or cells themselves. */
 .work-week-page .ww-results-table tbody a:hover {
   color: #0c93d9;
 }
@@ -1445,19 +1436,12 @@
   min-width: 90px;
 }
 
-/* Summary and Notes get the extra room. Status+Assignee are merged into one
-   column (below) so their combined width no longer needs two separate
-   allocations, freeing space that goes to Push to Jira and Notes. Due/MRD
-   stay narrow too (nowrap dates won't truncate under table-layout: auto, so
-   this only affects how spare width is distributed, not legibility). */
 .work-week-page .ww-results-table th:nth-child(3),
 .work-week-page .ww-results-table td:nth-child(3) {
   width: 32%;
   max-width: 400px;
 }
 
-/* Status + Assignee, stacked vertically in one cell (see
-   .ww-cell-status-assignee below) instead of two side-by-side columns. */
 .work-week-page .ww-results-table th:nth-child(4),
 .work-week-page .ww-results-table td:nth-child(4) {
   width: 12%;
@@ -1508,8 +1492,6 @@
   min-width: 320px;
 }
 
-/* Push to Jira — back to a comfortable width now that merging Status and
-   Assignee freed real space, rather than needing sticky positioning. */
 .work-week-page .ww-results-table th:nth-child(11),
 .work-week-page .ww-results-table td:nth-child(11) {
   width: 9%;

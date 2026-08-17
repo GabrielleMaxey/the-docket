@@ -2,13 +2,6 @@ import React from "react";
 import { formatPercent } from "../utils/format";
 import { getStatusColor } from "../utils/statusScale";
 
-// Generic SVG chart for a { label: count } status breakdown.
-// Supports two variants via the `variant` prop:
-//   "pie"  (default) — existing SVG pie with legend
-//   "bar"            — vertical SVG bar chart with legend
-//
-// Colours come from statusScale.js, so a status stays the same colour everywhere.
-
 const polarToCartesian = (center, radius, angle) => ({
   x: center + radius * Math.cos(angle),
   y: center + radius * Math.sin(angle),
@@ -67,10 +60,6 @@ const truncate = (str, max) =>
   str.length > max ? str.slice(0, max - 1) + "\u2026" : str;
 
 const StatusBarChart = ({ statusCounts, className = "" }) => {
-  const { entries: baseEntries, total } = buildPieData(statusCounts);
-  // buildPieData's `entries` never carries colour (only its `slices` array
-  // does) - re-derive it here via the same getStatusColor so bars match pie
-  // slices exactly.
   const entries = baseEntries.map((entry, i) => ({
     ...entry,
     color: getStatusColor(entry.label, i),
@@ -110,7 +99,6 @@ const StatusBarChart = ({ statusCounts, className = "" }) => {
                 <title>{`${label}: ${count} (${pct}%)`}</title>
               </rect>
 
-              {/* Count label inside bar if tall enough, otherwise above */}
               {barH >= 18 ? (
                 <text
                   x={x + BAR_W / 2}
@@ -134,7 +122,6 @@ const StatusBarChart = ({ statusCounts, className = "" }) => {
                 </text>
               )}
 
-              {/* Truncated label below bar */}
               <text
                 x={x + BAR_W / 2}
                 y={CHART_H + 15}
@@ -149,7 +136,6 @@ const StatusBarChart = ({ statusCounts, className = "" }) => {
         })}
       </svg>
 
-      {/* Full legend below the bars so labels aren't lost */}
       <ul className="dashboard-pie-legend">
         {entries.map(({ label, count, color }) => (
           <li key={label}>

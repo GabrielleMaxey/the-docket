@@ -29,13 +29,7 @@ import {
   saveWorkWeekProjectReport,
 } from "../../utils/pageReportPersistence";
 
-// Plain literal date arithmetic, not JQL relative-date syntax. Jira JQL's
-// relative-date units are y/w/d/h/m (minutes) - there is no "months" unit,
-// so "-3M" (the earlier, broken version of this) silently matched nothing.
-// Computing an actual date and embedding it as a literal avoids that class
-// of bug entirely, and matches how this app already does relative-date
-// filtering everywhere else (see computePastDueFloorDate in
-// shared/dashboardMetrics.mjs).
+// JQL has no months unit (`m` is minutes); `-3M` matched nothing.
 const monthsAgoDateString = (months) => {
   const d = new Date();
   d.setMonth(d.getMonth() - Number(months || 0));
@@ -47,11 +41,6 @@ const isIssueOpen = (issue) => {
   return !/(closed|resolved|done)/.test(status);
 };
 
-// Epic-level due date (MRD/IDD, via getEffectiveDueDateForIssue's parent-chain
-// fallback) compared against today. This space doesn't use per-task Jira due
-// dates today - due dates live at the Epic level - so this is the meaningful
-// notion of "overdue" here, not a raw duedate field that's essentially always
-// empty for individual tasks.
 const isIssueOverdueByEffectiveDueDate = (issue, dueDateContext) => {
   if (!isIssueOpen(issue)) {
     return false;
@@ -110,9 +99,6 @@ const PWB_PERIOD_OPTIONS = [
 
 const ALL_WORK_MONTHS_OPTIONS = [3, 6, 12];
 
-// Global (not per-run) app_settings keys, via the existing generic
-// GET/PUT /api/settings - same career goals apply regardless of which
-// project this panel is currently reporting on.
 const USER_GOALS_SETTINGS_KEY = "work_week_report_user_goals";
 const COMPANY_GOALS_SETTINGS_KEY = "work_week_report_company_goals";
 
@@ -135,9 +121,6 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
   const [companyGoals, setCompanyGoals] = React.useState("");
   const [goalsLoaded, setGoalsLoaded] = React.useState(false);
 
-  // Load previously-saved goals once on mount so the user doesn't have to
-  // retype them every time. Company goals default to shown-and-checked only
-  // if something was actually saved before.
   React.useEffect(() => {
     let cancelled = false;
     fetchAppSettings()
@@ -151,9 +134,7 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
           setIncludeCompanyGoals(true);
         }
       })
-      .catch(() => {
-        // Non-fatal - the fields just start empty, same as before this existed.
-      })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setGoalsLoaded(true);
       });
@@ -172,14 +153,11 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
     saveAppSettings({ [COMPANY_GOALS_SETTINGS_KEY]: "" }).catch(() => {});
   };
 
-  // "current" | "all_work" | a specific other run's index
   const [reportScope, setReportScope] = React.useState("current");
   const [allWorkMonths, setAllWorkMonths] = React.useState(3);
 
   const isCareerReport = reportType === "one_on_one" || reportType === "pwb";
 
-  // Other Work Week query slots that are actually configured (real jql +
-  // label, not a transient drill-down tab), excluding this panel's own run.
   const otherRuns = React.useMemo(() => {
     return (jqlRuns || []).filter(
       (r) =>
@@ -225,12 +203,6 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
     runBackgroundJob(jobId, {
       label: jobLabel,
       run: async () => {
-        // Auto-save non-empty goals for next time, independent of whether
-        // generation below succeeds - the user's typed input is worth
-        // keeping either way. Never auto-saves an empty value over a
-        // previously-saved one; clearing is only ever an explicit action
-        // (the Clear buttons), so a blank field this one time doesn't
-        // silently wipe a saved goal.
         if (isCareerReport) {
           const toSave = {};
           if (userGoals.trim()) toSave[USER_GOALS_SETTINGS_KEY] = userGoals.trim();
@@ -246,29 +218,15 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
         let scopeJql = run.jql || "";
         let summary;
 
-        // dueFieldId/mrdFieldId come from the global Jira field mapping (same
-        // for every query, not query-specific), so this run's own values are
-        // always the right ones to reuse. parentMostRecentDoneDateByKey IS
-        // query-specific - only trustworthy for issues that were actually
-        // enriched against it, so freshly-fetched issue sets need their own.
         const { dueFieldId, mrdFieldId } = run;
 
         if (reportScope === "all_work") {
           scopeLabel = `All my assigned work — past ${allWorkMonths} months`;
           const cutoff = monthsAgoDateString(allWorkMonths);
-          // "Touched" = one of four meaningful signals, not just Jira's
-          // blanket `updated` timestamp (bumps on any field change,
-          // including automated ones): a status change, a reassignment, a
-          // note added in this app, or a comment added directly in Jira -
-          // covering activity that happened outside this app too, not just
-          // through it.
+          // Jira `updated` includes automated field bumps; use status/assignee changelog instead.
           scopeJql = `assignee = currentUser() AND (status changed after "${cutoff}" OR assignee changed after "${cutoff}") ORDER BY updated DESC`;
 
-          // Status/assignee changes are queried directly via Jira's own
-          // changelog (server-side, one search). Notes and comments aren't
-          // changelog fields Jira can filter by in a single query, so both
-          // need the full "currently assigned to me" pool as candidates to
-          // check individually against.
+          // Notes/comments are not changelog fields; pull assigned issues and match locally.
           const [{ issues: changedIssues }, notedKeys, { issues: allAssignedIssues }] =
             await Promise.all([
               fetchJiraSearchAll({ jql: scopeJql, maxTotal: 500 }),
@@ -287,9 +245,6 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
             }
           }
 
-          // Comments: no bulk "commented after" JQL clause exists, so the
-          // remaining unmatched candidates are checked one by one against
-          // Jira's own latest-comment timestamp.
           const remainingCandidates = (allAssignedIssues || []).filter(
             (iss) => !knownKeys.has(iss.key)
           );

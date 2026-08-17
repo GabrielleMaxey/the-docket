@@ -192,9 +192,7 @@ const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
   return { ok: true, status: response.status, data };
 };
 
-// Multipart variant of jiraRequest — used for attachment uploads. Jira requires
-// X-Atlassian-Token: no-check for uploads, and the multipart boundary must come
-// from fetch itself, so Content-Type is intentionally omitted.
+// Jira uploads need X-Atlassian-Token: no-check; omit Content-Type so fetch sets the multipart boundary.
 const jiraMultipartRequest = async ({ method = "POST", pathWithQuery, formData }) => {
   const target = `${process.env.JIRA_BASE_URL}${pathWithQuery}`;
   const response = await fetch(target, {
@@ -245,10 +243,6 @@ const resolveJiraAttachmentMediaId = async (attachmentId) => {
   return extractMediaIdFromUrl(response.url);
 };
 
-// Shared JQL search (used by route modules).
-// Supports both call styles currently present in the codebase:
-// 1) runJiraSearchRequest({ jql, maxResults, fields, nextPageToken, res })
-// 2) runJiraSearchRequest(jql, { maxResults, fields, nextPageToken })
 const runJiraSearchRequest = async (input, legacyOptions = {}) => {
   const payload =
     typeof input === "string"

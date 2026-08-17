@@ -1,10 +1,5 @@
 import React from "react";
 
-// Self-contained "joke ticker" feature for the WorkWeekTasks header — fetches
-// a couple of joke APIs, falls back to a static list, and rotates through
-// them. Extracted out of WorkWeekTasks.jsx: this has nothing to do with Jira
-// task management, it was just bundled into the page component.
-
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
 const JOKE_FETCH_SOURCES = [

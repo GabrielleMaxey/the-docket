@@ -1,26 +1,4 @@
-// ── Status colour scale ──────────────────────────────────────────────────────
-// This module is a DATA ENCODING, not UI chrome.
-//
-// Do not fold these values into the general neutral/brand palette, and do not
-// include them in any find-and-replace pass that retints chrome colours.
-// Sharing tokens between a data scale and UI chrome lets a chrome retint
-// silently corrupt the encoding without breaking anything visibly.
-//
-// Structure: four families. Hue carries the family; lightness separates within
-// it. Fills are saturated so a status is legible at a glance in a pie wedge,
-// bar, or dot without consulting a legend.
-//
-//   Terminal   Brand blue → teal    work that has landed or is landing
-//   In flight  Brand warm ramp      work actively moving
-//   Inert      true neutral         work not moving, deliberately drained
-//   Alarm      Brand coral          reserved; the only colour that means "act"
-//
-// Priority (src/Pages/priorityScale.css) is a separate encoding on its own
-// ramp. The two share hues but sit in different registers: priority renders as
-// pale row washes (92–96% L), status as saturated marks (55–75% L).
-//
-// Previously duplicated across StatusPieChart.jsx and MetricBar.jsx; both now
-// import from here so the two can no longer drift.
+// Status colors are a data encoding, not UI chrome — do not fold into a palette retint.
 
 export const STATUS_TERMINAL = "#0c93d9";
 export const STATUS_VERIFYING = "#2AEDE5";
@@ -31,8 +9,6 @@ export const STATUS_BACKLOG = "#b0b0b0";
 export const STATUS_OTHER = "#d0d0d0";
 export const STATUS_ALARM = "#F95E4A";
 
-// Fallback rotation for status labels not in the map below. Brand-derived and
-// chosen to stay distinguishable from the mapped values above.
 export const STATUS_FALLBACK_COLORS = [
   "#076ea4",
   "#0a8f92",

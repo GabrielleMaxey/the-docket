@@ -1,6 +1,7 @@
 import { createLogger } from "../lib/logger.mjs";
 import { fetchCapacityWorkloads } from "../lib/capacityPlanning.mjs";
 import { mapWatchedAssigneeRow } from "../db/schema.mjs";
+import { buildFieldMappingsMap } from "../lib/epicFilterJql.mjs";
 
 const log = createLogger("capacity-planning");
 
@@ -16,11 +17,6 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
         .all()
         .map(mapWatchedAssigneeRow);
 
-      // Same entries back Dashboard and Chat too, so a PM viewing a wide
-      // portfolio here shouldn't be forced to fetch (and pay the Jira
-      // search cost for) every entry that exists - only the ones actually
-      // selected. Omitting ?ids entirely keeps the old "fetch everything"
-      // behavior, so this stays backward compatible for any other caller.
       const idsParam = String(req.query?.ids || "").trim();
       if (idsParam) {
         const requestedIds = new Set(
@@ -32,7 +28,15 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
         watchedRows = watchedRows.filter((row) => requestedIds.has(row.id));
       }
 
-      const items = await fetchCapacityWorkloads({ watchedRows, jiraRequest, runJiraSearchRequest });
+      const mappingsByRole = buildFieldMappingsMap(
+        db.prepare("SELECT role, field_id, field_name FROM jira_field_mappings").all()
+      );
+      const items = await fetchCapacityWorkloads({
+        watchedRows,
+        jiraRequest,
+        runJiraSearchRequest,
+        mappingsByRole,
+      });
 
       return res.json({ items });
     } catch (error) {
