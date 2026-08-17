@@ -56,23 +56,32 @@ const buildOpenCountJql = (scopeJql) => (scopeJql ? `(${scopeJql}) AND statusCat
 // their share of THIS project/query (computeIssueBreakdown, below) and
 // their total open workload everywhere else too - a person could look
 // lightly loaded within one project while already buried elsewhere. This
-// fetches the second number for the top contributors in one batched
-// query (assignee in (...) AND statusCategory != Done, no scope
+// fetches the second number for EVERY distinct contributor in one
+// batched query (assignee in (...) AND statusCategory != Done, no scope
 // restriction - deliberately cross-project), rather than one query per
 // person, which would multiply calls by contributor count on entries
-// with many people (one real entry here has 20+).
+// with many people (one real entry here has 20+) - it's still exactly
+// one extra Jira round-trip regardless of how many names go in the list.
+//
+// Deliberately NOT limited to the top N by in-scope count: the PM's own
+// stated use for this number is finding who has room for NEW work, which
+// means the people with the LOWEST in-scope count are exactly the ones
+// most likely to matter here - a "top N by in-scope count" cutoff would
+// systematically exclude the very people this number exists to surface.
+// A high safety cap still exists (not a literal "no limit") in case some
+// future entry has an unusually large contributor list that would make
+// the JQL string itself unwieldy.
 //
 // A middle "in project" tier was tried between these two (deriving the
 // dominant project from the query's own issue keys) and removed per user
 // feedback - three numbers this close together read as noise, not
 // signal, on a real card. Keeping just the two that were asked for.
-const CONTRIBUTOR_TOTAL_LIMIT = 6;
+const CONTRIBUTOR_TOTAL_SAFETY_LIMIT = 150;
 
 const fetchContributorTotalWorkloads = async ({ contributorCounts, runJiraSearchRequest }) => {
   const names = Object.keys(contributorCounts || {})
     .filter((name) => name !== "Unassigned")
-    .sort((a, b) => contributorCounts[b] - contributorCounts[a])
-    .slice(0, CONTRIBUTOR_TOTAL_LIMIT);
+    .slice(0, CONTRIBUTOR_TOTAL_SAFETY_LIMIT);
   if (names.length === 0) {
     return {};
   }
@@ -81,7 +90,7 @@ const fetchContributorTotalWorkloads = async ({ contributorCounts, runJiraSearch
   const jql = `assignee in (${nameList}) AND statusCategory != Done`;
 
   try {
-    const { issues } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 500 });
+    const { issues } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 2000 });
     const totals = {};
     for (const issue of issues || []) {
       const assigneeName = String(issue?.fields?.assignee?.displayName || "").trim();
