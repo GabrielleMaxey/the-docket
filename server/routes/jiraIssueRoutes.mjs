@@ -10,6 +10,11 @@ import {
   formatJiraApiError,
   loadCreateFieldOptions,
 } from "../lib/jiraCreateIssueFields.mjs";
+import {
+  buildAiHelperIntakePrompt,
+  normalizeAiHelperIntake,
+  validateAiHelperIntake,
+} from "../../shared/aiHelperIntake.mjs";
 import { descriptionTextToAdf } from "../../shared/jiraDescriptionAdf.mjs";
 import { isEpicIssueType } from "../../shared/dashboardMetrics.mjs";
 import {
@@ -106,7 +111,7 @@ const buildFormattedDescription = ({ overview, sections }) => {
   return parts.join("\n\n");
 };
 
-const buildGenerateDescriptionResponse = (parsed, { isStory, isBug }) => {
+const buildGenerateDescriptionResponse = (parsed, { isStory, isBug, allowSummary = false }) => {
   const questions = normalizeStringList(parsed?.questions).slice(0, isStory ? 3 : 4);
   const needsClarification = Boolean(parsed?.needsClarification) || questions.length > 0;
   const overview = String(parsed?.overview || "").trim();
@@ -125,7 +130,7 @@ const buildGenerateDescriptionResponse = (parsed, { isStory, isBug }) => {
   return {
     needsClarification,
     questions,
-    summary: isStory ? String(parsed?.summary || "").trim() || null : null,
+    summary: isStory || allowSummary ? String(parsed?.summary || "").trim() || null : null,
     description,
     subtasks,
     priority: isBug ? String(parsed?.priority || "").trim() || null : null,
@@ -485,9 +490,23 @@ export const registerJiraIssueRoutes = (
     const issueType = String(req.body?.issueType || "Story").trim();
     const epicName = String(req.body?.epicName || "").trim();
     const epicKey = String(req.body?.epicKey || "").trim();
+    const intake = normalizeAiHelperIntake(issueType, req.body?.intake);
+    const hasIntake = Object.keys(intake).length > 0;
 
-    if (!summary) {
+    // With guided intake the AI derives the title, so a summary is only required without it.
+    if (!summary && !hasIntake) {
       return res.status(400).json({ error: "summary is required" });
+    }
+
+    if (hasIntake) {
+      const intakeCheck = validateAiHelperIntake(issueType, intake);
+      if (!intakeCheck.valid) {
+        return res.status(400).json({
+          error: intakeCheck.errors[0],
+          errors: intakeCheck.errors,
+          missingFieldIds: intakeCheck.missingFieldIds,
+        });
+      }
     }
 
     const provider = resolveFirstReadyReportProvider();
@@ -508,11 +527,19 @@ export const registerJiraIssueRoutes = (
     }
     const context = contextParts.join(" | ");
 
-    const systemPrompt = buildAiDraftSystemPrompt({ isStory, isBug });
-    const userPrompt = buildAiDraftUserPrompt({ summary, context, isStory, isBug });
+    const systemPrompt = buildAiDraftSystemPrompt({ isStory, isBug, hasIntake });
+    const userPrompt = buildAiDraftUserPrompt({
+      summary,
+      context,
+      isStory,
+      isBug,
+      intakeBlock: hasIntake ? buildAiHelperIntakePrompt(issueType, intake) : "",
+    });
 
     try {
-      log.info(`generating description for ${issueType}: "${summary}"`);
+      log.info(
+        `generating description for ${issueType}: "${summary || "(from AI helper intake)"}"${hasIntake ? " with guided intake" : ""}`
+      );
       const maxTokens = isStory ? 1400 : isBug ? 900 : 600;
       const raw = await completeLlmText({ provider, systemPrompt, userMessage: userPrompt, maxTokens });
       const cleaned = String(raw || "").replace(/```json|```/g, "").trim();
@@ -530,7 +557,9 @@ export const registerJiraIssueRoutes = (
         });
       }
 
-      return res.json(buildGenerateDescriptionResponse(parsed, { isStory, isBug }));
+      return res.json(
+        buildGenerateDescriptionResponse(parsed, { isStory, isBug, allowSummary: hasIntake })
+      );
     } catch (error) {
       log.error("generate-description failed", error instanceof Error ? error.message : error);
       return res.status(500).json({
