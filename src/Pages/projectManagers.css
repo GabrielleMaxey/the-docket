@@ -255,6 +255,13 @@
   text-decoration: underline;
 }
 
+.pm-contributor-row-total--unknown {
+  font-weight: 400;
+  font-style: italic;
+  color: #cbd5e1;
+  cursor: default;
+}
+
 .pm-contributor-row-here {
   color: #64748b;
   cursor: pointer;
