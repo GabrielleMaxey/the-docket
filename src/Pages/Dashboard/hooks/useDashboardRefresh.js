@@ -14,11 +14,11 @@ import {
   useAttachBackgroundJob,
   useBackgroundJobRunning,
 } from "../../../hooks/useBackgroundJobs.js";
-import { collectEpicCompletionCounts, getTerminalIssueCount, normalizePastDueLookbackYears } from "../../../../shared/dashboardMetrics.mjs";
+import { normalizePastDueLookbackYears } from "../../../../shared/dashboardMetrics.mjs";
 import {
   sameNumberSet,
   sameStringSet,
-  getWorkloadStatusCounts,
+  computeOverallTotals,
   defaultDashboardDueByDate,
   buildDashboardRefreshTimeoutMessage,
   getDashboardRefreshTimeoutMs,
@@ -369,37 +369,10 @@ export const useDashboardRefresh = ({
     return map;
   }, [snapshot?.epics]);
 
-  const overallTotals = React.useMemo(() => {
-    const epics = snapshot?.epics || [];
-    let totalIssues = 0;
-    let resolvedIssues = 0;
-    let openIssues = 0;
-    let overdueOpenIssues = 0;
-    let inProgressIssues = 0;
-    let backlogIssues = 0;
-    const { epicsComplete, epicCount } = collectEpicCompletionCounts(epics);
-
-    for (const epic of epics) {
-      totalIssues += Number(epic.totalIssues || 0);
-      openIssues += Number(epic.openIssues || 0);
-      overdueOpenIssues += Number(epic.overdueOpenIssues || 0);
-      resolvedIssues += getTerminalIssueCount(epic);
-      const workload = getWorkloadStatusCounts(epic);
-      inProgressIssues += workload.inProgress;
-      backlogIssues += workload.backlog;
-    }
-
-    return {
-      totalIssues,
-      resolvedIssues,
-      openIssues,
-      overdueOpenIssues,
-      inProgressIssues,
-      backlogIssues,
-      completeEpics: epicsComplete,
-      epicCount,
-    };
-  }, [snapshot?.epics]);
+  const overallTotals = React.useMemo(
+    () => computeOverallTotals(snapshot?.epics || []),
+    [snapshot?.epics]
+  );
 
   const handleRefreshRef = React.useRef(handleRefresh);
   handleRefreshRef.current = handleRefresh;
