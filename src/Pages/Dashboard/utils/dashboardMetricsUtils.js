@@ -652,6 +652,8 @@ export const rollupEpicContributorPeople = (epics) => {
         overdueOpenIssues: 0,
         openIssues: 0,
         openStatusCounts: {},
+        overdueIssues: [],
+        upcomingDueIssues: [],
       };
       prev.totalIssues += Number(row.totalIssues || 0);
       prev.resolvedIssues += Number(row.resolvedIssues || 0);
@@ -659,6 +661,12 @@ export const rollupEpicContributorPeople = (epics) => {
       prev.openIssues += Number(row.openIssues || 0);
       for (const [status, count] of Object.entries(row.openStatusCounts || {})) {
         prev.openStatusCounts[status] = (prev.openStatusCounts[status] || 0) + (Number(count) || 0);
+      }
+      if (Array.isArray(row.overdueIssues)) {
+        prev.overdueIssues.push(...row.overdueIssues);
+      }
+      if (Array.isArray(row.upcomingDueIssues)) {
+        prev.upcomingDueIssues.push(...row.upcomingDueIssues);
       }
       byName.set(name, prev);
     }

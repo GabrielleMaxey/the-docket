@@ -13,6 +13,8 @@ const ReportDiagrams = ({
   personTitle = "By person",
   contributorRows = [],
   contributorRowsTitle = "Individual contributor metrics",
+  jiraBaseUrl,
+  dueByDate,
 }) => {
   const showStatus = hasCountData(statusCounts);
   const showProgress = progressBars.some((row) => row && (row.value != null || row.count != null));
@@ -76,7 +78,12 @@ const ReportDiagrams = ({
             </div>
           </div>
           {visibleContributorRows.map((row) => (
-            <ContributorStatusBar key={row.name} person={row} />
+            <ContributorStatusBar
+              key={row.name}
+              person={row}
+              jiraBaseUrl={jiraBaseUrl}
+              dueByDate={dueByDate}
+            />
           ))}
         </div>
       ) : null}

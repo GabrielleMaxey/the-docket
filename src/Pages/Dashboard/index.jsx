@@ -516,6 +516,8 @@ const Dashboard = () => {
                     epics={displayEpics}
                     assignees={assigneeMetrics}
                     directReportWatches={directReportWatches}
+                    jiraBaseUrl={jiraBaseUrl}
+                    dueByDate={snapshot?.dueByDate}
                   />
                   <WeeklyDigestPanel hasSnapshot={Boolean(snapshot)} />
                 </>

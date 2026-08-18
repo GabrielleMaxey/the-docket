@@ -3,6 +3,7 @@ import { getStatusColor } from "../../../utils/statusScale";
 import { formatPercent } from "../../../utils/format";
 import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 import { TERMINAL_STATUS_LABEL } from "../utils/dashboardMetricsUtils";
+import ContributorDueTasksSection from "./ContributorDueTasksSection";
 import "../../../Components/report.css";
 
 // Fixed left-to-right order so the same status always lands in the same place across
@@ -38,7 +39,7 @@ export const CONTRIBUTOR_STATUS_LEGEND = SEGMENT_ORDER.map((label, index) => ({
   color: getStatusColor(label, index),
 }));
 
-const ContributorStatusBar = ({ person }) => {
+const ContributorStatusBar = ({ person, jiraBaseUrl, dueByDate }) => {
   const total = Number(person?.totalIssues || 0);
   if (total <= 0) {
     return null;
@@ -87,6 +88,20 @@ const ContributorStatusBar = ({ person }) => {
           />
         ))}
       </div>
+      <ContributorDueTasksSection
+        title="Past due"
+        tasks={person.overdueIssues}
+        jiraBaseUrl={jiraBaseUrl}
+        variant="overdue"
+        personKey={person.name}
+      />
+      <ContributorDueTasksSection
+        title={dueByDate ? `Upcoming due through ${dueByDate}` : "Upcoming due dates"}
+        tasks={person.upcomingDueIssues}
+        jiraBaseUrl={jiraBaseUrl}
+        variant="upcoming"
+        personKey={person.name}
+      />
     </div>
   );
 };

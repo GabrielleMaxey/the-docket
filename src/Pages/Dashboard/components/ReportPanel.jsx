@@ -22,6 +22,8 @@ const ReportPanel = ({
   epics = [],
   assignees = [],
   directReportWatches = [],
+  jiraBaseUrl,
+  dueByDate,
 }) => {
   const {
     audience,
@@ -215,6 +217,8 @@ const ReportPanel = ({
             personBars={personBars}
             personTitle={personTitle}
             contributorRows={contributorRows}
+            jiraBaseUrl={jiraBaseUrl}
+            dueByDate={dueByDate}
           />
         }
       />

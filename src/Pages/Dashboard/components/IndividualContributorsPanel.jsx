@@ -46,7 +46,12 @@ const IndividualContributorsPanel = ({
               </div>
             </div>
             {autoRows.map((row) => (
-              <ContributorStatusBar key={row.name} person={row} />
+              <ContributorStatusBar
+                key={row.name}
+                person={row}
+                jiraBaseUrl={jiraBaseUrl}
+                dueByDate={dueByDate}
+              />
             ))}
           </>
         ) : (
