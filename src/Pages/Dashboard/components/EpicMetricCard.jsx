@@ -144,6 +144,8 @@ const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant }) => {
             chartVariant={chartVariant}
             dueByDate={dueByDate}
             epicPresetId={epic.epicPresetId}
+            showOverdueList={false}
+            showUpcomingList={false}
           />
         </>
       ) : null}

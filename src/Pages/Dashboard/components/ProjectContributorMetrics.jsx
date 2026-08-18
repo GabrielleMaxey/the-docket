@@ -13,6 +13,7 @@ const ProjectContributorMetrics = ({
   chartVariant,
   dueByDate,
   epicPresetId,
+  showOverdueList = true,
   showUpcomingList = true,
 }) => {
   const rows = Array.isArray(contributorMetrics)
@@ -66,6 +67,14 @@ const ProjectContributorMetrics = ({
                   variant={chartVariant}
                 />
               </div>
+            ) : null}
+            {showOverdueList && person.overdueIssues?.length > 0 ? (
+              <ContributorOverdueList
+                tasks={person.overdueIssues}
+                jiraBaseUrl={jiraBaseUrl}
+                variant="overdue"
+                layout="compact"
+              />
             ) : null}
             {showUpcomingList && person.upcomingDueIssues?.length > 0 ? (
               <ContributorOverdueList
