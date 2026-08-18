@@ -595,11 +595,15 @@ export const rollupEpicContributorPeople = (epics) => {
         resolvedIssues: 0,
         overdueOpenIssues: 0,
         openIssues: 0,
+        openStatusCounts: {},
       };
       prev.totalIssues += Number(row.totalIssues || 0);
       prev.resolvedIssues += Number(row.resolvedIssues || 0);
       prev.overdueOpenIssues += Number(row.overdueOpenIssues || 0);
       prev.openIssues += Number(row.openIssues || 0);
+      for (const [status, count] of Object.entries(row.openStatusCounts || {})) {
+        prev.openStatusCounts[status] = (prev.openStatusCounts[status] || 0) + (Number(count) || 0);
+      }
       byName.set(name, prev);
     }
   }
