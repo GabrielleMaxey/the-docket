@@ -1,5 +1,6 @@
 import {
   isClosedLikeStatus as isClosedLikeStatusName,
+  collectEpicCompletionCounts,
   getTerminalIssueCount,
 } from "../../../../shared/dashboardMetrics.mjs";
 
@@ -139,6 +140,43 @@ export const getWorkloadStatusCounts = (source) => {
   };
 };
 
+// Same shape and math for one epic or many, so the Overall Status cards read
+// identically whether "View All" or a single project tab is selected.
+export const computeOverallTotals = (epics) => {
+  const list = Array.isArray(epics) ? epics : [];
+  let totalIssues = 0;
+  let resolvedIssues = 0;
+  let openIssues = 0;
+  let overdueOpenIssues = 0;
+  let inProgressIssues = 0;
+  let backlogIssues = 0;
+  const { epicsComplete, epicCount } = collectEpicCompletionCounts(list);
+
+  for (const epic of list) {
+    totalIssues += Number(epic.totalIssues || 0);
+    openIssues += Number(epic.openIssues || 0);
+    overdueOpenIssues += Number(epic.overdueOpenIssues || 0);
+    resolvedIssues += getTerminalIssueCount(epic);
+    const workload = getWorkloadStatusCounts(epic);
+    inProgressIssues += workload.inProgress;
+    backlogIssues += workload.backlog;
+  }
+
+  return {
+    totalIssues,
+    resolvedIssues,
+    openIssues,
+    overdueOpenIssues,
+    inProgressIssues,
+    backlogIssues,
+    completeEpics: epicsComplete,
+    epicCount,
+    issuePercent: totalIssues > 0 ? (resolvedIssues / totalIssues) * 100 : 0,
+    epicPercent: epicCount > 0 ? (epicsComplete / epicCount) * 100 : 0,
+    overduePercent: openIssues > 0 ? (overdueOpenIssues / openIssues) * 100 : 0,
+  };
+};
+
 export const sumEpicMetrics = (epics) => {
   const statusCounts = {};
   const openStatusCounts = {};
@@ -203,14 +241,32 @@ export const workloadCountsToPieData = (counts, { includeResolved = true } = {})
 };
 
 export const buildContributorPieStatusCounts = (person) => {
+  const openCounts = { ...(person?.openStatusCounts || {}) };
+  const overdueIssues = Array.isArray(person?.overdueIssues) ? person.overdueIssues : [];
+
+  // Overdue issues get their own "Past Due" slice instead of their raw status slice —
+  // mirrors computeAssigneeWorkloadCounts' mutually-exclusive bucketing server-side, so an
+  // overdue "In Progress" issue counts once, not twice.
+  for (const issue of overdueIssues) {
+    const status = String(issue?.status || "").trim();
+    if (status && Number(openCounts[status]) > 0) {
+      openCounts[status] -= 1;
+    }
+  }
+
   const pie = {};
-  const openCounts = person?.openStatusCounts || {};
   for (const [status, count] of Object.entries(openCounts)) {
     const value = Number(count) || 0;
     if (value > 0) {
       pie[status] = value;
     }
   }
+
+  const pastDue = overdueIssues.length > 0 ? overdueIssues.length : Number(person?.overdueOpenIssues || 0);
+  if (pastDue > 0) {
+    pie["Past Due"] = pastDue;
+  }
+
   return pie;
 };
 
@@ -595,11 +651,23 @@ export const rollupEpicContributorPeople = (epics) => {
         resolvedIssues: 0,
         overdueOpenIssues: 0,
         openIssues: 0,
+        openStatusCounts: {},
+        overdueIssues: [],
+        upcomingDueIssues: [],
       };
       prev.totalIssues += Number(row.totalIssues || 0);
       prev.resolvedIssues += Number(row.resolvedIssues || 0);
       prev.overdueOpenIssues += Number(row.overdueOpenIssues || 0);
       prev.openIssues += Number(row.openIssues || 0);
+      for (const [status, count] of Object.entries(row.openStatusCounts || {})) {
+        prev.openStatusCounts[status] = (prev.openStatusCounts[status] || 0) + (Number(count) || 0);
+      }
+      if (Array.isArray(row.overdueIssues)) {
+        prev.overdueIssues.push(...row.overdueIssues);
+      }
+      if (Array.isArray(row.upcomingDueIssues)) {
+        prev.upcomingDueIssues.push(...row.upcomingDueIssues);
+      }
       byName.set(name, prev);
     }
   }

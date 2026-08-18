@@ -231,14 +231,9 @@ export const buildEpicBreakdownForIssues = async ({
   });
 };
 
-export const buildIssueEpicContext = async ({ issues, mappingsByRole, jiraRequest }) => {
-  const openIssues = (issues || []).filter((issue) => isIssueOpen(issue));
-  const { epicKeyToIssues, issueCache } = await buildJqlEpicContext({
-    issues: openIssues,
-    mappingsByRole,
-    jiraRequest,
-  });
-
+// Builds the per-issue "which epic is this under" lookup from an already-resolved
+// epicKeyToIssues/issueCache pair (e.g. from buildJqlEpicContext), with no Jira calls.
+export const buildIssueEpicMapsFromContext = ({ epicKeyToIssues, issueCache }) => {
   const issueToEpicKey = new Map();
   const epicByKey = new Map();
 
@@ -254,6 +249,17 @@ export const buildIssueEpicContext = async ({ issues, mappingsByRole, jiraReques
   }
 
   return { issueToEpicKey, epicByKey };
+};
+
+export const buildIssueEpicContext = async ({ issues, mappingsByRole, jiraRequest }) => {
+  const openIssues = (issues || []).filter((issue) => isIssueOpen(issue));
+  const { epicKeyToIssues, issueCache } = await buildJqlEpicContext({
+    issues: openIssues,
+    mappingsByRole,
+    jiraRequest,
+  });
+
+  return buildIssueEpicMapsFromContext({ epicKeyToIssues, issueCache });
 };
 
 export const resolveCandidateFieldIds = (dueByField, { dueFieldId, mrdFieldId, iddFieldId, pedFieldId }) => {

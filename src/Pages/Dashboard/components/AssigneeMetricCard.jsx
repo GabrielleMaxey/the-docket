@@ -58,7 +58,7 @@ const AssigneeMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", dueByDa
         <AssigneeWorkloadChart workloadCounts={counts} chartVariant={chartVariant} />
       ) : null}
       <ContributorDueTasksSection
-        title="Overdue tasks"
+        title="Past due"
         tasks={overdueTasks}
         jiraBaseUrl={jiraBaseUrl}
         variant="overdue"
