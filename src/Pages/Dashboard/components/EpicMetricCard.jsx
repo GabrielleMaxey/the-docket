@@ -11,7 +11,7 @@ import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 import MetricBar from "./MetricBar";
 import ProjectContributorMetrics from "./ProjectContributorMetrics";
 
-const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePastDue }) => {
+const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant }) => {
   const isJqlPreset = epic.epicKey === "JQL";
   const epicBreakdown = Array.isArray(epic.epicBreakdown) ? epic.epicBreakdown : [];
   const hasEpicBreakdown = isJqlPreset && epicBreakdown.length > 0;
@@ -144,7 +144,6 @@ const EpicMetricCard = ({ epic, jiraBaseUrl, dueByDate, chartVariant, includePas
             chartVariant={chartVariant}
             dueByDate={dueByDate}
             epicPresetId={epic.epicPresetId}
-            showOverdueList={includePastDue}
           />
         </>
       ) : null}

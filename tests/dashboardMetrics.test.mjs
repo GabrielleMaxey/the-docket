@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildDueIssueRow,
   computeAssigneeMetrics,
   computeAssigneeMetricsFromIssueSet,
   computeContributorMetricsFromIssues,
@@ -380,6 +381,16 @@ describe("computeChildIssueMetrics", () => {
     });
 
     assert.equal(metrics.overdueOpenIssues, 0);
+  });
+});
+
+describe("buildDueIssueRow", () => {
+  it("includes the issue's status alongside key/summary/dueDate/issueType", () => {
+    const issue = makeIssue({ key: "ODI-40", status: "In Progress", dueValue: "2020-01-01" });
+    const row = buildDueIssueRow(issue, "duedate");
+    assert.equal(row.key, "ODI-40");
+    assert.equal(row.status, "In Progress");
+    assert.equal(row.dueDate, "2020-01-01");
   });
 });
 

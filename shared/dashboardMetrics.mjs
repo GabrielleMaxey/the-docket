@@ -986,6 +986,7 @@ export const buildDueIssueRow = (issue, dueFieldId, issueDueByOptions = null) =>
     summary: String(issue?.fields?.summary || "").trim(),
     dueDate: formatDateOnly(dueValue),
     issueType: getIssueTypeName(issue),
+    status: getIssueStatusName(issue) || "Unknown",
   };
 };
 

@@ -203,14 +203,32 @@ export const workloadCountsToPieData = (counts, { includeResolved = true } = {})
 };
 
 export const buildContributorPieStatusCounts = (person) => {
+  const openCounts = { ...(person?.openStatusCounts || {}) };
+  const overdueIssues = Array.isArray(person?.overdueIssues) ? person.overdueIssues : [];
+
+  // Overdue issues get their own "Past Due" slice instead of their raw status slice —
+  // mirrors computeAssigneeWorkloadCounts' mutually-exclusive bucketing server-side, so an
+  // overdue "In Progress" issue counts once, not twice.
+  for (const issue of overdueIssues) {
+    const status = String(issue?.status || "").trim();
+    if (status && Number(openCounts[status]) > 0) {
+      openCounts[status] -= 1;
+    }
+  }
+
   const pie = {};
-  const openCounts = person?.openStatusCounts || {};
   for (const [status, count] of Object.entries(openCounts)) {
     const value = Number(count) || 0;
     if (value > 0) {
       pie[status] = value;
     }
   }
+
+  const pastDue = overdueIssues.length > 0 ? overdueIssues.length : Number(person?.overdueOpenIssues || 0);
+  if (pastDue > 0) {
+    pie["Past Due"] = pastDue;
+  }
+
   return pie;
 };
 
