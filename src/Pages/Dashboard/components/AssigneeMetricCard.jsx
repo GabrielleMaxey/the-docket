@@ -22,10 +22,6 @@ const AssigneeMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", dueByDa
   const resolved = Number(counts.totalResolved || 0);
   const open = Number(counts.totalAssigned || 0);
   const assigneeName = person.resolvedDisplayName || person.queryName;
-  const overdueTasks =
-    person.overdueIssues?.length > 0
-      ? person.overdueIssues
-      : (person.overdueIssueKeys || []).map((key) => ({ key, summary: "", dueDate: null, issueType: "" }));
   const upcomingTasks = person.upcomingDueIssues || [];
   const epicBreakdown = Array.isArray(person.epicBreakdown) ? person.epicBreakdown : [];
 
@@ -57,13 +53,6 @@ const AssigneeMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", dueByDa
       {total > 0 ? (
         <AssigneeWorkloadChart workloadCounts={counts} chartVariant={chartVariant} />
       ) : null}
-      <ContributorDueTasksSection
-        title="Overdue tasks"
-        tasks={overdueTasks}
-        jiraBaseUrl={jiraBaseUrl}
-        variant="overdue"
-        personKey={assigneeName}
-      />
       <ContributorDueTasksSection
         title={dueByDate ? `Upcoming due through ${dueByDate}` : "Upcoming due dates"}
         tasks={upcomingTasks}

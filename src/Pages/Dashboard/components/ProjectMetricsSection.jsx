@@ -62,7 +62,6 @@ const ProjectMetricsSection = ({
                   jiraBaseUrl={jiraBaseUrl}
                   dueByDate={dueByDate}
                   chartVariant={chartVariant}
-                  includePastDue={snapshot.includePastDue}
                 />
               ))}
             </div>
@@ -77,7 +76,6 @@ const ProjectMetricsSection = ({
               jiraBaseUrl={jiraBaseUrl}
               dueByDate={dueByDate}
               chartVariant={chartVariant}
-              includePastDue={snapshot.includePastDue}
             />
           ))}
         </div>
@@ -94,7 +92,6 @@ const ProjectMetricsSection = ({
               jiraBaseUrl={jiraBaseUrl}
               dueByDate={dueByDate}
               chartVariant={chartVariant}
-              includePastDue={snapshot.includePastDue}
             />
           </>
         );
@@ -111,7 +108,6 @@ const ProjectMetricsSection = ({
               jiraBaseUrl={jiraBaseUrl}
               dueByDate={dueByDate}
               chartVariant={chartVariant}
-              includePastDue={snapshot.includePastDue}
             />
           </>
         );
