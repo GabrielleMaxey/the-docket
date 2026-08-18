@@ -17,6 +17,7 @@ import { fetchEpicIssue, resolveJiraUser, searchAllIssues } from "../jiraSearchH
 import {
   buildEpicBreakdownFromContext,
   buildEpicLevelDueByIssues,
+  buildIssueEpicMapsFromContext,
   buildJqlEpicContext,
   filterEpicGroupsToOpenIssues,
 } from "./dueByHelpers.mjs";
@@ -282,10 +283,20 @@ export const buildEpicMetricsFromPresets = async ({
         statusCounts: childMetrics.statusCounts,
         openStatusCounts: childMetrics.openStatusCounts,
         contributorMetrics: computeContributorMetricsFromIssues(
-        childMetrics.childIssues,
-        ctx.dueFieldId,
-        ctx.overdueFieldIds
-      ),
+          childMetrics.childIssues,
+          ctx.dueFieldId,
+          ctx.overdueFieldIds,
+          ctx.dueByOptions
+            ? {
+                dueByDate: ctx.dueByDate,
+                dueByOptions: ctx.dueByOptions,
+                ...buildIssueEpicMapsFromContext({
+                  epicKeyToIssues: jqlEpicContext.epicKeyToIssues,
+                  issueCache: jqlEpicContext.issueCache,
+                }),
+              }
+            : null
+        ),
         childIssues: childMetrics.childIssues,
       });
       scopedChildIssues.push(...childMetrics.childIssues);
