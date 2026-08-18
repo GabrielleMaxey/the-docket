@@ -710,11 +710,15 @@ export const computeContributorMetricsFromIssues = (
     const issueOpts = resolveIssueDueByOptions(issue, normalizedDueContext);
     const row = buildDueIssueRow(issue, dueFieldId, issueOpts);
 
-    if (row.dueDate) {
-      if (isIssueOverdueForMetrics(issue, dueFieldId, extraOverdueFieldIds, issueOpts)) {
-        bucket.overdueOpenIssues += 1;
-        bucket.overdueIssues.push(row);
-      } else if (
+    // Mirrors computeChildIssueMetrics: overdue is decided from dueFieldId +
+    // extraOverdueFieldIds independently of the single "due by" compare field
+    // that row.dueDate is built from, so an issue overdue only by an extra
+    // field (e.g. an Epic done-date basis) still counts here.
+    if (isIssueOverdueForMetrics(issue, dueFieldId, extraOverdueFieldIds, issueOpts)) {
+      bucket.overdueOpenIssues += 1;
+      bucket.overdueIssues.push(row);
+    } else if (row.dueDate) {
+      if (
         normalizedDueContext?.dueByDate &&
         isIssueUpcomingDueBy(
           issue,

@@ -653,3 +653,22 @@ describe("getTerminalIssueCount", () => {
     );
   });
 });
+
+describe("computeContributorMetricsFromIssues — overdue via extra field", () => {
+  it("counts overdue when the issue has no primary due date but an extra overdue field is past due", () => {
+    const targetFieldId = "customfield_target";
+    const issue = makeIssue({
+      key: "ODI-30",
+      assignee: "Jane Doe",
+      dueValue: "2020-01-01",
+      dueFieldId: targetFieldId,
+    });
+
+    const rows = computeContributorMetricsFromIssues([issue], "duedate", [targetFieldId]);
+
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].overdueOpenIssues, 1);
+    assert.equal(rows[0].overdueIssues.length, 1);
+    assert.equal(rows[0].overdueIssues[0].key, "ODI-30");
+  });
+});
