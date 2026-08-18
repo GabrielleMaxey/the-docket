@@ -24,10 +24,11 @@ const IndividualContributorsPanel = ({
   return (
     <div className="dashboard-contributors-panel">
       <div className="dashboard-contributors-block">
-        <p className="dashboard-contributors-block-title">From your selected projects</p>
+        <p className="dashboard-contributors-block-title">Within your selected projects</p>
         <p className="dashboard-contributors-block-hint">
-          Auto-derived from the projects picked in Filters above — no separate roster to pick or
-          refresh.
+          Auto-derived from the projects picked in Filters above — each person&rsquo;s work on
+          just these projects, not their full Jira workload. No separate roster to pick or
+          refresh; for the full picture, add them under Layered in below.
         </p>
         {autoRows.length > 0 ? (
           autoRows.map((row) => (
@@ -37,6 +38,7 @@ const IndividualContributorsPanel = ({
               jiraBaseUrl={jiraBaseUrl}
               dueByDate={dueByDate}
               showBar={false}
+              showResolvedBar
               showOverdueList={false}
               showUpcomingList={false}
             />
