@@ -4,6 +4,7 @@ import { formatPercent } from "../../../utils/format";
 import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 import { TERMINAL_STATUS_LABEL } from "../utils/dashboardMetricsUtils";
 import ContributorDueTasksSection from "./ContributorDueTasksSection";
+import MetricBar from "./MetricBar";
 import "../../../Components/report.css";
 
 // Fixed left-to-right order so the same status always lands in the same place across
@@ -44,6 +45,7 @@ const ContributorStatusBar = ({
   jiraBaseUrl,
   dueByDate,
   showBar = true,
+  showResolvedBar = false,
   showOverdueList = true,
   showUpcomingList = true,
 }) => {
@@ -96,6 +98,9 @@ const ContributorStatusBar = ({
             />
           ))}
         </div>
+      ) : null}
+      {showResolvedBar ? (
+        <MetricBar label="Resolved" value={resolvedPercent} count={`${resolved}/${total}`} />
       ) : null}
       {showOverdueList ? (
         <ContributorDueTasksSection
