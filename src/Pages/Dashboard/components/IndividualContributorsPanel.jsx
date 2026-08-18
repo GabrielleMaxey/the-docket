@@ -1,5 +1,5 @@
 import { Message } from "semantic-ui-react";
-import ContributorStatusBar, { CONTRIBUTOR_STATUS_LEGEND } from "./ContributorStatusBar";
+import ContributorStatusBar from "./ContributorStatusBar";
 import AssigneeMetricCard from "./AssigneeMetricCard";
 import JqlContributorMetricCard from "./JqlContributorMetricCard";
 import DashboardRefreshActions from "./DashboardRefreshActions";
@@ -30,32 +30,17 @@ const IndividualContributorsPanel = ({
           refresh.
         </p>
         {autoRows.length > 0 ? (
-          <>
-            <div className="app-report-contributor-legend-row">
-              <span />
-              <div className="app-report-contributor-legend">
-                {CONTRIBUTOR_STATUS_LEGEND.map((item) => (
-                  <span key={item.label} className="app-report-contributor-legend-item">
-                    <span
-                      className="app-report-contributor-legend-swatch"
-                      style={{ background: item.color }}
-                    />
-                    {item.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-            {autoRows.map((row) => (
-              <ContributorStatusBar
-                key={row.name}
-                person={row}
-                jiraBaseUrl={jiraBaseUrl}
-                dueByDate={dueByDate}
-                showOverdueList={false}
-                showUpcomingList={false}
-              />
-            ))}
-          </>
+          autoRows.map((row) => (
+            <ContributorStatusBar
+              key={row.name}
+              person={row}
+              jiraBaseUrl={jiraBaseUrl}
+              dueByDate={dueByDate}
+              showBar={false}
+              showOverdueList={false}
+              showUpcomingList={false}
+            />
+          ))
         ) : (
           <Message info size="small">
             Select a project in Filters and refresh to see contributors here.
