@@ -550,7 +550,14 @@ export const computeChildIssueMetrics = (
   dueFieldId,
   dueByDate,
   extraOverdueFieldIds = [],
-  dueByOptions = null
+  dueByOptions = null,
+  // Optional { epicByKey, issueToEpicKey } maps for groups that can span multiple
+  // epics (e.g. a JQL preset). When set, each issue's overdue check substitutes its
+  // OWN epic in place of dueByOptions.epicIssue, instead of one epic shared by every
+  // issue in the call. Only affects the overdue count below — the dueByDate list
+  // further down still uses the single shared epicIssue, since none of its current
+  // callers pass per-issue maps.
+  issueEpicMaps = null
 ) => {
   const compareFieldId = dueByOptions?.dueByCompareFieldId || dueFieldId;
   const fallbackFieldId = dueByOptions?.dueByFallbackFieldId || dueFieldId;
@@ -559,6 +566,16 @@ export const computeChildIssueMetrics = (
   const epicIssue = dueByOptions?.epicIssue ?? null;
   const preferEpicCompareForChildren = Boolean(dueByOptions?.preferEpicCompareForChildren);
   const childIssues = issues.filter((issue) => String(issue.key || "") !== String(epicKey || ""));
+
+  const resolveOverdueOptionsForIssue = (issue) => {
+    if (!issueEpicMaps?.issueToEpicKey || !issueEpicMaps?.epicByKey) {
+      return dueByOptions;
+    }
+    const issueKey = String(issue?.key || "").trim();
+    const issueEpicKey = issueEpicMaps.issueToEpicKey.get(issueKey);
+    const issueEpicIssue = issueEpicKey ? issueEpicMaps.epicByKey.get(issueEpicKey) : null;
+    return issueEpicIssue ? { ...dueByOptions, epicIssue: issueEpicIssue } : dueByOptions;
+  };
 
   let completedIssues = 0;
   let resolvedIssues = 0;
@@ -579,7 +596,14 @@ export const computeChildIssueMetrics = (
     } else {
       openIssues += 1;
       openStatusCounts[statusName] = (openStatusCounts[statusName] || 0) + 1;
-      if (isIssueOverdueForMetrics(issue, dueFieldId, extraOverdueFieldIds, dueByOptions)) {
+      if (
+        isIssueOverdueForMetrics(
+          issue,
+          dueFieldId,
+          extraOverdueFieldIds,
+          resolveOverdueOptionsForIssue(issue)
+        )
+      ) {
         overdueOpenIssues += 1;
       }
       if (dueByDate) {

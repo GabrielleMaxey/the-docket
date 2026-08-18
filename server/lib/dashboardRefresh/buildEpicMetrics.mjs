@@ -225,21 +225,30 @@ export const buildEpicMetricsFromPresets = async ({
     }
 
     if (preset.presetType === "jql") {
+      const jqlEpicContext = await buildJqlEpicContext({
+        issues,
+        mappingsByRole: ctx.mappingsByRole,
+        jiraRequest,
+      });
+      const jqlEpicMaps = buildIssueEpicMapsFromContext({
+        epicKeyToIssues: jqlEpicContext.epicKeyToIssues,
+        issueCache: jqlEpicContext.issueCache,
+      });
+
       const childMetrics = computeChildIssueMetrics(
         issues,
         "",
         ctx.dueFieldId,
         ctx.dueByDate,
         ctx.overdueFieldIds,
-        ctx.dueByOptions
+        ctx.dueByOptions,
+        // JQL groups can span many epics, so overdue (via preferEpicCompareForChildren)
+        // needs a per-issue epic lookup rather than the single shared epicIssue an
+        // epic-preset call would use.
+        jqlEpicMaps
       );
       childMetrics.dueFieldId = ctx.dueFieldId;
 
-      const jqlEpicContext = await buildJqlEpicContext({
-        issues,
-        mappingsByRole: ctx.mappingsByRole,
-        jiraRequest,
-      });
       const epicBreakdown = buildEpicBreakdownFromContext({
         epicKeyToIssues: jqlEpicContext.epicKeyToIssues,
         issueCache: jqlEpicContext.issueCache,
@@ -287,14 +296,7 @@ export const buildEpicMetricsFromPresets = async ({
           ctx.dueFieldId,
           ctx.overdueFieldIds,
           ctx.dueByOptions
-            ? {
-                dueByDate: ctx.dueByDate,
-                dueByOptions: ctx.dueByOptions,
-                ...buildIssueEpicMapsFromContext({
-                  epicKeyToIssues: jqlEpicContext.epicKeyToIssues,
-                  issueCache: jqlEpicContext.issueCache,
-                }),
-              }
+            ? { dueByDate: ctx.dueByDate, dueByOptions: ctx.dueByOptions, ...jqlEpicMaps }
             : null
         ),
         childIssues: childMetrics.childIssues,
