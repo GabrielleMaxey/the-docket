@@ -1674,3 +1674,83 @@
   font-size: 1rem;
   color: #0f172a;
 }
+
+.dashboard-page .dashboard-tabs-strip {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 1.75rem;
+  border-bottom: 1.5px solid #e2e8f0;
+}
+
+.dashboard-page .dashboard-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  border: 1.5px solid transparent;
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transform: translateY(1.5px);
+}
+
+.dashboard-page .dashboard-tab-btn:hover {
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.dashboard-page .dashboard-tab-btn--active {
+  border-color: #e2e8f0;
+  background: #fff;
+  color: #0c93d9;
+}
+
+.dashboard-page .dashboard-tab-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+.dashboard-page .dashboard-tab-btn--active .dashboard-tab-badge {
+  color: #0c93d9;
+  background: #e8f5fd;
+}
+
+.dashboard-page .dashboard-tab-panel {
+  padding-top: 0.25rem;
+}
+
+.dashboard-page .dashboard-contributors-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.dashboard-page .dashboard-contributors-block {
+  background: #fff;
+  border: 1px solid #dde7e9;
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: 0 1px 2px rgba(15, 49, 51, 0.05), 0 6px 16px rgba(15, 49, 51, 0.06);
+}
+
+.dashboard-page .dashboard-contributors-block-title {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.dashboard-page .dashboard-contributors-block-hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+}

@@ -3,6 +3,7 @@ import { getStatusColor } from "../../../utils/statusScale";
 import { formatPercent } from "../../../utils/format";
 import { buildWorkWeekHref } from "../../../utils/workWeekNavigation";
 import { TERMINAL_STATUS_LABEL } from "../utils/dashboardMetricsUtils";
+import "../../../Components/report.css";
 
 // Fixed left-to-right order so the same status always lands in the same place across
 // every person's bar — that's what makes the bars comparable at a glance.
