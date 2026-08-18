@@ -1,4 +1,5 @@
 import { Message } from "semantic-ui-react";
+import CollapsibleSection from "../../../Components/CollapsibleSection";
 import ContributorStatusBar from "./ContributorStatusBar";
 import AssigneeMetricCard from "./AssigneeMetricCard";
 import JqlContributorMetricCard from "./JqlContributorMetricCard";
@@ -23,13 +24,14 @@ const IndividualContributorsPanel = ({
 
   return (
     <div className="dashboard-contributors-panel">
-      <div className="dashboard-contributors-block">
-        <p className="dashboard-contributors-block-title">Within your selected projects</p>
-        <p className="dashboard-contributors-block-hint">
-          Auto-derived from the projects picked in Filters above — each person&rsquo;s work on
-          just these projects, not their full Jira workload. No separate roster to pick or
-          refresh; for the full picture, add them under Layered in below.
-        </p>
+      <CollapsibleSection
+        title="Within your selected projects"
+        subtitle="Auto-derived from the projects picked in Filters above — each person's work on just these projects, not their full Jira workload. No separate roster to pick or refresh; for the full picture, add them under Layered in below."
+        storageKey="individualContributorsWithinProjects"
+        persistKeyPrefix="dashboard-collapse-"
+        defaultOpen={true}
+        badge={autoRows.length > 0 ? `${autoRows.length} people` : null}
+      >
         {autoRows.length > 0 ? (
           autoRows.map((row) => (
             <ContributorStatusBar
@@ -48,7 +50,7 @@ const IndividualContributorsPanel = ({
             Select a project in Filters and refresh to see contributors here.
           </Message>
         )}
-      </div>
+      </CollapsibleSection>
 
       <div className="dashboard-contributors-block dashboard-contributors-block--layered">
         <p className="dashboard-contributors-block-title">
