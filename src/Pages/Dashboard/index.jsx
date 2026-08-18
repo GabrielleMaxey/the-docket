@@ -5,6 +5,7 @@ import { usePersistedState } from "../hooks/usePersistedState";
 import { formatPercent, formatTimestamp } from "../../utils/format";
 import {
   collapseTerminalStatusCounts,
+  computeOverallTotals,
   DEFAULT_DASHBOARD_VISIBLE_SECTIONS,
   normalizeVisibleSections,
   splitDueByIssues,
@@ -128,6 +129,13 @@ const Dashboard = () => {
   }, [activeProjectTab, displayEpics, pastDueEpics]);
   const isSingleProjectView = Boolean(selectedProjectEpic);
 
+  // Same card grid either way — scoped to the one selected project's own totals
+  // instead of the full selection when a single project tab is active.
+  const overallDisplayTotals = React.useMemo(
+    () => (isSingleProjectView ? computeOverallTotals([selectedProjectEpic]) : overallTotals),
+    [isSingleProjectView, selectedProjectEpic, overallTotals]
+  );
+
   const toggleSection = React.useCallback(
     (key) => {
       setVisibleSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -242,83 +250,95 @@ const Dashboard = () => {
 
           {activeDashboardTab === "project" ? (
             <div className="dashboard-tab-panel">
-              {visibleSections.overall && showOverall && !isSingleProjectView ? (
+              {visibleSections.overall && showOverall ? (
                 <CollapsibleSection
                   title="Overall Status"
-                  subtitle="High-level health across selected projects: resolved, in-progress, complete, and overdue percentages."
+                  subtitle={
+                    isSingleProjectView
+                      ? `High-level health for ${selectedProjectEpic.label}: resolved, in-progress, complete, and overdue percentages.`
+                      : "High-level health across selected projects: resolved, in-progress, complete, and overdue percentages."
+                  }
                   storageKey="overall"
                   persistKeyPrefix="dashboard-collapse-"
                   className="app-collapsible--spaced"
-                  badge={`${formatPercent(snapshot.overallIssuePercent)} resolved`}
+                  badge={`${formatPercent(overallDisplayTotals.issuePercent)} resolved`}
                 >
                   <div className="dashboard-overall-grid">
                     <OverallSummaryCard
                       label="Tasks resolved"
-                      description="Percentage of all tasks across selected projects that are closed, done, or resolved."
-                      percent={snapshot.overallIssuePercent}
-                      numerator={overallTotals.resolvedIssues}
-                      denominator={overallTotals.totalIssues}
+                      description={
+                        isSingleProjectView
+                          ? "Percentage of tasks in this project that are closed, done, or resolved."
+                          : "Percentage of all tasks across selected projects that are closed, done, or resolved."
+                      }
+                      percent={overallDisplayTotals.issuePercent}
+                      numerator={overallDisplayTotals.resolvedIssues}
+                      denominator={overallDisplayTotals.totalIssues}
                       tone="blue"
                     />
                     <OverallSummaryCard
                       label="Tasks in progress"
                       description="Percentage of all tasks currently being actively worked on."
                       percent={
-                        overallTotals.totalIssues > 0
-                          ? (overallTotals.inProgressIssues / overallTotals.totalIssues) * 100
+                        overallDisplayTotals.totalIssues > 0
+                          ? (overallDisplayTotals.inProgressIssues / overallDisplayTotals.totalIssues) * 100
                           : 0
                       }
-                      numerator={overallTotals.inProgressIssues}
-                      denominator={overallTotals.totalIssues}
+                      numerator={overallDisplayTotals.inProgressIssues}
+                      denominator={overallDisplayTotals.totalIssues}
                       tone="orange"
                     />
                     <OverallSummaryCard
                       label="Tasks in backlog"
-                      description="Percentage of all tasks across selected projects that are in backlog."
+                      description={
+                        isSingleProjectView
+                          ? "Percentage of tasks in this project that are in backlog."
+                          : "Percentage of all tasks across selected projects that are in backlog."
+                      }
                       percent={
-                        overallTotals.totalIssues > 0
-                          ? (overallTotals.backlogIssues / overallTotals.totalIssues) * 100
+                        overallDisplayTotals.totalIssues > 0
+                          ? (overallDisplayTotals.backlogIssues / overallDisplayTotals.totalIssues) * 100
                           : 0
                       }
-                      numerator={overallTotals.backlogIssues}
-                      denominator={overallTotals.totalIssues}
+                      numerator={overallDisplayTotals.backlogIssues}
+                      denominator={overallDisplayTotals.totalIssues}
                       tone="gray"
                     />
-                    {overallTotals.epicCount > 0 ? (
+                    {overallDisplayTotals.epicCount > 0 ? (
                       <OverallSummaryCard
                         label="Projects complete"
                         description="Percentage of epics with Initial Done Date or Most Recent Done Date set (MRD/IDD)."
-                        percent={snapshot.overallEpicPercent}
-                        numerator={overallTotals.completeEpics}
-                        denominator={overallTotals.epicCount}
+                        percent={overallDisplayTotals.epicPercent}
+                        numerator={overallDisplayTotals.completeEpics}
+                        denominator={overallDisplayTotals.epicCount}
                         tone="teal"
                       />
                     ) : null}
                     <OverallSummaryCard
                       label="Open tasks overdue"
                       description="Percentage of currently open tasks that have passed their target completion date."
-                      percent={snapshot.overallOverduePercent}
-                      numerator={overallTotals.overdueOpenIssues}
-                      denominator={overallTotals.openIssues}
-                      warning={snapshot.overallOverduePercent > 0}
+                      percent={overallDisplayTotals.overduePercent}
+                      numerator={overallDisplayTotals.overdueOpenIssues}
+                      denominator={overallDisplayTotals.openIssues}
+                      warning={overallDisplayTotals.overduePercent > 0}
                     />
                   </div>
-                  {overallTotals.totalIssues > 0 ? (
+                  {overallDisplayTotals.totalIssues > 0 ? (
                     <div className="dashboard-summary-chips">
                       <div className="dashboard-summary-chip">
-                        <span className="dashboard-summary-chip-value">{overallTotals.totalIssues}</span>
+                        <span className="dashboard-summary-chip-value">{overallDisplayTotals.totalIssues}</span>
                         <span className="dashboard-summary-chip-label">issues</span>
                       </div>
                       <div className="dashboard-summary-chip dashboard-summary-chip--overdue">
-                        <span className="dashboard-summary-chip-value">{overallTotals.overdueOpenIssues}</span>
+                        <span className="dashboard-summary-chip-value">{overallDisplayTotals.overdueOpenIssues}</span>
                         <span className="dashboard-summary-chip-label">overdue</span>
                       </div>
                       <div className="dashboard-summary-chip dashboard-summary-chip--resolved">
-                        <span className="dashboard-summary-chip-value">{overallTotals.resolvedIssues}</span>
+                        <span className="dashboard-summary-chip-value">{overallDisplayTotals.resolvedIssues}</span>
                         <span className="dashboard-summary-chip-label">resolved</span>
                       </div>
                       <div className="dashboard-summary-chip dashboard-summary-chip--backlog">
-                        <span className="dashboard-summary-chip-value">{overallTotals.backlogIssues}</span>
+                        <span className="dashboard-summary-chip-value">{overallDisplayTotals.backlogIssues}</span>
                         <span className="dashboard-summary-chip-label">backlog</span>
                       </div>
                     </div>

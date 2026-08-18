@@ -1,5 +1,6 @@
 import {
   isClosedLikeStatus as isClosedLikeStatusName,
+  collectEpicCompletionCounts,
   getTerminalIssueCount,
 } from "../../../../shared/dashboardMetrics.mjs";
 
@@ -136,6 +137,43 @@ export const getWorkloadStatusCounts = (source) => {
     inProgress: sumStatusCount(openCounts, "in progress"),
     readyForVerification: sumStatusCount(openCounts, "ready for verification"),
     backlog: sumStatusCount(openCounts, "backlog"),
+  };
+};
+
+// Same shape and math for one epic or many, so the Overall Status cards read
+// identically whether "View All" or a single project tab is selected.
+export const computeOverallTotals = (epics) => {
+  const list = Array.isArray(epics) ? epics : [];
+  let totalIssues = 0;
+  let resolvedIssues = 0;
+  let openIssues = 0;
+  let overdueOpenIssues = 0;
+  let inProgressIssues = 0;
+  let backlogIssues = 0;
+  const { epicsComplete, epicCount } = collectEpicCompletionCounts(list);
+
+  for (const epic of list) {
+    totalIssues += Number(epic.totalIssues || 0);
+    openIssues += Number(epic.openIssues || 0);
+    overdueOpenIssues += Number(epic.overdueOpenIssues || 0);
+    resolvedIssues += getTerminalIssueCount(epic);
+    const workload = getWorkloadStatusCounts(epic);
+    inProgressIssues += workload.inProgress;
+    backlogIssues += workload.backlog;
+  }
+
+  return {
+    totalIssues,
+    resolvedIssues,
+    openIssues,
+    overdueOpenIssues,
+    inProgressIssues,
+    backlogIssues,
+    completeEpics: epicsComplete,
+    epicCount,
+    issuePercent: totalIssues > 0 ? (resolvedIssues / totalIssues) * 100 : 0,
+    epicPercent: epicCount > 0 ? (epicsComplete / epicCount) * 100 : 0,
+    overduePercent: openIssues > 0 ? (overdueOpenIssues / openIssues) * 100 : 0,
   };
 };
 
