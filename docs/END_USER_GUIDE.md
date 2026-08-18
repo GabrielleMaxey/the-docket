@@ -271,11 +271,13 @@ Use Metrics when you want to see how a whole project (or several) is tracking, n
 
 1. **Select projects** — pick one or more Epic & JQL presets from the panel at the top (add or edit them in Settings → **Epic & JQL presets**)
 2. **Optional due-date views** — set an upcoming window, past-due lookback, and which date field to compare against (see below)
-3. **Contributor Metrics** — add people or custom queries to track in the **Individual Contributor Metrics** section (saved entries from Settings → **Contributor Metrics**, or type a display name directly)
-4. **Choose views** — under **Views**, check which dashboard sections you want visible (including separate toggles for upcoming vs past-due due-date cards)
+3. **Contributor Metrics** *(optional)* — add people or custom queries to layer in on the **Individual contributors** tab (saved entries from Settings → **Contributor Metrics**, or type a display name directly). Not required — that tab already shows everyone from your selected projects with no extra setup; see [Individual contributors](#individual-contributors) below
+4. **Choose views** — under **Views**, check which sections you want visible on the **Project metrics** tab (including separate toggles for upcoming vs past-due due-date cards)
 5. Click **Refresh status** — the app pulls metrics from Jira and stores them
 
 The stored snapshot stays until you click **Refresh status** again. The page loads from the last snapshot even if Jira is slow. You can navigate away while refresh runs — watch the top nav for **Refreshing dashboard** and return when it finishes.
+
+The page itself is split into three tabs — **Project metrics**, **Individual contributors**, and **Reports** — all reading from the same snapshot, so one **Refresh status** updates all three.
 
 ### Jump to Task Management from Metrics
 
@@ -305,12 +307,12 @@ These filters are optional. **Refresh status** always updates resolution, worklo
 
 > **Tip:** Upcoming lists show only future due dates. Past-due rows appear in a separate card only when **Past Due Projects** is enabled.
 
-### Sections (all collapsible)
+### Project metrics
 
-Toggle each section under **Views** in Filters & Settings. Open/closed state is remembered per section.
+The default tab. Sections below are individually collapsible; toggle which ones appear under **Views** in Filters & Settings. Open/closed state is remembered per section.
 
 **Overall Status**  
-Summary cards — % tasks resolved, % in progress, % in backlog, % projects complete (epics with MRD/IDD set, including epics discovered inside JQL presets), and % open tasks overdue. Below the cards, count chips show total issues, overdue, resolved, and backlog at a glance.
+Summary cards — % tasks resolved, % in progress, % in backlog, % projects complete (epics with MRD/IDD set, including epics discovered inside JQL presets), and % open tasks overdue. Below the cards, count chips show total issues, overdue, resolved, and backlog at a glance. Shows for a single selected project too, scoped to just that project — not only when "View All" is active.
 
 **Project Metrics**  
 One card per epic/JQL preset showing:
@@ -319,6 +321,7 @@ One card per epic/JQL preset showing:
 - Status breakdown (pie or bar chart — toggle under **Chart style**)
 - Deadline dates (Initial Done Date, Most Recent Done Date, Project End Date) on epic presets
 - Past due badge when a deadline has been missed (when Past Due Projects is enabled)
+- Its own **Individual contributors — [project]** breakdown, scoped to just that project's issues
 
 **Upcoming Due Dates** *(optional)*  
 Blue-accent card listing open tasks with due dates from **today through** your selected upcoming cutoff, grouped by project → person. Each row shows issue type (Task, Epic, etc.), key, summary, and due date. Period summary chips break counts down by week or month.
@@ -326,12 +329,22 @@ Blue-accent card listing open tasks with due dates from **today through** your s
 **Past Due in lookback** *(optional)*  
 Coral-accent card listing open tasks that missed their deadline within the selected lookback (1–3 years). Populated only when **Past Due Projects** is enabled. Empty state explains how to enable it.
 
-**Individual Contributor Metrics**  
-One card per person or custom query configured in Settings → **Contributor Metrics** (or names you add directly in the Metrics filter panel). The section appears as soon as people are selected — click **Refresh status** to load metrics. After refresh: open workload, overdue count, and status breakdown per person. Person names link to Task Management with an assignee drill-down.
+### Individual contributors
+
+Two panels, stacked — different sources, different scope:
+
+**From your selected projects**  
+Auto-derived from whatever's picked in **Select projects** above — no separate roster to pick, and no extra refresh click; it reads from the same snapshot **Refresh status** already pulled. Each person gets a compact row: name (links to Task Management filtered to them), then open/resolved/overdue counts. This is each person's work on *just these projects* — not their full Jira workload, so it can read lower than their real total if they also work outside your selected presets.
+
+**Layered in — people, custom queries, and My Direct Reports**  
+The chip-based roster from Settings → **Contributor Metrics** (or names typed directly in the Metrics filter panel), for rosters that span multiple projects or aren't covered by your project selection. Needs its own **Refresh contributors** click — it's a separate Jira query, not read from the Project Metrics snapshot. After refresh, each card shows a full pie/bar status breakdown, past-due and upcoming-due lists, and:
 
 - **Person watches** — full Jira assignee workload (`assignee = "…"` search), not limited to the projects selected in step 1.
 - **Custom query watches** — metrics come from the watch JQL as written (same scope you defined in Settings).
-- **Per-project contributor rows** on Project Metrics cards — only issues within that epic/preset (Jane’s 5 tasks in Epic A, not her 10 elsewhere).
+
+The two panels can overlap — a person auto-derived from your projects may also appear layered in with a different (larger) total. That's expected; each source keeps its own numbers.
+
+### Reports
 
 **Generate Report**  
 Choose an audience and click Generate:
@@ -339,12 +352,13 @@ Choose an audience and click Generate:
 | Audience | Written for |
 |----------|------------|
 | Executive Summary | Senior leadership — highlights, risks, action items |
-| Product Owner Report | Feature delivery, backlog health, blockers |
-| Developer Report | Team workload, overdue by person, WIP |
+| Project Manager Summary | Deadline realism, stakeholder impact, delay risks, stand-up summaries, and closeout reports |
+| Developer Report | Team workload and WIP, plus a full status breakdown per contributor (not just overdue) — pulled from whichever projects are selected above, same as the Individual contributors tab |
+| Ad-hoc team report | A manager's direct reports specifically — uses Settings → **My Direct Reports**, not the project presets selected above. Select those chips under Contributor Metrics and **Refresh contributors** first |
 
-Reports include an optional status chart when Metrics data supports it. Use **Copy**, **Download .md**, or **Clear report** (removes the report from this page only — archived copies remain in **Past Reports**). Generation continues in the background if you leave the page.
+Project-scoped audiences (Executive Summary, Project Manager Summary, Developer Report) can report on one project or several — use the project tabs above the audience cards to pick. Reports include an optional status chart when Metrics data supports it. Use **Copy**, **Download .md**, or **Clear report** (removes the report from this page only — archived copies remain in **Past Reports**). Generation continues in the background if you leave the page.
 
-**Weekly digest** (same section, below the LLM reports)  
+**Weekly digest** (same tab, below the LLM reports)  
 Snapshot-based stand-up brief — overdue/upcoming highlights, contributor load, and project health. **No LLM required.** Click **Generate weekly digest** after a Metrics refresh, then copy, download, or **Clear report**.
 
 ---

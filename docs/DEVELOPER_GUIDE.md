@@ -119,7 +119,7 @@ taskManager/
 │   │   ├── Dashboard/              # Dashboard feature (index.jsx, hooks, components)
 │   │   │   ├── index.jsx
 │   │   │   ├── hooks/              # useDashboardRefresh, useReportGeneration
-│   │   │   ├── components/         # filters, due-date lists, epic cards, WeeklyDigestPanel
+│   │   │   ├── components/         # DashboardTabs, filters, due-date lists, epic cards, IndividualContributorsPanel, ContributorStatusBar, WeeklyDigestPanel
 │   │   │   └── utils/              # dashboardMetricsUtils (presets, splitDueByIssues)
 │   │   ├── Dashboard.jsx           # Re-exports Dashboard/index
 │   │   ├── Settings/               # Settings feature folder
@@ -244,7 +244,7 @@ Notable snapshot fields used by the UI and Chat context:
 
 **`app_settings`** — key-value store for `epic_past_due_mode`, `proxy_url`, `chat_custom_instructions`
 
-**`watched_assignees`** — saved people and custom queries for the Dashboard Individual Contributor Metrics section
+**`watched_assignees`** — saved people and custom queries for the Individual contributors tab's "Layered in" panel (not the auto-derived "From your selected projects" panel, which has no dedicated table — it's computed from epic `contributorMetrics` at read time)
 
 | Column | Notes |
 |--------|-------|
@@ -306,9 +306,11 @@ These are mapped in Settings → Jira field mapping and synced via `POST /api/ji
 1. **`parseRefreshInput.mjs`** — validates preset IDs, `dueByDate`, `dueByField`, `includePastDue`, `pastDueLookbackYears` (1/2/3 only)
 2. **`buildRefreshContext.mjs`** — resolves field IDs, `dueByCompareFieldId`, `pastDueFloor`, and `dueByOptions` (including `epicIssue` when computing per-epic child metrics)
 3. **`buildEpicMetrics.mjs`** — Jira search per preset; `computeChildIssueMetrics` + `buildEpicLevelDueByIssues` for due-date lists; per-epic `contributorMetrics` stay scoped to that preset’s issues
-4. **`buildAssigneeMetrics.mjs`** — Individual Contributor Metrics cards: **person** watches run `assignee = "…"` JQL (full assignee workload); **JQL** watches use the saved query without intersecting preset scope
+4. **`buildAssigneeMetrics.mjs`** — the **Individual contributors** tab's "Layered in" panel: **person** watches run `assignee = "…"` JQL (full assignee workload); **JQL** watches use the saved query without intersecting preset scope. This is a separate Jira round-trip from step 3, which is why it needs its own **Refresh contributors** click rather than riding the main snapshot refresh
 5. **`collectDueByIssues.mjs`** — merges epic-level due-by rows into snapshot flat list (capped at 200)
 6. **`persistSnapshot.mjs`** — writes `dashboard_snapshots` and related metric rows
+
+**Client-side rollup:** the **Individual contributors** tab's "From your selected projects" panel does *not* call `buildAssigneeMetrics.mjs` — it's `rollupEpicContributorPeople()` in `dashboardMetricsUtils.js`, summing the per-epic `contributorMetrics` from step 3 (already in the snapshot) across whichever presets are selected. No extra request, no separate refresh; it's stale only when the main snapshot is. `IndividualContributorsPanel.jsx` renders both panels side by side; `ContributorStatusBar.jsx` renders each auto-derived row.
 
 ### Due-date resolution (`shared/dashboardMetrics.mjs`)
 
@@ -460,16 +462,16 @@ UI: `ReportArchive.jsx` — three tabs, list + `ReportOutput` viewer. Dashboard 
 
 ### Dashboard UI section toggles
 
-Persisted in `localStorage` key `dashboard-visible-sections` via `normalizeVisibleSections()` in `dashboardMetricsUtils.js`:
+Persisted in `localStorage` key `dashboard-visible-sections` via `normalizeVisibleSections()` in `dashboardMetricsUtils.js`. `activeDashboardTab` (separate state, `DashboardTabs.jsx`) controls which of the three tabs — **project** / **people** / **reports** — is currently shown; `visibleSections` controls whether that tab's content renders at all versus a "turned off — enable it under Filters → Views" message (`Dashboard/index.jsx`). The first four keys gate individual `CollapsibleSection`s within the **project** tab; `overdue` and `report` gate an entire tab's content each:
 
-| Key | Section |
-|-----|---------|
-| `overall` | Overall Status |
-| `epicMetrics` | Project Metrics |
-| `dueByUpcoming` | Upcoming Due Dates card |
-| `dueByPastDue` | Past Due in lookback card |
-| `overdue` | Individual Contributor Metrics |
-| `report` | Generate Report |
+| Key | Section | Tab |
+|-----|---------|-----|
+| `overall` | Overall Status | project |
+| `epicMetrics` | Project Metrics | project |
+| `dueByUpcoming` | Upcoming Due Dates card | project |
+| `dueByPastDue` | Past Due in lookback card | project |
+| `overdue` | Individual contributors (both panels) | people |
+| `report` | Reports (Generate Report + Weekly digest) | reports |
 
 Legacy `dueBy` key migrates to both `dueByUpcoming` and `dueByPastDue`.
 
@@ -541,10 +543,11 @@ All routes mounted by `server/jiraProxy.mjs`.
 Written **from the assignee's perspective**, second person ("you have", "your open items"). Tone: supportive colleague, not manager status update. Covers: overall tracking %, key open items, overdue concerns, recommended next steps. Flowing prose, no bullet lists.
 
 ### `/api/report/generate` (Dashboard — Generate Report)
-Three audience variants stored in `reportRoutes.mjs`:
-- **Executive** — highlights, risks, action items for leadership
-- **Product Owner** — feature delivery, backlog health, blockers, upcoming priorities
-- **Developer** — team workload, overdue by person, WIP, upcoming tasks
+Four audience variants — `AUDIENCE_CONFIGS` in `server/lib/aiInstructions.mjs`, keyed by `audience` in the request body (`AUDIENCE_OPTIONS` in `useReportGeneration.js` is the frontend mirror):
+- **`executive`** — Executive Summary: highlights, risks, action items for leadership
+- **`product_owner`** — Project Manager Summary: deadline realism, stakeholder impact, delay risks, stand-up summaries, closeout reports (key kept as `product_owner` for backward compatibility; the label was renamed)
+- **`developer`** — Developer Report: team workload and WIP, plus a full per-contributor status breakdown (`rollupEpicContributorPeople` + `ContributorStatusBar`, not just overdue counts)
+- **`direct_reports`** — Ad-hoc team report: `isAdhocTeamReport` in `reportRoutes.mjs`; scoped to Settings → My Direct Reports rather than the selected project presets
 
 ### `/api/plan/week` (Work Week — Help me plan my week)
 Day-by-day Monday–Friday plan using actual issue keys from the loaded JQL runs. Respects `focusStyle` (balance / overdue-first / single-project / meeting-heavy), `capacityHours`, `fixedCommitments`, and `additionalContext`. Flags overdue items with ⚠️.
