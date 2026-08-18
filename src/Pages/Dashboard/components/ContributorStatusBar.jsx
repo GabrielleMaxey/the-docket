@@ -43,6 +43,7 @@ const ContributorStatusBar = ({
   person,
   jiraBaseUrl,
   dueByDate,
+  showBar = true,
   showOverdueList = true,
   showUpcomingList = true,
 }) => {
@@ -52,13 +53,13 @@ const ContributorStatusBar = ({
   }
 
   const resolved = Number(person.resolvedIssues || 0);
+  const resolvedPercent = (resolved / total) * 100;
+  const overdue = Number(person.overdueOpenIssues || 0);
   const statusCounts = { ...(person.openStatusCounts || {}) };
   if (resolved > 0) {
     statusCounts[TERMINAL_STATUS_LABEL] = resolved;
   }
-  const segments = orderSegments(statusCounts);
-  const resolvedPercent = (resolved / total) * 100;
-  const overdue = Number(person.overdueOpenIssues || 0);
+  const segments = showBar ? orderSegments(statusCounts) : [];
 
   return (
     <div className="app-report-contributor-row">
@@ -75,25 +76,27 @@ const ContributorStatusBar = ({
           {overdue > 0 ? ` · ${overdue} overdue` : ""}
         </span>
       </div>
-      <div
-        className="app-report-stacked-bar"
-        role="img"
-        aria-label={`${person.name}: ${segments
-          .map((segment) => `${segment.label} ${segment.count}`)
-          .join(", ")}`}
-      >
-        {segments.map((segment, index) => (
-          <div
-            key={segment.label}
-            className="app-report-stacked-bar-segment"
-            style={{
-              width: `${(segment.count / total) * 100}%`,
-              background: getStatusColor(segment.label, index),
-            }}
-            title={`${segment.label}: ${segment.count}`}
-          />
-        ))}
-      </div>
+      {showBar ? (
+        <div
+          className="app-report-stacked-bar"
+          role="img"
+          aria-label={`${person.name}: ${segments
+            .map((segment) => `${segment.label} ${segment.count}`)
+            .join(", ")}`}
+        >
+          {segments.map((segment, index) => (
+            <div
+              key={segment.label}
+              className="app-report-stacked-bar-segment"
+              style={{
+                width: `${(segment.count / total) * 100}%`,
+                background: getStatusColor(segment.label, index),
+              }}
+              title={`${segment.label}: ${segment.count}`}
+            />
+          ))}
+        </div>
+      ) : null}
       {showOverdueList ? (
         <ContributorDueTasksSection
           title="Past due"
