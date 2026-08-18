@@ -42,7 +42,7 @@ const JqlContributorMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", d
         <AssigneeWorkloadChart workloadCounts={counts} chartVariant={chartVariant} />
       ) : null}
       <ContributorDueTasksSection
-        title="Overdue tasks"
+        title="Past due"
         tasks={person.overdueIssues}
         jiraBaseUrl={jiraBaseUrl}
         variant="overdue"
@@ -61,7 +61,6 @@ const JqlContributorMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", d
         jiraBaseUrl={jiraBaseUrl}
         chartVariant={chartVariant}
         dueByDate={dueByDate}
-        showOverdueList
       />
     </div>
   );

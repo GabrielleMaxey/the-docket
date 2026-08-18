@@ -22,6 +22,8 @@ const ReportPanel = ({
   epics = [],
   assignees = [],
   directReportWatches = [],
+  jiraBaseUrl,
+  dueByDate,
 }) => {
   const {
     audience,
@@ -84,23 +86,18 @@ const ReportPanel = ({
                 : 0,
         },
       ].filter(Boolean);
-  const personRows = buildPersonProgressBars(
-    isAdhocTeam ? teamPeople : audience === "developer" ? rollupEpicContributorPeople(scopedEpics) : []
-  );
-  const personBars = personRows.map((row) =>
-    isAdhocTeam
-      ? {
-          name: row.name,
-          value: row.resolution,
-          count: `${row.resolved}/${row.total}`,
-        }
-      : {
-          name: row.name,
-          value: row.overdue,
-          count: `${row.overdueCount} overdue`,
-        }
-  );
-  const personTitle = isAdhocTeam ? "Resolution by person" : "Overdue by person";
+  const isDeveloper = audience === "developer";
+  const personRows = buildPersonProgressBars(isAdhocTeam ? teamPeople : []);
+  const personBars = personRows.map((row) => ({
+    name: row.name,
+    value: row.resolution,
+    count: `${row.resolved}/${row.total}`,
+  }));
+  const personTitle = "Resolution by person";
+  // Developer report gets a per-contributor breakdown across every status (not just
+  // overdue), derived straight from the projects already selected above — same
+  // contributorMetrics the epic cards already compute, no separate roster to pick.
+  const contributorRows = isDeveloper ? rollupEpicContributorPeople(scopedEpics) : [];
   const canGenerate = hasSnapshot && (!isAdhocTeam || (directReportWatches.length > 0 && hasTeamPeople));
 
   return (
@@ -219,6 +216,9 @@ const ReportPanel = ({
             progressBars={progressBars}
             personBars={personBars}
             personTitle={personTitle}
+            contributorRows={contributorRows}
+            jiraBaseUrl={jiraBaseUrl}
+            dueByDate={dueByDate}
           />
         }
       />

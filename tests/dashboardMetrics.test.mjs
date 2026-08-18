@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildDueIssueRow,
   computeAssigneeMetrics,
   computeAssigneeMetricsFromIssueSet,
   computeContributorMetricsFromIssues,
@@ -329,6 +330,68 @@ describe("computeChildIssueMetrics", () => {
     assert.equal(metrics.dueByOpenIssues, 1);
     assert.equal(metrics.dueByIssues[0]?.dueDate, epicDateStr);
   });
+
+  it("resolves overdue per-issue via issueEpicMaps when a group spans multiple epics (JQL presets)", () => {
+    const mrdFieldId = "customfield_10009";
+    // Two issues under two different epics — no single epicIssue can cover both,
+    // which is exactly the JQL-preset case (unlike the single-epic test above).
+    const overdueIssue = makeIssue({ key: "ODI-30", assignee: "Jane Doe" });
+    const onTrackIssue = makeIssue({ key: "ODI-31", assignee: "Jane Doe" });
+    const overdueEpic = { key: "ODI-EPIC-A", fields: { [mrdFieldId]: "2020-01-01" } };
+    const onTrackEpic = { key: "ODI-EPIC-B", fields: { [mrdFieldId]: "2099-01-01" } };
+
+    const issueEpicMaps = {
+      issueToEpicKey: new Map([
+        ["ODI-30", "ODI-EPIC-A"],
+        ["ODI-31", "ODI-EPIC-B"],
+      ]),
+      epicByKey: new Map([
+        ["ODI-EPIC-A", overdueEpic],
+        ["ODI-EPIC-B", onTrackEpic],
+      ]),
+    };
+
+    const metrics = computeChildIssueMetrics(
+      [overdueIssue, onTrackIssue],
+      "",
+      "duedate",
+      null,
+      [mrdFieldId],
+      {
+        dueByCompareFieldId: mrdFieldId,
+        dueByFallbackFieldId: mrdFieldId,
+        preferEpicCompareForChildren: true,
+        // No shared epicIssue — a JQL group has no single epic to fall back to.
+      },
+      issueEpicMaps
+    );
+
+    assert.equal(metrics.openIssues, 2);
+    assert.equal(metrics.overdueOpenIssues, 1);
+  });
+
+  it("without issueEpicMaps, preferEpicCompareForChildren with no shared epicIssue finds no overdue", () => {
+    const mrdFieldId = "customfield_10009";
+    const issue = makeIssue({ key: "ODI-32", assignee: "Jane Doe" });
+
+    const metrics = computeChildIssueMetrics([issue], "", "duedate", null, [mrdFieldId], {
+      dueByCompareFieldId: mrdFieldId,
+      dueByFallbackFieldId: mrdFieldId,
+      preferEpicCompareForChildren: true,
+    });
+
+    assert.equal(metrics.overdueOpenIssues, 0);
+  });
+});
+
+describe("buildDueIssueRow", () => {
+  it("includes the issue's status alongside key/summary/dueDate/issueType", () => {
+    const issue = makeIssue({ key: "ODI-40", status: "In Progress", dueValue: "2020-01-01" });
+    const row = buildDueIssueRow(issue, "duedate");
+    assert.equal(row.key, "ODI-40");
+    assert.equal(row.status, "In Progress");
+    assert.equal(row.dueDate, "2020-01-01");
+  });
 });
 
 describe("computeContributorMetricsFromIssues", () => {
@@ -651,5 +714,24 @@ describe("getTerminalIssueCount", () => {
       }),
       5
     );
+  });
+});
+
+describe("computeContributorMetricsFromIssues — overdue via extra field", () => {
+  it("counts overdue when the issue has no primary due date but an extra overdue field is past due", () => {
+    const targetFieldId = "customfield_target";
+    const issue = makeIssue({
+      key: "ODI-30",
+      assignee: "Jane Doe",
+      dueValue: "2020-01-01",
+      dueFieldId: targetFieldId,
+    });
+
+    const rows = computeContributorMetricsFromIssues([issue], "duedate", [targetFieldId]);
+
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].overdueOpenIssues, 1);
+    assert.equal(rows[0].overdueIssues.length, 1);
+    assert.equal(rows[0].overdueIssues[0].key, "ODI-30");
   });
 });
