@@ -51,6 +51,8 @@ const IndividualContributorsPanel = ({
                 person={row}
                 jiraBaseUrl={jiraBaseUrl}
                 dueByDate={dueByDate}
+                showOverdueList={false}
+                showUpcomingList={false}
               />
             ))}
           </>
