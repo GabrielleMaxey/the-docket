@@ -39,7 +39,13 @@ export const CONTRIBUTOR_STATUS_LEGEND = SEGMENT_ORDER.map((label, index) => ({
   color: getStatusColor(label, index),
 }));
 
-const ContributorStatusBar = ({ person, jiraBaseUrl, dueByDate }) => {
+const ContributorStatusBar = ({
+  person,
+  jiraBaseUrl,
+  dueByDate,
+  showOverdueList = true,
+  showUpcomingList = true,
+}) => {
   const total = Number(person?.totalIssues || 0);
   if (total <= 0) {
     return null;
@@ -88,20 +94,24 @@ const ContributorStatusBar = ({ person, jiraBaseUrl, dueByDate }) => {
           />
         ))}
       </div>
-      <ContributorDueTasksSection
-        title="Past due"
-        tasks={person.overdueIssues}
-        jiraBaseUrl={jiraBaseUrl}
-        variant="overdue"
-        personKey={person.name}
-      />
-      <ContributorDueTasksSection
-        title={dueByDate ? `Upcoming due through ${dueByDate}` : "Upcoming due dates"}
-        tasks={person.upcomingDueIssues}
-        jiraBaseUrl={jiraBaseUrl}
-        variant="upcoming"
-        personKey={person.name}
-      />
+      {showOverdueList ? (
+        <ContributorDueTasksSection
+          title="Past due"
+          tasks={person.overdueIssues}
+          jiraBaseUrl={jiraBaseUrl}
+          variant="overdue"
+          personKey={person.name}
+        />
+      ) : null}
+      {showUpcomingList ? (
+        <ContributorDueTasksSection
+          title={dueByDate ? `Upcoming due through ${dueByDate}` : "Upcoming due dates"}
+          tasks={person.upcomingDueIssues}
+          jiraBaseUrl={jiraBaseUrl}
+          variant="upcoming"
+          personKey={person.name}
+        />
+      ) : null}
     </div>
   );
 };

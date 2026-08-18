@@ -13,10 +13,8 @@ const ContributorDueTasksSection = ({
     return null;
   }
 
-  const groupClass =
-    variant === "upcoming"
-      ? "dashboard-contributor-due-group--upcoming"
-      : "dashboard-contributor-due-group--overdue";
+  // Same CSS regardless of variant — past due and upcoming read as one visual pattern.
+  const groupClass = "dashboard-contributor-due-group--overdue";
 
   const storageKey = personKey
     ? `contributor-due-${variant}-${personKey}`
