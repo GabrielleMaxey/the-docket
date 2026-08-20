@@ -1088,7 +1088,7 @@ const JiraResultsTable = ({
                                 onClick={() => handleSaveMetadata(issueKey)}
                                 disabled={save.loading}
                               >
-                                {save.loading ? "Saving..." : "Save to DB"}
+                                {save.loading ? "Saving..." : "Save to local DB"}
                               </button>
                             </div>
                           )}
