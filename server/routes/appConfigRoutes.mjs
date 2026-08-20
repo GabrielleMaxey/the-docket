@@ -20,6 +20,8 @@ const EPIC_PAST_DUE_MODES = new Set(["most_recent_done_date", "project_end_date"
 const WATCH_TYPES = new Set(["person", "jql", "direct_reports"]);
 const PRESET_TYPES = new Set(["epic", "jql"]);
 const JQL_PRESET_KEY = "JQL";
+const REMINDER_SLOT_COUNT = 4;
+const REMINDER_TEXT_MAX_LENGTH = 500;
 
 export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest }) => {
   const listEpicPresetsStmt = db.prepare(
@@ -63,6 +65,31 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
       value = excluded.value,
       updated_at = CURRENT_TIMESTAMP
   `);
+
+  const listRemindersStmt = db.prepare(
+    "SELECT slot_index, text, done FROM reminders ORDER BY slot_index ASC"
+  );
+  const upsertReminderStmt = db.prepare(`
+    INSERT INTO reminders (slot_index, text, done, updated_at)
+    VALUES (@slotIndex, @text, @done, CURRENT_TIMESTAMP)
+    ON CONFLICT(slot_index) DO UPDATE SET
+      text = excluded.text,
+      done = excluded.done,
+      updated_at = CURRENT_TIMESTAMP
+  `);
+  const saveRemindersTxn = db.transaction((rows) => {
+    for (const row of rows) {
+      upsertReminderStmt.run(row);
+    }
+  });
+
+  const readReminders = () => {
+    const bySlot = new Map(listRemindersStmt.all().map((row) => [row.slot_index, row]));
+    return Array.from({ length: REMINDER_SLOT_COUNT }, (_, index) => ({
+      text: String(bySlot.get(index)?.text || ""),
+      done: Boolean(bySlot.get(index)?.done),
+    }));
+  };
 
   const listWatchedAssigneesStmt = db.prepare(
     "SELECT * FROM watched_assignees ORDER BY sort_order ASC, id ASC"
@@ -712,6 +739,22 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
     }
 
     return res.json({ settings: readSettingsMap() });
+  });
+
+  app.get("/api/reminders", (_req, res) => {
+    return res.json({ items: readReminders() });
+  });
+
+  app.put("/api/reminders", (req, res) => {
+    const incoming = Array.isArray(req.body?.reminders) ? req.body.reminders : [];
+    const rows = Array.from({ length: REMINDER_SLOT_COUNT }, (_, index) => ({
+      slotIndex: index,
+      text: String(incoming[index]?.text || "").slice(0, REMINDER_TEXT_MAX_LENGTH),
+      done: incoming[index]?.done ? 1 : 0,
+    }));
+
+    saveRemindersTxn(rows);
+    return res.json({ items: readReminders() });
   });
 
   app.get("/api/watched-assignees", (_req, res) => {

@@ -249,6 +249,15 @@ Notable snapshot fields used by the UI and Chat context:
 
 **`app_settings`** — key-value store for `epic_past_due_mode`, `proxy_url`, `chat_custom_instructions`
 
+**`reminders`** — the four header reminder slots (`slot_index` 0–3), read/written via `GET`/`PUT /api/reminders`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `slot_index` | INTEGER PK | 0–3, fixed slot count |
+| `text` | TEXT | Reminder text, max 500 chars |
+| `done` | INTEGER | 0/1 |
+| `updated_at` | TEXT | ISO 8601 |
+
 **`watched_assignees`** — saved people and custom queries for the Individual contributors tab's "Layered in" panel (not the auto-derived "From your selected projects" panel, which has no dedicated table — it's computed from epic `contributorMetrics` at read time)
 
 | Column | Notes |
@@ -524,6 +533,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 | GET/PUT | `/api/jira/field-mappings` | Date field role mappings |
 | POST | `/api/jira/field-mappings/sync` | Sync mappings from Jira |
 | GET/PUT | `/api/settings` | App settings key-value |
+| GET/PUT | `/api/reminders` | Header reminders (4 fixed slots; body for PUT: `{ reminders: [{ text, done }, ...] }`) |
 | GET/POST/PUT/DELETE | `/api/watched-assignees` | Contributor Metrics entries, including capacity targets |
 | GET | `/api/project-managers/capacity` | Capacity planning data for selected Contributor Metrics entries |
 | POST | `/api/dashboard/refresh` | Pull + store metrics snapshot |
@@ -622,11 +632,11 @@ Ad-hoc Chat saves use `saveAdHocReport()` → `POST /api/reports/archive` (not a
 | On-page Work Week project reports | `localStorage` | `taskManagerPersistedWorkWeekProjectReports` |
 | On-page week plan | `localStorage` | `taskManagerPersistedWeekPlan` |
 | Work Week notes-on-run preference | `localStorage` | `workWeekTasksJiraPreferences` → `pullLatestComment` |
-| Header reminders | `localStorage` | `workWeekTasksReminders` |
 | Work Week header banners | `localStorage` | `workWeekTasksHeaderPreferences` (`showJokeTicker`, `showUpcomingDueBanner`) |
-| Collapsible open/closed | `localStorage` via `usePersistedState` | various `ww-*` / `dashboard-*` keys |
+| Collapsible open/closed (including header **Reminders** panel) | `localStorage` via `usePersistedState` | various `ww-*` / `dashboard-*` keys, e.g. `ww-reminders-open` |
 | Dashboard visible sections | `localStorage` | `dashboard-visible-sections` (`dueByUpcoming`, `dueByPastDue`, …) |
 | Issue notes + P1–P20 (persisted) | SQLite via proxy | `issue_metadata` |
+| Header reminders (4 slots, debounced save on change) | SQLite via proxy | `reminders` (`GET`/`PUT /api/reminders`) |
 | Generated reports archive | SQLite via proxy | `generated_reports` |
 | Dashboard snapshot | SQLite via proxy | `dashboard_snapshots` (+ related metric tables) |
 | Packaged desktop `.env` + SQLite | OS user data folder | `TASK_MANAGER_USER_DATA` (see Packaged desktop below) |

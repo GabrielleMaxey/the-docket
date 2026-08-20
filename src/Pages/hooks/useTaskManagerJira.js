@@ -454,7 +454,7 @@ export const useTaskManagerJira = () => {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jiraPreferences);
       window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jqlRuns);
-      // Do not remove header reminders (`workWeekTasksReminders` in WorkWeekTasks.jsx) or
+      // Do not remove header reminders (stored in the local db, see WorkWeekTasks.jsx) or
       // notes/priorities — reset is JQL prefs + cached runs only.
     }
   };

@@ -129,7 +129,7 @@ Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 | Chat session artifacts (reports/plans for context) | Browser `localStorage` | No |
 | On-page reports/plans (Task Management + Metrics) | Browser `localStorage` | No |
 | **Past Reports** archive | `data/workweek.sqlite` → `generated_reports`; saved under your browser's local timestamp/timezone | No |
-| Header reminders | Browser `localStorage` | No |
+| Header reminders | `data/workweek.sqlite` (local file) | No |
 | Per-issue notes + P1–P20 priority | `data/workweek.sqlite` (local file); shared-program slots use Atlas demo / future MySQL | No for personal slots |
 | Start date (ad-hoc, for Gantt views) | `data/workweek.sqlite` (local file); same personal/shared split as priority | No for personal slots |
 | Status/assignee changes | Jira (your Atlassian instance) | Yes — visible in Jira to anyone with access |
