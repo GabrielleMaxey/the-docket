@@ -249,8 +249,10 @@ function SectionPanel({ section }: { section: SectionId }) {
           <Stack gap={8}>
             <Text>
               Up to <Text weight="semibold">5</Text> side-by-side JQL slots.
-              Table: status, assignee (Jira user search), P1–P20 priority, MRD
-              column, notes, push-to-Jira comments.
+              Table: Key, Parent (moved next to Key), status, assignee (Jira
+              user search), P1–P20 priority, Dates (Due/MRD editable + push to
+              Jira, Start local-only for Gantt views), notes (pop-out editor,
+              markdown pushed to Jira as ADF comments).
             </Text>
             <Text size="small" tone="secondary">
               Priority today: local SQLite per slot; optional{" "}

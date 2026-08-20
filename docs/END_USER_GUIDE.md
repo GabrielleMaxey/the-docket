@@ -565,8 +565,8 @@ Past due rows are in a separate **Past Due in lookback** card. Enable **Also inc
 **Upcoming search works with Initial Done Date but not Most Recent Done Date**
 The app prefers each task’s own Jira due date over automated done-date fields on subtasks, then falls back to the parent epic’s compare field. Refresh after changing **Compare against** so the snapshot matches.
 
-**MRD column is empty on a child task**
-If the task has no MRD, the app inherits from parents up to the epic. **Run JQL** again (or refresh the page so saved results re-load parent dates) if you still see — after a code update or first visit.
+**MRD field (in Dates) is empty on a child task**
+If the task has no MRD, the app inherits from parents up to the epic — shown as a small "from parent: …" hint under the field, not filled into the input itself. **Run JQL** again (or refresh the page so saved results re-load parent dates) if you still see — after a code update or first visit.
 
 **Test Jira Connection fails**
 Check your network/VPN, then verify `.env` has correct `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN`. See [JIRA_SETUP.md](./JIRA_SETUP.md).
