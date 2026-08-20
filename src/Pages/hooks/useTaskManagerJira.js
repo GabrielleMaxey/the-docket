@@ -827,6 +827,26 @@ export const useTaskManagerJira = () => {
     );
   };
 
+  // Shared loading/success/error lifecycle for a single-row Jira field push —
+  // Status, Due date, and MRD all follow this same shape; each caller supplies
+  // its own pre-validation, the API call, the local issue patch, and messages.
+  const performRowFieldUpdate = async (issueKey, { apply, patchIssue, successMessage, errorFallback }) => {
+    setRowUpdateMessage(issueKey, { loading: true, error: "", success: "" });
+
+    try {
+      await apply();
+      if (patchIssue) {
+        updateIssueInRuns(issueKey, patchIssue);
+      }
+      setRowUpdateMessage(issueKey, { loading: false, success: successMessage });
+    } catch (error) {
+      setRowUpdateMessage(issueKey, {
+        loading: false,
+        error: errorMessage(error, errorFallback),
+      });
+    }
+  };
+
   const handleStatusUpdate = async (issueKey, fallbackStatus) => {
     const targetStatus = String(statusDrafts[issueKey] || fallbackStatus || "").trim();
     if (!targetStatus) {
@@ -834,27 +854,18 @@ export const useTaskManagerJira = () => {
       return;
     }
 
-    setRowUpdateMessage(issueKey, { loading: true, error: "", success: "" });
-
-    try {
-      await updateJiraIssueStatus({ issueKey, targetStatus });
-      updateIssueInRuns(issueKey, (issue) => ({
+    await performRowFieldUpdate(issueKey, {
+      apply: () => updateJiraIssueStatus({ issueKey, targetStatus }),
+      patchIssue: (issue) => ({
         ...issue,
         fields: {
           ...issue.fields,
-          status: {
-            ...(issue.fields?.status || {}),
-            name: targetStatus,
-          },
+          status: { ...(issue.fields?.status || {}), name: targetStatus },
         },
-      }));
-      setRowUpdateMessage(issueKey, { loading: false, success: `Status updated to ${targetStatus}.` });
-    } catch (error) {
-      setRowUpdateMessage(issueKey, {
-        loading: false,
-        error: errorMessage(error, "Failed to update status"),
-      });
-    }
+      }),
+      successMessage: `Status updated to ${targetStatus}.`,
+      errorFallback: "Failed to update status",
+    });
   };
 
   const handleDueDateDraftChange = (issueKey, value) => {
@@ -868,24 +879,12 @@ export const useTaskManagerJira = () => {
   const handleDueDateUpdate = async (issueKey, fallbackValue) => {
     const value = String(dueDateDrafts[issueKey] ?? fallbackValue ?? "").trim();
 
-    setRowUpdateMessage(issueKey, { loading: true, error: "", success: "" });
-
-    try {
-      await updateJiraIssueDateField({ issueKey, role: "due_date", value });
-      updateIssueInRuns(issueKey, (issue) => ({
-        ...issue,
-        fields: { ...issue.fields, duedate: value || null },
-      }));
-      setRowUpdateMessage(issueKey, {
-        loading: false,
-        success: value ? `Due date set to ${value}.` : "Due date cleared.",
-      });
-    } catch (error) {
-      setRowUpdateMessage(issueKey, {
-        loading: false,
-        error: errorMessage(error, "Failed to update Due date"),
-      });
-    }
+    await performRowFieldUpdate(issueKey, {
+      apply: () => updateJiraIssueDateField({ issueKey, role: "due_date", value }),
+      patchIssue: (issue) => ({ ...issue, fields: { ...issue.fields, duedate: value || null } }),
+      successMessage: value ? `Due date set to ${value}.` : "Due date cleared.",
+      errorFallback: "Failed to update Due date",
+    });
   };
 
   const handleMrdUpdate = async (issueKey, fallbackValue, mrdFieldId) => {
@@ -896,24 +895,12 @@ export const useTaskManagerJira = () => {
 
     const value = String(mrdDrafts[issueKey] ?? fallbackValue ?? "").trim();
 
-    setRowUpdateMessage(issueKey, { loading: true, error: "", success: "" });
-
-    try {
-      await updateJiraIssueDateField({ issueKey, role: "most_recent_done_date", value });
-      updateIssueInRuns(issueKey, (issue) => ({
-        ...issue,
-        fields: { ...issue.fields, [mrdFieldId]: value || null },
-      }));
-      setRowUpdateMessage(issueKey, {
-        loading: false,
-        success: value ? `MRD set to ${value}.` : "MRD cleared.",
-      });
-    } catch (error) {
-      setRowUpdateMessage(issueKey, {
-        loading: false,
-        error: errorMessage(error, "Failed to update MRD"),
-      });
-    }
+    await performRowFieldUpdate(issueKey, {
+      apply: () => updateJiraIssueDateField({ issueKey, role: "most_recent_done_date", value }),
+      patchIssue: (issue) => ({ ...issue, fields: { ...issue.fields, [mrdFieldId]: value || null } }),
+      successMessage: value ? `MRD set to ${value}.` : "MRD cleared.",
+      errorFallback: "Failed to update MRD",
+    });
   };
 
   // No Jira field backs this, so it saves straight to a DB with no Update step —

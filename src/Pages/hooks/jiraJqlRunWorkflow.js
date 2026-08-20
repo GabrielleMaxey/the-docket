@@ -46,19 +46,21 @@ const readCommentEntry = (entry) => {
 const escapeJqlString = (value) =>
   String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
+const dedupeIssueKeys = (issueKeys) => [
+  ...new Set(
+    (Array.isArray(issueKeys) ? issueKeys : [])
+      .map((key) => String(key || "").trim())
+      .filter(Boolean)
+  ),
+];
+
 const applyTeamPriorityState = async ({
   issueKeys,
   clampPriority,
   setJiraRowPriorities,
   setPrioritySourceByKey,
 }) => {
-  const keys = [
-    ...new Set(
-      (Array.isArray(issueKeys) ? issueKeys : [])
-        .map((key) => String(key || "").trim())
-        .filter(Boolean)
-    ),
-  ];
+  const keys = dedupeIssueKeys(issueKeys);
   if (keys.length === 0) {
     return;
   }
@@ -92,13 +94,7 @@ const applyTeamDateState = async ({ issueKeys, setStartDateByKey }) => {
   if (!setStartDateByKey) {
     return;
   }
-  const keys = [
-    ...new Set(
-      (Array.isArray(issueKeys) ? issueKeys : [])
-        .map((key) => String(key || "").trim())
-        .filter(Boolean)
-    ),
-  ];
+  const keys = dedupeIssueKeys(issueKeys);
   if (keys.length === 0) {
     return;
   }
@@ -361,13 +357,16 @@ export async function runJqlWorkflow({
       }
     }
 
-    await applyTeamPriorityState({
-      issueKeys: [...teamIssueKeys],
-      clampPriority,
-      setJiraRowPriorities,
-      setPrioritySourceByKey,
-    });
-    await applyTeamDateState({ issueKeys: [...teamIssueKeys], setStartDateByKey });
+    // Independent endpoints, disjoint state — no reason to serialize them.
+    await Promise.all([
+      applyTeamPriorityState({
+        issueKeys: [...teamIssueKeys],
+        clampPriority,
+        setJiraRowPriorities,
+        setPrioritySourceByKey,
+      }),
+      applyTeamDateState({ issueKeys: [...teamIssueKeys], setStartDateByKey }),
+    ]);
 
     const enrichedRuns = await Promise.all(
       runResults.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows))
@@ -442,13 +441,15 @@ export async function loadRemainingJqlIssues({
     }
 
     if (sharedProgramId) {
-      await applyTeamPriorityState({
-        issueKeys,
-        clampPriority,
-        setJiraRowPriorities,
-        setPrioritySourceByKey,
-      });
-      await applyTeamDateState({ issueKeys, setStartDateByKey });
+      await Promise.all([
+        applyTeamPriorityState({
+          issueKeys,
+          clampPriority,
+          setJiraRowPriorities,
+          setPrioritySourceByKey,
+        }),
+        applyTeamDateState({ issueKeys, setStartDateByKey }),
+      ]);
       return;
     }
 

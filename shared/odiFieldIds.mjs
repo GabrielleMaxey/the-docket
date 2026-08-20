@@ -2,6 +2,7 @@
 export const ODI_FIELD_IDS = {
   initial_done_date: "customfield_10008",
   most_recent_done_date: "customfield_10009",
+  due_date: "duedate",
 };
 
 export const resolveMappedFieldId = (mappingsByRole, role) => {

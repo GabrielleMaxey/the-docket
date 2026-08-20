@@ -587,10 +587,7 @@ export const registerIssueMetadataRoutes = (
     }
 
     const mappingsByRole = buildFieldMappingsMap(listFieldMappingsStmt.all());
-    const fieldId =
-      role === "due_date"
-        ? mappingsByRole.get("due_date")?.fieldId || "duedate"
-        : resolveMappedFieldId(mappingsByRole, "most_recent_done_date");
+    const fieldId = resolveMappedFieldId(mappingsByRole, role);
 
     if (!fieldId) {
       return res.status(422).json({ error: `No Jira field mapped for ${role}. Set it in Settings.` });

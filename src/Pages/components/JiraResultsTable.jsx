@@ -1,12 +1,10 @@
 import React from "react";
+import { Button, Modal } from "semantic-ui-react";
 import PriorityCell from "./cells/PriorityCell";
 import AssigneeCell from "./cells/AssigneeCell.jsx";
 import NoteImagesStrip from "./NoteImagesStrip.jsx";
 import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
-import {
-  getEffectiveDueDateForIssue,
-  getMostRecentDoneDateForIssue,
-} from "../../utils/jiraIssueDoneDates.js";
+import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js";
 import { getFieldValue, formatDateOnly } from "../../../shared/dashboardMetrics.mjs";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
 import { buildNotePushFingerprint } from "../../utils/notePushFingerprint.js";
@@ -372,19 +370,6 @@ const JiraResultsTable = ({
   React.useEffect(() => {
     setActiveTab((prev) => Math.min(Math.max(prev, 0), Math.max(0, visibleRuns.length - 1)));
   }, [visibleRuns.length]);
-
-  React.useEffect(() => {
-    if (!expandedNoteKey) {
-      return undefined;
-    }
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") {
-        setExpandedNoteKey(null);
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [expandedNoteKey]);
 
   const hadDrillDownFiltersRef = React.useRef(false);
 
@@ -940,11 +925,6 @@ const JiraResultsTable = ({
                           {(() => {
                             const ownDue =
                               formatDateOnly(getFieldValue(issue, run.dueFieldId || "duedate")) || "";
-                            const effectiveDue = getEffectiveDueDateForIssue(issue, {
-                              dueFieldId: run.dueFieldId,
-                              mrdFieldId: run.mrdFieldId,
-                              parentMostRecentDoneDateByKey: run.parentMostRecentDoneDateByKey,
-                            });
                             const ownMrd = formatDateOnly(getFieldValue(issue, run.mrdFieldId)) || "";
                             const inheritedMrd = getMostRecentDoneDateForIssue(
                               issue,
@@ -975,8 +955,8 @@ const JiraResultsTable = ({
                                     Update
                                   </button>
                                 </div>
-                                {!ownDue && effectiveDue ? (
-                                  <p className="ww-date-hint">from MRD: {effectiveDue}</p>
+                                {!ownDue && inheritedMrd ? (
+                                  <p className="ww-date-hint">from MRD: {inheritedMrd}</p>
                                 ) : null}
 
                                 <div className="ww-date-row">
@@ -1143,30 +1123,19 @@ const JiraResultsTable = ({
                   );
 
                   return (
-                    <div
-                      className="ww-note-modal-backdrop"
-                      onClick={() => setExpandedNoteKey(null)}
+                    <Modal
+                      open
+                      onClose={() => setExpandedNoteKey(null)}
+                      size="large"
+                      closeIcon
                     >
-                      <div
-                        className="ww-note-modal"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <div className="ww-note-modal-header">
-                          <div className="ww-note-modal-title">
-                            <strong>{expandedNoteKey}</strong>
-                            <span className="ww-note-modal-summary">
-                              {noteIssue.fields?.summary || ""}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            className="ww-note-modal-close"
-                            onClick={() => setExpandedNoteKey(null)}
-                            aria-label="Close"
-                          >
-                            ×
-                          </button>
-                        </div>
+                      <Modal.Header>
+                        {expandedNoteKey}
+                        <span className="ww-note-modal-summary">
+                          {noteIssue.fields?.summary || ""}
+                        </span>
+                      </Modal.Header>
+                      <Modal.Content>
                         <p className="ww-note-modal-hint">
                           Markdown renders when pushed to Jira: **bold**, *italic*, `code`,
                           [links](url), - lists, 1. numbered lists, # headings
@@ -1181,17 +1150,11 @@ const JiraResultsTable = ({
                           disabled={modalClosedOrResolved}
                           autoFocus
                         />
-                        <div className="ww-note-modal-footer">
-                          <button
-                            type="button"
-                            className="ww-note-modal-done"
-                            onClick={() => setExpandedNoteKey(null)}
-                          >
-                            Done
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                      </Modal.Content>
+                      <Modal.Actions>
+                        <Button primary content="Done" onClick={() => setExpandedNoteKey(null)} />
+                      </Modal.Actions>
+                    </Modal>
                   );
                 })()
               : null}
