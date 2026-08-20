@@ -268,21 +268,35 @@
   font-weight: 700;
 }
 
-.work-week-page .ww-reminders-block {
+.work-week-page .ww-reminders-block.app-collapsible {
   min-width: 0;
-  padding: 0.65rem 0.75rem;
+  margin-top: 0;
   border-radius: 10px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
+  box-shadow: none;
 }
 
-.work-week-page .ww-reminders-label {
-  margin: 0 0 0.5rem;
+.work-week-page .ww-reminders-block .app-collapsible-header {
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+}
+
+.work-week-page .ww-reminders-block .app-collapsible-header:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.work-week-page .ww-reminders-block .app-collapsible-title {
   font-size: 0.72rem;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: #64748b;
   font-weight: 700;
+}
+
+.work-week-page .ww-reminders-block .app-collapsible-body {
+  padding: 0 0.75rem 0.65rem;
+  border-top: none;
 }
 
 .work-week-page .ww-reminders-list {

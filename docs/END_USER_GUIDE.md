@@ -132,7 +132,7 @@ This is the main screen for managing your open work. Some older docs and code st
 
 - **Header banners** (optional) — at the top of Task Management, toggle **Joke ticker** and/or **My upcoming due dates**. The due-date banner lists **only your** assigned issues (matched by your Jira display name) from the latest Metrics snapshot's upcoming due-date window. Refresh Metrics after changing due-date filters or if the banner is empty when you expect tasks. Same toggles in **Settings → Work Week header**.
 - **Date & calendar** — shows today; useful when planning.
-- **Reminders** — four short text lines, for your eyes only. Check the box to mark done (greyed out). They are never sent to Jira.
+- **Reminders** — four short text lines, for your eyes only, saved to your local database as you type. Check the box to mark done (greyed out). Click the **Reminders** header to collapse/expand the panel — that state is remembered too. They are never sent to Jira.
 
 ### Task Manager card
 
@@ -142,7 +142,7 @@ This is the main screen for managing your open work. Some older docs and code st
    - **Keep local notes** (default) — notes come from your local database for issues in the result set.
    - **Pull most recent Jira comment** — overwrites each row's **Notes** text with that issue's latest Jira comment. Attached files are not changed. Use **Clear** to reset to **Keep local notes**.
 4. **Run JQL** — loads fresh results from Jira, merges local (or shared-program) priorities, and saves results locally. Shortcut: **Ctrl+Enter** (Windows/Linux) or **⌘+Enter** (Mac).
-5. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes or priorities in the local database, or header reminders.
+5. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes, priorities, or reminders in the local database.
 6. **Create Issue** — opens a modal to create a new Jira issue in ODI. See [Create Issue](#create-issue) below for parent selection and ODI rules. In short: pick a preset or parent, enter a title, then click **✦ AI Draft** (blue button next to the Description label) to generate a description and, for Stories, a suggested sub-task list:
    - **Story**: AI rewrites the title into Job Story format ("When… I want… so I can…") if it isn't already, and generates a description that expands on the situation, motivation, and desired outcome. 2–5 suggested sub-tasks appear as editable checkboxes; uncheck any you don't want before clicking Create.
    - **Bug**: AI generates a structured description covering what is broken, steps to reproduce, expected vs actual, environment, and any known workaround. A suggested priority (Low / Medium / High / Critical) appears based on ODI severity definitions.
@@ -512,7 +512,7 @@ PMs can keep rankings in the NORA spreadsheet and share a **CSV** export:
 | **Past Reports** archive | Local file (`data/workweek.sqlite` → `generated_reports`), saved with your browser's local timestamp/timezone | No |
 | Chat session artifacts (for Chat context) | This browser only (`localStorage`) | No |
 | Desktop app credentials + DB (packaged) | `%APPDATA%\Task Manager\` (Windows) or `~/Library/Application Support/Task Manager/` (Mac) | No |
-| Header reminders | This browser only | No |
+| Header reminders | Local file (`data/workweek.sqlite`) | No |
 | Issue notes + priorities (P1–P20) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL | No for personal slots — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) |
 | Start date (ad-hoc, for Gantt views) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL, same as priority | No for personal slots |
 | Note attachments (**Keep on this machine**) | Local file (`data/note-images/` + SQLite) | No — cleared after a successful **Push note** |

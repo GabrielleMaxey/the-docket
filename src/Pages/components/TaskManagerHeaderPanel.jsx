@@ -1,6 +1,9 @@
 import React from "react";
 import { Grid, Segment } from "semantic-ui-react";
 import WorkWeekHeaderBanners from "./WorkWeekHeaderBanners";
+import CollapsibleSection from "../../Components/CollapsibleSection";
+
+const REMINDERS_COLLAPSE_KEY = "ww-reminders-open";
 
 const TaskManagerHeaderPanel = ({
   showJokeTicker,
@@ -70,8 +73,12 @@ const TaskManagerHeaderPanel = ({
                 </div>
               </div>
 
-              <div className="ww-reminders-block">
-                <p className="ww-reminders-label">Reminders</p>
+              <CollapsibleSection
+                title="Reminders"
+                storageKey={REMINDERS_COLLAPSE_KEY}
+                defaultOpen
+                className="ww-reminders-block"
+              >
                 <ul className="ww-reminders-list">
                   {reminders.map((row, index) => (
                     <li
@@ -108,7 +115,7 @@ const TaskManagerHeaderPanel = ({
                 {weeklyPlanPanel ? (
                   <div className="ww-weekly-plan-block">{weeklyPlanPanel}</div>
                 ) : null}
-              </div>
+              </CollapsibleSection>
             </Segment>
           </Grid.Column>
         </Grid.Row>

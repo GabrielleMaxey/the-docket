@@ -478,6 +478,23 @@ export const saveAppSettings = async (settings) => {
   return data?.settings || {};
 };
 
+export const fetchReminders = async () => {
+  const data = await requestJson("/api/reminders");
+  return data?.items || [];
+};
+
+export const saveReminders = async (reminders) => {
+  const data = await requestJson("/api/reminders", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ reminders: reminders || [] }),
+  });
+
+  return data?.items || [];
+};
+
 export const fetchWatchedAssignees = async () => {
   const data = await requestJson("/api/watched-assignees");
   return data?.items || [];
