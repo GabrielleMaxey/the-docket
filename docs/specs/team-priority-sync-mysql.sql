@@ -43,6 +43,18 @@ CREATE TABLE team_issue_priority (
     CHECK (priority >= 1 AND priority <= 20)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Ad-hoc "start date" for shared-program issues (feeds Gantt charts). No Jira field
+-- backs this. Deliberately its own table, not a column on team_issue_priority: that
+-- table deletes its row whenever priority hits 0, and a start date must survive that.
+CREATE TABLE team_issue_date (
+  issue_key    VARCHAR(32) NOT NULL,
+  start_date   DATE NOT NULL,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_by   VARCHAR(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (issue_key),
+  KEY team_issue_date_updated_at_idx (updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Optional seed (confirm epic keys with PMs before PROD)
 -- INSERT INTO shared_program (slug, display_name) VALUES
 --   ('nora', 'NORA'),

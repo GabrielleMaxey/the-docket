@@ -184,6 +184,8 @@ const migrateDatabase = (db) => {
   ensureColumn(db, "dashboard_assignee_metrics", "epic_breakdown_json", "TEXT NOT NULL DEFAULT '[]'");
   ensureColumn(db, "app_settings", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
   ensureColumn(db, "issue_metadata", "keep_note_images", "INTEGER NOT NULL DEFAULT 0");
+  // Ad-hoc "start date" — local only, no Jira field backs it.
+  ensureColumn(db, "issue_metadata", "start_date", "TEXT NOT NULL DEFAULT ''");
   // NULL capacity = no target; 0 = zero capacity.
   ensureColumn(db, "watched_assignees", "capacity", "INTEGER");
   ensureColumn(db, "watched_assignees", "overdue_date_basis", "TEXT NOT NULL DEFAULT 'either'");

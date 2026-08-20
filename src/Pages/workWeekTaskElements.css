@@ -1400,6 +1400,36 @@
   color: #64748b;
 }
 
+.work-week-page .ww-cell-dates {
+  min-width: 170px;
+}
+
+.work-week-page .ww-date-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.work-week-page .ww-date-label {
+  flex: 0 0 2.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.work-week-page .ww-date-row .ww-edit-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.work-week-page .ww-date-hint {
+  margin: -0.15rem 0 0 2.95rem;
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
 /* ── results table ── */
 .work-week-page .ww-results-table-wrap {
   width: 100%;
