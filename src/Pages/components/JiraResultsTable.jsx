@@ -1,12 +1,11 @@
 import React from "react";
+import { Button, Modal } from "semantic-ui-react";
 import PriorityCell from "./cells/PriorityCell";
 import AssigneeCell from "./cells/AssigneeCell.jsx";
 import NoteImagesStrip from "./NoteImagesStrip.jsx";
 import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
-import {
-  getEffectiveDueDateForIssue,
-  getMostRecentDoneDateForIssue,
-} from "../../utils/jiraIssueDoneDates.js";
+import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js";
+import { getFieldValue, formatDateOnly } from "../../../shared/dashboardMetrics.mjs";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
 import { buildNotePushFingerprint } from "../../utils/notePushFingerprint.js";
 
@@ -264,6 +263,9 @@ const JiraResultsTable = ({
   saveState,
   rowUpdateState,
   statusDrafts,
+  dueDateDrafts,
+  mrdDrafts,
+  startDateByKey,
   assigneeDrafts,
   jiraRowPriorities,
   jiraNotes,
@@ -283,6 +285,11 @@ const JiraResultsTable = ({
   handleSelectAll,
   handleStatusDraftChange,
   handleStatusUpdate,
+  handleDueDateDraftChange,
+  handleDueDateUpdate,
+  handleMrdDraftChange,
+  handleMrdUpdate,
+  handleStartDateChange,
   handleAssigneeDraftChange,
   handleAssigneeUpdate,
   handleRowPriorityChange,
@@ -309,6 +316,7 @@ const JiraResultsTable = ({
   const [assigneeFilterByRunIndex, setAssigneeFilterByRunIndex] = React.useState({});
   const [sortField, setSortField] = React.useState("default");
   const [sortDirection, setSortDirection] = React.useState("asc");
+  const [expandedNoteKey, setExpandedNoteKey] = React.useState(null);
 
   const pendingDrillDownRun = React.useMemo(() => {
     if (!drillDownPending) {
@@ -757,6 +765,7 @@ const JiraResultsTable = ({
                         Key{getSortIndicator("key")}
                       </button>
                     </th>
+                    <th>Parent</th>
                     <th>Jira Type</th>
                     <th>Summary</th>
                     <th>
@@ -778,11 +787,9 @@ const JiraResultsTable = ({
                       </div>
                     </th>
                     <th>Updated</th>
-                    <th title="Jira due date, or inherited Most Recent Done Date when due date is unset">
-                      Due
+                    <th title="Due date, Most Recent Done Date, and start date (start date is local-only, used for Gantt charts)">
+                      Dates
                     </th>
-                    <th title="Most Recent Done Date">MRD</th>
-                    <th>Parent</th>
                     <th aria-sort={getHeaderAriaSort("priority")}>
                       <button
                         type="button"
@@ -853,6 +860,20 @@ const JiraResultsTable = ({
                             issueKey
                           )}
                         </td>
+                        <td>
+                          {issue.fields?.parent?.key
+                            ? (() => {
+                                const parentUrl = getIssueBrowseUrl({ key: issue.fields.parent.key, self: issue.self });
+                                return parentUrl ? (
+                                  <a href={parentUrl} target="_blank" rel="noreferrer noopener" style={{ fontSize: "0.82rem", whiteSpace: "nowrap" }}>
+                                    {issue.fields.parent.key}
+                                  </a>
+                                ) : (
+                                  <span style={{ fontSize: "0.82rem" }}>{issue.fields.parent.key}</span>
+                                );
+                              })()
+                            : <span style={{ color: "#94a3b8" }}>—</span>}
+                        </td>
                         <td>{issue.fields?.issuetype?.name || "-"}</td>
                         <td>{issue.fields?.summary || "No summary"}</td>
 
@@ -900,35 +921,83 @@ const JiraResultsTable = ({
 
                         <td>{updated}</td>
 
-                        <td>
-                          {getEffectiveDueDateForIssue(issue, {
-                            dueFieldId: run.dueFieldId,
-                            mrdFieldId: run.mrdFieldId,
-                            parentMostRecentDoneDateByKey: run.parentMostRecentDoneDateByKey,
-                          }) || <span style={{ color: "#94a3b8" }}>—</span>}
-                        </td>
+                        <td className="ww-cell-dates">
+                          {(() => {
+                            const ownDue =
+                              formatDateOnly(getFieldValue(issue, run.dueFieldId || "duedate")) || "";
+                            const ownMrd = formatDateOnly(getFieldValue(issue, run.mrdFieldId)) || "";
+                            const inheritedMrd = getMostRecentDoneDateForIssue(
+                              issue,
+                              run.mrdFieldId,
+                              run.parentMostRecentDoneDateByKey
+                            );
+                            const sharedProgramId = String(
+                              run.sharedProgramId || jqlSharedProgramIds?.[runSlotIndex] || ""
+                            ).trim();
 
-                        <td>
-                          {getMostRecentDoneDateForIssue(
-                            issue,
-                            run.mrdFieldId,
-                            run.parentMostRecentDoneDateByKey
-                          ) || <span style={{ color: "#94a3b8" }}>—</span>}
-                        </td>
+                            return (
+                              <div className={"ww-edit-cell" + (isClosedOrResolved ? " ww-edit-disabled" : "")}>
+                                <div className="ww-date-row">
+                                  <label className="ww-date-label" title="Jira due date">Due</label>
+                                  <input
+                                    type="date"
+                                    className="ww-edit-input"
+                                    value={dueDateDrafts[issueKey] ?? ownDue}
+                                    disabled={isClosedOrResolved}
+                                    onChange={(event) => handleDueDateDraftChange(issueKey, event.target.value)}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="ww-inline-action-btn"
+                                    onClick={() => handleDueDateUpdate(issueKey, ownDue)}
+                                    disabled={rowUpdate.loading || isClosedOrResolved}
+                                  >
+                                    Update
+                                  </button>
+                                </div>
+                                {!ownDue && inheritedMrd ? (
+                                  <p className="ww-date-hint">from MRD: {inheritedMrd}</p>
+                                ) : null}
 
-                        <td>
-                          {issue.fields?.parent?.key
-                            ? (() => {
-                                const parentUrl = getIssueBrowseUrl({ key: issue.fields.parent.key, self: issue.self });
-                                return parentUrl ? (
-                                  <a href={parentUrl} target="_blank" rel="noreferrer noopener" style={{ fontSize: "0.82rem", whiteSpace: "nowrap" }}>
-                                    {issue.fields.parent.key}
-                                  </a>
-                                ) : (
-                                  <span style={{ fontSize: "0.82rem" }}>{issue.fields.parent.key}</span>
-                                );
-                              })()
-                            : <span style={{ color: "#94a3b8" }}>—</span>}
+                                <div className="ww-date-row">
+                                  <label className="ww-date-label" title="Most Recent Done Date">MRD</label>
+                                  <input
+                                    type="date"
+                                    className="ww-edit-input"
+                                    value={mrdDrafts[issueKey] ?? ownMrd}
+                                    disabled={isClosedOrResolved}
+                                    onChange={(event) => handleMrdDraftChange(issueKey, event.target.value)}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="ww-inline-action-btn"
+                                    onClick={() => handleMrdUpdate(issueKey, ownMrd, run.mrdFieldId)}
+                                    disabled={rowUpdate.loading || isClosedOrResolved}
+                                  >
+                                    Update
+                                  </button>
+                                </div>
+                                {!ownMrd && inheritedMrd ? (
+                                  <p className="ww-date-hint">from parent: {inheritedMrd}</p>
+                                ) : null}
+
+                                <div className="ww-date-row">
+                                  <label className="ww-date-label" title="Ad-hoc start date — local only, used for Gantt charts. No Jira field.">
+                                    Start
+                                  </label>
+                                  <input
+                                    type="date"
+                                    className="ww-edit-input"
+                                    value={startDateByKey[issueKey] || ""}
+                                    disabled={isClosedOrResolved}
+                                    onChange={(event) =>
+                                      handleStartDateChange(issueKey, event.target.value, { sharedProgramId })
+                                    }
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         <PriorityCell
@@ -952,32 +1021,43 @@ const JiraResultsTable = ({
                           {isClosedOrResolved ? (
                             <span>-</span>
                           ) : (
-                            <NoteImagesStrip
-                              images={noteImagesByKey[issueKey]}
-                              disabled={push.loading || isClosedOrResolved}
-                              error={noteImageErrorsByKey[issueKey]}
-                              onAddFiles={(files) => handleNoteImagesAdd(issueKey, files)}
-                              onRemove={(localId) => handleNoteImageRemove(issueKey, localId)}
-                              keepOnMachine={keepNoteImagesByKey[issueKey]}
-                              keepPending={Boolean(noteImageKeepPendingByKey[issueKey])}
-                              onKeepChange={(checked) => handleKeepNoteImagesToggle(issueKey, checked)}
-                            >
-                              <textarea
-                                className={`ww-note-textarea${
-                                  isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
-                                }`}
-                                value={noteDraft}
-                                onChange={(event) =>
-                                  handleNoteChange(issueKey, event.target.value)
-                                }
-                                placeholder="Add notes here"
-                                title={
-                                  isNoteAlreadyPushed
-                                    ? "This note was pushed to Jira. Change the text or images before pushing again."
-                                    : undefined
-                                }
-                              />
-                            </NoteImagesStrip>
+                            <div className="ww-note-cell-wrap">
+                              <button
+                                type="button"
+                                className="ww-note-expand-btn"
+                                onClick={() => setExpandedNoteKey(issueKey)}
+                                title="Pop out notes to a larger editor"
+                                aria-label={`Expand notes for ${issueKey}`}
+                              >
+                                ⤢
+                              </button>
+                              <NoteImagesStrip
+                                images={noteImagesByKey[issueKey]}
+                                disabled={push.loading || isClosedOrResolved}
+                                error={noteImageErrorsByKey[issueKey]}
+                                onAddFiles={(files) => handleNoteImagesAdd(issueKey, files)}
+                                onRemove={(localId) => handleNoteImageRemove(issueKey, localId)}
+                                keepOnMachine={keepNoteImagesByKey[issueKey]}
+                                keepPending={Boolean(noteImageKeepPendingByKey[issueKey])}
+                                onKeepChange={(checked) => handleKeepNoteImagesToggle(issueKey, checked)}
+                              >
+                                <textarea
+                                  className={`ww-note-textarea${
+                                    isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
+                                  }`}
+                                  value={noteDraft}
+                                  onChange={(event) =>
+                                    handleNoteChange(issueKey, event.target.value)
+                                  }
+                                  placeholder="Add notes here"
+                                  title={
+                                    isNoteAlreadyPushed
+                                      ? "This note was pushed to Jira. Change the text or images before pushing again."
+                                      : undefined
+                                  }
+                                />
+                              </NoteImagesStrip>
+                            </div>
                           )}
                         </td>
 
@@ -1013,7 +1093,7 @@ const JiraResultsTable = ({
                                 onClick={() => handleSaveMetadata(issueKey)}
                                 disabled={save.loading}
                               >
-                                {save.loading ? "Saving..." : "Save to DB"}
+                                {save.loading ? "Saving..." : "Save to local DB"}
                               </button>
                             </div>
                           )}
@@ -1030,6 +1110,54 @@ const JiraResultsTable = ({
                 </tbody>
               </table>
             </div>
+
+            {expandedNoteKey
+              ? (() => {
+                  const noteIssue = pagedIssues.find((issue) => issue.key === expandedNoteKey);
+                  if (!noteIssue) {
+                    return null;
+                  }
+                  const modalNoteDraft = jiraNotes[expandedNoteKey] || "";
+                  const modalClosedOrResolved = isClosedLikeStatus(
+                    noteIssue.fields?.status?.name || "-"
+                  );
+
+                  return (
+                    <Modal
+                      open
+                      onClose={() => setExpandedNoteKey(null)}
+                      size="large"
+                      closeIcon
+                    >
+                      <Modal.Header>
+                        {expandedNoteKey}
+                        <span className="ww-note-modal-summary">
+                          {noteIssue.fields?.summary || ""}
+                        </span>
+                      </Modal.Header>
+                      <Modal.Content>
+                        <p className="ww-note-modal-hint">
+                          Markdown renders when pushed to Jira: **bold**, *italic*, `code`,
+                          [links](url), - lists, 1. numbered lists, # headings
+                        </p>
+                        <textarea
+                          className="ww-note-modal-textarea"
+                          value={modalNoteDraft}
+                          onChange={(event) =>
+                            handleNoteChange(expandedNoteKey, event.target.value)
+                          }
+                          placeholder="Add notes here"
+                          disabled={modalClosedOrResolved}
+                          autoFocus
+                        />
+                      </Modal.Content>
+                      <Modal.Actions>
+                        <Button primary content="Done" onClick={() => setExpandedNoteKey(null)} />
+                      </Modal.Actions>
+                    </Modal>
+                  );
+                })()
+              : null}
 
             <ResultsPagerBar
               placement="bottom"

@@ -1,10 +1,12 @@
 import {
+  bulkGetTeamDates,
   bulkGetTeamPriorities,
   bulkPutTeamPriorities,
   isTeamPriorityMongoConfigured,
   listAllTeamPriorities,
   listSharedPrograms,
   pingTeamPriorityMongo,
+  putTeamDate,
   putTeamPriority,
   seedSharedPrograms,
 } from "../lib/teamPriorityMongo.mjs";
@@ -21,6 +23,18 @@ const notConfigured = (res) =>
 
 const errorMessage = (error) =>
   error instanceof Error ? error.message : "Unknown error";
+
+const resolveUpdatedBy = async (resolveJiraUser) => {
+  if (typeof resolveJiraUser !== "function") {
+    return "demo";
+  }
+  try {
+    const me = await resolveJiraUser();
+    return String(me?.displayName || me?.accountId || "").trim() || "demo";
+  } catch {
+    return "demo";
+  }
+};
 
 const withTeamMongo = (label, handler) => async (req, res) => {
   if (!isTeamPriorityMongoConfigured()) {
@@ -169,19 +183,34 @@ export const registerTeamPriorityRoutes = (app, { db, resolveJiraUser }) => {
   app.put(
     "/api/team-priority/:issueKey",
     withTeamMongo("update team priority", async (req, res) => {
-      let updatedBy = "demo";
-      if (typeof resolveJiraUser === "function") {
-        try {
-          const me = await resolveJiraUser();
-          updatedBy = String(me?.displayName || me?.accountId || "").trim() || "demo";
-        } catch {
-          updatedBy = "demo";
-        }
-      }
+      const updatedBy = await resolveUpdatedBy(resolveJiraUser);
 
       const result = await putTeamPriority({
         issueKey: req.params.issueKey,
         priority: req.body?.priority,
+        updatedBy,
+      });
+      return res.json(result);
+    })
+  );
+
+  app.post(
+    "/api/team-priority/dates/bulk",
+    withTeamMongo("fetch team dates", async (req, res) => {
+      const issueKeys = Array.isArray(req.body?.issueKeys) ? req.body.issueKeys : [];
+      const items = await bulkGetTeamDates(issueKeys);
+      return res.json({ items });
+    })
+  );
+
+  app.put(
+    "/api/team-priority/dates/:issueKey",
+    withTeamMongo("update team start date", async (req, res) => {
+      const updatedBy = await resolveUpdatedBy(resolveJiraUser);
+
+      const result = await putTeamDate({
+        issueKey: req.params.issueKey,
+        startDate: req.body?.startDate,
         updatedBy,
       });
       return res.json(result);

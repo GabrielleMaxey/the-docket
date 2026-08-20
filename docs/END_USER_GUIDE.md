@@ -132,7 +132,8 @@ This is the main screen for managing your open work. Some older docs and code st
 
 - **Header banners** (optional) — at the top of Task Management, toggle **Joke ticker** and/or **My upcoming due dates**. The due-date banner lists **only your** assigned issues (matched by your Jira display name) from the latest Metrics snapshot's upcoming due-date window. Refresh Metrics after changing due-date filters or if the banner is empty when you expect tasks. Same toggles in **Settings → Work Week header**.
 - **Date & calendar** — shows today; useful when planning.
-- **Reminders** — four short text lines, for your eyes only. Check the box to mark done (greyed out). They are never sent to Jira.
+- **Reminders** — four short text lines, for your eyes only, saved to your local database as you type. Check the box to mark done (greyed out). They are never sent to Jira.
+- **Hide calendar & reminders / Show calendar & reminders** — click the link under the date to collapse or expand the calendar, reminders, and week-plan panel together; that state is remembered too.
 
 ### Task Manager card
 
@@ -142,7 +143,7 @@ This is the main screen for managing your open work. Some older docs and code st
    - **Keep local notes** (default) — notes come from your local database for issues in the result set.
    - **Pull most recent Jira comment** — overwrites each row's **Notes** text with that issue's latest Jira comment. Attached files are not changed. Use **Clear** to reset to **Keep local notes**.
 4. **Run JQL** — loads fresh results from Jira, merges local (or shared-program) priorities, and saves results locally. Shortcut: **Ctrl+Enter** (Windows/Linux) or **⌘+Enter** (Mac).
-5. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes or priorities in the local database, or header reminders.
+5. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes, priorities, or reminders in the local database.
 6. **Create Issue** — opens a modal to create a new Jira issue in ODI. See [Create Issue](#create-issue) below for parent selection and ODI rules. In short: pick a preset or parent, enter a title, then click **✦ AI Draft** (blue button next to the Description label) to generate a description and, for Stories, a suggested sub-task list:
    - **Story**: AI rewrites the title into Job Story format ("When… I want… so I can…") if it isn't already, and generates a description that expands on the situation, motivation, and desired outcome. 2–5 suggested sub-tasks appear as editable checkboxes; uncheck any you don't want before clicking Create.
    - **Bug**: AI generates a structured description covering what is broken, steps to reproduce, expected vs actual, environment, and any known workaround. A suggested priority (Low / Medium / High / Critical) appears based on ODI severity definitions.
@@ -235,8 +236,11 @@ Each row is one Jira issue. What you can do per row:
 |--------|-----|
 | Change **status** in Jira | Dropdown → **Update Status** |
 | Change **assignee** in Jira | Type a **display name, email, or username** in the Assignee box — suggestions appear as you type from Jira user search and assignees already in the table. Press **Enter** or click **Update Assignee** |
+| Change **Due date** or **MRD** in Jira | Date picker in the **Dates** column → **Update**. Each field pushes to Jira independently — editing Due date doesn't touch MRD and vice versa. Clear a date and click Update to unset it in Jira |
+| Set a **Start date** (local) | Date picker in the **Dates** column, third row — saves automatically, no Update button. Not a Jira field; used for Gantt-chart views. On shared projects linked to a shared program, this syncs the same way priority does — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) below |
 | Set personal **priority** (P1–P20) | Priority dropdown — P1 = most urgent, P20 = least. A **Jira** badge means priority was set from the latest comment on **Run JQL** |
-| Write a **note** (local) | Type in the Notes box — text saves automatically |
+| Write a **note** (local) | Type in the Notes box — text saves automatically. Supports **markdown**: `**bold**`, `*italic*`, `` `code` ``, `[links](url)`, `-` bullet lists, `1.` numbered lists, `#` headings — all render properly once pushed to Jira, not as literal asterisks/hashes |
+| **Pop out** the notes box | Click the **⤢** button in the corner of the Notes cell to open a larger editor (720×600, not squeezed into the table cell). Typing there is the same draft as the inline box — either one updates the other live. Close with **Done**, the backdrop, or **Esc** |
 | Add **files** to a note | **Add file** button, paste while the notes area is focused (images only), or drag-and-drop onto the notes cell. Up to **5** files per note; **5 MB** each — images (PNG, JPEG, GIF, WebP) plus TXT, PDF, DOC/DOCX, XLSX, and CSV |
 | **Keep on this machine** (attachments) | Optional checkbox below the notes box. Off by default — attachments stay until you **Push note** or close/refresh the tab. Turn on to keep draft files on this machine across reloads |
 | Push note to Jira as a **comment** | Check the row checkbox → **Push note** (or **Push Selected** for multiple). Sends note text and attachments inline in the Jira comment (same as images for documents); local copies are cleared after a successful push |
@@ -253,7 +257,9 @@ Each row is one Jira issue. What you can do per row:
 
 A green banner confirms the active drill-down. Use **Clear filter** to remove the Metrics filter from the URL while keeping any drill-down tabs you opened in this browser session. Use the small **x** on an individual green drill-down tab to remove only that tab.
 
-**MRD column:** The header shows **MRD** (hover for “Most Recent Done Date”). It displays the issue’s automated Most Recent Done Date when that field is set on the task. When the task has no MRD, the app walks the **parent chain** (for example Story → Epic) and shows the first ancestor that has an MRD. This uses the same ODI field mapping as Metrics (`customfield_10009` by default). Standard Jira **Due date** is not shown in the table, but if a task has one, it takes priority over the epic-level fallback for **My Metrics**’ overdue count (see below) and Chat context; most teams in this space don’t use per-task due dates today, so this is effectively the epic-level MRD/IDD in practice.
+**Dates column:** One column stacks three date fields per row — **Due** (Jira's standard due date), **MRD** (hover for "Most Recent Done Date," the same ODI field mapping used by Metrics — `customfield_10009` by default), and **Start** (local-only, see the table above). When a row's own Due date is empty, a small hint shows the inherited value used for overdue calculations elsewhere in the app (**My Metrics**, Chat context): the task's own MRD if set, otherwise the first ancestor's MRD found by walking the **parent chain** (for example Story → Epic). Editing Due or MRD here writes directly to Jira; it doesn't change that inheritance behavior for other rows.
+
+**Parent column:** Sits right after **Key** — links to the issue's parent (Story or Epic) when Jira reports one.
 
 On **shared projects**, link a Task Management slot to a **Shared program** (when the Atlas demo or future MySQL team DB is configured) so priorities sync across machines. Otherwise use local priority + NORA CSV import — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
 
@@ -466,6 +472,9 @@ Some teams used a shared Excel tracker so everyone sees the same ranking. In Tas
 | Note **attachments** (before push) | No — your machine only unless **Keep on this machine** is on |
 | **Priority** on a personal Task Management slot | No — local SQLite on this machine |
 | **Priority** on a slot linked to a **Shared program** | Yes — Atlas demo today (Team badge); MySQL long-term |
+| **Start date** on a personal Task Management slot | No — local SQLite on this machine |
+| **Start date** on a slot linked to a **Shared program** | Yes — same Atlas/MySQL split as Priority |
+| **Due date** and **MRD** | Always — real Jira fields, editing them writes straight to Jira regardless of slot type |
 
 ### Shared-program slots (recommended for team ranking)
 
@@ -504,12 +513,14 @@ PMs can keep rankings in the NORA spreadsheet and share a **CSV** export:
 | **Past Reports** archive | Local file (`data/workweek.sqlite` → `generated_reports`), saved with your browser's local timestamp/timezone | No |
 | Chat session artifacts (for Chat context) | This browser only (`localStorage`) | No |
 | Desktop app credentials + DB (packaged) | `%APPDATA%\Task Manager\` (Windows) or `~/Library/Application Support/Task Manager/` (Mac) | No |
-| Header reminders | This browser only | No |
+| Header reminders | Local file (`data/workweek.sqlite`) | No |
 | Issue notes + priorities (P1–P20) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL | No for personal slots — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) |
+| Start date (ad-hoc, for Gantt views) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL, same as priority | No for personal slots |
 | Note attachments (**Keep on this machine**) | Local file (`data/note-images/` + SQLite) | No — cleared after a successful **Push note** |
 | Epic/JQL preset team pack (export/import) | JSON file you save/share | No |
 | Metrics snapshot | Local file (`data/workweek.sqlite`) | No |
 | Status/assignee changes | Jira | Yes |
+| Due date / MRD changes | Jira | Yes |
 | Notes you push as comments | Jira | Yes — text and attachments; priority is not read from comments |
 
 ---
@@ -555,8 +566,8 @@ Past due rows are in a separate **Past Due in lookback** card. Enable **Also inc
 **Upcoming search works with Initial Done Date but not Most Recent Done Date**
 The app prefers each task’s own Jira due date over automated done-date fields on subtasks, then falls back to the parent epic’s compare field. Refresh after changing **Compare against** so the snapshot matches.
 
-**MRD column is empty on a child task**
-If the task has no MRD, the app inherits from parents up to the epic. **Run JQL** again (or refresh the page so saved results re-load parent dates) if you still see — after a code update or first visit.
+**MRD field (in Dates) is empty on a child task**
+If the task has no MRD, the app inherits from parents up to the epic — shown as a small "from parent: …" hint under the field, not filled into the input itself. **Run JQL** again (or refresh the page so saved results re-load parent dates) if you still see — after a code update or first visit.
 
 **Test Jira Connection fails**
 Check your network/VPN, then verify `.env` has correct `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN`. See [JIRA_SETUP.md](./JIRA_SETUP.md).

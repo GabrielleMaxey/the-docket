@@ -1,6 +1,8 @@
 // Builds the ADF comment body for note pushes and orchestrates attachment
 // upload + comment posting for note images.
 
+import { markdownTextToAdfNodes } from "../../shared/markdownToAdf.mjs";
+
 const MEDIA_FILE_ID_RE = /\/file\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i;
 
 export const extractMediaIdFromUrl = (url) => {
@@ -13,10 +15,7 @@ export const buildNoteCommentAdf = ({ noteText = "", mediaIds = [] } = {}) => {
   const text = String(noteText || "").trim();
 
   if (text) {
-    content.push({
-      type: "paragraph",
-      content: [{ type: "text", text }],
-    });
+    content.push(...markdownTextToAdfNodes(text));
   }
 
   for (const id of mediaIds || []) {
