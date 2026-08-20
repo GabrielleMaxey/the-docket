@@ -24,6 +24,18 @@ const notConfigured = (res) =>
 const errorMessage = (error) =>
   error instanceof Error ? error.message : "Unknown error";
 
+const resolveUpdatedBy = async (resolveJiraUser) => {
+  if (typeof resolveJiraUser !== "function") {
+    return "demo";
+  }
+  try {
+    const me = await resolveJiraUser();
+    return String(me?.displayName || me?.accountId || "").trim() || "demo";
+  } catch {
+    return "demo";
+  }
+};
+
 const withTeamMongo = (label, handler) => async (req, res) => {
   if (!isTeamPriorityMongoConfigured()) {
     return notConfigured(res);
@@ -171,15 +183,7 @@ export const registerTeamPriorityRoutes = (app, { db, resolveJiraUser }) => {
   app.put(
     "/api/team-priority/:issueKey",
     withTeamMongo("update team priority", async (req, res) => {
-      let updatedBy = "demo";
-      if (typeof resolveJiraUser === "function") {
-        try {
-          const me = await resolveJiraUser();
-          updatedBy = String(me?.displayName || me?.accountId || "").trim() || "demo";
-        } catch {
-          updatedBy = "demo";
-        }
-      }
+      const updatedBy = await resolveUpdatedBy(resolveJiraUser);
 
       const result = await putTeamPriority({
         issueKey: req.params.issueKey,
@@ -202,15 +206,7 @@ export const registerTeamPriorityRoutes = (app, { db, resolveJiraUser }) => {
   app.put(
     "/api/team-priority/dates/:issueKey",
     withTeamMongo("update team start date", async (req, res) => {
-      let updatedBy = "demo";
-      if (typeof resolveJiraUser === "function") {
-        try {
-          const me = await resolveJiraUser();
-          updatedBy = String(me?.displayName || me?.accountId || "").trim() || "demo";
-        } catch {
-          updatedBy = "demo";
-        }
-      }
+      const updatedBy = await resolveUpdatedBy(resolveJiraUser);
 
       const result = await putTeamDate({
         issueKey: req.params.issueKey,
