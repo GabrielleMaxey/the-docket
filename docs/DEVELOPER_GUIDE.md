@@ -201,20 +201,23 @@ taskManager/
 
 ## SQLite schema
 
-**`issue_metadata`** — per-issue notes and personal priority
+**`issue_metadata`** — per-issue notes, personal priority, and ad-hoc start date
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `issue_key` | TEXT PK | e.g. `ODI-1234` |
 | `note` | TEXT | Local draft note |
 | `priority` | INTEGER | 0–20; 0 = unranked, 1 = highest |
+| `start_date` | TEXT | `YYYY-MM-DD` or `''`. Ad-hoc — no Jira field backs this; feeds Gantt-chart views |
 | `updated_at` | TEXT | ISO 8601 |
 
-**Multi-user / shared projects (today):** `issue_metadata` is **per machine** for personal slots. Slots linked to a shared program use Atlas (`TEAM_PRIORITY_MONGODB_URI`) for priority; production target is MySQL (see below).
+**Multi-user / shared projects (today):** `issue_metadata` is **per machine** for personal slots. Slots linked to a shared program use Atlas (`TEAM_PRIORITY_MONGODB_URI`) for priority and start date; production target is MySQL (see below).
 
 **Planned — team priority DB:** Shared program priority in team **MySQL**. Prefer **`jiraProxy` → MySQL** when a connection is available; optional Team Priority API only if DB access cannot be granted. Epic-root scope on writes; Task Management slots **link explicitly** to a shared program for team mode — all other slots stay local-only. Priority range **1–20**. Spec → **[specs/team-priority-sync.md](./specs/team-priority-sync.md)**; DDL → **[specs/team-priority-sync-mysql.sql](./specs/team-priority-sync-mysql.sql)**.
 
 **Current priority sources:** Local SQLite (`issue_metadata`) for personal Task Management slots; Atlas team DB for slots linked to a shared program. Jira comment text is **not** parsed for priority. NORA CSV import seeds local and/or Atlas. Clamp helper: `shared/issuePriority.mjs`. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
+
+**Start date sources:** Same split as priority — local SQLite for personal slots, the team store (`team_issue_dates` Mongo collection / `team_issue_date` MySQL table, see specs above) for shared-program-linked issues. Deliberately a separate table/collection from priority: `team_issue_priority` deletes its row when priority hits 0, and a start date must survive that. **Due date** and **MRD** (Most Recent Done Date) are real Jira fields (`duedate` and the field mapped to the `most_recent_done_date` role — see Settings → field mappings) — editing them in Task Management pushes straight to Jira via `POST /api/jira/issues/:issueKey/date-field`, no local storage involved.
 
 **`epic_presets`** — saved JQL/epic presets
 

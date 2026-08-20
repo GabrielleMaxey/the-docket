@@ -230,13 +230,16 @@ export const fetchLatestJiraCommentsBulk = async (issueKeys) => {
   return data?.items || {};
 };
 
-export const saveIssueMetadata = async ({ issueKey, note, priority }) => {
+export const saveIssueMetadata = async ({ issueKey, note, priority, startDate }) => {
   const body = {};
   if (typeof note === "string") {
     body.note = note;
   }
   if (priority !== undefined) {
     body.priority = priority;
+  }
+  if (typeof startDate === "string") {
+    body.startDate = startDate;
   }
 
   return requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}`, {
@@ -245,6 +248,17 @@ export const saveIssueMetadata = async ({ issueKey, note, priority }) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+  });
+};
+
+// role: "due_date" | "most_recent_done_date". value: "YYYY-MM-DD" or "" to clear.
+export const updateJiraIssueDateField = async ({ issueKey, role, value }) => {
+  return requestJson(`/api/jira/issues/${encodeURIComponent(issueKey)}/date-field`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ role, value }),
   });
 };
 
@@ -325,6 +339,27 @@ export const saveTeamPriority = async ({ issueKey, priority }) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ priority }),
+  });
+};
+
+export const fetchTeamDatesBulk = async (issueKeys) => {
+  const data = await requestJson("/api/team-priority/dates/bulk", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ issueKeys }),
+  });
+  return data?.items || {};
+};
+
+export const saveTeamDate = async ({ issueKey, startDate }) => {
+  return requestJson(`/api/team-priority/dates/${encodeURIComponent(issueKey)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ startDate }),
   });
 };
 

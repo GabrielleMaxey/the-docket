@@ -104,7 +104,8 @@ const WorkWeekTasks = () => {
     showRestoredJqlBanner, jqlError, jqlMaxResults, pullLatestComment, assigneeRefreshNotice,
     jiraNotes, jiraRowPriorities, prioritySourceByKey, selectedForPush,
     lastPushedJiraNoteByKey, pushState, saveState,
-    statusDrafts, assigneeDrafts, rowUpdateState, noteImagesByKey, noteImageErrorsByKey,
+    statusDrafts, dueDateDrafts, mrdDrafts, startDateByKey,
+    assigneeDrafts, rowUpdateState, noteImagesByKey, noteImageErrorsByKey,
     keepNoteImagesByKey, noteImageKeepPendingByKey,
     isClosedLikeStatus, clampPriority, getPriorityClass,
     getPriorityRowClass, formatDate, filtersLoading,
@@ -112,7 +113,9 @@ const WorkWeekTasks = () => {
     handleJqlChange, handleJqlLabelChange, handleJqlSharedProgramChange,
     handleResetSavedQueries, handleRunJql, handleLoadRemainingJql, handleDrillDownToKey, handleDrillDownToAssignee, handleDrillDownToJql, clearDrillDownRun, handlePushSelected,
     handleSaveMetadata, handleSelectAll, handleStatusDraftChange,
-    handleStatusUpdate, handleAssigneeDraftChange, handleAssigneeUpdate,
+    handleStatusUpdate, handleDueDateDraftChange, handleDueDateUpdate,
+    handleMrdDraftChange, handleMrdUpdate, handleStartDateChange,
+    handleAssigneeDraftChange, handleAssigneeUpdate,
     handleRowPriorityChange, handleNoteChange, handleNoteImagesAdd, handleNoteImageRemove,
     handleKeepNoteImagesToggle,
     handleSelectForPush, handlePushNote,
@@ -584,6 +587,7 @@ const WorkWeekTasks = () => {
           lastPushedJiraNoteByKey={lastPushedJiraNoteByKey}
           pushState={pushState} saveState={saveState}
           rowUpdateState={rowUpdateState} statusDrafts={statusDrafts}
+          dueDateDrafts={dueDateDrafts} mrdDrafts={mrdDrafts} startDateByKey={startDateByKey}
           assigneeDrafts={assigneeDrafts} jiraRowPriorities={jiraRowPriorities}
           prioritySourceByKey={prioritySourceByKey}
           jiraNotes={jiraNotes} statusOptions={STATUS_OPTIONS}
@@ -594,6 +598,9 @@ const WorkWeekTasks = () => {
           formatDate={formatDate} handlePushSelected={handlePushSelected}
           handleSaveMetadata={handleSaveMetadata} handleSelectAll={handleSelectAll}
           handleStatusDraftChange={handleStatusDraftChange} handleStatusUpdate={handleStatusUpdate}
+          handleDueDateDraftChange={handleDueDateDraftChange} handleDueDateUpdate={handleDueDateUpdate}
+          handleMrdDraftChange={handleMrdDraftChange} handleMrdUpdate={handleMrdUpdate}
+          handleStartDateChange={handleStartDateChange}
           handleAssigneeDraftChange={handleAssigneeDraftChange} handleAssigneeUpdate={handleAssigneeUpdate}
           handleRowPriorityChange={handleRowPriorityChange} handleNoteChange={handleNoteChange}
           handleNoteImagesAdd={handleNoteImagesAdd} handleNoteImageRemove={handleNoteImageRemove}

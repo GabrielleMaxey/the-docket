@@ -98,6 +98,21 @@ Who may create/update/delete programs and roots (**decision 8**: bootstrap via s
 
 **Decision 2:** Setting priority to **0** → **DELETE** the row (unset = absent from table).
 
+### `team_issue_date`
+
+Ad-hoc **start date** for shared-program issues — feeds Gantt charts. No Jira field backs
+this. A separate table from `team_issue_priority` on purpose: that table deletes its row
+whenever priority hits 0, and a start date needs to survive independently of priority.
+
+| Column | Notes |
+|--------|-------|
+| `issue_key` | PK — task/story key, e.g. `ODI-25800` |
+| `start_date` | `YYYY-MM-DD` only (no row when unset) |
+| `updated_at` | UTC timestamp |
+| `updated_by` | Jira display name or accountId |
+
+Setting start date to empty → **DELETE** the row (unset = absent from table), same as priority.
+
 ---
 
 ## App API contract (jiraProxy)
@@ -108,6 +123,8 @@ Whether storage is direct DB or a remote API, the **browser** always talks to th
 |--------|------|---------|
 | POST | `/api/team-priority/bulk` | Body `{ issueKeys: [] }` → `{ items: { "ODI-1": { priority, updatedAt, updatedBy } } }` |
 | PUT | `/api/team-priority/:issueKey` | Body `{ priority }` — upsert **1–20** or delete when priority is 0 |
+| POST | `/api/team-priority/dates/bulk` | Body `{ issueKeys: [] }` → `{ items: { "ODI-1": { startDate, updatedAt, updatedBy } } }` |
+| PUT | `/api/team-priority/dates/:issueKey` | Body `{ startDate }` — upsert `YYYY-MM-DD` or delete when startDate is empty |
 | GET | `/api/shared-programs` | List enabled programs (for slot picker) |
 | POST | `/api/shared-programs` | Admin only — create program + roots |
 | PUT | `/api/shared-programs/:id` | Admin only |
