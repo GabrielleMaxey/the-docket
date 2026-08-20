@@ -132,7 +132,8 @@ This is the main screen for managing your open work. Some older docs and code st
 
 - **Header banners** (optional) — at the top of Task Management, toggle **Joke ticker** and/or **My upcoming due dates**. The due-date banner lists **only your** assigned issues (matched by your Jira display name) from the latest Metrics snapshot's upcoming due-date window. Refresh Metrics after changing due-date filters or if the banner is empty when you expect tasks. Same toggles in **Settings → Work Week header**.
 - **Date & calendar** — shows today; useful when planning.
-- **Reminders** — four short text lines, for your eyes only, saved to your local database as you type. Check the box to mark done (greyed out). Click the **Reminders** header to collapse/expand the panel — that state is remembered too. They are never sent to Jira.
+- **Reminders** — four short text lines, for your eyes only, saved to your local database as you type. Check the box to mark done (greyed out). They are never sent to Jira.
+- **Hide calendar & reminders / Show calendar & reminders** — click the link under the date to collapse or expand the calendar, reminders, and week-plan panel together; that state is remembered too.
 
 ### Task Manager card
 

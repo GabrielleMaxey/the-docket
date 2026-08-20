@@ -219,6 +219,36 @@
   color: #0f172a;
 }
 
+.work-week-page .ww-date-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #0c93d9;
+  cursor: pointer;
+}
+
+.work-week-page .ww-date-toggle:hover {
+  color: #076ea4;
+  text-decoration: underline;
+}
+
+.work-week-page .ww-date-toggle-chevron {
+  font-size: 1rem;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 0.18s;
+}
+
+.work-week-page .ww-date-toggle-chevron.open {
+  transform: rotate(-90deg);
+}
+
 .work-week-page .ww-calendar-block {
   min-width: 212px;
   width: fit-content;
@@ -268,35 +298,21 @@
   font-weight: 700;
 }
 
-.work-week-page .ww-reminders-block.app-collapsible {
+.work-week-page .ww-reminders-block {
   min-width: 0;
-  margin-top: 0;
+  padding: 0.65rem 0.75rem;
   border-radius: 10px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  box-shadow: none;
 }
 
-.work-week-page .ww-reminders-block .app-collapsible-header {
-  padding: 0.5rem 0.75rem;
-  background: transparent;
-}
-
-.work-week-page .ww-reminders-block .app-collapsible-header:hover {
-  background: rgba(15, 23, 42, 0.04);
-}
-
-.work-week-page .ww-reminders-block .app-collapsible-title {
+.work-week-page .ww-reminders-label {
+  margin: 0 0 0.5rem;
   font-size: 0.72rem;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: #64748b;
   font-weight: 700;
-}
-
-.work-week-page .ww-reminders-block .app-collapsible-body {
-  padding: 0 0.75rem 0.65rem;
-  border-top: none;
 }
 
 .work-week-page .ww-reminders-list {

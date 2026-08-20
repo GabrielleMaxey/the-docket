@@ -633,7 +633,7 @@ Ad-hoc Chat saves use `saveAdHocReport()` → `POST /api/reports/archive` (not a
 | On-page week plan | `localStorage` | `taskManagerPersistedWeekPlan` |
 | Work Week notes-on-run preference | `localStorage` | `workWeekTasksJiraPreferences` → `pullLatestComment` |
 | Work Week header banners | `localStorage` | `workWeekTasksHeaderPreferences` (`showJokeTicker`, `showUpcomingDueBanner`) |
-| Collapsible open/closed (including header **Reminders** panel) | `localStorage` via `usePersistedState` | various `ww-*` / `dashboard-*` keys, e.g. `ww-reminders-open` |
+| Collapsible open/closed (including header calendar/reminders panel) | `localStorage` via `usePersistedState` | various `ww-*` / `dashboard-*` keys, e.g. `ww-today-details-open` |
 | Dashboard visible sections | `localStorage` | `dashboard-visible-sections` (`dueByUpcoming`, `dueByPastDue`, …) |
 | Issue notes + P1–P20 (persisted) | SQLite via proxy | `issue_metadata` |
 | Header reminders (4 slots, debounced save on change) | SQLite via proxy | `reminders` (`GET`/`PUT /api/reminders`) |
