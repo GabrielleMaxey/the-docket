@@ -1577,6 +1577,145 @@
   color: #94a3b8;
 }
 
+.work-week-page .ww-note-cell-wrap {
+  position: relative;
+}
+
+.work-week-page .ww-note-expand-btn {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.work-week-page .ww-note-expand-btn:hover {
+  opacity: 1;
+  border-color: #0c93d9;
+  color: #0c93d9;
+}
+
+.work-week-page .ww-note-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+}
+
+.work-week-page .ww-note-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 100%);
+  height: min(600px, 100%);
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
+}
+
+.work-week-page .ww-note-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.work-week-page .ww-note-modal-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.work-week-page .ww-note-modal-title strong {
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.work-week-page .ww-note-modal-summary {
+  font-size: 0.82rem;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-week-page .ww-note-modal-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.work-week-page .ww-note-modal-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.work-week-page .ww-note-modal-textarea {
+  flex: 1 1 auto;
+  width: 100%;
+  border: none;
+  resize: none;
+  padding: 1.1rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.work-week-page .ww-note-modal-textarea:focus {
+  outline: none;
+}
+
+.work-week-page .ww-note-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.7rem 1.1rem;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.work-week-page .ww-note-modal-done {
+  border: 1px solid #0c93d9;
+  background: #0c93d9;
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 0.4rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.work-week-page .ww-note-modal-done:hover {
+  background: #076ea4;
+}
+
 .work-week-page .ww-note-images-strip {
   display: flex;
   flex-wrap: wrap;
