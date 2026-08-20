@@ -129,9 +129,12 @@ Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 | Chat session artifacts (reports/plans for context) | Browser `localStorage` | No |
 | On-page reports/plans (Task Management + Metrics) | Browser `localStorage` | No |
 | **Past Reports** archive | `data/workweek.sqlite` → `generated_reports`; saved under your browser's local timestamp/timezone | No |
-| Header reminders | Browser `localStorage` | No |
-| Per-issue notes + P1–P20 priority | `data/workweek.sqlite` (local file) | No |
-| Status/assignee changes, pushed comments | Jira (your Atlassian instance) | Yes — visible in Jira to anyone with access |
+| Header reminders | `data/workweek.sqlite` (local file) | No |
+| Per-issue notes + P1–P20 priority | `data/workweek.sqlite` (local file); shared-program slots use Atlas demo / future MySQL | No for personal slots |
+| Start date (ad-hoc, for Gantt views) | `data/workweek.sqlite` (local file); same personal/shared split as priority | No for personal slots |
+| Status/assignee changes | Jira (your Atlassian instance) | Yes — visible in Jira to anyone with access |
+| Due date / MRD changes | Jira (your Atlassian instance) | Yes |
+| Notes you push as comments | Jira (your Atlassian instance) | Yes — text and attachments, rendered as markdown (bold/italic/lists/etc.) |
 | Metrics snapshot | `data/workweek.sqlite` (dev) or user data folder (packaged desktop) | No |
 | Desktop `.env` + local DB (packaged app) | OS user data folder — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) | No |
 | Jira credentials | `.env` file on this machine | No — only the local proxy reads them |

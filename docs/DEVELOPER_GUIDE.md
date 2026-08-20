@@ -88,7 +88,7 @@ taskManager/
 │       ├── capacityPlanningRoutes.mjs # Project Managers capacity endpoint
 │       ├── chatRoutes.mjs         # /api/chat/*
 │       ├── dashboardRoutes.mjs    # /api/dashboard/*
-│       ├── issueMetadataRoutes.mjs# Notes + priority (SQLite)
+│       ├── issueMetadataRoutes.mjs# Notes + priority + start date (SQLite); Due date/MRD push to Jira
 │       ├── jiraCoreRoutes.mjs     # Health, user, fields
 │       ├── jiraIssueRoutes.mjs    # Status/assignee updates, create issue
 │       └── reportRoutes.mjs       # /api/report/* + /api/plan/week
@@ -100,6 +100,7 @@ taskManager/
 │   ├── createIssueParentUtils.mjs # Manual key validation + query-issue parent resolution
 │   ├── jiraParentCandidates.mjs   # Parent chain walk + dropdown builders (shared UI/server)
 │   ├── jiraDescriptionAdf.mjs     # Plain-text description → Jira ADF
+│   ├── markdownToAdf.mjs          # Note-comment markdown (bold/italic/code/links/lists/headings) → Jira ADF
 │   ├── issuePriority.mjs          # MAX_ISSUE_PRIORITY + clampIssuePriority (P0–P20)
 │   └── chatSessionPrompt.mjs  # Formats Chat session context for LLM prompts
 ├── tests/
@@ -110,6 +111,7 @@ taskManager/
 │   ├── jiraParentCandidates.test.mjs
 │   ├── createIssuePresetUtils.test.mjs
 │   ├── chatSessionPrompt.test.mjs
+│   ├── markdownToAdf.test.mjs
 │   └── issuePriority.test.mjs
 ├── src/
 │   ├── context/
@@ -201,20 +203,23 @@ taskManager/
 
 ## SQLite schema
 
-**`issue_metadata`** — per-issue notes and personal priority
+**`issue_metadata`** — per-issue notes, personal priority, and ad-hoc start date
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `issue_key` | TEXT PK | e.g. `ODI-1234` |
 | `note` | TEXT | Local draft note |
 | `priority` | INTEGER | 0–20; 0 = unranked, 1 = highest |
+| `start_date` | TEXT | `YYYY-MM-DD` or `''`. Ad-hoc — no Jira field backs this; feeds Gantt-chart views |
 | `updated_at` | TEXT | ISO 8601 |
 
-**Multi-user / shared projects (today):** `issue_metadata` is **per machine** for personal slots. Slots linked to a shared program use Atlas (`TEAM_PRIORITY_MONGODB_URI`) for priority; production target is MySQL (see below).
+**Multi-user / shared projects (today):** `issue_metadata` is **per machine** for personal slots. Slots linked to a shared program use Atlas (`TEAM_PRIORITY_MONGODB_URI`) for priority and start date; production target is MySQL (see below).
 
 **Planned — team priority DB:** Shared program priority in team **MySQL**. Prefer **`jiraProxy` → MySQL** when a connection is available; optional Team Priority API only if DB access cannot be granted. Epic-root scope on writes; Task Management slots **link explicitly** to a shared program for team mode — all other slots stay local-only. Priority range **1–20**. Spec → **[specs/team-priority-sync.md](./specs/team-priority-sync.md)**; DDL → **[specs/team-priority-sync-mysql.sql](./specs/team-priority-sync-mysql.sql)**.
 
 **Current priority sources:** Local SQLite (`issue_metadata`) for personal Task Management slots; Atlas team DB for slots linked to a shared program. Jira comment text is **not** parsed for priority. NORA CSV import seeds local and/or Atlas. Clamp helper: `shared/issuePriority.mjs`. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
+
+**Start date sources:** Same split as priority — local SQLite for personal slots, the team store (`team_issue_dates` Mongo collection / `team_issue_date` MySQL table, see specs above) for shared-program-linked issues. Deliberately a separate table/collection from priority: `team_issue_priority` deletes its row when priority hits 0, and a start date must survive that. **Due date** and **MRD** (Most Recent Done Date) are real Jira fields (`duedate` and the field mapped to the `most_recent_done_date` role — see Settings → field mappings) — editing them in Task Management pushes straight to Jira via `POST /api/jira/issues/:issueKey/date-field`, no local storage involved.
 
 **`epic_presets`** — saved JQL/epic presets
 
@@ -243,6 +248,15 @@ Notable snapshot fields used by the UI and Chat context:
 **`field_mappings`** — maps app date-field roles to Jira custom field IDs/names
 
 **`app_settings`** — key-value store for `epic_past_due_mode`, `proxy_url`, `chat_custom_instructions`
+
+**`reminders`** — the four header reminder slots (`slot_index` 0–3), read/written via `GET`/`PUT /api/reminders`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `slot_index` | INTEGER PK | 0–3, fixed slot count |
+| `text` | TEXT | Reminder text, max 500 chars |
+| `done` | INTEGER | 0/1 |
+| `updated_at` | TEXT | ISO 8601 |
 
 **`watched_assignees`** — saved people and custom queries for the Individual contributors tab's "Layered in" panel (not the auto-derived "From your selected projects" panel, which has no dedicated table — it's computed from epic `contributorMetrics` at read time)
 
@@ -353,7 +367,9 @@ Upcoming vs past-due list membership:
 
 **Stale snapshot handling:** if the Dashboard snapshot was captured with `includePastDue: true` and the user later turns that off without refreshing, `dueByIssues` may still contain `isOverdue: true` rows from the old capture. The Upcoming card empty state detects this via `snapshot.includePastDue` and shows a “Refresh status to update” hint rather than “enable Past Due Due Dates”.
 
-### Work Week MRD column (`src/utils/jiraIssueDoneDates.js`)
+### Work Week Dates column (`src/utils/jiraIssueDoneDates.js`)
+
+`JiraResultsTable` stacks three date fields into one **Dates** column per row — **Due**, **MRD**, and **Start** — rather than separate columns. Due and MRD are editable `<input type="date">` fields with their own **Update** button each, pushing straight to Jira via `POST /api/jira/issues/:issueKey/date-field` (`handleDueDateUpdate` / `handleMrdUpdate` in `useTaskManagerJira.js`). Start is local-only — see [SQLite schema](#sqlite-schema) below.
 
 After each **Run JQL**, `enrichRunWithParentDoneDates` (in `jiraJqlRunWorkflow.js`) attaches `mrdFieldId` and `parentMostRecentDoneDateByKey` to each run. Restored runs from `localStorage` are re-enriched when field mappings finish loading (`useTaskManagerJira.js`).
 
@@ -362,7 +378,7 @@ Display logic in `getMostRecentDoneDateForIssue`:
 1. **Issue’s own MRD** (`most_recent_done_date` mapping) when set
 2. **`parentMostRecentDoneDateByKey[parentKey]`** when the task has no MRD
 
-`buildParentMostRecentDoneDateMap` fetches missing parents from Jira and walks up to **five** ancestor levels (Story → Epic, etc.) until an MRD is found. `JiraResultsTable` renders the column header as **MRD** with `title="Most Recent Done Date"`.
+`buildParentMostRecentDoneDateMap` fetches missing parents from Jira and walks up to **five** ancestor levels (Story → Epic, etc.) until an MRD is found. When a row's own Due/MRD field is empty, the Dates column shows a small "from MRD: …" / "from parent: …" hint below that field with the inherited value used for overdue calculations elsewhere in the app — editing the field writes only the issue's own value, it does not change the inheritance.
 
 ### Work Week JQL — full result loading
 
@@ -492,6 +508,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 | POST | `/api/jira/issues/:issueKey/comment` | Add Jira comment |
 | POST | `/api/jira/issues/:issueKey/status` | Transition status |
 | POST | `/api/jira/issues/:issueKey/assignee` | Update assignee |
+| POST | `/api/jira/issues/:issueKey/date-field` | Push Due date or MRD (body: `{ role: "due_date" \| "most_recent_done_date", value }`) — resolves the field ID through Settings field mappings, falls back to `duedate` / `customfield_10009` |
 | GET | `/api/jira/users/search` | Jira user search (`?query=`) for assignee typing |
 | POST | `/api/jira/issues` | Create issue |
 | GET | `/api/jira/issues/:issueKey/summary` | Issue type summary (`isEpic`, `isStory`) for manual parent validation |
@@ -516,6 +533,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 | GET/PUT | `/api/jira/field-mappings` | Date field role mappings |
 | POST | `/api/jira/field-mappings/sync` | Sync mappings from Jira |
 | GET/PUT | `/api/settings` | App settings key-value |
+| GET/PUT | `/api/reminders` | Header reminders (4 fixed slots; body for PUT: `{ reminders: [{ text, done }, ...] }`) |
 | GET/POST/PUT/DELETE | `/api/watched-assignees` | Contributor Metrics entries, including capacity targets |
 | GET | `/api/project-managers/capacity` | Capacity planning data for selected Contributor Metrics entries |
 | POST | `/api/dashboard/refresh` | Pull + store metrics snapshot |
@@ -614,11 +632,11 @@ Ad-hoc Chat saves use `saveAdHocReport()` → `POST /api/reports/archive` (not a
 | On-page Work Week project reports | `localStorage` | `taskManagerPersistedWorkWeekProjectReports` |
 | On-page week plan | `localStorage` | `taskManagerPersistedWeekPlan` |
 | Work Week notes-on-run preference | `localStorage` | `workWeekTasksJiraPreferences` → `pullLatestComment` |
-| Header reminders | `localStorage` | `workWeekTasksReminders` |
 | Work Week header banners | `localStorage` | `workWeekTasksHeaderPreferences` (`showJokeTicker`, `showUpcomingDueBanner`) |
-| Collapsible open/closed | `localStorage` via `usePersistedState` | various `ww-*` / `dashboard-*` keys |
+| Collapsible open/closed (including header calendar/reminders panel) | `localStorage` via `usePersistedState` | various `ww-*` / `dashboard-*` keys, e.g. `ww-today-details-open` |
 | Dashboard visible sections | `localStorage` | `dashboard-visible-sections` (`dueByUpcoming`, `dueByPastDue`, …) |
 | Issue notes + P1–P20 (persisted) | SQLite via proxy | `issue_metadata` |
+| Header reminders (4 slots, debounced save on change) | SQLite via proxy | `reminders` (`GET`/`PUT /api/reminders`) |
 | Generated reports archive | SQLite via proxy | `generated_reports` |
 | Dashboard snapshot | SQLite via proxy | `dashboard_snapshots` (+ related metric tables) |
 | Packaged desktop `.env` + SQLite | OS user data folder | `TASK_MANAGER_USER_DATA` (see Packaged desktop below) |

@@ -219,6 +219,36 @@
   color: #0f172a;
 }
 
+.work-week-page .ww-date-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #0c93d9;
+  cursor: pointer;
+}
+
+.work-week-page .ww-date-toggle:hover {
+  color: #076ea4;
+  text-decoration: underline;
+}
+
+.work-week-page .ww-date-toggle-chevron {
+  font-size: 1rem;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 0.18s;
+}
+
+.work-week-page .ww-date-toggle-chevron.open {
+  transform: rotate(-90deg);
+}
+
 .work-week-page .ww-calendar-block {
   min-width: 212px;
   width: fit-content;
@@ -1400,6 +1430,36 @@
   color: #64748b;
 }
 
+.work-week-page .ww-cell-dates {
+  min-width: 170px;
+}
+
+.work-week-page .ww-date-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.work-week-page .ww-date-label {
+  flex: 0 0 2.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.work-week-page .ww-date-row .ww-edit-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.work-week-page .ww-date-hint {
+  margin: -0.15rem 0 0 2.95rem;
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
 /* ── results table ── */
 .work-week-page .ww-results-table-wrap {
   width: 100%;
@@ -1424,78 +1484,78 @@
   color: #0f172a;
 }
 
+/* Key */
 .work-week-page .ww-results-table th:nth-child(1),
 .work-week-page .ww-results-table td:nth-child(1) {
   width: 7%;
   min-width: 100px;
 }
 
+/* Parent */
 .work-week-page .ww-results-table th:nth-child(2),
 .work-week-page .ww-results-table td:nth-child(2) {
-  width: 6%;
-  min-width: 90px;
-}
-
-.work-week-page .ww-results-table th:nth-child(3),
-.work-week-page .ww-results-table td:nth-child(3) {
-  width: 32%;
-  max-width: 400px;
-}
-
-.work-week-page .ww-results-table th:nth-child(4),
-.work-week-page .ww-results-table td:nth-child(4) {
-  width: 12%;
-  min-width: 150px;
-}
-
-.work-week-page .ww-results-table th:nth-child(5),
-.work-week-page .ww-results-table td:nth-child(5) {
-  width: 5%;
-  min-width: 75px;
-}
-
-/* Due (task due date or inherited MRD) */
-.work-week-page .ww-results-table th:nth-child(6),
-.work-week-page .ww-results-table td:nth-child(6) {
-  width: 4%;
-  min-width: 70px;
-  white-space: nowrap;
-}
-
-/* MRD (Most Recent Done Date) */
-.work-week-page .ww-results-table th:nth-child(7),
-.work-week-page .ww-results-table td:nth-child(7) {
-  width: 4%;
-  min-width: 70px;
-  white-space: nowrap;
-}
-
-/* Parent */
-.work-week-page .ww-results-table th:nth-child(8),
-.work-week-page .ww-results-table td:nth-child(8) {
   width: 6%;
   min-width: 85px;
   white-space: nowrap;
 }
 
+/* Jira Type — kept narrow (Task/Bug/Story/Sub-task are all short) so Summary
+   starts right after it instead of trailing a wide, mostly-empty column. */
+.work-week-page .ww-results-table th:nth-child(3),
+.work-week-page .ww-results-table td:nth-child(3) {
+  width: 5%;
+  min-width: 72px;
+  padding-right: 0.2rem;
+}
+
+/* Summary */
+.work-week-page .ww-results-table th:nth-child(4),
+.work-week-page .ww-results-table td:nth-child(4) {
+  width: 28%;
+  max-width: 400px;
+  padding-left: 0.3rem;
+}
+
+/* Status / Assignee */
+.work-week-page .ww-results-table th:nth-child(5),
+.work-week-page .ww-results-table td:nth-child(5) {
+  width: 12%;
+  min-width: 150px;
+}
+
+/* Updated */
+.work-week-page .ww-results-table th:nth-child(6),
+.work-week-page .ww-results-table td:nth-child(6) {
+  width: 5%;
+  min-width: 75px;
+}
+
+/* Dates — Due / MRD / Start stacked in one cell */
+.work-week-page .ww-results-table th:nth-child(7),
+.work-week-page .ww-results-table td:nth-child(7) {
+  width: 15%;
+  min-width: 190px;
+}
+
 /* Priority */
-.work-week-page .ww-results-table th:nth-child(9),
-.work-week-page .ww-results-table td:nth-child(9) {
+.work-week-page .ww-results-table th:nth-child(8),
+.work-week-page .ww-results-table td:nth-child(8) {
   width: 6%;
   min-width: 80px;
 }
 
 /* Notes */
-.work-week-page .ww-results-table th:nth-child(10),
-.work-week-page .ww-results-table td:nth-child(10) {
-  width: 24%;
-  min-width: 320px;
+.work-week-page .ww-results-table th:nth-child(9),
+.work-week-page .ww-results-table td:nth-child(9) {
+  width: 27%;
+  min-width: 360px;
 }
 
-.work-week-page .ww-results-table th:nth-child(11),
-.work-week-page .ww-results-table td:nth-child(11) {
-  width: 9%;
-  min-width: 140px;
+/* Push to Jira */
+.work-week-page .ww-results-table th:nth-child(10),
+.work-week-page .ww-results-table td:nth-child(10) {
+  width: 8%;
+  min-width: 110px;
 }
 
 .work-week-page .ww-th-status-assignee {
@@ -1525,7 +1585,7 @@
 .work-week-page .ww-results-table textarea,
 .work-week-page .ww-results-table textarea.ww-note-textarea {
   width: 100%;
-  min-height: 96px;
+  min-height: 150px;
   resize: vertical;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
@@ -1545,6 +1605,69 @@
 
 .work-week-page .ww-results-table textarea.ww-note-textarea-pushed::placeholder {
   color: #94a3b8;
+}
+
+.work-week-page .ww-note-cell-wrap {
+  position: relative;
+}
+
+.work-week-page .ww-note-expand-btn {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.work-week-page .ww-note-expand-btn:hover {
+  opacity: 1;
+  border-color: #0c93d9;
+  color: #0c93d9;
+}
+
+/* Note modal is rendered via a Semantic UI Modal portal, appended outside
+   .work-week-page, so these rules can't be scoped under that ancestor. */
+.ww-note-modal-summary {
+  margin-left: 0.6rem;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: #64748b;
+}
+
+.ww-note-modal-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+.ww-note-modal-textarea {
+  width: 100%;
+  min-height: 380px;
+  resize: vertical;
+  padding: 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  font-family: inherit;
+  box-sizing: border-box;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.ww-note-modal-textarea:focus {
+  outline: none;
+  border-color: #0c93d9;
 }
 
 .work-week-page .ww-note-images-strip {
@@ -1668,8 +1791,8 @@
 .work-week-page .ww-push-actions {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  min-width: 8.75rem;
+  gap: 0.3rem;
+  min-width: 6.5rem;
 }
 
 .work-week-page .ww-push-selected-row {
@@ -1696,9 +1819,9 @@
 .work-week-page .ww-push-btn,
 .work-week-page .ww-save-btn {
   width: 100%;
-  border-radius: 8px;
-  padding: 0.35rem 0.6rem;
-  font-size: 0.85rem;
+  border-radius: 6px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.74rem;
   font-weight: 600;
   line-height: 1.25;
   cursor: pointer;

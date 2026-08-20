@@ -4,6 +4,7 @@ import {
   fetchJiraSearchAll,
   fetchLatestJiraCommentsBulk,
   fetchTeamPriorityBulk,
+  fetchTeamDatesBulk,
 } from "../../services/jiraClient";
 import { enrichRunWithParentDoneDates } from "../../utils/jiraIssueDoneDates.js";
 import { getConfiguredJqlSlotIndexes } from "../../utils/workWeekStorage.js";
@@ -45,19 +46,21 @@ const readCommentEntry = (entry) => {
 const escapeJqlString = (value) =>
   String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
+const dedupeIssueKeys = (issueKeys) => [
+  ...new Set(
+    (Array.isArray(issueKeys) ? issueKeys : [])
+      .map((key) => String(key || "").trim())
+      .filter(Boolean)
+  ),
+];
+
 const applyTeamPriorityState = async ({
   issueKeys,
   clampPriority,
   setJiraRowPriorities,
   setPrioritySourceByKey,
 }) => {
-  const keys = [
-    ...new Set(
-      (Array.isArray(issueKeys) ? issueKeys : [])
-        .map((key) => String(key || "").trim())
-        .filter(Boolean)
-    ),
-  ];
+  const keys = dedupeIssueKeys(issueKeys);
   if (keys.length === 0) {
     return;
   }
@@ -87,12 +90,38 @@ const applyTeamPriorityState = async ({
   }
 };
 
+const applyTeamDateState = async ({ issueKeys, setStartDateByKey }) => {
+  if (!setStartDateByKey) {
+    return;
+  }
+  const keys = dedupeIssueKeys(issueKeys);
+  if (keys.length === 0) {
+    return;
+  }
+
+  try {
+    const teamItems = await fetchTeamDatesBulk(keys);
+    const teamDates = {};
+    Object.entries(teamItems || {}).forEach(([issueKey, item]) => {
+      if (item?.startDate) {
+        teamDates[issueKey] = item.startDate;
+      }
+    });
+    if (Object.keys(teamDates).length > 0) {
+      setStartDateByKey((prev) => ({ ...prev, ...teamDates }));
+    }
+  } catch (error) {
+    console.error("Failed to fetch team start dates", error);
+  }
+};
+
 const applyDrillDownMetadata = async ({
   issueKeys,
   pullLatestComment,
   clampPriority,
   setJiraRowPriorities,
   setJiraNotes,
+  setStartDateByKey,
   hydrateNoteImages,
 }) => {
   if (issueKeys.length === 0) {
@@ -120,6 +149,7 @@ const applyDrillDownMetadata = async ({
   const persisted = await fetchIssueMetadataBulk(issueKeys);
   const nextNotes = {};
   const nextPriorities = {};
+  const nextStartDates = {};
   issueKeys.forEach((key) => {
     const item = persisted?.[key];
     if (!item) {
@@ -131,6 +161,9 @@ const applyDrillDownMetadata = async ({
     if (item.priority !== undefined) {
       nextPriorities[key] = clampPriority(item.priority);
     }
+    if (typeof item.startDate === "string" && item.startDate) {
+      nextStartDates[key] = item.startDate;
+    }
     if (hydrateNoteImages) {
       hydrateNoteImages(key, { keepNoteImages: item.keepNoteImages, images: item.images });
     }
@@ -140,6 +173,9 @@ const applyDrillDownMetadata = async ({
   }
   if (Object.keys(nextPriorities).length > 0) {
     setJiraRowPriorities((prev) => mergeIssueMapsPreferExisting(prev, nextPriorities));
+  }
+  if (setStartDateByKey && Object.keys(nextStartDates).length > 0) {
+    setStartDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextStartDates));
   }
 };
 
@@ -157,6 +193,7 @@ export async function runJqlWorkflow({
   setJiraNotes,
   setJiraRowPriorities,
   setPrioritySourceByKey,
+  setStartDateByKey,
   hydrateNoteImages,
   fieldMappingRows,
 }) {
@@ -253,6 +290,7 @@ export async function runJqlWorkflow({
         const persisted = await fetchIssueMetadataBulk(localKeys);
         const nextNotes = {};
         const nextPriorities = {};
+        const nextStartDates = {};
 
         localKeys.forEach((issueKey) => {
           const item = persisted?.[issueKey];
@@ -266,6 +304,9 @@ export async function runJqlWorkflow({
           if (item.priority !== undefined) {
             nextPriorities[issueKey] = clampPriority(item.priority);
           }
+          if (typeof item.startDate === "string" && item.startDate) {
+            nextStartDates[issueKey] = item.startDate;
+          }
           if (hydrateNoteImages) {
             hydrateNoteImages(issueKey, { keepNoteImages: item.keepNoteImages, images: item.images });
           }
@@ -277,6 +318,9 @@ export async function runJqlWorkflow({
         if (Object.keys(nextPriorities).length > 0) {
           setJiraRowPriorities((prev) => mergeIssueMapsPreferExisting(prev, nextPriorities));
         }
+        if (setStartDateByKey && Object.keys(nextStartDates).length > 0) {
+          setStartDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextStartDates));
+        }
       } catch (error) {
         console.error("Failed to fetch persisted issue metadata", error);
       }
@@ -286,6 +330,7 @@ export async function runJqlWorkflow({
       try {
         const persisted = await fetchIssueMetadataBulk([...teamIssueKeys]);
         const nextNotes = {};
+        const nextStartDates = {};
         [...teamIssueKeys].forEach((issueKey) => {
           const item = persisted?.[issueKey];
           if (!item) {
@@ -294,6 +339,9 @@ export async function runJqlWorkflow({
           if (!pullLatestComment && typeof item.note === "string") {
             nextNotes[issueKey] = item.note;
           }
+          if (typeof item.startDate === "string" && item.startDate) {
+            nextStartDates[issueKey] = item.startDate;
+          }
           if (hydrateNoteImages) {
             hydrateNoteImages(issueKey, { keepNoteImages: item.keepNoteImages, images: item.images });
           }
@@ -301,17 +349,24 @@ export async function runJqlWorkflow({
         if (!pullLatestComment && Object.keys(nextNotes).length > 0) {
           setJiraNotes((prev) => mergeIssueMapsPreferExisting(prev, nextNotes));
         }
+        if (setStartDateByKey && Object.keys(nextStartDates).length > 0) {
+          setStartDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextStartDates));
+        }
       } catch (error) {
         console.error("Failed to fetch notes for team-slot issues", error);
       }
     }
 
-    await applyTeamPriorityState({
-      issueKeys: [...teamIssueKeys],
-      clampPriority,
-      setJiraRowPriorities,
-      setPrioritySourceByKey,
-    });
+    // Independent endpoints, disjoint state — no reason to serialize them.
+    await Promise.all([
+      applyTeamPriorityState({
+        issueKeys: [...teamIssueKeys],
+        clampPriority,
+        setJiraRowPriorities,
+        setPrioritySourceByKey,
+      }),
+      applyTeamDateState({ issueKeys: [...teamIssueKeys], setStartDateByKey }),
+    ]);
 
     const enrichedRuns = await Promise.all(
       runResults.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows))
@@ -340,6 +395,7 @@ export async function loadRemainingJqlIssues({
   setJiraRowPriorities,
   setPrioritySourceByKey,
   setJiraNotes,
+  setStartDateByKey,
   pullLatestComment,
   fieldMappingRows,
 }) {
@@ -385,12 +441,15 @@ export async function loadRemainingJqlIssues({
     }
 
     if (sharedProgramId) {
-      await applyTeamPriorityState({
-        issueKeys,
-        clampPriority,
-        setJiraRowPriorities,
-        setPrioritySourceByKey,
-      });
+      await Promise.all([
+        applyTeamPriorityState({
+          issueKeys,
+          clampPriority,
+          setJiraRowPriorities,
+          setPrioritySourceByKey,
+        }),
+        applyTeamDateState({ issueKeys, setStartDateByKey }),
+      ]);
       return;
     }
 
@@ -411,14 +470,21 @@ export async function loadRemainingJqlIssues({
     try {
       const persisted = await fetchIssueMetadataBulk(issueKeys);
       const nextPriorities = {};
+      const nextStartDates = {};
       issueKeys.forEach((issueKey) => {
         const item = persisted?.[issueKey];
         if (item?.priority !== undefined) {
           nextPriorities[issueKey] = clampPriority(item.priority);
         }
+        if (typeof item?.startDate === "string" && item.startDate) {
+          nextStartDates[issueKey] = item.startDate;
+        }
       });
       if (Object.keys(nextPriorities).length > 0) {
         setJiraRowPriorities((prev) => mergeIssueMapsPreferExisting(prev, nextPriorities));
+      }
+      if (setStartDateByKey && Object.keys(nextStartDates).length > 0) {
+        setStartDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextStartDates));
       }
     } catch (error) {
       console.error("Failed to fetch persisted issue metadata", error);
@@ -444,6 +510,7 @@ export async function loadDrillDownIssueByKey({
   setJiraRowPriorities,
   setPrioritySourceByKey,
   setJiraNotes,
+  setStartDateByKey,
   setJqlError,
   hydrateNoteImages,
   fieldMappingRows,
@@ -502,6 +569,7 @@ export async function loadDrillDownIssueByKey({
         clampPriority,
         setJiraRowPriorities,
         setJiraNotes,
+        setStartDateByKey,
         hydrateNoteImages,
       });
     } catch (error) {
@@ -543,6 +611,7 @@ export async function loadDrillDownIssuesByAssignee({
   setJiraRowPriorities,
   setPrioritySourceByKey,
   setJiraNotes,
+  setStartDateByKey,
   setJqlError,
   hydrateNoteImages,
   fieldMappingRows,
@@ -637,6 +706,7 @@ export async function loadDrillDownIssuesByAssignee({
         clampPriority,
         setJiraRowPriorities,
         setJiraNotes,
+        setStartDateByKey,
         hydrateNoteImages,
       });
     } catch (error) {
@@ -678,6 +748,7 @@ export async function loadDrillDownByJql({
   setJiraRowPriorities,
   setPrioritySourceByKey,
   setJiraNotes,
+  setStartDateByKey,
   setJqlError,
   hydrateNoteImages,
   fieldMappingRows,
@@ -732,6 +803,7 @@ export async function loadDrillDownByJql({
         clampPriority,
         setJiraRowPriorities,
         setJiraNotes,
+        setStartDateByKey,
         hydrateNoteImages,
       });
     } catch (error) {

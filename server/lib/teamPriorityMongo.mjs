@@ -6,6 +6,9 @@ const log = createLogger("team-priority-mongo");
 
 const COL_PROGRAMS = "shared_programs";
 const COL_PRIORITIES = "team_issue_priorities";
+// Separate from COL_PRIORITIES on purpose: priority rows are deleted when priority
+// hits 0, and a start date (used for Gantt charts) must survive that independently.
+const COL_DATES = "team_issue_dates";
 
 const SEED_PROGRAMS = [
   {
@@ -226,4 +229,84 @@ export const bulkPutTeamPriorities = async (entries, updatedBy = "csv-import") =
   }
 
   return { updated, deleted };
+};
+
+const isValidDateOnly = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
+
+export const bulkGetTeamDates = async (issueKeys) => {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Team priority demo not configured");
+  }
+  const keys = [
+    ...new Set(
+      (Array.isArray(issueKeys) ? issueKeys : [])
+        .map((key) => String(key || "").trim().toUpperCase())
+        .filter(Boolean)
+    ),
+  ];
+  if (keys.length === 0) {
+    return {};
+  }
+
+  const rows = await db
+    .collection(COL_DATES)
+    .find({ _id: { $in: keys } })
+    .toArray();
+
+  const items = {};
+  for (const row of rows) {
+    items[row._id] = {
+      startDate: String(row.startDate || ""),
+      updatedAt: row.updatedAt || null,
+      updatedBy: String(row.updatedBy || ""),
+    };
+  }
+  return items;
+};
+
+export const putTeamDate = async ({ issueKey, startDate, updatedBy }) => {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Team priority demo not configured");
+  }
+  const key = String(issueKey || "").trim().toUpperCase();
+  if (!key) {
+    throw new Error("Missing issue key");
+  }
+
+  const nextStartDate = String(startDate || "").trim();
+  if (nextStartDate && !isValidDateOnly(nextStartDate)) {
+    throw new Error("startDate must be YYYY-MM-DD");
+  }
+
+  const col = db.collection(COL_DATES);
+
+  if (!nextStartDate) {
+    await col.deleteOne({ _id: key });
+    return { ok: true, deleted: true, issueKey: key };
+  }
+
+  const updatedAt = new Date();
+  const by = String(updatedBy || "demo").trim() || "demo";
+  await col.updateOne(
+    { _id: key },
+    {
+      $set: {
+        startDate: nextStartDate,
+        updatedAt,
+        updatedBy: by,
+      },
+    },
+    { upsert: true }
+  );
+
+  return {
+    ok: true,
+    deleted: false,
+    issueKey: key,
+    startDate: nextStartDate,
+    updatedAt,
+    updatedBy: by,
+  };
 };

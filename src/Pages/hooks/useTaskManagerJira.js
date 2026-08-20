@@ -14,11 +14,13 @@ import {
   pushJiraIssueNote,
   saveIssueMetadata,
   saveTeamPriority,
+  saveTeamDate,
   saveKeptNoteImages,
   deleteKeptNoteImages,
   fetchKeptNoteImageBlob,
   updateJiraIssueAssignee,
   updateJiraIssueStatus,
+  updateJiraIssueDateField,
   JIRA_UNASSIGNED_ASSIGNEE,
   isJiraUnassignValue,
 } from "../../services/jiraClient";
@@ -271,6 +273,9 @@ export const useTaskManagerJira = () => {
   const [pushState, setPushState] = React.useState({});
   const [saveState, setSaveState] = React.useState({});
   const [statusDrafts, setStatusDrafts] = React.useState({});
+  const [dueDateDrafts, setDueDateDrafts] = React.useState({});
+  const [mrdDrafts, setMrdDrafts] = React.useState({});
+  const [startDateByKey, setStartDateByKey] = React.useState({});
   const [assigneeDrafts, setAssigneeDrafts] = React.useState({});
   const [assigneeAccountIds, setAssigneeAccountIds] = React.useState({});
   const [rowUpdateState, setRowUpdateState] = React.useState({});
@@ -449,7 +454,7 @@ export const useTaskManagerJira = () => {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jiraPreferences);
       window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jqlRuns);
-      // Do not remove header reminders (`workWeekTasksReminders` in WorkWeekTasks.jsx) or
+      // Do not remove header reminders (stored in the local db, see WorkWeekTasks.jsx) or
       // notes/priorities — reset is JQL prefs + cached runs only.
     }
   };
@@ -822,6 +827,26 @@ export const useTaskManagerJira = () => {
     );
   };
 
+  // Shared loading/success/error lifecycle for a single-row Jira field push —
+  // Status, Due date, and MRD all follow this same shape; each caller supplies
+  // its own pre-validation, the API call, the local issue patch, and messages.
+  const performRowFieldUpdate = async (issueKey, { apply, patchIssue, successMessage, errorFallback }) => {
+    setRowUpdateMessage(issueKey, { loading: true, error: "", success: "" });
+
+    try {
+      await apply();
+      if (patchIssue) {
+        updateIssueInRuns(issueKey, patchIssue);
+      }
+      setRowUpdateMessage(issueKey, { loading: false, success: successMessage });
+    } catch (error) {
+      setRowUpdateMessage(issueKey, {
+        loading: false,
+        error: errorMessage(error, errorFallback),
+      });
+    }
+  };
+
   const handleStatusUpdate = async (issueKey, fallbackStatus) => {
     const targetStatus = String(statusDrafts[issueKey] || fallbackStatus || "").trim();
     if (!targetStatus) {
@@ -829,27 +854,74 @@ export const useTaskManagerJira = () => {
       return;
     }
 
-    setRowUpdateMessage(issueKey, { loading: true, error: "", success: "" });
-
-    try {
-      await updateJiraIssueStatus({ issueKey, targetStatus });
-      updateIssueInRuns(issueKey, (issue) => ({
+    await performRowFieldUpdate(issueKey, {
+      apply: () => updateJiraIssueStatus({ issueKey, targetStatus }),
+      patchIssue: (issue) => ({
         ...issue,
         fields: {
           ...issue.fields,
-          status: {
-            ...(issue.fields?.status || {}),
-            name: targetStatus,
-          },
+          status: { ...(issue.fields?.status || {}), name: targetStatus },
         },
-      }));
-      setRowUpdateMessage(issueKey, { loading: false, success: `Status updated to ${targetStatus}.` });
-    } catch (error) {
-      setRowUpdateMessage(issueKey, {
-        loading: false,
-        error: errorMessage(error, "Failed to update status"),
-      });
+      }),
+      successMessage: `Status updated to ${targetStatus}.`,
+      errorFallback: "Failed to update status",
+    });
+  };
+
+  const handleDueDateDraftChange = (issueKey, value) => {
+    setDueDateDrafts((prev) => patchIssueKeyed(prev, issueKey, value));
+  };
+
+  const handleMrdDraftChange = (issueKey, value) => {
+    setMrdDrafts((prev) => patchIssueKeyed(prev, issueKey, value));
+  };
+
+  const handleDueDateUpdate = async (issueKey, fallbackValue) => {
+    const value = String(dueDateDrafts[issueKey] ?? fallbackValue ?? "").trim();
+
+    await performRowFieldUpdate(issueKey, {
+      apply: () => updateJiraIssueDateField({ issueKey, role: "due_date", value }),
+      patchIssue: (issue) => ({ ...issue, fields: { ...issue.fields, duedate: value || null } }),
+      successMessage: value ? `Due date set to ${value}.` : "Due date cleared.",
+      errorFallback: "Failed to update Due date",
+    });
+  };
+
+  const handleMrdUpdate = async (issueKey, fallbackValue, mrdFieldId) => {
+    if (!mrdFieldId) {
+      setRowUpdateMessage(issueKey, { error: "No MRD field mapped. Set it in Settings → Field mappings." });
+      return;
     }
+
+    const value = String(mrdDrafts[issueKey] ?? fallbackValue ?? "").trim();
+
+    await performRowFieldUpdate(issueKey, {
+      apply: () => updateJiraIssueDateField({ issueKey, role: "most_recent_done_date", value }),
+      patchIssue: (issue) => ({ ...issue, fields: { ...issue.fields, [mrdFieldId]: value || null } }),
+      successMessage: value ? `MRD set to ${value}.` : "MRD cleared.",
+      errorFallback: "Failed to update MRD",
+    });
+  };
+
+  // No Jira field backs this, so it saves straight to a DB with no Update step —
+  // shared-program issues go to the team store (same split as priority), everything
+  // else stays in local SQLite.
+  const handleStartDateChange = (issueKey, value, options = {}) => {
+    const trimmed = String(value || "").trim();
+    const sharedProgramId = String(options.sharedProgramId || "").trim();
+
+    setStartDateByKey((prev) => patchIssueKeyed(prev, issueKey, trimmed));
+
+    if (sharedProgramId) {
+      saveTeamDate({ issueKey, startDate: trimmed }).catch((error) => {
+        console.error("Failed to persist team start date", issueKey, error);
+      });
+      return;
+    }
+
+    saveIssueMetadata({ issueKey, startDate: trimmed }).catch((error) => {
+      console.error("Failed to persist start date", issueKey, error);
+    });
   };
 
   const handleAssigneeUpdate = async (issueKey) => {
@@ -945,6 +1017,7 @@ export const useTaskManagerJira = () => {
           setJiraNotes,
           setJiraRowPriorities,
           setPrioritySourceByKey,
+          setStartDateByKey,
           hydrateNoteImages: hydrateKeptNoteImages,
           fieldMappingRows,
         }),
@@ -972,6 +1045,7 @@ export const useTaskManagerJira = () => {
           setJiraRowPriorities,
           setPrioritySourceByKey,
           setJiraNotes,
+          setStartDateByKey,
           pullLatestComment,
           fieldMappingRows,
         }),
@@ -997,6 +1071,7 @@ export const useTaskManagerJira = () => {
         setJiraRowPriorities,
         setPrioritySourceByKey,
         setJiraNotes,
+        setStartDateByKey,
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
@@ -1027,6 +1102,7 @@ export const useTaskManagerJira = () => {
         setJiraRowPriorities,
         setPrioritySourceByKey,
         setJiraNotes,
+        setStartDateByKey,
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
@@ -1055,6 +1131,7 @@ export const useTaskManagerJira = () => {
         setJiraRowPriorities,
         setPrioritySourceByKey,
         setJiraNotes,
+        setStartDateByKey,
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
@@ -1117,6 +1194,9 @@ export const useTaskManagerJira = () => {
     pushState,
     saveState,
     statusDrafts,
+    dueDateDrafts,
+    mrdDrafts,
+    startDateByKey,
     assigneeDrafts,
     rowUpdateState,
     noteImagesByKey,
@@ -1148,6 +1228,11 @@ export const useTaskManagerJira = () => {
     handleSelectAll,
     handleStatusDraftChange,
     handleStatusUpdate,
+    handleDueDateDraftChange,
+    handleDueDateUpdate,
+    handleMrdDraftChange,
+    handleMrdUpdate,
+    handleStartDateChange,
     handleAssigneeDraftChange,
     handleAssigneeUpdate,
     handleRowPriorityChange,

@@ -12,13 +12,12 @@ import JqlControlsPanel from "./components/JqlControlsPanel";
 import WeeklyPlanPanel from "./components/WeeklyPlanPanel";
 import MyMetricsSection from "./components/MyMetricsSection";
 import { useEpicFilters } from "../context/EpicFiltersContext.jsx";
-import { usePersistedState } from "./hooks/usePersistedState";
 import { useJokeTicker } from "./hooks/useJokeTicker";
 import { useCalendarData } from "./hooks/useCalendarData";
 import { useWorkWeekHeaderPreferences } from "./hooks/useWorkWeekHeaderPreferences";
 import { useUpcomingDueBanner } from "./hooks/useUpcomingDueBanner";
 import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.js";
-import { fetchSharedPrograms } from "../services/jiraClient.js";
+import { fetchReminders, fetchSharedPrograms, saveReminders } from "../services/jiraClient.js";
 import { isDrillDownDismissed } from "../utils/jqlRunPersistence.js";
 import { resolveCreateIssueDefaults } from "../../shared/createIssuePresetUtils.mjs";
 import {
@@ -80,7 +79,48 @@ const WorkWeekTasks = () => {
   } = useUpcomingDueBanner(showUpcomingDueBanner);
   const { todayDay, monthLabel, fullDateLabel, calendarCells } = useCalendarData();
 
-  const [reminders, setReminders] = usePersistedState(WORK_WEEK_STORAGE_KEYS.reminders, defaultReminderRows(), { sanitize: sanitizeReminders });
+  const [reminders, setReminders] = React.useState(defaultReminderRows());
+  const reminderSaveTimeoutRef = React.useRef(null);
+
+  const persistReminders = React.useCallback((next) => {
+    clearTimeout(reminderSaveTimeoutRef.current);
+    reminderSaveTimeoutRef.current = setTimeout(() => {
+      saveReminders(next).catch(() => {});
+    }, 500);
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    fetchReminders()
+      .then((items) => {
+        if (cancelled) return;
+        const fromDb = sanitizeReminders(items);
+        if (fromDb.some((row) => row.text.trim() || row.done)) {
+          setReminders(fromDb);
+          return;
+        }
+
+        // One-time migration for reminders saved before this moved to the local db.
+        try {
+          const legacyRaw = window.localStorage.getItem(WORK_WEEK_STORAGE_KEYS.reminders);
+          const legacy = legacyRaw ? sanitizeReminders(JSON.parse(legacyRaw)) : null;
+          if (legacy && legacy.some((row) => row.text.trim() || row.done)) {
+            setReminders(legacy);
+            saveReminders(legacy).catch(() => {});
+          }
+          window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.reminders);
+        } catch {
+          // Malformed legacy data — nothing to migrate.
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      clearTimeout(reminderSaveTimeoutRef.current);
+    };
+  }, []);
   const [importSlotIndex, setImportSlotIndex] = React.useState(null);
   const [createIssueOpen, setCreateIssueOpen] = React.useState(false);
   const [quickPickValueBySlot, setQuickPickValueBySlot] = React.useState({});
@@ -104,7 +144,8 @@ const WorkWeekTasks = () => {
     showRestoredJqlBanner, jqlError, jqlMaxResults, pullLatestComment, assigneeRefreshNotice,
     jiraNotes, jiraRowPriorities, prioritySourceByKey, selectedForPush,
     lastPushedJiraNoteByKey, pushState, saveState,
-    statusDrafts, assigneeDrafts, rowUpdateState, noteImagesByKey, noteImageErrorsByKey,
+    statusDrafts, dueDateDrafts, mrdDrafts, startDateByKey,
+    assigneeDrafts, rowUpdateState, noteImagesByKey, noteImageErrorsByKey,
     keepNoteImagesByKey, noteImageKeepPendingByKey,
     isClosedLikeStatus, clampPriority, getPriorityClass,
     getPriorityRowClass, formatDate, filtersLoading,
@@ -112,7 +153,9 @@ const WorkWeekTasks = () => {
     handleJqlChange, handleJqlLabelChange, handleJqlSharedProgramChange,
     handleResetSavedQueries, handleRunJql, handleLoadRemainingJql, handleDrillDownToKey, handleDrillDownToAssignee, handleDrillDownToJql, clearDrillDownRun, handlePushSelected,
     handleSaveMetadata, handleSelectAll, handleStatusDraftChange,
-    handleStatusUpdate, handleAssigneeDraftChange, handleAssigneeUpdate,
+    handleStatusUpdate, handleDueDateDraftChange, handleDueDateUpdate,
+    handleMrdDraftChange, handleMrdUpdate, handleStartDateChange,
+    handleAssigneeDraftChange, handleAssigneeUpdate,
     handleRowPriorityChange, handleNoteChange, handleNoteImagesAdd, handleNoteImageRemove,
     handleKeepNoteImagesToggle,
     handleSelectForPush, handlePushNote,
@@ -305,16 +348,24 @@ const WorkWeekTasks = () => {
   }, [jqlLoading]);
 
   const handleReminderTextChange = React.useCallback((index, value) => {
-    setReminders((prev) => prev.map((row, i) => {
-      if (i !== index) return row;
-      const clearDone = String(value).trim() !== String(row.text).trim() || !String(value).trim();
-      return { text: value, done: clearDone ? false : row.done };
-    }));
-  }, [setReminders]);
+    setReminders((prev) => {
+      const next = prev.map((row, i) => {
+        if (i !== index) return row;
+        const clearDone = String(value).trim() !== String(row.text).trim() || !String(value).trim();
+        return { text: value, done: clearDone ? false : row.done };
+      });
+      persistReminders(next);
+      return next;
+    });
+  }, [persistReminders]);
 
   const handleReminderDoneChange = React.useCallback((index, checked) => {
-    setReminders((prev) => prev.map((row, i) => i === index ? { ...row, done: checked } : row));
-  }, [setReminders]);
+    setReminders((prev) => {
+      const next = prev.map((row, i) => i === index ? { ...row, done: checked } : row);
+      persistReminders(next);
+      return next;
+    });
+  }, [persistReminders]);
 
   const handleImportFilter = React.useCallback((index, jql, label) => {
     handleJqlChange(index, jql);
@@ -584,6 +635,7 @@ const WorkWeekTasks = () => {
           lastPushedJiraNoteByKey={lastPushedJiraNoteByKey}
           pushState={pushState} saveState={saveState}
           rowUpdateState={rowUpdateState} statusDrafts={statusDrafts}
+          dueDateDrafts={dueDateDrafts} mrdDrafts={mrdDrafts} startDateByKey={startDateByKey}
           assigneeDrafts={assigneeDrafts} jiraRowPriorities={jiraRowPriorities}
           prioritySourceByKey={prioritySourceByKey}
           jiraNotes={jiraNotes} statusOptions={STATUS_OPTIONS}
@@ -594,6 +646,9 @@ const WorkWeekTasks = () => {
           formatDate={formatDate} handlePushSelected={handlePushSelected}
           handleSaveMetadata={handleSaveMetadata} handleSelectAll={handleSelectAll}
           handleStatusDraftChange={handleStatusDraftChange} handleStatusUpdate={handleStatusUpdate}
+          handleDueDateDraftChange={handleDueDateDraftChange} handleDueDateUpdate={handleDueDateUpdate}
+          handleMrdDraftChange={handleMrdDraftChange} handleMrdUpdate={handleMrdUpdate}
+          handleStartDateChange={handleStartDateChange}
           handleAssigneeDraftChange={handleAssigneeDraftChange} handleAssigneeUpdate={handleAssigneeUpdate}
           handleRowPriorityChange={handleRowPriorityChange} handleNoteChange={handleNoteChange}
           handleNoteImagesAdd={handleNoteImagesAdd} handleNoteImageRemove={handleNoteImageRemove}

@@ -249,8 +249,10 @@ function SectionPanel({ section }: { section: SectionId }) {
           <Stack gap={8}>
             <Text>
               Up to <Text weight="semibold">5</Text> side-by-side JQL slots.
-              Table: status, assignee (Jira user search), P1–P20 priority, MRD
-              column, notes, push-to-Jira comments.
+              Table: Key, Parent (moved next to Key), status, assignee (Jira
+              user search), P1–P20 priority, Dates (Due/MRD editable + push to
+              Jira, Start local-only for Gantt views), notes (pop-out editor,
+              markdown pushed to Jira as ADF comments).
             </Text>
             <Text size="small" tone="secondary">
               Priority today: local SQLite per slot; optional{" "}
@@ -418,7 +420,6 @@ function SectionPanel({ section }: { section: SectionId }) {
             ["Notes + row priority UI cache", "localStorage", "workWeekTasksJiraNotes, workWeekTasksJiraRowPriorities"],
             ["Chat session artifacts (last 8)", "localStorage", "taskManagerChatSessionArtifacts"],
             ["On-page reports / week plan", "localStorage", "taskManagerPersistedDashboardReport, …"],
-            ["Header reminders", "localStorage", "workWeekTasksReminders"],
             ["Dashboard visible sections", "localStorage", "dashboard-visible-sections"],
             ["Epic preset selection", "localStorage", "epicFilterSelectedIds"],
           ]}
@@ -436,6 +437,7 @@ function SectionPanel({ section }: { section: SectionId }) {
             ["dashboard_assignee_metrics", "Contributor metric rows"],
             ["field_mappings", "Jira custom field ID ↔ app date roles"],
             ["app_settings", "Key-value config (chat instructions, proxy URL, …)"],
+            ["reminders", "Header reminders — 4 fixed slots (text + done)"],
             ["watched_assignees", "Dashboard contributor watches (person or JQL)"],
             ["generated_reports", "Archived reports, week plans, Chat saves"],
             ["chat_sessions", "Rovo OAuth tokens when CHAT_PROVIDER=rovo"],
@@ -445,6 +447,7 @@ function SectionPanel({ section }: { section: SectionId }) {
             "info",
             "neutral",
             "info",
+            undefined,
             undefined,
             undefined,
             undefined,

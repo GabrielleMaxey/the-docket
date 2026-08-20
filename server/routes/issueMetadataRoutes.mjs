@@ -25,6 +25,8 @@ import {
   isAllowedNoteImageMime,
 } from "../../shared/noteImageLimits.mjs";
 import { clampIssuePriority } from "../../shared/issuePriority.mjs";
+import { buildFieldMappingsMap } from "../lib/epicFilterJql.mjs";
+import { resolveMappedFieldId } from "../../shared/odiFieldIds.mjs";
 const log = createLogger("metadata");
 
 const uploadNoteImages = multer({
@@ -61,16 +63,20 @@ export const registerIssueMetadataRoutes = (
   { db, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, noteImagesDir }
 ) => {
   const selectIssueMetadataStmt = db.prepare(
-    "SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key = ?"
+    "SELECT issue_key, note, priority, start_date FROM issue_metadata WHERE issue_key = ?"
   );
   const upsertIssueMetadataStmt = db.prepare(`
-    INSERT INTO issue_metadata (issue_key, note, priority, updated_at)
-    VALUES (@issueKey, @note, @priority, CURRENT_TIMESTAMP)
+    INSERT INTO issue_metadata (issue_key, note, priority, start_date, updated_at)
+    VALUES (@issueKey, @note, @priority, @startDate, CURRENT_TIMESTAMP)
     ON CONFLICT(issue_key) DO UPDATE SET
       note = excluded.note,
       priority = excluded.priority,
+      start_date = excluded.start_date,
       updated_at = CURRENT_TIMESTAMP
   `);
+  const listFieldMappingsStmt = db.prepare(
+    "SELECT role, field_id, field_name FROM jira_field_mappings"
+  );
   const setKeepNoteImagesStmt = db.prepare(`
     INSERT INTO issue_metadata (issue_key, keep_note_images, updated_at)
     VALUES (@issueKey, @keepNoteImages, CURRENT_TIMESTAMP)
@@ -343,7 +349,7 @@ export const registerIssueMetadataRoutes = (
     const placeholders = issueKeys.map(() => "?").join(",");
     const rows = db
       .prepare(
-        `SELECT issue_key, note, priority, keep_note_images FROM issue_metadata WHERE issue_key IN (${placeholders})`
+        `SELECT issue_key, note, priority, keep_note_images, start_date FROM issue_metadata WHERE issue_key IN (${placeholders})`
       )
       .all(...issueKeys);
 
@@ -354,6 +360,7 @@ export const registerIssueMetadataRoutes = (
         priority: clampIssuePriority(row.priority),
         keepNoteImages,
         images: keepNoteImages ? listNoteImages(db, row.issue_key) : [],
+        startDate: String(row.start_date || ""),
       };
       return acc;
     }, {});
@@ -527,20 +534,25 @@ export const registerIssueMetadataRoutes = (
     const current = selectIssueMetadataStmt.get(issueKey) || {};
     const hasNote = typeof req.body?.note === "string";
     const hasPriority = req.body?.priority !== undefined;
+    const hasStartDate = typeof req.body?.startDate === "string";
 
-    if (!hasNote && !hasPriority) {
-      return res.status(400).json({ error: "Provide note or priority" });
+    if (!hasNote && !hasPriority && !hasStartDate) {
+      return res.status(400).json({ error: "Provide note, priority, or startDate" });
     }
 
     const nextNote = hasNote ? String(req.body.note) : String(current.note || "");
     const nextPriority = hasPriority
       ? clampIssuePriority(req.body.priority)
       : clampIssuePriority(current.priority);
+    const nextStartDate = hasStartDate
+      ? String(req.body.startDate).trim()
+      : String(current.start_date || "");
 
     upsertIssueMetadataStmt.run({
       issueKey,
       note: nextNote,
       priority: nextPriority,
+      startDate: nextStartDate,
     });
 
     return res.json({
@@ -548,6 +560,58 @@ export const registerIssueMetadataRoutes = (
       issueKey,
       note: nextNote,
       priority: nextPriority,
+      startDate: nextStartDate,
     });
+  });
+
+  // Pushes a date-valued Jira field (Due date or MRD) directly to Jira — respects
+  // Settings → field mappings so a remapped MRD field ID is honored, not hardcoded.
+  app.post("/api/jira/issues/:issueKey/date-field", async (req, res) => {
+    if (!ensureEnvOrRespond(res)) {
+      return;
+    }
+
+    const issueKey = String(req.params.issueKey || "").trim();
+    const role = String(req.body?.role || "").trim();
+    const rawValue = req.body?.value;
+    const value = rawValue === null || rawValue === undefined ? "" : String(rawValue).trim();
+
+    if (!issueKey) {
+      return res.status(400).json({ error: "Missing issue key" });
+    }
+    if (role !== "due_date" && role !== "most_recent_done_date") {
+      return res.status(400).json({ error: "role must be 'due_date' or 'most_recent_done_date'" });
+    }
+    if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return res.status(400).json({ error: "value must be YYYY-MM-DD or empty" });
+    }
+
+    const mappingsByRole = buildFieldMappingsMap(listFieldMappingsStmt.all());
+    const fieldId = resolveMappedFieldId(mappingsByRole, role);
+
+    if (!fieldId) {
+      return res.status(422).json({ error: `No Jira field mapped for ${role}. Set it in Settings.` });
+    }
+
+    try {
+      const result = await jiraRequest({
+        method: "PUT",
+        pathWithQuery: `/rest/api/3/issue/${encodeURIComponent(issueKey)}`,
+        body: { fields: { [fieldId]: value || null } },
+      });
+
+      if (!result.ok) {
+        return res.status(result.status).json(result.data);
+      }
+
+      log.info(`${role} updated ${issueKey} → ${value || "(cleared)"}`);
+      return res.json({ ok: true, issueKey, role, fieldId, value });
+    } catch (error) {
+      log.error(`${role} update failed for ${issueKey}`, error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: `Failed to update ${role === "due_date" ? "Due date" : "MRD"}`,
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
   });
 };
