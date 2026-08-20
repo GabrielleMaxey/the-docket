@@ -88,7 +88,7 @@ taskManager/
 │       ├── capacityPlanningRoutes.mjs # Project Managers capacity endpoint
 │       ├── chatRoutes.mjs         # /api/chat/*
 │       ├── dashboardRoutes.mjs    # /api/dashboard/*
-│       ├── issueMetadataRoutes.mjs# Notes + priority (SQLite)
+│       ├── issueMetadataRoutes.mjs# Notes + priority + start date (SQLite); Due date/MRD push to Jira
 │       ├── jiraCoreRoutes.mjs     # Health, user, fields
 │       ├── jiraIssueRoutes.mjs    # Status/assignee updates, create issue
 │       └── reportRoutes.mjs       # /api/report/* + /api/plan/week
@@ -100,6 +100,7 @@ taskManager/
 │   ├── createIssueParentUtils.mjs # Manual key validation + query-issue parent resolution
 │   ├── jiraParentCandidates.mjs   # Parent chain walk + dropdown builders (shared UI/server)
 │   ├── jiraDescriptionAdf.mjs     # Plain-text description → Jira ADF
+│   ├── markdownToAdf.mjs          # Note-comment markdown (bold/italic/code/links/lists/headings) → Jira ADF
 │   ├── issuePriority.mjs          # MAX_ISSUE_PRIORITY + clampIssuePriority (P0–P20)
 │   └── chatSessionPrompt.mjs  # Formats Chat session context for LLM prompts
 ├── tests/
@@ -110,6 +111,7 @@ taskManager/
 │   ├── jiraParentCandidates.test.mjs
 │   ├── createIssuePresetUtils.test.mjs
 │   ├── chatSessionPrompt.test.mjs
+│   ├── markdownToAdf.test.mjs
 │   └── issuePriority.test.mjs
 ├── src/
 │   ├── context/
@@ -356,7 +358,9 @@ Upcoming vs past-due list membership:
 
 **Stale snapshot handling:** if the Dashboard snapshot was captured with `includePastDue: true` and the user later turns that off without refreshing, `dueByIssues` may still contain `isOverdue: true` rows from the old capture. The Upcoming card empty state detects this via `snapshot.includePastDue` and shows a “Refresh status to update” hint rather than “enable Past Due Due Dates”.
 
-### Work Week MRD column (`src/utils/jiraIssueDoneDates.js`)
+### Work Week Dates column (`src/utils/jiraIssueDoneDates.js`)
+
+`JiraResultsTable` stacks three date fields into one **Dates** column per row — **Due**, **MRD**, and **Start** — rather than separate columns. Due and MRD are editable `<input type="date">` fields with their own **Update** button each, pushing straight to Jira via `POST /api/jira/issues/:issueKey/date-field` (`handleDueDateUpdate` / `handleMrdUpdate` in `useTaskManagerJira.js`). Start is local-only — see [SQLite schema](#sqlite-schema) below.
 
 After each **Run JQL**, `enrichRunWithParentDoneDates` (in `jiraJqlRunWorkflow.js`) attaches `mrdFieldId` and `parentMostRecentDoneDateByKey` to each run. Restored runs from `localStorage` are re-enriched when field mappings finish loading (`useTaskManagerJira.js`).
 
@@ -365,7 +369,7 @@ Display logic in `getMostRecentDoneDateForIssue`:
 1. **Issue’s own MRD** (`most_recent_done_date` mapping) when set
 2. **`parentMostRecentDoneDateByKey[parentKey]`** when the task has no MRD
 
-`buildParentMostRecentDoneDateMap` fetches missing parents from Jira and walks up to **five** ancestor levels (Story → Epic, etc.) until an MRD is found. `JiraResultsTable` renders the column header as **MRD** with `title="Most Recent Done Date"`.
+`buildParentMostRecentDoneDateMap` fetches missing parents from Jira and walks up to **five** ancestor levels (Story → Epic, etc.) until an MRD is found. When a row's own Due/MRD field is empty, the Dates column shows a small "from MRD: …" / "from parent: …" hint below that field with the inherited value used for overdue calculations elsewhere in the app — editing the field writes only the issue's own value, it does not change the inheritance.
 
 ### Work Week JQL — full result loading
 
@@ -495,6 +499,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 | POST | `/api/jira/issues/:issueKey/comment` | Add Jira comment |
 | POST | `/api/jira/issues/:issueKey/status` | Transition status |
 | POST | `/api/jira/issues/:issueKey/assignee` | Update assignee |
+| POST | `/api/jira/issues/:issueKey/date-field` | Push Due date or MRD (body: `{ role: "due_date" \| "most_recent_done_date", value }`) — resolves the field ID through Settings field mappings, falls back to `duedate` / `customfield_10009` |
 | GET | `/api/jira/users/search` | Jira user search (`?query=`) for assignee typing |
 | POST | `/api/jira/issues` | Create issue |
 | GET | `/api/jira/issues/:issueKey/summary` | Issue type summary (`isEpic`, `isStory`) for manual parent validation |

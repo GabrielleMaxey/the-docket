@@ -131,7 +131,6 @@ Jira `PRIORITY P#` comment parsing was removed. **Target:** Shared MySQL for des
 
 | Item | Effort | Note |
 |------|--------|------|
-| Due date column on Work Week table | Small | Align table with Dashboard due logic |
 | Bulk status/assignee on selected rows | Medium | PM backlog cleanup |
 | Map priority to Jira custom field (if ODI has one) | Medium | Optional alternative once shared DB is stable |
 | Scheduled Dashboard refresh | Small | Reduces stale snapshots |
