@@ -1167,6 +1167,10 @@ const JiraResultsTable = ({
                             ×
                           </button>
                         </div>
+                        <p className="ww-note-modal-hint">
+                          Markdown renders when pushed to Jira: **bold**, *italic*, `code`,
+                          [links](url), - lists, 1. numbered lists, # headings
+                        </p>
                         <textarea
                           className="ww-note-modal-textarea"
                           value={modalNoteDraft}
