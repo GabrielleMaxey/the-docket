@@ -318,6 +318,7 @@ const JiraResultsTable = ({
   const [assigneeFilterByRunIndex, setAssigneeFilterByRunIndex] = React.useState({});
   const [sortField, setSortField] = React.useState("default");
   const [sortDirection, setSortDirection] = React.useState("asc");
+  const [expandedNoteKey, setExpandedNoteKey] = React.useState(null);
 
   const pendingDrillDownRun = React.useMemo(() => {
     if (!drillDownPending) {
@@ -371,6 +372,19 @@ const JiraResultsTable = ({
   React.useEffect(() => {
     setActiveTab((prev) => Math.min(Math.max(prev, 0), Math.max(0, visibleRuns.length - 1)));
   }, [visibleRuns.length]);
+
+  React.useEffect(() => {
+    if (!expandedNoteKey) {
+      return undefined;
+    }
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setExpandedNoteKey(null);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [expandedNoteKey]);
 
   const hadDrillDownFiltersRef = React.useRef(false);
 
@@ -1027,32 +1041,43 @@ const JiraResultsTable = ({
                           {isClosedOrResolved ? (
                             <span>-</span>
                           ) : (
-                            <NoteImagesStrip
-                              images={noteImagesByKey[issueKey]}
-                              disabled={push.loading || isClosedOrResolved}
-                              error={noteImageErrorsByKey[issueKey]}
-                              onAddFiles={(files) => handleNoteImagesAdd(issueKey, files)}
-                              onRemove={(localId) => handleNoteImageRemove(issueKey, localId)}
-                              keepOnMachine={keepNoteImagesByKey[issueKey]}
-                              keepPending={Boolean(noteImageKeepPendingByKey[issueKey])}
-                              onKeepChange={(checked) => handleKeepNoteImagesToggle(issueKey, checked)}
-                            >
-                              <textarea
-                                className={`ww-note-textarea${
-                                  isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
-                                }`}
-                                value={noteDraft}
-                                onChange={(event) =>
-                                  handleNoteChange(issueKey, event.target.value)
-                                }
-                                placeholder="Add notes here"
-                                title={
-                                  isNoteAlreadyPushed
-                                    ? "This note was pushed to Jira. Change the text or images before pushing again."
-                                    : undefined
-                                }
-                              />
-                            </NoteImagesStrip>
+                            <div className="ww-note-cell-wrap">
+                              <button
+                                type="button"
+                                className="ww-note-expand-btn"
+                                onClick={() => setExpandedNoteKey(issueKey)}
+                                title="Pop out notes to a larger editor"
+                                aria-label={`Expand notes for ${issueKey}`}
+                              >
+                                ⤢
+                              </button>
+                              <NoteImagesStrip
+                                images={noteImagesByKey[issueKey]}
+                                disabled={push.loading || isClosedOrResolved}
+                                error={noteImageErrorsByKey[issueKey]}
+                                onAddFiles={(files) => handleNoteImagesAdd(issueKey, files)}
+                                onRemove={(localId) => handleNoteImageRemove(issueKey, localId)}
+                                keepOnMachine={keepNoteImagesByKey[issueKey]}
+                                keepPending={Boolean(noteImageKeepPendingByKey[issueKey])}
+                                onKeepChange={(checked) => handleKeepNoteImagesToggle(issueKey, checked)}
+                              >
+                                <textarea
+                                  className={`ww-note-textarea${
+                                    isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
+                                  }`}
+                                  value={noteDraft}
+                                  onChange={(event) =>
+                                    handleNoteChange(issueKey, event.target.value)
+                                  }
+                                  placeholder="Add notes here"
+                                  title={
+                                    isNoteAlreadyPushed
+                                      ? "This note was pushed to Jira. Change the text or images before pushing again."
+                                      : undefined
+                                  }
+                                />
+                              </NoteImagesStrip>
+                            </div>
                           )}
                         </td>
 
@@ -1105,6 +1130,67 @@ const JiraResultsTable = ({
                 </tbody>
               </table>
             </div>
+
+            {expandedNoteKey
+              ? (() => {
+                  const noteIssue = pagedIssues.find((issue) => issue.key === expandedNoteKey);
+                  if (!noteIssue) {
+                    return null;
+                  }
+                  const modalNoteDraft = jiraNotes[expandedNoteKey] || "";
+                  const modalClosedOrResolved = isClosedLikeStatus(
+                    noteIssue.fields?.status?.name || "-"
+                  );
+
+                  return (
+                    <div
+                      className="ww-note-modal-backdrop"
+                      onClick={() => setExpandedNoteKey(null)}
+                    >
+                      <div
+                        className="ww-note-modal"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <div className="ww-note-modal-header">
+                          <div className="ww-note-modal-title">
+                            <strong>{expandedNoteKey}</strong>
+                            <span className="ww-note-modal-summary">
+                              {noteIssue.fields?.summary || ""}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="ww-note-modal-close"
+                            onClick={() => setExpandedNoteKey(null)}
+                            aria-label="Close"
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <textarea
+                          className="ww-note-modal-textarea"
+                          value={modalNoteDraft}
+                          onChange={(event) =>
+                            handleNoteChange(expandedNoteKey, event.target.value)
+                          }
+                          placeholder="Add notes here"
+                          disabled={modalClosedOrResolved}
+                          autoFocus
+                        />
+                        <div className="ww-note-modal-footer">
+                          <button
+                            type="button"
+                            className="ww-note-modal-done"
+                            onClick={() => setExpandedNoteKey(null)}
+                          >
+                            Done
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              : null}
 
             <ResultsPagerBar
               placement="bottom"
