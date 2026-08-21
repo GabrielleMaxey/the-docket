@@ -266,6 +266,7 @@ const JiraResultsTable = ({
   dueDateDrafts,
   mrdDrafts,
   startDateByKey,
+  completeDateByKey,
   assigneeDrafts,
   jiraRowPriorities,
   jiraNotes,
@@ -290,6 +291,8 @@ const JiraResultsTable = ({
   handleMrdDraftChange,
   handleMrdUpdate,
   handleStartDateChange,
+  handleCompleteDateChange,
+  handleClearDateTracking,
   handleAssigneeDraftChange,
   handleAssigneeUpdate,
   handleRowPriorityChange,
@@ -995,6 +998,43 @@ const JiraResultsTable = ({
                                     }
                                   />
                                 </div>
+
+                                <div className="ww-date-row">
+                                  <label
+                                    className="ww-date-label"
+                                    title="Ad-hoc complete date — local only, used for Gantt charts. Defaults from MRD if empty. No Jira field."
+                                  >
+                                    Complete
+                                  </label>
+                                  <input
+                                    type="date"
+                                    className="ww-edit-input"
+                                    value={completeDateByKey[issueKey] ?? (ownMrd || inheritedMrd || "")}
+                                    disabled={isClosedOrResolved}
+                                    onChange={(event) =>
+                                      handleCompleteDateChange(issueKey, event.target.value, { sharedProgramId })
+                                    }
+                                  />
+                                </div>
+
+                                {startDateByKey[issueKey] || completeDateByKey[issueKey] ? (
+                                  <button
+                                    type="button"
+                                    className="ww-date-clear-btn"
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          `Clear start/complete date tracking for ${issueKey}? This can't be undone.`
+                                        )
+                                      ) {
+                                        handleClearDateTracking(issueKey, { sharedProgramId });
+                                      }
+                                    }}
+                                    disabled={isClosedOrResolved}
+                                  >
+                                    Clear tracking
+                                  </button>
+                                ) : null}
                               </div>
                             );
                           })()}

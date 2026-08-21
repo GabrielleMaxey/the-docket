@@ -195,6 +195,85 @@ describe("issue metadata date fields", () => {
     });
   });
 
+  it("saves and returns completeDate independently of startDate", async () => {
+    await withServer(async ({ db, request }) => {
+      const response = await request("/api/jira/issue-metadata/ABC-1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completeDate: "2026-04-15" }),
+      });
+
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.completeDate, "2026-04-15");
+      assert.equal(body.startDate, "");
+      assert.equal(
+        db.prepare("SELECT complete_date FROM issue_metadata WHERE issue_key = ?").get("ABC-1")
+          .complete_date,
+        "2026-04-15"
+      );
+    });
+  });
+
+  it("preserves completeDate when only startDate is updated, and vice versa", async () => {
+    await withServer(async ({ request }) => {
+      await request("/api/jira/issue-metadata/ABC-1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startDate: "2026-03-01", completeDate: "2026-04-15" }),
+      });
+
+      const response = await request("/api/jira/issue-metadata/ABC-1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startDate: "2026-03-10" }),
+      });
+
+      const body = await response.json();
+      assert.equal(body.startDate, "2026-03-10");
+      assert.equal(body.completeDate, "2026-04-15");
+    });
+  });
+
+  it("returns completeDate from the bulk metadata route", async () => {
+    await withServer(async ({ db, request }) => {
+      db.prepare(
+        "INSERT INTO issue_metadata (issue_key, complete_date) VALUES (?, ?)"
+      ).run("ABC-1", "2026-04-15");
+
+      const response = await request("/api/jira/issue-metadata/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issueKeys: ["ABC-1"] }),
+      });
+
+      const body = await response.json();
+      assert.equal(body.items["ABC-1"].completeDate, "2026-04-15");
+    });
+  });
+
+  it("CSV priority import preserves existing start/complete dates instead of wiping them", async () => {
+    await withServer(async ({ db, request }) => {
+      db.prepare(
+        "INSERT INTO issue_metadata (issue_key, note, priority, start_date, complete_date) VALUES (?, ?, ?, ?, ?)"
+      ).run("ABC-1", "", 0, "2026-03-01", "2026-04-15");
+
+      const response = await request("/api/jira/issue-metadata/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csvText: "ODI,Priority\nABC-1,5\n" }),
+      });
+
+      assert.equal(response.status, 200);
+      const row = db
+        .prepare("SELECT priority, start_date, complete_date FROM issue_metadata WHERE issue_key = ?")
+        .get("ABC-1");
+      assert.equal(row.priority, 5);
+      assert.equal(row.start_date, "2026-03-01");
+      assert.equal(row.complete_date, "2026-04-15");
+    });
+  });
+
   it("rejects an invalid role for the date-field route", async () => {
     await withServer(async ({ request }) => {
       const response = await request("/api/jira/issues/ABC-1/date-field", {

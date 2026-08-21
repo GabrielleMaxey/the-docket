@@ -2,6 +2,7 @@ import {
   bulkGetTeamDates,
   bulkGetTeamPriorities,
   bulkPutTeamPriorities,
+  deleteTeamDate,
   isTeamPriorityMongoConfigured,
   listAllTeamPriorities,
   listSharedPrograms,
@@ -205,14 +206,30 @@ export const registerTeamPriorityRoutes = (app, { db, resolveJiraUser }) => {
 
   app.put(
     "/api/team-priority/dates/:issueKey",
-    withTeamMongo("update team start date", async (req, res) => {
+    withTeamMongo("update team date tracking", async (req, res) => {
+      const hasStartDate = req.body?.startDate !== undefined;
+      const hasCompleteDate = req.body?.completeDate !== undefined;
+      if (!hasStartDate && !hasCompleteDate) {
+        return res.status(400).json({ error: "Provide startDate or completeDate" });
+      }
+
       const updatedBy = await resolveUpdatedBy(resolveJiraUser);
 
       const result = await putTeamDate({
         issueKey: req.params.issueKey,
-        startDate: req.body?.startDate,
+        ...(hasStartDate ? { startDate: req.body.startDate } : {}),
+        ...(hasCompleteDate ? { completeDate: req.body.completeDate } : {}),
         updatedBy,
       });
+      return res.json(result);
+    })
+  );
+
+  // Explicit, deliberate clear — never triggered just by blanking a date field.
+  app.delete(
+    "/api/team-priority/dates/:issueKey",
+    withTeamMongo("clear team date tracking", async (req, res) => {
+      const result = await deleteTeamDate({ issueKey: req.params.issueKey });
       return res.json(result);
     })
   );

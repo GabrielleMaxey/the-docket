@@ -63,15 +63,16 @@ export const registerIssueMetadataRoutes = (
   { db, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, noteImagesDir }
 ) => {
   const selectIssueMetadataStmt = db.prepare(
-    "SELECT issue_key, note, priority, start_date FROM issue_metadata WHERE issue_key = ?"
+    "SELECT issue_key, note, priority, start_date, complete_date FROM issue_metadata WHERE issue_key = ?"
   );
   const upsertIssueMetadataStmt = db.prepare(`
-    INSERT INTO issue_metadata (issue_key, note, priority, start_date, updated_at)
-    VALUES (@issueKey, @note, @priority, @startDate, CURRENT_TIMESTAMP)
+    INSERT INTO issue_metadata (issue_key, note, priority, start_date, complete_date, updated_at)
+    VALUES (@issueKey, @note, @priority, @startDate, @completeDate, CURRENT_TIMESTAMP)
     ON CONFLICT(issue_key) DO UPDATE SET
       note = excluded.note,
       priority = excluded.priority,
       start_date = excluded.start_date,
+      complete_date = excluded.complete_date,
       updated_at = CURRENT_TIMESTAMP
   `);
   const listFieldMappingsStmt = db.prepare(
@@ -349,7 +350,7 @@ export const registerIssueMetadataRoutes = (
     const placeholders = issueKeys.map(() => "?").join(",");
     const rows = db
       .prepare(
-        `SELECT issue_key, note, priority, keep_note_images, start_date FROM issue_metadata WHERE issue_key IN (${placeholders})`
+        `SELECT issue_key, note, priority, keep_note_images, start_date, complete_date FROM issue_metadata WHERE issue_key IN (${placeholders})`
       )
       .all(...issueKeys);
 
@@ -361,6 +362,7 @@ export const registerIssueMetadataRoutes = (
         keepNoteImages,
         images: keepNoteImages ? listNoteImages(db, row.issue_key) : [],
         startDate: String(row.start_date || ""),
+        completeDate: String(row.complete_date || ""),
       };
       return acc;
     }, {});
@@ -410,13 +412,15 @@ export const registerIssueMetadataRoutes = (
         const placeholders = issueKeys.map(() => "?").join(",");
         const existingRows = db
           .prepare(
-            `SELECT issue_key, note, priority FROM issue_metadata WHERE issue_key IN (${placeholders})`
+            `SELECT issue_key, note, priority, start_date, complete_date FROM issue_metadata WHERE issue_key IN (${placeholders})`
           )
           .all(...issueKeys);
         for (const row of existingRows) {
           existingByKey[row.issue_key] = {
             note: String(row.note || ""),
             priority: clampIssuePriority(row.priority),
+            startDate: String(row.start_date || ""),
+            completeDate: String(row.complete_date || ""),
           };
         }
       }
@@ -428,6 +432,8 @@ export const registerIssueMetadataRoutes = (
             issueKey: item.issueKey,
             note: item.note,
             priority: item.priority,
+            startDate: existingByKey[item.issueKey]?.startDate || "",
+            completeDate: existingByKey[item.issueKey]?.completeDate || "",
           });
         }
       });
@@ -535,9 +541,10 @@ export const registerIssueMetadataRoutes = (
     const hasNote = typeof req.body?.note === "string";
     const hasPriority = req.body?.priority !== undefined;
     const hasStartDate = typeof req.body?.startDate === "string";
+    const hasCompleteDate = typeof req.body?.completeDate === "string";
 
-    if (!hasNote && !hasPriority && !hasStartDate) {
-      return res.status(400).json({ error: "Provide note, priority, or startDate" });
+    if (!hasNote && !hasPriority && !hasStartDate && !hasCompleteDate) {
+      return res.status(400).json({ error: "Provide note, priority, startDate, or completeDate" });
     }
 
     const nextNote = hasNote ? String(req.body.note) : String(current.note || "");
@@ -547,12 +554,16 @@ export const registerIssueMetadataRoutes = (
     const nextStartDate = hasStartDate
       ? String(req.body.startDate).trim()
       : String(current.start_date || "");
+    const nextCompleteDate = hasCompleteDate
+      ? String(req.body.completeDate).trim()
+      : String(current.complete_date || "");
 
     upsertIssueMetadataStmt.run({
       issueKey,
       note: nextNote,
       priority: nextPriority,
       startDate: nextStartDate,
+      completeDate: nextCompleteDate,
     });
 
     return res.json({
@@ -561,6 +572,7 @@ export const registerIssueMetadataRoutes = (
       note: nextNote,
       priority: nextPriority,
       startDate: nextStartDate,
+      completeDate: nextCompleteDate,
     });
   });
 

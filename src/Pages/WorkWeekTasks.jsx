@@ -144,7 +144,7 @@ const WorkWeekTasks = () => {
     showRestoredJqlBanner, jqlError, jqlMaxResults, pullLatestComment, assigneeRefreshNotice,
     jiraNotes, jiraRowPriorities, prioritySourceByKey, selectedForPush,
     lastPushedJiraNoteByKey, pushState, saveState,
-    statusDrafts, dueDateDrafts, mrdDrafts, startDateByKey,
+    statusDrafts, dueDateDrafts, mrdDrafts, startDateByKey, completeDateByKey,
     assigneeDrafts, rowUpdateState, noteImagesByKey, noteImageErrorsByKey,
     keepNoteImagesByKey, noteImageKeepPendingByKey,
     isClosedLikeStatus, clampPriority, getPriorityClass,
@@ -155,6 +155,7 @@ const WorkWeekTasks = () => {
     handleSaveMetadata, handleSelectAll, handleStatusDraftChange,
     handleStatusUpdate, handleDueDateDraftChange, handleDueDateUpdate,
     handleMrdDraftChange, handleMrdUpdate, handleStartDateChange,
+    handleCompleteDateChange, handleClearDateTracking,
     handleAssigneeDraftChange, handleAssigneeUpdate,
     handleRowPriorityChange, handleNoteChange, handleNoteImagesAdd, handleNoteImageRemove,
     handleKeepNoteImagesToggle,
@@ -636,6 +637,7 @@ const WorkWeekTasks = () => {
           pushState={pushState} saveState={saveState}
           rowUpdateState={rowUpdateState} statusDrafts={statusDrafts}
           dueDateDrafts={dueDateDrafts} mrdDrafts={mrdDrafts} startDateByKey={startDateByKey}
+          completeDateByKey={completeDateByKey}
           assigneeDrafts={assigneeDrafts} jiraRowPriorities={jiraRowPriorities}
           prioritySourceByKey={prioritySourceByKey}
           jiraNotes={jiraNotes} statusOptions={STATUS_OPTIONS}
@@ -649,6 +651,8 @@ const WorkWeekTasks = () => {
           handleDueDateDraftChange={handleDueDateDraftChange} handleDueDateUpdate={handleDueDateUpdate}
           handleMrdDraftChange={handleMrdDraftChange} handleMrdUpdate={handleMrdUpdate}
           handleStartDateChange={handleStartDateChange}
+          handleCompleteDateChange={handleCompleteDateChange}
+          handleClearDateTracking={handleClearDateTracking}
           handleAssigneeDraftChange={handleAssigneeDraftChange} handleAssigneeUpdate={handleAssigneeUpdate}
           handleRowPriorityChange={handleRowPriorityChange} handleNoteChange={handleNoteChange}
           handleNoteImagesAdd={handleNoteImagesAdd} handleNoteImageRemove={handleNoteImageRemove}

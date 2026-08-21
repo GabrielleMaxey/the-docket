@@ -1441,7 +1441,7 @@
 }
 
 .work-week-page .ww-date-label {
-  flex: 0 0 2.6rem;
+  flex: 0 0 4.2rem;
   font-size: 0.72rem;
   font-weight: 600;
   color: #64748b;
@@ -1455,9 +1455,31 @@
 }
 
 .work-week-page .ww-date-hint {
-  margin: -0.15rem 0 0 2.95rem;
+  margin: -0.15rem 0 0 4.55rem;
   font-size: 0.7rem;
   color: #94a3b8;
+}
+
+.work-week-page .ww-date-clear-btn {
+  margin-top: 0.15rem;
+  align-self: flex-start;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 0.7rem;
+  color: #b91c1c;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.work-week-page .ww-date-clear-btn:hover {
+  color: #7f1d1d;
+}
+
+.work-week-page .ww-date-clear-btn:disabled {
+  color: #cbd5e1;
+  cursor: not-allowed;
+  text-decoration: none;
 }
 
 /* ── results table ── */
