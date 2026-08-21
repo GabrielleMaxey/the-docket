@@ -5,23 +5,25 @@ import {
   createWatchedAssignee,
   deleteWatchedAssignee,
   fetchWatchedAssignees,
+  resolveJiraUsersByAccountIds,
   updateWatchedAssignee,
 } from "../../../services/jiraClient.js";
 import { useFlash } from "../../hooks/useFlash.js";
 import {
   DEFAULT_DIRECT_REPORTS_LABEL,
   buildDirectReportsJql,
+  looksLikeAccountId,
   normalizeMemberNames,
 } from "../../../../shared/directReportsJql.mjs";
 
-const NameChip = ({ name, onRemove }) => (
+const NameChip = ({ name, label, onRemove }) => (
   <span className="settings-name-chip">
-    {name}
+    {label || name}
     <button
       type="button"
       className="settings-name-chip-remove"
       onClick={() => onRemove(name)}
-      aria-label={`Remove ${name}`}
+      aria-label={`Remove ${label || name}`}
     >
       ×
     </button>
@@ -47,8 +49,56 @@ const DirectReportsSection = ({ watchedAssignees, setWatchedAssignees, onError }
   const [memberNames, setMemberNames] = React.useState([]);
   const [editingId, setEditingId] = React.useState(null);
   const [flash, setFlash] = useFlash();
+  // accountId -> resolved display name; null means "tried, Jira has no match"
+  // so we keep showing the raw id instead of retrying forever.
+  const [resolvedNames, setResolvedNames] = React.useState({});
 
   const previewJql = buildDirectReportsJql([...memberNames, nameInput]);
+
+  React.useEffect(() => {
+    const pendingIds = [
+      ...new Set(
+        [...queries.flatMap((query) => query.memberNames || []), ...memberNames].filter(
+          (name) => looksLikeAccountId(name) && resolvedNames[name] === undefined
+        )
+      ),
+    ];
+    if (pendingIds.length === 0) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    resolveJiraUsersByAccountIds(pendingIds)
+      .then((items) => {
+        if (cancelled) return;
+        setResolvedNames((prev) => {
+          const next = { ...prev };
+          for (const accountId of pendingIds) {
+            const user = items[accountId];
+            next[accountId] = user?.displayName || user?.emailAddress || null;
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setResolvedNames((prev) => {
+          const next = { ...prev };
+          for (const accountId of pendingIds) {
+            next[accountId] = prev[accountId] ?? null;
+          }
+          return next;
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queries, memberNames, resolvedNames]);
+
+  // Members stay stored/queried by account id (stable across renames) — this
+  // only swaps in a human-readable label for display.
+  const displayMemberName = (name) => (looksLikeAccountId(name) ? resolvedNames[name] || name : name);
 
   const resetForm = (items = queries) => {
     setEditingId(null);
@@ -200,6 +250,7 @@ const DirectReportsSection = ({ watchedAssignees, setWatchedAssignees, onError }
                         <NameChip
                           key={name}
                           name={name}
+                          label={displayMemberName(name)}
                           onRemove={() => handleRemoveSavedName(query, name)}
                         />
                       ))}
@@ -251,7 +302,7 @@ const DirectReportsSection = ({ watchedAssignees, setWatchedAssignees, onError }
         {memberNames.length > 0 ? (
           <div className="settings-name-chips">
             {memberNames.map((name) => (
-              <NameChip key={name} name={name} onRemove={handleRemoveName} />
+              <NameChip key={name} name={name} label={displayMemberName(name)} onRemove={handleRemoveName} />
             ))}
             <Button type="button" size="mini" basic onClick={handleClearDraftNames}>
               Clear names
