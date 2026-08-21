@@ -1316,13 +1316,6 @@
   margin-bottom: 0.2rem;
 }
 
-.work-week-page .ww-jql-query {
-  font-size: 0.8rem;
-  color: #475569;
-  margin-bottom: 0.35rem;
-  word-break: break-word;
-}
-
 .work-week-page .ww-jql-result ul {
   margin: 0.25rem 0 0;
   padding-left: 1rem;
