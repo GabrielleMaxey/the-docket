@@ -8,6 +8,7 @@ import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js
 import { getFieldValue, formatDateOnly } from "../../../shared/dashboardMetrics.mjs";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
 import { buildNotePushFingerprint } from "../../utils/notePushFingerprint.js";
+import { useJiraAccountIdResolver } from "../hooks/useJiraAccountIdResolver.js";
 
 const PAGE_SIZE = 30;
 const SORT_FIELDS = [
@@ -345,6 +346,12 @@ const JiraResultsTable = ({
     return pendingDrillDownRun ? [pendingDrillDownRun, ...configuredRuns] : configuredRuns;
   }, [jqlRuns, pendingDrillDownRun]);
 
+  const watchedJqlTexts = React.useMemo(
+    () => visibleRuns.map((item) => item.jql),
+    [visibleRuns]
+  );
+  const { humanizeJql } = useJiraAccountIdResolver(watchedJqlTexts);
+
   const getJqlRunsIndex = React.useCallback(
     (item) => {
       if (!item || item.isPendingDrillDown) {
@@ -583,7 +590,7 @@ const JiraResultsTable = ({
       <div className="ww-jql-result">
         <div className="ww-jql-result-header">
           <p className="ww-jql-title">{run.label}</p>
-          <p className="ww-jql-query">{run.jql || "(empty)"}</p>
+          <p className="ww-jql-query">{humanizeJql(run.jql) || "(empty)"}</p>
         </div>
 
         {run.isPendingDrillDown ? (

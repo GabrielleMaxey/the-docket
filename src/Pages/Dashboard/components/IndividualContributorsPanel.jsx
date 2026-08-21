@@ -1,3 +1,4 @@
+import React from "react";
 import { Message } from "semantic-ui-react";
 import CollapsibleSection from "../../../Components/CollapsibleSection";
 import ContributorStatusBar from "./ContributorStatusBar";
@@ -5,6 +6,7 @@ import AssigneeMetricCard from "./AssigneeMetricCard";
 import JqlContributorMetricCard from "./JqlContributorMetricCard";
 import DashboardRefreshActions from "./DashboardRefreshActions";
 import { rollupEpicContributorPeople, getDashboardRefreshLoadingHint } from "../utils/dashboardMetricsUtils";
+import { useJiraAccountIdResolver } from "../../hooks/useJiraAccountIdResolver.js";
 
 const IndividualContributorsPanel = ({
   displayEpics,
@@ -21,6 +23,11 @@ const IndividualContributorsPanel = ({
   const autoRows = rollupEpicContributorPeople(displayEpics).filter(
     (row) => Number(row.totalIssues || 0) > 0
   );
+  const watchedTexts = React.useMemo(
+    () => assigneeMetrics.map((person) => person.jql),
+    [assigneeMetrics]
+  );
+  const { humanizeJql } = useJiraAccountIdResolver(watchedTexts);
 
   return (
     <div className="dashboard-contributors-panel">
@@ -84,6 +91,7 @@ const IndividualContributorsPanel = ({
                   jiraBaseUrl={jiraBaseUrl}
                   chartVariant={chartVariant}
                   dueByDate={dueByDate}
+                  humanizeJql={humanizeJql}
                 />
               ) : (
                 <AssigneeMetricCard

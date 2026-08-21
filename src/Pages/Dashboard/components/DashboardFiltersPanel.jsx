@@ -2,6 +2,7 @@ import React from "react";
 import { Button, Message, Segment } from "semantic-ui-react";
 import EpicFilterPanel from "../../components/EpicFilterPanel";
 import DashboardRefreshActions from "./DashboardRefreshActions";
+import { useJiraAccountIdResolver } from "../../hooks/useJiraAccountIdResolver.js";
 import {
   getDashboardRefreshLoadingHint,
   getDashboardRefreshStatusHint,
@@ -74,6 +75,11 @@ const DashboardFiltersPanel = ({
   const [upcomingPresetMode, setUpcomingPresetMode] = React.useState(() =>
     inferUpcomingDuePreset(dueByDate)
   );
+  const watchedJqlTexts = React.useMemo(
+    () => [...directReportWatches, ...jqlWatches].map((watch) => watch.jql),
+    [directReportWatches, jqlWatches]
+  );
+  const { humanizeJql } = useJiraAccountIdResolver(watchedJqlTexts);
   const showUpcomingCustomDate = upcomingPresetMode === UPCOMING_DUE_PRESET_CUSTOM;
 
   React.useEffect(() => {
@@ -324,7 +330,7 @@ const DashboardFiltersPanel = ({
                 primary={selectedWatchedIds.includes(watch.id)}
                 basic={!selectedWatchedIds.includes(watch.id)}
                 onClick={() => handleToggleWatched(watch.id)}
-                title={watch.jql}
+                title={humanizeJql(watch.jql)}
               >
                 {watch.displayName}
               </Button>
@@ -352,7 +358,7 @@ const DashboardFiltersPanel = ({
                 primary={selectedWatchedIds.includes(watch.id)}
                 basic={!selectedWatchedIds.includes(watch.id)}
                 onClick={() => handleToggleWatched(watch.id)}
-                title={watch.jql}
+                title={humanizeJql(watch.jql)}
               >
                 {watch.displayName}
               </Button>
