@@ -145,7 +145,7 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
         epicKey: JQL_PRESET_KEY,
         epicName,
         jql,
-        jiraFilterId: "",
+        jiraFilterId,
         sortOrder: Number(body?.sortOrder ?? existing?.sort_order ?? 0),
       };
     }

@@ -15,7 +15,7 @@ import { registerIssueMetadataRoutes } from "./routes/issueMetadataRoutes.mjs";
 import { registerEpicWorkloadRoutes } from "./routes/epicWorkloadRoutes.mjs";
 import { registerCapacityPlanningRoutes } from "./routes/capacityPlanningRoutes.mjs";
 import { registerTeamPriorityRoutes } from "./routes/teamPriorityRoutes.mjs";
-import { resolveJiraUser } from "./lib/jiraSearchHelpers.mjs";
+import { resolveJiraUser, fetchJiraMyself } from "./lib/jiraSearchHelpers.mjs";
 import { getJiraSearchFields } from "./lib/jiraSearchFields.mjs";
 import { createLogger } from "./lib/logger.mjs";
 import {
@@ -312,6 +312,9 @@ const routeCtx = {
   ensureEnvOrRespond,
   runJiraSearchRequest,
   resolveJiraUser,
+  // Distinct from resolveJiraUser (a by-query search) — this resolves the
+  // currently authenticated Jira account, for attributing writes like team priority.
+  resolveCurrentJiraUser: () => fetchJiraMyself({ jiraRequest }),
   noteImagesDir,
 };
 

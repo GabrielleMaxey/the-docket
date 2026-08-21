@@ -4,7 +4,13 @@ import AssigneeWorkloadChart from "./AssigneeWorkloadChart";
 import ProjectContributorMetrics from "./ProjectContributorMetrics";
 import ContributorDueTasksSection from "./ContributorDueTasksSection";
 
-const JqlContributorMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", dueByDate }) => {
+const JqlContributorMetricCard = ({
+  person,
+  jiraBaseUrl,
+  chartVariant = "pie",
+  dueByDate,
+  humanizeJql = (jql) => jql,
+}) => {
   const counts = person.workloadCounts || {};
   const total = Number(counts.totalIssues || 0);
   const resolved = Number(counts.totalResolved || 0);
@@ -18,8 +24,8 @@ const JqlContributorMetricCard = ({ person, jiraBaseUrl, chartVariant = "pie", d
         <span className="dashboard-badge dashboard-badge-jql">JQL</span>
       </h4>
       {person.jql ? (
-        <p className="dashboard-assignee-jql" title={person.jql}>
-          {person.jql}
+        <p className="dashboard-assignee-jql" title={humanizeJql(person.jql)}>
+          {humanizeJql(person.jql)}
         </p>
       ) : null}
       {person.error ? (

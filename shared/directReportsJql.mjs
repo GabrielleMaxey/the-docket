@@ -23,6 +23,51 @@ export const looksLikeAccountId = (value) => {
   return false;
 };
 
+// Matches an account id wherever JQL can legally carry one: quoted
+// (assignee = "...") or bare inside an IN (...) list — Jira accepts both,
+// e.g. `assignee in (5daa26bfa627f40c2f3c43be, 712020:d230216f-...)`.
+const JQL_ACCOUNT_ID_TOKEN_RE = /"([^"]*)"|\b\d+:[0-9a-fA-F-]{8,}\b|\b[0-9a-fA-F]{24,32}\b/g;
+
+// Account ids that show up as a JQL string literal or bare IN (...) token,
+// or as a standalone value (e.g. a saved member name).
+export const extractAccountIdsFromText = (text) => {
+  const value = String(text || "");
+  const ids = new Set();
+  if (looksLikeAccountId(value)) {
+    ids.add(stripAccountIdPrefix(value));
+  }
+  for (const match of value.matchAll(JQL_ACCOUNT_ID_TOKEN_RE)) {
+    const raw = match[1] !== undefined ? match[1] : match[0];
+    if (looksLikeAccountId(raw)) {
+      ids.add(stripAccountIdPrefix(raw));
+    }
+  }
+  return [...ids];
+};
+
+export const extractAccountIdsFromTexts = (texts) => [
+  ...new Set((Array.isArray(texts) ? texts : []).flatMap((text) => extractAccountIdsFromText(text))),
+];
+
+// Swaps resolved account ids for a display name inside a JQL string, purely
+// for rendering — the underlying stored/queried JQL keeps using account ids.
+// A bare (unquoted) id gets quoted once swapped in, since a display name can
+// contain spaces JQL wouldn't parse as a single token.
+export const humanizeJqlAccountIds = (jql, resolvedNames) => {
+  const text = String(jql || "");
+  if (!text) {
+    return text;
+  }
+  return text.replace(JQL_ACCOUNT_ID_TOKEN_RE, (match, quotedInner) => {
+    const raw = quotedInner !== undefined ? quotedInner : match;
+    if (!looksLikeAccountId(raw)) {
+      return match;
+    }
+    const label = resolvedNames?.[stripAccountIdPrefix(raw)];
+    return label ? `"${label}"` : match;
+  });
+};
+
 export const isJqlCurrentUser = (value) =>
   /^currentuser\(\)$/i.test(String(value || "").trim());
 

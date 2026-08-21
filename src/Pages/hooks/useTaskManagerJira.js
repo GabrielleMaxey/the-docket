@@ -15,6 +15,7 @@ import {
   saveIssueMetadata,
   saveTeamPriority,
   saveTeamDate,
+  deleteTeamDate,
   saveKeptNoteImages,
   deleteKeptNoteImages,
   fetchKeptNoteImageBlob,
@@ -276,6 +277,7 @@ export const useTaskManagerJira = () => {
   const [dueDateDrafts, setDueDateDrafts] = React.useState({});
   const [mrdDrafts, setMrdDrafts] = React.useState({});
   const [startDateByKey, setStartDateByKey] = React.useState({});
+  const [completeDateByKey, setCompleteDateByKey] = React.useState({});
   const [assigneeDrafts, setAssigneeDrafts] = React.useState({});
   const [assigneeAccountIds, setAssigneeAccountIds] = React.useState({});
   const [rowUpdateState, setRowUpdateState] = React.useState({});
@@ -924,6 +926,47 @@ export const useTaskManagerJira = () => {
     });
   };
 
+  // Same shape as Start date — manual, autosaves on change, no Update step.
+  // The field's displayed default (falling back to MRD when empty) is computed
+  // by the table, not here; this just persists whatever the input reports.
+  const handleCompleteDateChange = (issueKey, value, options = {}) => {
+    const trimmed = String(value || "").trim();
+    const sharedProgramId = String(options.sharedProgramId || "").trim();
+
+    setCompleteDateByKey((prev) => patchIssueKeyed(prev, issueKey, trimmed));
+
+    if (sharedProgramId) {
+      saveTeamDate({ issueKey, completeDate: trimmed }).catch((error) => {
+        console.error("Failed to persist team complete date", issueKey, error);
+      });
+      return;
+    }
+
+    saveIssueMetadata({ issueKey, completeDate: trimmed }).catch((error) => {
+      console.error("Failed to persist complete date", issueKey, error);
+    });
+  };
+
+  // Explicit, deliberate removal of both tracked dates for an issue — never
+  // triggered just by blanking a field (see putTeamDate/deleteTeamDate).
+  const handleClearDateTracking = (issueKey, options = {}) => {
+    const sharedProgramId = String(options.sharedProgramId || "").trim();
+
+    setStartDateByKey((prev) => removeIssueKeyed(prev, issueKey));
+    setCompleteDateByKey((prev) => removeIssueKeyed(prev, issueKey));
+
+    if (sharedProgramId) {
+      deleteTeamDate(issueKey).catch((error) => {
+        console.error("Failed to clear team date tracking", issueKey, error);
+      });
+      return;
+    }
+
+    saveIssueMetadata({ issueKey, startDate: "", completeDate: "" }).catch((error) => {
+      console.error("Failed to clear date tracking", issueKey, error);
+    });
+  };
+
   const handleAssigneeUpdate = async (issueKey) => {
     const draftOrAccount =
       assigneeAccountIds[issueKey] === JIRA_UNASSIGNED_ASSIGNEE
@@ -1018,6 +1061,7 @@ export const useTaskManagerJira = () => {
           setJiraRowPriorities,
           setPrioritySourceByKey,
           setStartDateByKey,
+          setCompleteDateByKey,
           hydrateNoteImages: hydrateKeptNoteImages,
           fieldMappingRows,
         }),
@@ -1046,6 +1090,7 @@ export const useTaskManagerJira = () => {
           setPrioritySourceByKey,
           setJiraNotes,
           setStartDateByKey,
+          setCompleteDateByKey,
           pullLatestComment,
           fieldMappingRows,
         }),
@@ -1072,6 +1117,7 @@ export const useTaskManagerJira = () => {
         setPrioritySourceByKey,
         setJiraNotes,
         setStartDateByKey,
+        setCompleteDateByKey,
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
@@ -1103,6 +1149,7 @@ export const useTaskManagerJira = () => {
         setPrioritySourceByKey,
         setJiraNotes,
         setStartDateByKey,
+        setCompleteDateByKey,
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
@@ -1132,6 +1179,7 @@ export const useTaskManagerJira = () => {
         setPrioritySourceByKey,
         setJiraNotes,
         setStartDateByKey,
+        setCompleteDateByKey,
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
@@ -1197,6 +1245,7 @@ export const useTaskManagerJira = () => {
     dueDateDrafts,
     mrdDrafts,
     startDateByKey,
+    completeDateByKey,
     assigneeDrafts,
     rowUpdateState,
     noteImagesByKey,
@@ -1233,6 +1282,8 @@ export const useTaskManagerJira = () => {
     handleMrdDraftChange,
     handleMrdUpdate,
     handleStartDateChange,
+    handleCompleteDateChange,
+    handleClearDateTracking,
     handleAssigneeDraftChange,
     handleAssigneeUpdate,
     handleRowPriorityChange,

@@ -9,6 +9,7 @@ import {
   updateWatchedAssignee,
 } from "../../../services/jiraClient.js";
 import { useFlash } from "../../hooks/useFlash.js";
+import { useJiraAccountIdResolver } from "../../hooks/useJiraAccountIdResolver.js";
 import {
   DEFAULT_OVERDUE_DATE_BASIS,
   OVERDUE_DATE_BASIS_OPTIONS,
@@ -47,6 +48,11 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
   const [flash, setFlash] = useFlash();
   const quickPickRequestRef = React.useRef(0);
   const contributorEntries = watchedAssignees.filter((person) => person.watchType !== "direct_reports");
+  const watchedTexts = React.useMemo(
+    () => contributorEntries.map((person) => person.jql),
+    [contributorEntries]
+  );
+  const { humanizeJql } = useJiraAccountIdResolver(watchedTexts);
 
   const handlePresetTypeSelect = (presetId) => {
     setWatchedPresetId(presetId);
@@ -308,7 +314,7 @@ const MetricTargetsSection = ({ watchedAssignees, setWatchedAssignees, onError, 
                       : "Custom query"}
                 </Table.Cell>
                 <Table.Cell>{person.displayName}</Table.Cell>
-                <Table.Cell>{person.jql || "—"}</Table.Cell>
+                <Table.Cell>{humanizeJql(person.jql) || "—"}</Table.Cell>
                 <Table.Cell collapsing>{overdueDateBasisShortLabel(person.overdueDateBasis)}</Table.Cell>
                 <Table.Cell collapsing>
                   <Input

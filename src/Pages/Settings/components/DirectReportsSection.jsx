@@ -8,20 +8,21 @@ import {
   updateWatchedAssignee,
 } from "../../../services/jiraClient.js";
 import { useFlash } from "../../hooks/useFlash.js";
+import { useJiraAccountIdResolver } from "../../hooks/useJiraAccountIdResolver.js";
 import {
   DEFAULT_DIRECT_REPORTS_LABEL,
   buildDirectReportsJql,
   normalizeMemberNames,
 } from "../../../../shared/directReportsJql.mjs";
 
-const NameChip = ({ name, onRemove }) => (
+const NameChip = ({ name, label, onRemove }) => (
   <span className="settings-name-chip">
-    {name}
+    {label || name}
     <button
       type="button"
       className="settings-name-chip-remove"
       onClick={() => onRemove(name)}
-      aria-label={`Remove ${name}`}
+      aria-label={`Remove ${label || name}`}
     >
       ×
     </button>
@@ -49,6 +50,14 @@ const DirectReportsSection = ({ watchedAssignees, setWatchedAssignees, onError }
   const [flash, setFlash] = useFlash();
 
   const previewJql = buildDirectReportsJql([...memberNames, nameInput]);
+
+  // Members/JQL stay stored and queried by account id (stable across
+  // renames) — this only swaps in a human-readable label for display.
+  const watchedTexts = React.useMemo(
+    () => [...queries.flatMap((query) => [...(query.memberNames || []), query.jql]), ...memberNames, previewJql],
+    [queries, memberNames, previewJql]
+  );
+  const { displayMemberName, humanizeJql } = useJiraAccountIdResolver(watchedTexts);
 
   const resetForm = (items = queries) => {
     setEditingId(null);
@@ -200,6 +209,7 @@ const DirectReportsSection = ({ watchedAssignees, setWatchedAssignees, onError }
                         <NameChip
                           key={name}
                           name={name}
+                          label={displayMemberName(name)}
                           onRemove={() => handleRemoveSavedName(query, name)}
                         />
                       ))}
@@ -209,7 +219,7 @@ const DirectReportsSection = ({ watchedAssignees, setWatchedAssignees, onError }
                   )}
                 </Table.Cell>
                 <Table.Cell>
-                  <code>{query.jql || "—"}</code>
+                  <code>{humanizeJql(query.jql) || "—"}</code>
                 </Table.Cell>
                 <Table.Cell collapsing>
                   <Button size="mini" onClick={() => handleEdit(query)}>
@@ -251,7 +261,7 @@ const DirectReportsSection = ({ watchedAssignees, setWatchedAssignees, onError }
         {memberNames.length > 0 ? (
           <div className="settings-name-chips">
             {memberNames.map((name) => (
-              <NameChip key={name} name={name} onRemove={handleRemoveName} />
+              <NameChip key={name} name={name} label={displayMemberName(name)} onRemove={handleRemoveName} />
             ))}
             <Button type="button" size="mini" basic onClick={handleClearDraftNames}>
               Clear names
@@ -260,7 +270,7 @@ const DirectReportsSection = ({ watchedAssignees, setWatchedAssignees, onError }
         ) : null}
         <Form.Field>
           <label>Generated JQL</label>
-          <code>{previewJql || "Add a name to preview JQL"}</code>
+          <code>{humanizeJql(previewJql) || "Add a name to preview JQL"}</code>
         </Form.Field>
         <Button primary onClick={handleSave}>
           {editingId ? "Save changes" : "Save query"}

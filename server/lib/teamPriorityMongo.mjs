@@ -258,6 +258,7 @@ export const bulkGetTeamDates = async (issueKeys) => {
   for (const row of rows) {
     items[row._id] = {
       startDate: String(row.startDate || ""),
+      completeDate: String(row.completeDate || ""),
       updatedAt: row.updatedAt || null,
       updatedBy: String(row.updatedBy || ""),
     };
@@ -265,7 +266,11 @@ export const bulkGetTeamDates = async (issueKeys) => {
   return items;
 };
 
-export const putTeamDate = async ({ issueKey, startDate, updatedBy }) => {
+// Partial upsert: only the field(s) passed are written, the other survives untouched.
+// The row itself is never auto-deleted here — clearing a field just blanks it, so
+// PM hand-off tracking (start/complete) can't vanish from one field being emptied.
+// Use deleteTeamDate for an explicit, deliberate removal of the whole row.
+export const putTeamDate = async ({ issueKey, startDate, completeDate, updatedBy }) => {
   const db = await getDb();
   if (!db) {
     throw new Error("Team priority demo not configured");
@@ -275,38 +280,57 @@ export const putTeamDate = async ({ issueKey, startDate, updatedBy }) => {
     throw new Error("Missing issue key");
   }
 
-  const nextStartDate = String(startDate || "").trim();
+  const hasStartDate = startDate !== undefined;
+  const hasCompleteDate = completeDate !== undefined;
+  if (!hasStartDate && !hasCompleteDate) {
+    throw new Error("Provide startDate or completeDate");
+  }
+
+  const nextStartDate = hasStartDate ? String(startDate || "").trim() : undefined;
   if (nextStartDate && !isValidDateOnly(nextStartDate)) {
     throw new Error("startDate must be YYYY-MM-DD");
   }
-
-  const col = db.collection(COL_DATES);
-
-  if (!nextStartDate) {
-    await col.deleteOne({ _id: key });
-    return { ok: true, deleted: true, issueKey: key };
+  const nextCompleteDate = hasCompleteDate ? String(completeDate || "").trim() : undefined;
+  if (nextCompleteDate && !isValidDateOnly(nextCompleteDate)) {
+    throw new Error("completeDate must be YYYY-MM-DD");
   }
 
+  const col = db.collection(COL_DATES);
   const updatedAt = new Date();
   const by = String(updatedBy || "demo").trim() || "demo";
-  await col.updateOne(
-    { _id: key },
-    {
-      $set: {
-        startDate: nextStartDate,
-        updatedAt,
-        updatedBy: by,
-      },
-    },
-    { upsert: true }
-  );
+  const $set = { updatedAt, updatedBy: by };
+  if (hasStartDate) {
+    $set.startDate = nextStartDate;
+  }
+  if (hasCompleteDate) {
+    $set.completeDate = nextCompleteDate;
+  }
+
+  await col.updateOne({ _id: key }, { $set }, { upsert: true });
 
   return {
     ok: true,
     deleted: false,
     issueKey: key,
-    startDate: nextStartDate,
+    ...(hasStartDate ? { startDate: nextStartDate } : {}),
+    ...(hasCompleteDate ? { completeDate: nextCompleteDate } : {}),
     updatedAt,
     updatedBy: by,
   };
+};
+
+// Explicit, deliberate removal of the whole tracking row — not triggered by
+// clearing a field, only by a dedicated "clear tracking" action in the UI.
+export const deleteTeamDate = async ({ issueKey }) => {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Team priority demo not configured");
+  }
+  const key = String(issueKey || "").trim().toUpperCase();
+  if (!key) {
+    throw new Error("Missing issue key");
+  }
+
+  await db.collection(COL_DATES).deleteOne({ _id: key });
+  return { ok: true, deleted: true, issueKey: key };
 };
