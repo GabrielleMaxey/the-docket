@@ -201,6 +201,17 @@ export const searchJiraUsers = async (query) => {
   return data?.items || [];
 };
 
+export const resolveJiraUsersByAccountIds = async (accountIds) => {
+  const data = await requestJson("/api/jira/users/resolve-bulk", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ accountIds }),
+  });
+  return data?.items || {};
+};
+
 export const fetchIssueMetadataBulk = async (issueKeys) => {
   const data = await requestJson("/api/jira/issue-metadata/bulk", {
     method: "POST",
@@ -230,7 +241,7 @@ export const fetchLatestJiraCommentsBulk = async (issueKeys) => {
   return data?.items || {};
 };
 
-export const saveIssueMetadata = async ({ issueKey, note, priority, startDate }) => {
+export const saveIssueMetadata = async ({ issueKey, note, priority, startDate, completeDate }) => {
   const body = {};
   if (typeof note === "string") {
     body.note = note;
@@ -240,6 +251,9 @@ export const saveIssueMetadata = async ({ issueKey, note, priority, startDate })
   }
   if (typeof startDate === "string") {
     body.startDate = startDate;
+  }
+  if (typeof completeDate === "string") {
+    body.completeDate = completeDate;
   }
 
   return requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}`, {
@@ -353,13 +367,28 @@ export const fetchTeamDatesBulk = async (issueKeys) => {
   return data?.items || {};
 };
 
-export const saveTeamDate = async ({ issueKey, startDate }) => {
+export const saveTeamDate = async ({ issueKey, startDate, completeDate }) => {
+  const body = {};
+  if (typeof startDate === "string") {
+    body.startDate = startDate;
+  }
+  if (typeof completeDate === "string") {
+    body.completeDate = completeDate;
+  }
+
   return requestJson(`/api/team-priority/dates/${encodeURIComponent(issueKey)}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ startDate }),
+    body: JSON.stringify(body),
+  });
+};
+
+// Explicit, deliberate clear of the whole shared date-tracking row for an issue.
+export const deleteTeamDate = async (issueKey) => {
+  return requestJson(`/api/team-priority/dates/${encodeURIComponent(issueKey)}`, {
+    method: "DELETE",
   });
 };
 
