@@ -27,11 +27,9 @@ import {
 import { isDrillDownDismissed } from "../utils/jqlRunPersistence.js";
 import { resolveCreateIssueDefaults } from "../../shared/createIssuePresetUtils.mjs";
 import {
-  buildSharedProgramJql,
   isConfiguredJqlRun,
   isConfiguredJqlSlot,
   normalizeJqlCount,
-  shouldReplaceSlotQueryForSharedProgram,
   WORK_WEEK_STORAGE_KEYS,
 } from "../utils/workWeekStorage.js";
 
@@ -131,16 +129,6 @@ const WorkWeekTasks = () => {
   const [createIssueOpen, setCreateIssueOpen] = React.useState(false);
   const [quickPickValueBySlot, setQuickPickValueBySlot] = React.useState({});
   const drillDownBannerRef = React.useRef(null);
-  // Tracks the JQL actually written into each slot by a shared-program pick
-  // (the descendant-expanded form resolveSharedProgramJql produces, not just
-  // the sync base) — shouldReplaceSlotQueryForSharedProgram's "is this still
-  // auto-generated, safe to swap" check needs the real previous value, or
-  // switching programs on the same slot only swaps the label, not the JQL.
-  // Persisted (not a plain ref) because the expanded JQL depends on live
-  // Jira data, not a fixed string derivable from epicRoots alone — an
-  // in-memory ref can't reconstruct it after a reload, so the "was this
-  // auto-generated" comparison would wrongly fail and switching programs on
-  // the same slot would silently stop updating the JQL.
   const [generatedSharedProgramJqlBySlot, setGeneratedSharedProgramJqlBySlot] = usePersistedState(
     WORK_WEEK_STORAGE_KEYS.generatedSharedProgramJqlBySlot,
     {}
@@ -405,8 +393,6 @@ const WorkWeekTasks = () => {
   const handleSharedProgramChange = React.useCallback(
     async (index, value) => {
       const nextSlug = String(value || "").trim();
-      const previousSlug = String(jqlSharedProgramIds[index] || "").trim();
-      const previousProgram = sharedPrograms.find((program) => program.slug === previousSlug);
       const nextProgram = sharedPrograms.find((program) => program.slug === nextSlug);
 
       let nextInputs = jqlInputs;
@@ -415,32 +401,17 @@ const WorkWeekTasks = () => {
 
       handleJqlSharedProgramChange(index, nextSlug);
       if (nextProgram) {
-        const previousGeneratedJql =
-          generatedSharedProgramJqlBySlot[index] ||
-          buildSharedProgramJql(previousProgram?.epicRoots);
-        const { replaceJql, replaceLabel } = shouldReplaceSlotQueryForSharedProgram({
-          jql: jqlInputs[index],
-          label: jqlLabels[index],
-          index,
-          previousGeneratedJql,
-          previousLabel: previousProgram?.displayName || previousProgram?.slug || "",
-        });
-
-        if (replaceJql) {
-          // Resolves direct children first so their subtasks are included too —
-          // a plain parent-in-epic JQL would silently miss every subtask.
-          const generatedJql = await resolveSharedProgramJql(nextProgram.epicRoots);
-          if (generatedJql) {
-            nextInputs = patchSlotValue(jqlInputs, index, generatedJql);
-            handleJqlChange(index, generatedJql);
-            setGeneratedSharedProgramJqlBySlot((prev) => ({ ...prev, [index]: generatedJql }));
-          }
+        // Resolves direct children first so their subtasks are included too —
+        // a plain parent-in-epic JQL would silently miss every subtask.
+        const generatedJql = await resolveSharedProgramJql(nextProgram.epicRoots);
+        if (generatedJql) {
+          nextInputs = patchSlotValue(jqlInputs, index, generatedJql);
+          handleJqlChange(index, generatedJql);
+          setGeneratedSharedProgramJqlBySlot((prev) => ({ ...prev, [index]: generatedJql }));
         }
-        if (replaceLabel) {
-          const nextLabel = nextProgram.displayName || nextProgram.slug;
-          nextLabels = patchSlotValue(jqlLabels, index, nextLabel);
-          handleJqlLabelChange(index, nextLabel);
-        }
+        const nextLabel = nextProgram.displayName || nextProgram.slug;
+        nextLabels = patchSlotValue(jqlLabels, index, nextLabel);
+        handleJqlLabelChange(index, nextLabel);
       }
 
       if (isConfiguredJqlSlot(nextInputs, nextLabels, index)) {
@@ -452,7 +423,6 @@ const WorkWeekTasks = () => {
       }
     },
     [
-      generatedSharedProgramJqlBySlot,
       handleJqlChange,
       handleJqlLabelChange,
       handleJqlSharedProgramChange,
