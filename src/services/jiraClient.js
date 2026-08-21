@@ -1,6 +1,10 @@
 import { buildApiUrl } from "./apiBase.js";
 import { getLocalTimestampPayload } from "../utils/localTimestamp.js";
 import { filterWorkfrontErrorMessages } from "../../shared/jiraErrorUtils.mjs";
+import {
+  buildSharedProgramJql,
+  buildSharedProgramJqlWithDescendants,
+} from "../utils/workWeekStorage.js";
 
 const formatErrorDetail = (value) => {
   if (value == null || value === "") {
@@ -115,6 +119,30 @@ export const fetchJiraSearchAll = async ({ jql, maxTotal = 200 }) => {
     },
     body: JSON.stringify({ jql, maxTotal }),
   });
+};
+
+// buildSharedProgramJql only reaches an epic's direct children (Story/Task/
+// Bug) — subtasks belong to those, not to the epic, so they'd be silently
+// dropped. This resolves the direct children first, then builds a JQL that
+// also reaches their subtasks. Falls back to the direct-children-only JQL
+// if the lookup fails, so a Jira hiccup degrades gracefully instead of
+// leaving the slot with no query at all.
+export const resolveSharedProgramJql = async (epicRoots) => {
+  const baseJql = buildSharedProgramJql(epicRoots);
+  if (!baseJql) {
+    return "";
+  }
+
+  try {
+    const data = await fetchJiraSearchAll({ jql: baseJql, maxTotal: 1000 });
+    const childKeys = (data?.issues || [])
+      .map((issue) => String(issue.key || "").trim())
+      .filter(Boolean);
+    return buildSharedProgramJqlWithDescendants(epicRoots, childKeys) || baseJql;
+  } catch (error) {
+    console.error("Failed to resolve shared program descendants", error);
+    return baseJql;
+  }
 };
 
 export const pushJiraIssueNote = async ({ issueKey, note, images = [] }) => {
