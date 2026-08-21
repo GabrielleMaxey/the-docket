@@ -1,11 +1,14 @@
 import React from "react";
 import { Button, Modal, Table, Message } from "semantic-ui-react";
 import { fetchFavouriteJiraFilters } from "../../services/jiraClient";
+import { useJiraAccountIdResolver } from "../hooks/useJiraAccountIdResolver.js";
 
 const JiraFilterImportModal = ({ open, onClose, onImport, slotLabel }) => {
   const [filters, setFilters] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+  const watchedTexts = React.useMemo(() => filters.map((filter) => filter.jql), [filters]);
+  const { humanizeJql } = useJiraAccountIdResolver(watchedTexts);
 
   React.useEffect(() => {
     if (!open) {
@@ -81,7 +84,7 @@ const JiraFilterImportModal = ({ open, onClose, onImport, slotLabel }) => {
                 <Table.Row key={filter.id}>
                   <Table.Cell>{filter.name || filter.id}</Table.Cell>
                   <Table.Cell>{filter.owner || "-"}</Table.Cell>
-                  <Table.Cell className="ww-filter-jql-cell">{filter.jql || "-"}</Table.Cell>
+                  <Table.Cell className="ww-filter-jql-cell">{humanizeJql(filter.jql) || "-"}</Table.Cell>
                   <Table.Cell collapsing>
                     <Button
                       size="mini"

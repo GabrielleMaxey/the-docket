@@ -11,6 +11,7 @@ import {
 } from "../../../services/jiraClient.js";
 import { JQL_PRESET_TEMPLATES, getJqlPresetTemplateByKey } from "../../../utils/jqlPresetTemplates.js";
 import { useFlash } from "../../hooks/useFlash.js";
+import { useJiraAccountIdResolver } from "../../hooks/useJiraAccountIdResolver.js";
 
 const EMPTY_EPIC_FORM = {
   presetType: "epic",
@@ -29,6 +30,8 @@ const PresetsSection = ({ epicPresets, onPresetsChanged, onError }) => {
   const [selectedJqlTemplateKey, setSelectedJqlTemplateKey] = React.useState("");
   const [flash, setFlash] = useFlash();
   const teamPackInputRef = React.useRef(null);
+  const watchedTexts = React.useMemo(() => epicPresets.map((preset) => preset.jql), [epicPresets]);
+  const { humanizeJql } = useJiraAccountIdResolver(watchedTexts);
 
   const handleEpicFormChange = (field, value) => {
     setEpicForm((prev) => ({ ...prev, [field]: value }));
@@ -179,7 +182,7 @@ const PresetsSection = ({ epicPresets, onPresetsChanged, onError }) => {
                 <Table.Cell>{preset.presetType === "jql" ? "JQL" : "Epic"}</Table.Cell>
                 <Table.Cell>{preset.label}</Table.Cell>
                 <Table.Cell>{preset.jiraFilterId || "—"}</Table.Cell>
-                <Table.Cell>{preset.jql || "—"}</Table.Cell>
+                <Table.Cell>{humanizeJql(preset.jql) || "—"}</Table.Cell>
                 <Table.Cell collapsing>
                   <Button size="mini" onClick={() => handleEditEpicPreset(preset)}>Edit</Button>
                   <Button size="mini" negative onClick={() => handleDeleteEpicPreset(preset.id)}>Delete</Button>

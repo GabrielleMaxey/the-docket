@@ -5,14 +5,13 @@ import {
   createWatchedAssignee,
   deleteWatchedAssignee,
   fetchWatchedAssignees,
-  resolveJiraUsersByAccountIds,
   updateWatchedAssignee,
 } from "../../../services/jiraClient.js";
 import { useFlash } from "../../hooks/useFlash.js";
+import { useJiraAccountIdResolver } from "../../hooks/useJiraAccountIdResolver.js";
 import {
   DEFAULT_DIRECT_REPORTS_LABEL,
   buildDirectReportsJql,
-  looksLikeAccountId,
   normalizeMemberNames,
 } from "../../../../shared/directReportsJql.mjs";
 
@@ -49,56 +48,16 @@ const DirectReportsSection = ({ watchedAssignees, setWatchedAssignees, onError }
   const [memberNames, setMemberNames] = React.useState([]);
   const [editingId, setEditingId] = React.useState(null);
   const [flash, setFlash] = useFlash();
-  // accountId -> resolved display name; null means "tried, Jira has no match"
-  // so we keep showing the raw id instead of retrying forever.
-  const [resolvedNames, setResolvedNames] = React.useState({});
 
   const previewJql = buildDirectReportsJql([...memberNames, nameInput]);
 
-  React.useEffect(() => {
-    const pendingIds = [
-      ...new Set(
-        [...queries.flatMap((query) => query.memberNames || []), ...memberNames].filter(
-          (name) => looksLikeAccountId(name) && resolvedNames[name] === undefined
-        )
-      ),
-    ];
-    if (pendingIds.length === 0) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    resolveJiraUsersByAccountIds(pendingIds)
-      .then((items) => {
-        if (cancelled) return;
-        setResolvedNames((prev) => {
-          const next = { ...prev };
-          for (const accountId of pendingIds) {
-            const user = items[accountId];
-            next[accountId] = user?.displayName || user?.emailAddress || null;
-          }
-          return next;
-        });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setResolvedNames((prev) => {
-          const next = { ...prev };
-          for (const accountId of pendingIds) {
-            next[accountId] = prev[accountId] ?? null;
-          }
-          return next;
-        });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [queries, memberNames, resolvedNames]);
-
-  // Members stay stored/queried by account id (stable across renames) — this
-  // only swaps in a human-readable label for display.
-  const displayMemberName = (name) => (looksLikeAccountId(name) ? resolvedNames[name] || name : name);
+  // Members/JQL stay stored and queried by account id (stable across
+  // renames) — this only swaps in a human-readable label for display.
+  const watchedTexts = React.useMemo(
+    () => [...queries.flatMap((query) => [...(query.memberNames || []), query.jql]), ...memberNames, previewJql],
+    [queries, memberNames, previewJql]
+  );
+  const { displayMemberName, humanizeJql } = useJiraAccountIdResolver(watchedTexts);
 
   const resetForm = (items = queries) => {
     setEditingId(null);
@@ -260,7 +219,7 @@ const DirectReportsSection = ({ watchedAssignees, setWatchedAssignees, onError }
                   )}
                 </Table.Cell>
                 <Table.Cell>
-                  <code>{query.jql || "—"}</code>
+                  <code>{humanizeJql(query.jql) || "—"}</code>
                 </Table.Cell>
                 <Table.Cell collapsing>
                   <Button size="mini" onClick={() => handleEdit(query)}>
@@ -311,7 +270,7 @@ const DirectReportsSection = ({ watchedAssignees, setWatchedAssignees, onError }
         ) : null}
         <Form.Field>
           <label>Generated JQL</label>
-          <code>{previewJql || "Add a name to preview JQL"}</code>
+          <code>{humanizeJql(previewJql) || "Add a name to preview JQL"}</code>
         </Form.Field>
         <Button primary onClick={handleSave}>
           {editingId ? "Save changes" : "Save query"}
