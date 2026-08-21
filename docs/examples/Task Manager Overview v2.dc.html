@@ -183,7 +183,7 @@
       <div style="border:1px solid var(--line); border-radius:12px; background:#fff; padding:34px 28px 38px; animation:stepOn 12s ease-in-out infinite -6s;">
         <div style="width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:24px; font-weight:600; margin-bottom:24px; animation:stepNum 12s ease-in-out infinite -6s;">3</div>
         <div style="font-size:30px; font-weight:700; line-height:1.25; margin-bottom:14px;">Update in place</div>
-        <div style="font-size:24px; line-height:1.4; color:var(--muted);">Status and assignee changes go straight to Jira from the row.</div>
+        <div style="font-size:24px; line-height:1.4; color:var(--muted);">Status, assignee, Due date, and MRD changes go straight to Jira from the row.</div>
       </div>
       <div style="border:1px solid var(--line); border-radius:12px; background:#fff; padding:34px 28px 38px; animation:stepOn 12s ease-in-out infinite -3s;">
         <div style="width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:24px; font-weight:600; margin-bottom:24px; animation:stepNum 12s ease-in-out infinite -3s;">4</div>
@@ -204,8 +204,10 @@
         <li>Per-query count chips — total, open, overdue, in progress</li>
         <li>Loaded X of Y matched, with Load remaining for the rest</li>
         <li>Status and assignee dropdowns that write back to Jira</li>
+        <li>Due date, MRD, and Start date columns — Due/MRD write back to Jira</li>
         <li>P1–P20 personal priority, warmer row colors for P1–P3</li>
-        <li>Notes with up to five attachments per note</li>
+        <li>Notes with pop-out editor and up to five attachments; pushed comments render as formatted markdown in Jira</li>
+        <li>Sub-tasks &amp; Bugs / + Stories issue-type filter toggle per tab</li>
         <li>Closed and resolved issues are read-only</li>
       </ul>
       <p style="margin:auto 0 0; font-family:var(--mono); font-size:24px; color:var(--muted);">Screens redacted: project and contributor names</p>
@@ -225,11 +227,11 @@
       </div>
       <div style="border:1px solid rgba(255,255,255,.22); border-radius:12px; padding:44px 36px; background:rgba(255,255,255,.06);">
         <div style="font-family:var(--mono); font-size:56px; font-weight:600; color:var(--accent); margin-bottom:22px;">5 files</div>
-        <div style="font-size:26px; line-height:1.45; color:rgba(255,255,255,.9);">Per note, 5 MB each — images plus TXT, PDF, DOC/DOCX, XLSX, CSV. Paste, drag, or Add file.</div>
+        <div style="font-size:26px; line-height:1.45; color:rgba(255,255,255,.9);">Per note, 5 MB each — images plus TXT, PDF, DOC/DOCX, XLSX, CSV. Paste, drag, or Add file. Pop-out editor for longer notes.</div>
       </div>
       <div style="border:1px solid rgba(255,255,255,.22); border-radius:12px; padding:44px 36px; background:rgba(255,255,255,.06);">
         <div style="font-family:var(--mono); font-size:56px; font-weight:600; color:var(--accent); margin-bottom:22px;">Push</div>
-        <div style="font-size:26px; line-height:1.45; color:rgba(255,255,255,.9);">Check the rows, click Push note. Text and attachments post as a Jira comment, visible to everyone with access.</div>
+        <div style="font-size:26px; line-height:1.45; color:rgba(255,255,255,.9);">Check the rows, click Push note. Text and attachments post as a Jira comment — markdown formatting (bold, lists, links) renders as structured content.</div>
       </div>
     </div>
     <p style="margin:auto 0 0; font-size:var(--type-small); line-height:1.4; color:rgba(255,255,255,.72); max-width:1500px;">Notes and priorities stay on your machine until you push. Nothing reaches Jira by accident.</p>
