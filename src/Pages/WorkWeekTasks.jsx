@@ -16,16 +16,20 @@ import { useJokeTicker } from "./hooks/useJokeTicker";
 import { useCalendarData } from "./hooks/useCalendarData";
 import { useWorkWeekHeaderPreferences } from "./hooks/useWorkWeekHeaderPreferences";
 import { useUpcomingDueBanner } from "./hooks/useUpcomingDueBanner";
+import { usePersistedState } from "./hooks/usePersistedState";
 import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.js";
-import { fetchReminders, fetchSharedPrograms, saveReminders } from "../services/jiraClient.js";
+import {
+  fetchReminders,
+  fetchSharedPrograms,
+  resolveSharedProgramJql,
+  saveReminders,
+} from "../services/jiraClient.js";
 import { isDrillDownDismissed } from "../utils/jqlRunPersistence.js";
 import { resolveCreateIssueDefaults } from "../../shared/createIssuePresetUtils.mjs";
 import {
-  buildSharedProgramJql,
   isConfiguredJqlRun,
   isConfiguredJqlSlot,
   normalizeJqlCount,
-  shouldReplaceSlotQueryForSharedProgram,
   WORK_WEEK_STORAGE_KEYS,
 } from "../utils/workWeekStorage.js";
 
@@ -125,6 +129,10 @@ const WorkWeekTasks = () => {
   const [createIssueOpen, setCreateIssueOpen] = React.useState(false);
   const [quickPickValueBySlot, setQuickPickValueBySlot] = React.useState({});
   const drillDownBannerRef = React.useRef(null);
+  const [generatedSharedProgramJqlBySlot, setGeneratedSharedProgramJqlBySlot] = usePersistedState(
+    WORK_WEEK_STORAGE_KEYS.generatedSharedProgramJqlBySlot,
+    {}
+  );
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -383,10 +391,8 @@ const WorkWeekTasks = () => {
   }, [setHeaderPrefs]);
 
   const handleSharedProgramChange = React.useCallback(
-    (index, value) => {
+    async (index, value) => {
       const nextSlug = String(value || "").trim();
-      const previousSlug = String(jqlSharedProgramIds[index] || "").trim();
-      const previousProgram = sharedPrograms.find((program) => program.slug === previousSlug);
       const nextProgram = sharedPrograms.find((program) => program.slug === nextSlug);
 
       let nextInputs = jqlInputs;
@@ -395,25 +401,17 @@ const WorkWeekTasks = () => {
 
       handleJqlSharedProgramChange(index, nextSlug);
       if (nextProgram) {
-        const generatedJql = buildSharedProgramJql(nextProgram.epicRoots);
-        const previousGeneratedJql = buildSharedProgramJql(previousProgram?.epicRoots);
-        const { replaceJql, replaceLabel } = shouldReplaceSlotQueryForSharedProgram({
-          jql: jqlInputs[index],
-          label: jqlLabels[index],
-          index,
-          previousGeneratedJql,
-          previousLabel: previousProgram?.displayName || previousProgram?.slug || "",
-        });
-
-        if (replaceJql && generatedJql) {
+        // Resolves direct children first so their subtasks are included too —
+        // a plain parent-in-epic JQL would silently miss every subtask.
+        const generatedJql = await resolveSharedProgramJql(nextProgram.epicRoots);
+        if (generatedJql) {
           nextInputs = patchSlotValue(jqlInputs, index, generatedJql);
           handleJqlChange(index, generatedJql);
+          setGeneratedSharedProgramJqlBySlot((prev) => ({ ...prev, [index]: generatedJql }));
         }
-        if (replaceLabel) {
-          const nextLabel = nextProgram.displayName || nextProgram.slug;
-          nextLabels = patchSlotValue(jqlLabels, index, nextLabel);
-          handleJqlLabelChange(index, nextLabel);
-        }
+        const nextLabel = nextProgram.displayName || nextProgram.slug;
+        nextLabels = patchSlotValue(jqlLabels, index, nextLabel);
+        handleJqlLabelChange(index, nextLabel);
       }
 
       if (isConfiguredJqlSlot(nextInputs, nextLabels, index)) {
@@ -432,6 +430,7 @@ const WorkWeekTasks = () => {
       jqlInputs,
       jqlLabels,
       jqlSharedProgramIds,
+      setGeneratedSharedProgramJqlBySlot,
       sharedPrograms,
     ]
   );

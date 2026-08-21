@@ -7,6 +7,7 @@ export const WORK_WEEK_STORAGE_KEYS = {
   drillDownRuns: "workWeekTasksJiraDrillDownRuns",
   dismissedDrillDownIds: "workWeekTasksJiraDismissedDrillDownIds",
   reminders: "workWeekTasksReminders",
+  generatedSharedProgramJqlBySlot: "workWeekTasksGeneratedSharedProgramJqlBySlot",
 };
 
 export const MAX_JQL_SLOTS = 5;
@@ -88,6 +89,40 @@ export const buildSharedProgramJql = (epicRoots) => {
   }
   const list = keys.join(", ");
   return `(parent in (${list}) OR key in (${list})) ORDER BY updated DESC`;
+};
+
+// Subtasks are never a direct child of an Epic — only of the Epic's own
+// children (Story/Task/Bug) — so matching just `parent in (epicRoots)`
+// silently drops every subtask. Jira has no reliable "all descendants" JQL
+// function in every instance, so the caller resolves direct children first
+// (via buildSharedProgramJql) and passes their keys in here as a second
+// parent-in clause to reach the subtask level too.
+export const buildSharedProgramJqlWithDescendants = (epicRoots, directChildKeys = []) => {
+  const roots = [
+    ...new Set(
+      (Array.isArray(epicRoots) ? epicRoots : [])
+        .map((key) => String(key || "").trim().toUpperCase())
+        .filter(Boolean)
+    ),
+  ];
+  if (roots.length === 0) {
+    return "";
+  }
+  const rootList = roots.join(", ");
+  const clauses = [`parent in (${rootList})`, `key in (${rootList})`];
+
+  const childKeys = [
+    ...new Set(
+      (Array.isArray(directChildKeys) ? directChildKeys : [])
+        .map((key) => String(key || "").trim().toUpperCase())
+        .filter(Boolean)
+    ),
+  ];
+  if (childKeys.length > 0) {
+    clauses.push(`parent in (${childKeys.join(", ")})`);
+  }
+
+  return `(${clauses.join(" OR ")}) ORDER BY updated DESC`;
 };
 
 export const shouldReplaceSlotQueryForSharedProgram = ({
