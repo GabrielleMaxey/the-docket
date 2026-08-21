@@ -4,7 +4,7 @@ import { getJiraSearchFields } from "../lib/jiraSearchFields.mjs";
 import { createLogger } from "../lib/logger.mjs";
 const log = createLogger("jira-core");
 
-import { searchAllIssues, searchJiraUsers } from "../lib/jiraSearchHelpers.mjs";
+import { searchAllIssues, searchJiraUsers, fetchJiraUsersByAccountIds } from "../lib/jiraSearchHelpers.mjs";
 
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
 
@@ -74,6 +74,36 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
     } catch (error) {
       return res.status(500).json({
         error: "Failed to search Jira users",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Resolves raw Atlassian account IDs (e.g. saved in Direct Reports queries
+  // before a display name/email was available) back to a human-readable name.
+  app.post("/api/jira/users/resolve-bulk", async (req, res) => {
+    if (!ensureEnvOrRespond(res)) {
+      return;
+    }
+
+    const accountIds = Array.isArray(req.body?.accountIds) ? req.body.accountIds : [];
+    if (accountIds.length === 0) {
+      return res.json({ items: {} });
+    }
+
+    try {
+      const users = await fetchJiraUsersByAccountIds({ accountIds, jiraRequest });
+      const items = {};
+      for (const user of users) {
+        items[user.accountId] = {
+          displayName: user.displayName,
+          emailAddress: user.emailAddress,
+        };
+      }
+      return res.json({ items });
+    } catch (error) {
+      return res.status(500).json({
+        error: "Failed to resolve Jira users",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

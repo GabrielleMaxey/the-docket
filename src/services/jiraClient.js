@@ -201,6 +201,17 @@ export const searchJiraUsers = async (query) => {
   return data?.items || [];
 };
 
+export const resolveJiraUsersByAccountIds = async (accountIds) => {
+  const data = await requestJson("/api/jira/users/resolve-bulk", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ accountIds }),
+  });
+  return data?.items || {};
+};
+
 export const fetchIssueMetadataBulk = async (issueKeys) => {
   const data = await requestJson("/api/jira/issue-metadata/bulk", {
     method: "POST",
