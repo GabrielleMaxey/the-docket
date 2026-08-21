@@ -5,7 +5,12 @@ import AssigneeCell from "./cells/AssigneeCell.jsx";
 import NoteImagesStrip from "./NoteImagesStrip.jsx";
 import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
 import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js";
-import { getFieldValue, formatDateOnly } from "../../../shared/dashboardMetrics.mjs";
+import {
+  getFieldValue,
+  formatDateOnly,
+  getIssueTypeName,
+  matchesIssueTypeFamily,
+} from "../../../shared/dashboardMetrics.mjs";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
 import { buildNotePushFingerprint } from "../../utils/notePushFingerprint.js";
 import { useJiraAccountIdResolver } from "../hooks/useJiraAccountIdResolver.js";
@@ -39,7 +44,10 @@ const getKnownStatuses = (issues) => {
   ).sort();
 };
 
-const filterIssues = (issues, { keyQuery, statusFilter, assigneeFilter }) => {
+const filterIssues = (
+  issues,
+  { keyQuery, statusFilter, assigneeFilter, subtaskBugOnly, includeStories }
+) => {
   let result = issues;
 
   const keyTerm = String(keyQuery || "").trim().toLowerCase();
@@ -62,6 +70,16 @@ const filterIssues = (issues, { keyQuery, statusFilter, assigneeFilter }) => {
     result = result.filter((issue) => {
       const name = String(issue.fields?.assignee?.displayName || "");
       return target === "" ? !name : name === target;
+    });
+  }
+
+  if (subtaskBugOnly) {
+    result = result.filter((issue) => {
+      const typeName = getIssueTypeName(issue);
+      if (matchesIssueTypeFamily(typeName, "sub-task") || matchesIssueTypeFamily(typeName, "bug")) {
+        return true;
+      }
+      return includeStories && matchesIssueTypeFamily(typeName, "story");
     });
   }
 
@@ -318,6 +336,8 @@ const JiraResultsTable = ({
   const [keyFilterByRunIndex, setKeyFilterByRunIndex] = React.useState({});
   const [statusFilterByRunIndex, setStatusFilterByRunIndex] = React.useState({});
   const [assigneeFilterByRunIndex, setAssigneeFilterByRunIndex] = React.useState({});
+  const [subtaskBugOnlyByRunIndex, setSubtaskBugOnlyByRunIndex] = React.useState({});
+  const [includeStoriesByRunIndex, setIncludeStoriesByRunIndex] = React.useState({});
   const [sortField, setSortField] = React.useState("default");
   const [sortDirection, setSortDirection] = React.useState("asc");
   const [expandedNoteKey, setExpandedNoteKey] = React.useState(null);
@@ -444,7 +464,15 @@ const JiraResultsTable = ({
   const keyFilterDraft = keyFilterByRunIndex[runStateKey] ?? "";
   const statusFilter = statusFilterByRunIndex[runStateKey] ?? "";
   const assigneeFilter = assigneeFilterByRunIndex[runStateKey] ?? "";
-  const issuesMatchingKey = filterIssues(allLoadedIssues, { keyQuery: keyFilterDraft, statusFilter, assigneeFilter });
+  const subtaskBugOnly = subtaskBugOnlyByRunIndex[runStateKey] ?? false;
+  const includeStories = includeStoriesByRunIndex[runStateKey] ?? false;
+  const issuesMatchingKey = filterIssues(allLoadedIssues, {
+    keyQuery: keyFilterDraft,
+    statusFilter,
+    assigneeFilter,
+    subtaskBugOnly,
+    includeStories,
+  });
   const knownAssignees = getKnownAssignees(allLoadedIssues);
   const knownStatuses = getKnownStatuses(allLoadedIssues);
   const sortedIssues = sortIssues({
@@ -506,6 +534,21 @@ const JiraResultsTable = ({
   const handleAssigneeFilterChange = (event) => {
     const value = event.target.value;
     setAssigneeFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: value }));
+    setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
+  };
+
+  const handleSubtaskBugOnlyChange = (event) => {
+    const checked = event.target.checked;
+    setSubtaskBugOnlyByRunIndex((prev) => ({ ...prev, [runStateKey]: checked }));
+    if (!checked) {
+      setIncludeStoriesByRunIndex((prev) => ({ ...prev, [runStateKey]: false }));
+    }
+    setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
+  };
+
+  const handleIncludeStoriesChange = (event) => {
+    const checked = event.target.checked;
+    setIncludeStoriesByRunIndex((prev) => ({ ...prev, [runStateKey]: checked }));
     setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
   };
 
@@ -677,6 +720,27 @@ const JiraResultsTable = ({
                   <option key={a} value={a}>{a}</option>
                 ))}
               </select>
+
+              <label className="ww-type-filter-toggle" htmlFor={`ww-subtask-bug-filter-${runStateKey}`}>
+                <input
+                  id={`ww-subtask-bug-filter-${runStateKey}`}
+                  type="checkbox"
+                  checked={subtaskBugOnly}
+                  onChange={handleSubtaskBugOnlyChange}
+                />
+                Sub-tasks &amp; Bugs only
+              </label>
+              {subtaskBugOnly ? (
+                <label className="ww-type-filter-toggle" htmlFor={`ww-include-stories-filter-${runStateKey}`}>
+                  <input
+                    id={`ww-include-stories-filter-${runStateKey}`}
+                    type="checkbox"
+                    checked={includeStories}
+                    onChange={handleIncludeStoriesChange}
+                  />
+                  + Stories
+                </label>
+              ) : null}
 
               {(keyFilterDraft || statusFilter || assigneeFilter) ? (
                 <button

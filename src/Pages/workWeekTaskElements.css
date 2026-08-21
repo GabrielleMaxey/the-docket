@@ -1088,6 +1088,21 @@
   color: #94a3b8;
 }
 
+.work-week-page .ww-type-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.work-week-page .ww-type-filter-toggle input[type="checkbox"] {
+  cursor: pointer;
+}
+
 .work-week-page .ww-pagination-row {
   display: flex;
   align-items: center;
