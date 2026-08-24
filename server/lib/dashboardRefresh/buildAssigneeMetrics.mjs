@@ -14,10 +14,8 @@ import {
   isCurrentUserMember,
   looksLikeAccountId,
   normalizeMemberNames,
+  escapeJqlString,
 } from "../../../shared/directReportsJql.mjs";
-
-const escapeJqlString = (value) =>
-  String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 const buildAssigneeWatchJql = (displayName) =>
   `assignee = "${escapeJqlString(displayName)}" ORDER BY updated DESC`;
