@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Container, Header, Message, Segment, Button } from "semantic-ui-react";
 import { fetchCapacityPlanning, fetchWatchedAssignees, saveAdHocReport } from "../services/jiraClient";
+import GanttChart from "./components/GanttChart";
 import { getStatusColor } from "../utils/statusScale";
 import { buildWorkWeekHref } from "../utils/workWeekNavigation";
 import { usePersistedState } from "./hooks/usePersistedState";
@@ -477,6 +478,7 @@ const buildCapacityReportCsv = (sortedItems) => {
 };
 
 const ProjectManagers = () => {
+  const [tab, setTab] = React.useState("capacity");
   const [allEntries, setAllEntries] = React.useState([]);
   const [entriesLoaded, setEntriesLoaded] = React.useState(false);
   const [entriesReady, setEntriesReady] = React.useState(false);
@@ -625,10 +627,32 @@ const ProjectManagers = () => {
   };
 
   return (
-    <Container className="project-managers-page">
+    <Container className={`project-managers-page${tab === "gantt" ? " project-managers-page--gantt" : ""}`}>
       <Header as="h1">
         <span aria-hidden="true">📐</span> Project Managers
       </Header>
+
+      <div className="pm-tab-bar">
+        <button
+          type="button"
+          className={`pm-tab${tab === "capacity" ? " pm-tab--active" : ""}`}
+          onClick={() => setTab("capacity")}
+        >
+          Capacity
+        </button>
+        <button
+          type="button"
+          className={`pm-tab${tab === "gantt" ? " pm-tab--active" : ""}`}
+          onClick={() => setTab("gantt")}
+        >
+          Gantt
+        </button>
+      </div>
+
+      {tab === "gantt" ? (
+        <GanttChart />
+      ) : (
+      <>
       <p className="ww-copy">
         Capacity planning: shows every selected Contributor Metrics entry's current open-issue
         count, status breakdown, and risk signals (overdue, blocked, stale) — compared against a
@@ -724,6 +748,8 @@ const ProjectManagers = () => {
             <CapacityCard key={item.id} item={item} />
           ))}
         </div>
+      )}
+      </>
       )}
     </Container>
   );
