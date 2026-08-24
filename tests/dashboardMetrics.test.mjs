@@ -59,6 +59,8 @@ describe("status helpers", () => {
   it("recognizes closed-like status names", () => {
     assert.equal(isClosedLikeStatus("Done"), true);
     assert.equal(isClosedLikeStatus("RESOLVED"), true);
+    assert.equal(isClosedLikeStatus("Completed"), true);
+    assert.equal(isClosedLikeStatus("Cancelled"), true);
     assert.equal(isClosedLikeStatus("In Progress"), false);
   });
 
