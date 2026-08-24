@@ -455,3 +455,255 @@
 .pm-key-swatch--over {
   background: #d1442d;
 }
+
+/* ── Tab bar ─────────────────────────────────────────────────────────────── */
+
+.pm-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 1.25rem;
+}
+
+.pm-tab {
+  background: none;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  border-radius: 4px 4px 0 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.pm-tab:hover {
+  color: #1e293b;
+}
+
+.pm-tab--active {
+  color: #1e293b;
+  border-bottom-color: #3b82f6;
+}
+
+/* ── Gantt wide layout ───────────────────────────────────────────────────── */
+
+.project-managers-page--gantt {
+  max-width: none;
+  padding: 0 1rem;
+}
+
+/* ── Gantt chrome ────────────────────────────────────────────────────────── */
+
+.pm-gantt {
+  margin-top: 0.5rem;
+}
+
+.pm-gantt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pm-gantt-toolbar-left,
+.pm-gantt-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pm-gantt-program-select {
+  font-size: 0.9rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #1e293b;
+}
+
+.pm-gantt-meta {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.pm-gantt-refresh {
+  font-size: 0.82rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+}
+
+.pm-gantt-refresh:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.pm-gantt-loading,
+.pm-gantt-empty,
+.pm-gantt-error,
+.pm-gantt-no-programs {
+  padding: 2rem 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.pm-gantt-error {
+  color: #b91c1c;
+}
+
+/* ── Gantt chart grid ────────────────────────────────────────────────────── */
+
+.pm-gantt-chart {
+  display: flex;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.8rem;
+}
+
+/* Label column */
+.pm-gantt-labels {
+  flex: 0 0 280px;
+  border-right: 1px solid #e2e8f0;
+  overflow: hidden;
+}
+
+.pm-gantt-label-header {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: #475569;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.pm-gantt-label-row {
+  height: 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  overflow: hidden;
+}
+
+.pm-gantt-label-key {
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+  font-size: 0.75rem;
+}
+
+.pm-gantt-label-summary {
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.75rem;
+}
+
+.pm-gantt-label-assignee {
+  display: none;
+}
+
+/* Timeline column */
+.pm-gantt-timeline {
+  flex: 1 1 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+}
+
+.pm-gantt-months {
+  display: flex;
+  height: 32px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  min-width: 100%;
+}
+
+.pm-gantt-month {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  border-right: 1px solid #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.pm-gantt-rows {
+  position: relative;
+  min-width: 100%;
+}
+
+.pm-gantt-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ef4444;
+  opacity: 0.7;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.pm-gantt-row {
+  height: 36px;
+  border-bottom: 1px solid #f1f5f9;
+  position: relative;
+}
+
+.pm-gantt-row-bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+}
+
+.pm-gantt-bar {
+  position: absolute;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  text-decoration: none;
+  overflow: hidden;
+  transition: opacity 0.1s;
+  z-index: 1;
+}
+
+.pm-gantt-bar:hover {
+  opacity: 0.85;
+}
+
+.pm-gantt-bar-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pm-gantt-no-date {
+  padding-left: 0.75rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-style: italic;
+}
