@@ -14,21 +14,10 @@ import {
   mergeJqlRuns,
   partitionJqlRuns,
 } from "../../utils/jqlRunPersistence.js";
-
-const errorMessage = (error, fallback) =>
-  error instanceof Error ? error.message : fallback;
+import { escapeJqlString } from "../../../shared/directReportsJql.mjs";
+import { errorMessage, mergeIssueMapsPreferExisting } from "../../utils/workflow.js";
 
 const UNASSIGNED_DRILLDOWN_PROJECT_KEY = "ODI";
-
-const mergeIssueMapsPreferExisting = (previous, additions) => {
-  const merged = { ...previous };
-  Object.entries(additions).forEach(([key, value]) => {
-    if (merged[key] === undefined) {
-      merged[key] = value;
-    }
-  });
-  return merged;
-};
 
 const readCommentEntry = (entry) => {
   if (typeof entry === "string") {
@@ -42,9 +31,6 @@ const readCommentEntry = (entry) => {
   }
   return { text: "", author: "" };
 };
-
-const escapeJqlString = (value) =>
-  String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 const dedupeIssueKeys = (issueKeys) => [
   ...new Set(
@@ -877,4 +863,3 @@ export async function loadDrillDownByJql({
     setJqlLoading(false);
   }
 }
-
