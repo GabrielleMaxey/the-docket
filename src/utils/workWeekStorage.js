@@ -91,12 +91,7 @@ export const buildSharedProgramJql = (epicRoots) => {
   return `(parent in (${list}) OR key in (${list})) ORDER BY updated DESC`;
 };
 
-// Subtasks are never a direct child of an Epic — only of the Epic's own
-// children (Story/Task/Bug) — so matching just `parent in (epicRoots)`
-// silently drops every subtask. Jira has no reliable "all descendants" JQL
-// function in every instance, so the caller resolves direct children first
-// (via buildSharedProgramJql) and passes their keys in here as a second
-// parent-in clause to reach the subtask level too.
+// Include direct-child keys because subtasks are not direct Epic children.
 export const buildSharedProgramJqlWithDescendants = (epicRoots, directChildKeys = []) => {
   const roots = [
     ...new Set(
