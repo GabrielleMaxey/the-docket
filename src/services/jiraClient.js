@@ -693,6 +693,11 @@ export const fetchCapacityPlanning = async (selectedIds) => {
   return data?.items || [];
 };
 
+export const fetchGanttData = async (slug) => {
+  const data = await requestJson(`/api/project-managers/gantt?slug=${encodeURIComponent(slug)}`);
+  return data;
+};
+
 export const searchEpics = async (query) => {
   const q = String(query || "").trim();
   if (q.length < 2) {
