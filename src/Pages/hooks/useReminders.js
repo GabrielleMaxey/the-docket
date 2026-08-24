@@ -24,12 +24,15 @@ const sanitizeReminders = (parsed) => {
 
 export const useReminders = () => {
   const [reminders, setReminders] = React.useState(defaultReminderRows);
+  const [error, setError] = React.useState("");
   const reminderSaveTimeoutRef = React.useRef(null);
 
   const persistReminders = React.useCallback((next) => {
     clearTimeout(reminderSaveTimeoutRef.current);
     reminderSaveTimeoutRef.current = setTimeout(() => {
-      saveReminders(next).catch(() => {});
+      saveReminders(next)
+        .then(() => setError(""))
+        .catch(() => setError("Reminders could not be saved. Your latest changes may not persist."));
     }, 500);
   }, []);
 
@@ -39,6 +42,7 @@ export const useReminders = () => {
     fetchReminders()
       .then((items) => {
         if (cancelled) return;
+        setError("");
         const fromDb = sanitizeReminders(items);
         if (fromDb.some((row) => row.text.trim() || row.done)) {
           setReminders(fromDb);
@@ -50,14 +54,22 @@ export const useReminders = () => {
           const legacy = legacyRaw ? sanitizeReminders(JSON.parse(legacyRaw)) : null;
           if (legacy && legacy.some((row) => row.text.trim() || row.done)) {
             setReminders(legacy);
-            saveReminders(legacy).catch(() => {});
+            saveReminders(legacy).catch(() => {
+              if (!cancelled) {
+                setError("Saved reminders could not be migrated.");
+              }
+            });
           }
           window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.reminders);
         } catch {
           // Malformed legacy data — nothing to migrate.
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) {
+          setError("Reminders could not be loaded.");
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -85,5 +97,5 @@ export const useReminders = () => {
     });
   }, [persistReminders]);
 
-  return { reminders, handleReminderTextChange, handleReminderDoneChange };
+  return { reminders, error, handleReminderTextChange, handleReminderDoneChange };
 };

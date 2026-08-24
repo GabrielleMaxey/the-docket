@@ -245,9 +245,7 @@ export const buildContributorPieStatusCounts = (person) => {
   const openCounts = { ...(person?.openStatusCounts || {}) };
   const overdueIssues = Array.isArray(person?.overdueIssues) ? person.overdueIssues : [];
 
-  // Overdue issues get their own "Past Due" slice instead of their raw status slice —
-  // mirrors computeAssigneeWorkloadCounts' mutually-exclusive bucketing server-side, so an
-  // overdue "In Progress" issue counts once, not twice.
+  // Keep overdue issues in a mutually exclusive "Past Due" slice.
   for (const issue of overdueIssues) {
     const status = String(issue?.status || "").trim();
     if (status && Number(openCounts[status]) > 0) {
