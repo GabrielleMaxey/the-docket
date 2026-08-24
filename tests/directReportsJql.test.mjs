@@ -2,11 +2,18 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildDirectReportsJql,
+  escapeJqlString,
   extractAccountIdsFromText,
   extractAccountIdsFromTexts,
   humanizeJqlAccountIds,
   normalizeMemberNames,
 } from "../shared/directReportsJql.mjs";
+
+describe("escapeJqlString", () => {
+  it("escapes backslashes and double quotes for JQL string literals", () => {
+    assert.equal(escapeJqlString('Jane \\ "Doe"'), 'Jane \\\\ \\"Doe\\"');
+  });
+});
 
 describe("buildDirectReportsJql", () => {
   it("returns empty JQL when no names are provided", () => {

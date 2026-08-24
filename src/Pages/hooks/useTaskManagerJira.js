@@ -38,6 +38,9 @@ import {
   savableJqlRuns,
 } from "../../utils/jqlRunPersistence.js";
 import { enrichRunWithParentDoneDates, runsNeedParentMrddEnrich } from "../../utils/jiraIssueDoneDates.js";
+import { isClosedLikeStatus } from "../../../shared/dashboardMetrics.mjs";
+import { errorMessage } from "../../utils/workflow.js";
+import { formatDate as formatLocalDate } from "../../utils/format.js";
 import { useFlash } from "./useFlash.js";
 import {
   BACKGROUND_JOB_IDS,
@@ -163,8 +166,6 @@ const loadStoredJqlRuns = () => {
 const loadInitialJqlRuns = () =>
   mergeJqlRuns(loadDrillDownRunsFromSessionStorage(), loadStoredJqlRuns());
 
-const isClosedLikeStatus = (status) => /^(closed|resolved|done)$/i.test(String(status || ""));
-
 const priorityTierClass = (prefix, value) => {
   const clamped = clampPriority(value);
   if (clamped < 1 || clamped > MAX_ISSUE_PRIORITY) {
@@ -178,17 +179,7 @@ const getPriorityClass = (value) => priorityTierClass("ww-priority", value);
 
 const getPriorityRowClass = (value) => priorityTierClass("ww-row-priority", value);
 
-const formatDate = (value) => {
-  if (!value) {
-    return "-";
-  }
-
-  try {
-    return new Date(value).toLocaleDateString();
-  } catch {
-    return value;
-  }
-};
+const formatDate = (value) => formatLocalDate(value, undefined, "-");
 
 const patchIndexedArray = (previous, index, nextValue) => {
   const next = [...previous];
@@ -238,9 +229,6 @@ const formatJqlRefreshNotice = ({ unsavedAssigneeCount, pullLatestComment }) => 
 
   return `${parts.join("; ")} while refreshing from Jira.`;
 };
-
-const errorMessage = (error, fallback) =>
-  error instanceof Error ? error.message : fallback;
 
 const NOTE_AUTOSAVE_DELAY_MS = 350;
 

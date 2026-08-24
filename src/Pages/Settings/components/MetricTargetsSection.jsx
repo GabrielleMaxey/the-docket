@@ -16,8 +16,7 @@ import {
   normalizeOverdueDateBasis,
   overdueDateBasisShortLabel,
 } from "../../../../shared/overdueDateBasis.mjs";
-
-const escapeJqlString = (value) => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+import { escapeJqlString } from "../../../../shared/directReportsJql.mjs";
 
 // Stored as watchType "jql" so Dashboard/capacity treat it like any other query.
 const buildReporterJql = (displayName) => `reporter = "${escapeJqlString(displayName)}" ORDER BY updated DESC`;

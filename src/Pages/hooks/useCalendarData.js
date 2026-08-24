@@ -1,4 +1,5 @@
 import React from "react";
+import { formatDate } from "../../utils/format.js";
 
 const getCalendarCells = (date) => {
   const year = date.getFullYear();
@@ -25,8 +26,8 @@ const getCalendarCells = (date) => {
 export const useCalendarData = () => {
   const today = React.useMemo(() => new Date(), []);
   const todayDay = today.getDate();
-  const monthLabel = today.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  const fullDateLabel = today.toLocaleDateString(undefined, {
+  const monthLabel = formatDate(today, { month: "long", year: "numeric" });
+  const fullDateLabel = formatDate(today, {
     weekday: "long",
     month: "long",
     day: "numeric",

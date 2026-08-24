@@ -1,5 +1,17 @@
-// Small generic formatting helpers used across pages (Dashboard today,
-// but these have no Dashboard-specific logic in them).
+const toValidDate = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? new Date(value) : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+export const formatDate = (value, options = {}, fallback = "") => {
+  const date = toValidDate(value);
+  const { locale, ...dateOptions } = options || {};
+  return date ? date.toLocaleDateString(locale, dateOptions) : fallback;
+};
 
 export const formatPercent = (value) => {
   if (value == null || Number.isNaN(Number(value))) {
@@ -9,13 +21,6 @@ export const formatPercent = (value) => {
 };
 
 export const formatTimestamp = (value) => {
-  if (!value) {
-    return "";
-  }
-
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return String(value);
-  }
+  const date = toValidDate(value);
+  return date ? date.toLocaleString() : value ? String(value) : "";
 };
