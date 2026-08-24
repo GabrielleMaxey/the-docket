@@ -1,13 +1,10 @@
 import { searchAllIssues } from "./jiraSearchHelpers.mjs";
 import { splitTrailingOrderBy } from "./epicFilterJql.mjs";
 import { getFieldValue, getIssueStatusName, parseJiraDate, startOfToday } from "../../shared/dashboardMetrics.mjs";
-import { toAssigneeJqlOperand } from "../../shared/directReportsJql.mjs";
+import { escapeJqlString, toAssigneeJqlOperand } from "../../shared/directReportsJql.mjs";
 import { resolveMappedFieldId } from "../../shared/odiFieldIds.mjs";
 import { normalizeOverdueDateBasis } from "../../shared/overdueDateBasis.mjs";
 import { buildIssueEpicContext } from "./dashboardRefresh/dueByHelpers.mjs";
-
-const escapeJqlString = ( value ) =>
-  String( value || "" ).replace( /\\/g, "\\\\" ).replace( /"/g, '\\"' );
 
 const STALE_DAYS_THRESHOLD = 14;
 const BLOCKED_STATUS_PATTERN = /blocked|on\s*hold/i;

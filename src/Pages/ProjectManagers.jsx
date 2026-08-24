@@ -8,9 +8,8 @@ import { buildWorkWeekHref } from "../utils/workWeekNavigation";
 import { usePersistedState } from "./hooks/usePersistedState";
 import { useFlash } from "./hooks/useFlash";
 import { reconcileSelectedEntryIds, sameIdList, watchTypeLabel } from "./pmEntrySelection";
+import { escapeJqlString } from "../../shared/directReportsJql.mjs";
 import "./projectManagers.css";
-
-const escapeJqlString = (value) => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 // Wrap before AND — unparenthesized OR in scopeJql would only apply the extra clause to the last branch.
 const buildDrillDownJql = (scopeJql, extraClause) => {

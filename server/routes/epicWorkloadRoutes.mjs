@@ -15,10 +15,9 @@ import {
   formatDateOnly,
   getFieldValue,
 } from "../../shared/dashboardMetrics.mjs";
+import { escapeJqlString } from "../../shared/directReportsJql.mjs";
 
 const log = createLogger("epic-workload");
-
-const escapeJqlString = (value) => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 export const registerEpicWorkloadRoutes = (app, { db, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
   const loadMappingsByRole = () => {

@@ -14,6 +14,7 @@ import {
   mergeJqlRuns,
   partitionJqlRuns,
 } from "../../utils/jqlRunPersistence.js";
+import { escapeJqlString } from "../../../shared/directReportsJql.mjs";
 
 const errorMessage = (error, fallback) =>
   error instanceof Error ? error.message : fallback;
@@ -42,9 +43,6 @@ const readCommentEntry = (entry) => {
   }
   return { text: "", author: "" };
 };
-
-const escapeJqlString = (value) =>
-  String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 const dedupeIssueKeys = (issueKeys) => [
   ...new Set(
@@ -877,4 +875,3 @@ export async function loadDrillDownByJql({
     setJqlLoading(false);
   }
 }
-
