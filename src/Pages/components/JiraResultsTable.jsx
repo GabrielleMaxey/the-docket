@@ -8,11 +8,17 @@ import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js
 import {
   getFieldValue,
   formatDateOnly,
-  getIssueTypeName,
-  matchesIssueTypeFamily,
 } from "../../../shared/dashboardMetrics.mjs";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
 import { buildNotePushFingerprint } from "../../utils/notePushFingerprint.js";
+import {
+  filterIssues,
+  getIssueBrowseUrl,
+  getKnownAssignees,
+  getKnownStatuses,
+  noteMatchesLastJiraPush,
+  sortIssues,
+} from "./jiraResultsTableUtils.js";
 
 const PAGE_SIZE = 30;
 const SORT_FIELDS = [
@@ -22,188 +28,6 @@ const SORT_FIELDS = [
   { value: "priority", label: "Priority" },
   { value: "key", label: "Key" },
 ];
-
-const getKnownAssignees = (issues) => {
-  return Array.from(
-    new Set(
-      issues
-        .map((issue) => issue.fields?.assignee?.displayName)
-        .filter((name) => typeof name === "string" && name.trim().length > 0)
-    )
-  ).sort();
-};
-
-const getKnownStatuses = (issues) => {
-  return Array.from(
-    new Set(
-      issues
-        .map((issue) => issue.fields?.status?.name)
-        .filter((s) => typeof s === "string" && s.trim().length > 0)
-    )
-  ).sort();
-};
-
-const filterIssues = (
-  issues,
-  { keyQuery, statusFilter, assigneeFilter, subtaskBugOnly, includeStories }
-) => {
-  let result = issues;
-
-  const keyTerm = String(keyQuery || "").trim().toLowerCase();
-  if (keyTerm) {
-    const looksLikeFullKey = /^[a-z][a-z0-9]*-\d+$/i.test(keyTerm);
-    result = result.filter((issue) => {
-      const issueKey = String(issue.key || "").toLowerCase();
-      return looksLikeFullKey ? issueKey === keyTerm : issueKey.includes(keyTerm);
-    });
-  }
-
-  if (statusFilter) {
-    result = result.filter(
-      (issue) => String(issue.fields?.status?.name || "") === statusFilter
-    );
-  }
-
-  if (assigneeFilter) {
-    const target = assigneeFilter === "__unassigned__" ? "" : assigneeFilter;
-    result = result.filter((issue) => {
-      const name = String(issue.fields?.assignee?.displayName || "");
-      return target === "" ? !name : name === target;
-    });
-  }
-
-  if (subtaskBugOnly) {
-    result = result.filter((issue) => {
-      const typeName = getIssueTypeName(issue);
-      if (matchesIssueTypeFamily(typeName, "sub-task") || matchesIssueTypeFamily(typeName, "bug")) {
-        return true;
-      }
-      return includeStories && matchesIssueTypeFamily(typeName, "story");
-    });
-  }
-
-  return result;
-};
-
-const getPrioritySortRank = (clampPriority, priorityValue) => {
-  const priority = clampPriority(priorityValue);
-  return priority === 0 ? 21 : priority;
-};
-
-const compareIssueKeys = (a, b) => {
-  return String(a.key || "").localeCompare(String(b.key || ""), undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
-};
-
-const compareTextValues = (left, right) => {
-  return String(left || "").localeCompare(String(right || ""), undefined, {
-    sensitivity: "base",
-  });
-};
-
-const getIssueStatus = (issue) => String(issue.fields?.status?.name || "");
-
-const getIssueAssignee = (issue) => {
-  return String(issue.fields?.assignee?.displayName || "Unassigned");
-};
-
-const filterIssuesByKeySubstring = (issues, rawQuery) => {
-  const term = String(rawQuery || "").trim().toLowerCase();
-  if (term.length === 0) {
-    return issues;
-  }
-
-  return issues.filter((issue) =>
-    String(issue.key || "").toLowerCase().includes(term)
-  );
-};
-
-const sortIssues = ({
-  issues,
-  isClosedLikeStatus,
-  jiraRowPriorities,
-  clampPriority,
-  sortField,
-  sortDirection,
-}) => {
-  return [...issues].sort((a, b) => {
-    const aStatus = getIssueStatus(a);
-    const bStatus = getIssueStatus(b);
-    const aClosed = isClosedLikeStatus(aStatus);
-    const bClosed = isClosedLikeStatus(bStatus);
-
-    if (aClosed !== bClosed) {
-      return aClosed ? 1 : -1;
-    }
-
-    if (sortField === "default") {
-      if (aClosed && bClosed) {
-        return compareIssueKeys(a, b);
-      }
-
-      const aPriority = clampPriority(jiraRowPriorities[String(a.key || "").trim()] ?? 0);
-      const bPriority = clampPriority(jiraRowPriorities[String(b.key || "").trim()] ?? 0);
-      const aRank = getPrioritySortRank(clampPriority, aPriority);
-      const bRank = getPrioritySortRank(clampPriority, bPriority);
-
-      if (aRank !== bRank) {
-        return aRank - bRank;
-      }
-
-      return compareIssueKeys(a, b);
-    }
-
-    let result = 0;
-
-    if (sortField === "key") {
-      result = compareIssueKeys(a, b);
-    } else if (sortField === "status") {
-      result = compareTextValues(aStatus, bStatus);
-    } else if (sortField === "assignee") {
-      result = compareTextValues(getIssueAssignee(a), getIssueAssignee(b));
-    } else if (sortField === "priority") {
-      const aPriority = clampPriority(jiraRowPriorities[String(a.key || "").trim()] ?? 0);
-      const bPriority = clampPriority(jiraRowPriorities[String(b.key || "").trim()] ?? 0);
-      const aRank = getPrioritySortRank(clampPriority, aPriority);
-      const bRank = getPrioritySortRank(clampPriority, bPriority);
-      result = aRank - bRank;
-    }
-
-    if (result === 0) {
-      result = compareIssueKeys(a, b);
-    }
-
-    if (sortDirection === "desc") {
-      return result * -1;
-    }
-
-    return result;
-  });
-};
-
-const getIssueBrowseUrl = (issue) => {
-  const issueKey = String(issue?.key || "").trim();
-  if (!issueKey) {
-    return "";
-  }
-
-  const selfUrl = issue?.self;
-  if (typeof selfUrl === "string" && selfUrl.trim().length > 0) {
-    try {
-      const parsed = new URL(selfUrl);
-      return `${parsed.protocol}//${parsed.host}/browse/${encodeURIComponent(issueKey)}`;
-    } catch {
-      return "";
-    }
-  }
-
-  return "";
-};
-
-const noteMatchesLastJiraPush = (fingerprint, lastPushed) =>
-  typeof lastPushed === "string" && lastPushed.length > 0 && fingerprint === lastPushed;
 
 const ResultsPagerBar = ({
   placement,
