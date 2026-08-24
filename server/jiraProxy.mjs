@@ -23,6 +23,7 @@ import {
   sanitizeJiraErrorData,
 } from "../shared/jiraErrorUtils.mjs";
 import { extractMediaIdFromUrl } from "./lib/jiraNoteComment.mjs";
+import { parseJiraResponse } from "./lib/jiraResponse.mjs";
 
 const log = createLogger("server");
 
@@ -173,9 +174,7 @@ const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
 
-  const text = await response.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = { message: text.slice(0, 500) }; }
+  const data = await parseJiraResponse(response);
 
   if (!response.ok) {
     const sanitized = sanitizeJiraErrorData(data);
@@ -205,9 +204,7 @@ const jiraMultipartRequest = async ({ method = "POST", pathWithQuery, formData }
     body: formData,
   });
 
-  const text = await response.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = { message: text.slice(0, 500) }; }
+  const data = await parseJiraResponse(response);
 
   if (!response.ok) {
     const sanitized = sanitizeJiraErrorData(data);
