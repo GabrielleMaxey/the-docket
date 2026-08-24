@@ -38,6 +38,7 @@ import {
   savableJqlRuns,
 } from "../../utils/jqlRunPersistence.js";
 import { enrichRunWithParentDoneDates, runsNeedParentMrddEnrich } from "../../utils/jiraIssueDoneDates.js";
+import { isClosedLikeStatus } from "../../../shared/dashboardMetrics.mjs";
 import { useFlash } from "./useFlash.js";
 import {
   BACKGROUND_JOB_IDS,
@@ -162,8 +163,6 @@ const loadStoredJqlRuns = () => {
 
 const loadInitialJqlRuns = () =>
   mergeJqlRuns(loadDrillDownRunsFromSessionStorage(), loadStoredJqlRuns());
-
-const isClosedLikeStatus = (status) => /^(closed|resolved|done)$/i.test(String(status || ""));
 
 const priorityTierClass = (prefix, value) => {
   const clamped = clampPriority(value);
