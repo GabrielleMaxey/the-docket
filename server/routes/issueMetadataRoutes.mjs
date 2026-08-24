@@ -262,19 +262,9 @@ export const registerIssueMetadataRoutes = (
         });
       }
 
-      let accountId = "";
-      let resolvedAssignee = assigneeRaw;
-
-      // Already looks like an Atlassian accountId (e.g. picked from a
-      // dropdown that already resolved it) — skip the user-search round trip.
-      const looksLikeAccountId = assigneeRaw.includes(":") || assigneeRaw.length > 20;
-      if (looksLikeAccountId) {
-        accountId = assigneeRaw;
-      } else {
-        const resolved = await resolveJiraUser({ query: assigneeRaw, jiraRequest });
-        accountId = resolved?.accountId || "";
-        resolvedAssignee = resolved?.displayName || assigneeRaw;
-      }
+      const resolved = await resolveJiraUser({ query: assigneeRaw, jiraRequest });
+      const accountId = resolved?.accountId || "";
+      const resolvedAssignee = resolved?.displayName || assigneeRaw;
 
       if (!accountId) {
         return res.status(404).json({
