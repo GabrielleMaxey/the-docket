@@ -67,48 +67,46 @@ export const STATUS_OPTIONS = [
   "Ready to Deploy",
 ];
 
+const DEFAULT_STORED_PREFERENCES = {
+  jqlCount: DEFAULT_JQL_COUNT,
+  jqlInputs: DEFAULT_JQLS,
+  jqlLabels: DEFAULT_JQL_LABELS,
+  jqlSharedProgramIds: DEFAULT_JQL_SHARED_PROGRAM_IDS,
+  pullLatestComment: false,
+};
+
+const getDefaultStoredPreferences = () => ({
+  ...DEFAULT_STORED_PREFERENCES,
+  jqlInputs: [...DEFAULT_STORED_PREFERENCES.jqlInputs],
+  jqlLabels: [...DEFAULT_STORED_PREFERENCES.jqlLabels],
+  jqlSharedProgramIds: [...DEFAULT_STORED_PREFERENCES.jqlSharedProgramIds],
+});
+
+const normalizeStoredPreferences = (parsed) => ({
+  jqlCount: normalizeJqlCount(parsed?.jqlCount),
+  jqlInputs: normalizeJqlSlotValues(parsed?.jqlInputs, DEFAULT_JQLS),
+  jqlLabels: normalizeJqlSlotValues(parsed?.jqlLabels, DEFAULT_JQL_LABELS),
+  jqlSharedProgramIds: normalizeJqlSlotValues(
+    parsed?.jqlSharedProgramIds,
+    DEFAULT_JQL_SHARED_PROGRAM_IDS
+  ),
+  pullLatestComment: parsed?.pullLatestComment === true,
+});
+
 const loadStoredPreferences = () => {
   if (typeof window === "undefined") {
-    return {
-      jqlCount: DEFAULT_JQL_COUNT,
-      jqlInputs: DEFAULT_JQLS,
-      jqlLabels: DEFAULT_JQL_LABELS,
-      jqlSharedProgramIds: DEFAULT_JQL_SHARED_PROGRAM_IDS,
-      pullLatestComment: false,
-    };
+    return getDefaultStoredPreferences();
   }
 
   try {
     const raw = window.localStorage.getItem(WORK_WEEK_STORAGE_KEYS.jiraPreferences);
     if (!raw) {
-      return {
-        jqlCount: DEFAULT_JQL_COUNT,
-        jqlInputs: DEFAULT_JQLS,
-        jqlLabels: DEFAULT_JQL_LABELS,
-        jqlSharedProgramIds: DEFAULT_JQL_SHARED_PROGRAM_IDS,
-        pullLatestComment: false,
-      };
+      return getDefaultStoredPreferences();
     }
 
-    const parsed = JSON.parse(raw);
-    return {
-      jqlCount: normalizeJqlCount(parsed?.jqlCount),
-      jqlInputs: normalizeJqlSlotValues(parsed?.jqlInputs, DEFAULT_JQLS),
-      jqlLabels: normalizeJqlSlotValues(parsed?.jqlLabels, DEFAULT_JQL_LABELS),
-      jqlSharedProgramIds: normalizeJqlSlotValues(
-        parsed?.jqlSharedProgramIds,
-        DEFAULT_JQL_SHARED_PROGRAM_IDS
-      ),
-      pullLatestComment: parsed?.pullLatestComment === true,
-    };
+    return normalizeStoredPreferences(JSON.parse(raw));
   } catch {
-    return {
-      jqlCount: DEFAULT_JQL_COUNT,
-      jqlInputs: DEFAULT_JQLS,
-      jqlLabels: DEFAULT_JQL_LABELS,
-      jqlSharedProgramIds: DEFAULT_JQL_SHARED_PROGRAM_IDS,
-      pullLatestComment: false,
-    };
+    return getDefaultStoredPreferences();
   }
 };
 
