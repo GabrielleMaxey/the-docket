@@ -66,7 +66,12 @@ const WorkWeekTasks = () => {
   } = useUpcomingDueBanner(showUpcomingDueBanner);
   const { todayDay, monthLabel, fullDateLabel, calendarCells } = useCalendarData();
 
-  const { reminders, handleReminderTextChange, handleReminderDoneChange } = useReminders();
+  const {
+    reminders,
+    error: remindersError,
+    handleReminderTextChange,
+    handleReminderDoneChange,
+  } = useReminders();
   const [importSlotIndex, setImportSlotIndex] = React.useState(null);
   const [createIssueOpen, setCreateIssueOpen] = React.useState(false);
   const [quickPickValueBySlot, setQuickPickValueBySlot] = React.useState({});
@@ -113,18 +118,21 @@ const WorkWeekTasks = () => {
   } = useTaskManagerJira();
 
   const [sharedPrograms, setSharedPrograms] = React.useState([]);
+  const [sharedProgramsError, setSharedProgramsError] = React.useState("");
 
   React.useEffect(() => {
     let cancelled = false;
     fetchSharedPrograms()
       .then((items) => {
         if (!cancelled) {
+          setSharedProgramsError("");
           setSharedPrograms(Array.isArray(items) ? items : []);
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!cancelled) {
           setSharedPrograms([]);
+          setSharedProgramsError(error instanceof Error ? error.message : "Shared programs could not be loaded.");
         }
       });
     return () => {
@@ -473,6 +481,7 @@ const WorkWeekTasks = () => {
             <WeeklyPlanPanel jqlRuns={jqlRuns} jiraRowPriorities={jiraRowPriorities} />
           }
         />
+        {remindersError ? <p className="ww-jira-status ww-jira-error">{remindersError}</p> : null}
 
         <CollapsibleSection title="🗂️ Task Manager" storageKey={TASK_MANAGER_KEY} defaultOpen>
           <JqlControlsPanel
@@ -503,6 +512,9 @@ const WorkWeekTasks = () => {
             filtersLoading={filtersLoading}
             jqlError={jqlError}
           />
+          {sharedProgramsError ? (
+            <p className="ww-jira-status ww-jira-error">{sharedProgramsError}</p>
+          ) : null}
         </CollapsibleSection>
 
         {showRestoredJqlBanner && jqlRuns.some(isConfiguredJqlRun) ? (

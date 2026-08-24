@@ -121,12 +121,8 @@ export const fetchJiraSearchAll = async ({ jql, maxTotal = 200 }) => {
   });
 };
 
-// buildSharedProgramJql only reaches an epic's direct children (Story/Task/
-// Bug) — subtasks belong to those, not to the epic, so they'd be silently
-// dropped. This resolves the direct children first, then builds a JQL that
-// also reaches their subtasks. Falls back to the direct-children-only JQL
-// if the lookup fails, so a Jira hiccup degrades gracefully instead of
-// leaving the slot with no query at all.
+// Resolve direct children first so generated JQL also includes their subtasks.
+// Fall back to the direct-child query if Jira cannot resolve descendants.
 export const resolveSharedProgramJql = async (epicRoots) => {
   const baseJql = buildSharedProgramJql(epicRoots);
   if (!baseJql) {
