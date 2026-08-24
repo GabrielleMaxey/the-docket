@@ -40,7 +40,7 @@ const AssigneeCell = ({
   const query = String(inputValue || "").trim();
 
   React.useEffect(() => {
-    if (query.length < 2) {
+    if (!showSuggestions || query.length < 2) {
       setJiraSuggestions([]);
       setSearchLoading(false);
       setSearchError("");
@@ -65,7 +65,7 @@ const AssigneeCell = ({
     }, 300);
 
     return () => clearTimeout(debounceRef.current);
-  }, [query]);
+  }, [query, showSuggestions]);
 
   const localSuggestions = React.useMemo(() => {
     if (query.length < 2) {
