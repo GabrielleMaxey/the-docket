@@ -1,5 +1,6 @@
 import React from "react";
 import { fetchSharedPrograms, fetchGanttData } from "../../services/jiraClient";
+import { formatDate } from "../../utils/format.js";
 
 const parseDate = (str) => {
   if (!str) return null;
@@ -14,7 +15,7 @@ const addDays = (date, n) => {
 };
 
 const fmtMonthYear = (date) =>
-  date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  formatDate(date, { locale: "en-US", month: "short", year: "numeric" });
 
 const STATUS_CATEGORY_COLOR = {
   "In Progress": "#3b82f6",
