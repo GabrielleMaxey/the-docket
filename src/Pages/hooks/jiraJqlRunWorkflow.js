@@ -15,21 +15,9 @@ import {
   partitionJqlRuns,
 } from "../../utils/jqlRunPersistence.js";
 import { escapeJqlString } from "../../../shared/directReportsJql.mjs";
-
-const errorMessage = (error, fallback) =>
-  error instanceof Error ? error.message : fallback;
+import { errorMessage, mergeIssueMapsPreferExisting } from "../../utils/workflow.js";
 
 const UNASSIGNED_DRILLDOWN_PROJECT_KEY = "ODI";
-
-const mergeIssueMapsPreferExisting = (previous, additions) => {
-  const merged = { ...previous };
-  Object.entries(additions).forEach(([key, value]) => {
-    if (merged[key] === undefined) {
-      merged[key] = value;
-    }
-  });
-  return merged;
-};
 
 const readCommentEntry = (entry) => {
   if (typeof entry === "string") {

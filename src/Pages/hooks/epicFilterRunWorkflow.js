@@ -1,17 +1,5 @@
 import { fetchIssueMetadataBulk, runEpicFilters } from "../../services/jiraClient";
-
-const errorMessage = (error, fallback) =>
-  error instanceof Error ? error.message : fallback;
-
-const mergeIssueMapsPreferExisting = (previous, additions) => {
-  const merged = { ...previous };
-  Object.entries(additions).forEach(([key, value]) => {
-    if (merged[key] === undefined) {
-      merged[key] = value;
-    }
-  });
-  return merged;
-};
+import { errorMessage, mergeIssueMapsPreferExisting } from "../../utils/workflow.js";
 
 export async function runEpicFilterWorkflow({
   epicPresetIds,

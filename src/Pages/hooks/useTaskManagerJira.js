@@ -39,6 +39,7 @@ import {
 } from "../../utils/jqlRunPersistence.js";
 import { enrichRunWithParentDoneDates, runsNeedParentMrddEnrich } from "../../utils/jiraIssueDoneDates.js";
 import { isClosedLikeStatus } from "../../../shared/dashboardMetrics.mjs";
+import { errorMessage } from "../../utils/workflow.js";
 import { useFlash } from "./useFlash.js";
 import {
   BACKGROUND_JOB_IDS,
@@ -237,9 +238,6 @@ const formatJqlRefreshNotice = ({ unsavedAssigneeCount, pullLatestComment }) => 
 
   return `${parts.join("; ")} while refreshing from Jira.`;
 };
-
-const errorMessage = (error, fallback) =>
-  error instanceof Error ? error.message : fallback;
 
 const NOTE_AUTOSAVE_DELAY_MS = 350;
 
