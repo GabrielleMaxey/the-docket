@@ -9,6 +9,7 @@ import { usePersistedState } from "./hooks/usePersistedState";
 import { useFlash } from "./hooks/useFlash";
 import { reconcileSelectedEntryIds, sameIdList, watchTypeLabel } from "./pmEntrySelection";
 import { escapeJqlString } from "../../shared/directReportsJql.mjs";
+import { formatDate, formatTimestamp } from "../utils/format.js";
 import "./projectManagers.css";
 
 // Wrap before AND — unparenthesized OR in scopeJql would only apply the extra clause to the last branch.
@@ -350,7 +351,7 @@ const buildKeyMarkdown = () =>
   ].join("\n");
 
 const buildCapacityReportMarkdown = (sortedItems) => {
-  const lines = [`# Project Managers — Capacity Planning`, "", `_Generated ${new Date().toLocaleString()}_`, ""];
+  const lines = [`# Project Managers — Capacity Planning`, "", `_Generated ${formatTimestamp(new Date())}_`, ""];
 
   for (const item of sortedItems) {
     const { displayName, watchType, capacity, openCount, openCountIncomplete, statusCounts, contributorCounts, contributorTotalCounts } =
@@ -614,7 +615,7 @@ const ProjectManagers = () => {
       const content = buildCapacityReportMarkdown(sortedItems);
       await saveAdHocReport({
         content,
-        label: `Capacity Planning — ${new Date().toLocaleDateString()}`,
+        label: `Capacity Planning — ${formatDate(new Date())}`,
         savedFrom: "project_managers",
       });
       doFlash("Saved to Reports.");

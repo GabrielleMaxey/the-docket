@@ -40,6 +40,7 @@ import {
 import { enrichRunWithParentDoneDates, runsNeedParentMrddEnrich } from "../../utils/jiraIssueDoneDates.js";
 import { isClosedLikeStatus } from "../../../shared/dashboardMetrics.mjs";
 import { errorMessage } from "../../utils/workflow.js";
+import { formatDate as formatLocalDate } from "../../utils/format.js";
 import { useFlash } from "./useFlash.js";
 import {
   BACKGROUND_JOB_IDS,
@@ -178,17 +179,7 @@ const getPriorityClass = (value) => priorityTierClass("ww-priority", value);
 
 const getPriorityRowClass = (value) => priorityTierClass("ww-row-priority", value);
 
-const formatDate = (value) => {
-  if (!value) {
-    return "-";
-  }
-
-  try {
-    return new Date(value).toLocaleDateString();
-  } catch {
-    return value;
-  }
-};
+const formatDate = (value) => formatLocalDate(value, undefined, "-");
 
 const patchIndexedArray = (previous, index, nextValue) => {
   const next = [...previous];

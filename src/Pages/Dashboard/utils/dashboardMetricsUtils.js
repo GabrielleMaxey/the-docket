@@ -3,6 +3,7 @@ import {
   collectEpicCompletionCounts,
   getTerminalIssueCount,
 } from "../../../../shared/dashboardMetrics.mjs";
+import { formatDate } from "../../../utils/format.js";
 
 export const TERMINAL_STATUS_LABEL = "Resolved/Closed/Done";
 
@@ -275,11 +276,11 @@ export const getWeekLabel = (dateStr) => {
   const daysToMonday = (d.getDay() + 6) % 7;
   const monday = new Date(d);
   monday.setDate(d.getDate() - daysToMonday);
-  return `Week of ${monday.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  return `Week of ${formatDate(monday, { locale: "en-US", month: "short", day: "numeric" })}`;
 };
 
 export const getMonthLabel = (dateStr) =>
-  new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  formatDate(new Date(dateStr + "T12:00:00"), { locale: "en-US", month: "long", year: "numeric" });
 
 export const UPCOMING_DUE_PRESET_OFF = "off";
 export const UPCOMING_DUE_PRESET_CUSTOM = "custom";
