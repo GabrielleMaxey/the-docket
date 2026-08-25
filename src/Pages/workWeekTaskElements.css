@@ -1934,3 +1934,285 @@
     font-size: 1.7rem;
   }
 }
+
+/* ── planning panel ── */
+.work-week-page .ww-page-btn--active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #1d4ed8;
+}
+
+.work-week-page .ww-open-decision-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: #fef08a;
+  color: #713f12;
+  border: 1px solid #fde047;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.work-week-page .ww-row-open-decision {
+  outline: 2px solid #fde047;
+  outline-offset: -2px;
+}
+
+.work-week-page .ww-row-has-tracking td:first-child::after {
+  content: "●";
+  font-size: 0.5rem;
+  color: #60a5fa;
+  vertical-align: super;
+  margin-left: 0.15rem;
+}
+
+.work-week-page .ww-planning-expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+  margin-right: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary, #666);
+  vertical-align: middle;
+  border-radius: 3px;
+}
+
+.work-week-page .ww-planning-expand-btn:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.work-week-page .ww-planning-expand-btn--open {
+  color: #2563eb;
+}
+
+.work-week-page .ww-planning-panel-cell {
+  padding: 0.6rem 1rem;
+  background: var(--color-surface-alt, #f8fafc);
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.work-week-page .ww-planning-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.work-week-page .ww-planning-panel-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.work-week-page .ww-planning-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 8rem;
+}
+
+.work-week-page .ww-planning-field--pm {
+  min-width: 14rem;
+}
+
+.work-week-page .ww-planning-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary, #555);
+}
+
+.work-week-page .ww-planning-pm-reporter {
+  font-size: 0.78rem;
+  color: var(--color-text, #333);
+  margin-bottom: 0.1rem;
+}
+
+.work-week-page .ww-planning-field--decision-note {
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 16rem;
+}
+
+.work-week-page .ww-planning-decision-note {
+  width: 100%;
+  resize: vertical;
+  min-height: 3.5rem;
+  font-size: 0.8rem;
+  font-family: inherit;
+  padding: 0.25rem 0.4rem;
+}
+
+/* IC My Capacity section */
+.ww-capacity-wrap {
+  margin-top: 0.6rem;
+}
+
+.ww-capacity-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary, #64748b);
+  margin-bottom: 0.4rem;
+}
+
+.ww-cap-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.ww-cap-row-label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #555);
+  min-width: 10rem;
+  flex-shrink: 0;
+}
+
+.ww-cap-count {
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ww-cap-count--ok   { color: #16a34a; }
+.ww-cap-count--warn { color: #d97706; }
+.ww-cap-count--over { color: #dc2626; }
+
+.ww-cap-sep {
+  color: #94a3b8;
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+
+.ww-cap-input {
+  width: 2.8rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  padding: 0.05rem 0.2rem;
+  background: transparent;
+  color: var(--color-text, #333);
+  -moz-appearance: textfield;
+}
+.ww-cap-input::-webkit-inner-spin-button,
+.ww-cap-input::-webkit-outer-spin-button { opacity: 0.4; }
+.ww-cap-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.ww-cap-track {
+  flex: 1 1 auto;
+  height: 0.5rem;
+  background: #e2e8f0;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.ww-cap-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.2s ease;
+}
+.ww-cap-fill--ok   { background: #22c55e; }
+.ww-cap-fill--warn { background: #f59e0b; }
+.ww-cap-fill--over { background: #ef4444; }
+
+.ww-cap-pct {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2rem;
+  text-align: right;
+}
+.ww-cap-pct--ok   { color: #16a34a; }
+.ww-cap-pct--warn { color: #d97706; }
+.ww-cap-pct--over { color: #dc2626; }
+
+.ww-capacity-benchmark {
+  font-size: 0.68rem;
+  color: var(--color-text-secondary, #94a3b8);
+  margin-bottom: 0.5rem;
+  padding-left: 0.1rem;
+}
+
+/* IC workload bar in My Metrics */
+.ww-workload-bar-wrap {
+  margin-top: 0.6rem;
+}
+
+.ww-workload-bar-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary, #888);
+  margin-bottom: 0.25rem;
+}
+
+.ww-workload-bar {
+  display: flex;
+  height: 1.25rem;
+  border-radius: 4px;
+  overflow: hidden;
+  gap: 1px;
+  background: #e2e8f0;
+}
+
+.ww-workload-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+  min-width: 0;
+  transition: opacity 0.1s;
+  cursor: default;
+}
+
+.ww-workload-seg:hover {
+  opacity: 0.85;
+}
+
+.ww-wl-inprogress { background: #3b82f6; }
+.ww-wl-verify     { background: #10b981; }
+.ww-wl-ready      { background: #8b5cf6; }
+.ww-wl-backlog    { background: #94a3b8; }
+.ww-wl-other      { background: #cbd5e1; color: #475569; }
+
+.ww-workload-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  margin-top: 0.35rem;
+}
+
+.ww-workload-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--color-text-secondary, #555);
+}
+
+.ww-workload-legend-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 2px;
+  flex-shrink: 0;
+}

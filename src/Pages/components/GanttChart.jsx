@@ -56,8 +56,13 @@ const issueUrl = (key) => {
 const GanttBar = ({ issue, rangeStart, rangeMs }) => {
   const start = parseDate(issue.startDate);
   const end = parseDate(issue.dueDate || issue.completeDate);
+  const planStart = parseDate(issue.plannedStart);
+  const planEnd = parseDate(issue.plannedFinish);
 
-  if (!start || !end || end <= start) {
+  const hasActualBar = start && end && end > start;
+  const hasPlanBar = planStart && planEnd && planEnd > planStart;
+
+  if (!hasActualBar && !hasPlanBar) {
     return (
       <div className="pm-gantt-row-bars">
         <span className="pm-gantt-no-date">no start date</span>
@@ -65,34 +70,33 @@ const GanttBar = ({ issue, rangeStart, rangeMs }) => {
     );
   }
 
-  const leftPct = Math.max(0, pct(start, rangeStart, rangeMs));
-  const rightPct = Math.min(100, pct(end, rangeStart, rangeMs));
-  const widthPct = Math.max(0.5, rightPct - leftPct);
-
   const url = issueUrl(issue.key);
-  const style = {
-    left: `${leftPct}%`,
-    width: `${widthPct}%`,
-    background: barColor(issue.statusCategory),
+
+  const renderBar = (s, e, className, title, barStyle) => {
+    const leftPct = Math.max(0, pct(s, rangeStart, rangeMs));
+    const rightPct = Math.min(100, pct(e, rangeStart, rangeMs));
+    const widthPct = Math.max(0.5, rightPct - leftPct);
+    const style = { left: `${leftPct}%`, width: `${widthPct}%`, ...barStyle };
+    return url ? (
+      <a key={className} className={`pm-gantt-bar ${className}`} href={url} target="_blank" rel="noreferrer noopener" title={title} style={style}>
+        <span className="pm-gantt-bar-label">{issue.key}</span>
+      </a>
+    ) : (
+      <div key={className} className={`pm-gantt-bar ${className}`} title={title} style={style}>
+        <span className="pm-gantt-bar-label">{issue.key}</span>
+      </div>
+    );
   };
 
   return (
     <div className="pm-gantt-row-bars">
-      {url ? (
-        <a
-          className="pm-gantt-bar"
-          href={url}
-          target="_blank"
-          rel="noreferrer noopener"
-          title={`${issue.key}: ${issue.summary}\n${issue.startDate} → ${issue.dueDate || issue.completeDate}`}
-          style={style}
-        >
-          <span className="pm-gantt-bar-label">{issue.key}</span>
-        </a>
-      ) : (
-        <div className="pm-gantt-bar" title={issue.summary} style={style}>
-          <span className="pm-gantt-bar-label">{issue.key}</span>
-        </div>
+      {hasPlanBar && renderBar(planStart, planEnd, "pm-gantt-bar--plan",
+        `${issue.key} planned: ${issue.plannedStart} → ${issue.plannedFinish}`,
+        { background: "transparent", border: "2px dashed var(--pm-gantt-plan-bar-color, #a0a0c0)", opacity: 0.65 }
+      )}
+      {hasActualBar && renderBar(start, end, "pm-gantt-bar--actual",
+        `${issue.key}: ${issue.summary}\n${issue.startDate} → ${issue.dueDate || issue.completeDate}`,
+        { background: barColor(issue.statusCategory) }
       )}
     </div>
   );

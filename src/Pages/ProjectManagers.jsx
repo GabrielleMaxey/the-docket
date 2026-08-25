@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Container, Header, Message, Segment, Button } from "semantic-ui-react";
-import { fetchCapacityPlanning, fetchWatchedAssignees, saveAdHocReport } from "../services/jiraClient";
+import { fetchCapacityPlanning, fetchWatchedAssignees, saveAdHocReport, fetchPmAsks, createPmAsk, updatePmAsk, deletePmAsk } from "../services/jiraClient";
 import GanttChart from "./components/GanttChart";
 import { getStatusColor } from "../utils/statusScale";
 import { buildWorkWeekHref } from "../utils/workWeekNavigation";
@@ -477,6 +477,142 @@ const buildCapacityReportCsv = (sortedItems) => {
   return rows.join("\r\n");
 };
 
+const AsksPanel = () => {
+  const [asks, setAsks] = React.useState([]);
+  const [error, setError] = React.useState("");
+  const [draft, setDraft] = React.useState({ title: "", whoAsked: "", note: "" });
+  const [editingId, setEditingId] = React.useState(null);
+  const [editDraft, setEditDraft] = React.useState({});
+
+  React.useEffect(() => {
+    fetchPmAsks().then(setAsks).catch((e) => setError(String(e?.message || "Failed to load asks")));
+  }, []);
+
+  const handleCreate = async () => {
+    try {
+      const created = await createPmAsk(draft);
+      setAsks((prev) => [...prev, created]);
+      setDraft({ title: "", whoAsked: "", note: "" });
+    } catch (e) {
+      setError(String(e?.message || "Failed to create ask"));
+    }
+  };
+
+  const handleEdit = (ask) => {
+    setEditingId(ask.id);
+    setEditDraft({ title: ask.title, whoAsked: ask.whoAsked, note: ask.note });
+  };
+
+  const handleSaveEdit = async (id) => {
+    try {
+      const updated = await updatePmAsk({ id, ...editDraft });
+      setAsks((prev) => prev.map((a) => (a.id === id ? updated : a)));
+      setEditingId(null);
+    } catch (e) {
+      setError(String(e?.message || "Failed to update ask"));
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this ask?")) return;
+    try {
+      await deletePmAsk(id);
+      setAsks((prev) => prev.filter((a) => a.id !== id));
+    } catch (e) {
+      setError(String(e?.message || "Failed to delete ask"));
+    }
+  };
+
+  const handleDownloadCsv = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = [["Title", "Who asked", "Note"]];
+    for (const a of asks) {
+      rows.push([a.title, a.whoAsked, a.note].map((v) => `"${String(v || "").replace(/"/g, '""')}"`));
+    }
+    const csv = "﻿" + rows.map((r) => r.join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `asks_${today}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="pm-asks-panel">
+      <p className="ww-copy">
+        Personal parking lot for project asks — not issues yet. This machine only. Notes are not pushed to Jira.
+      </p>
+      {error ? <p className="ww-inline-error">{error}</p> : null}
+
+      <div className="pm-asks-new-row">
+        <input
+          className="pm-asks-input"
+          placeholder="Title"
+          value={draft.title}
+          onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+        />
+        <input
+          className="pm-asks-input"
+          placeholder="Who asked"
+          value={draft.whoAsked}
+          onChange={(e) => setDraft((d) => ({ ...d, whoAsked: e.target.value }))}
+        />
+        <input
+          className="pm-asks-input pm-asks-input--note"
+          placeholder="Note"
+          value={draft.note}
+          onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))}
+        />
+        <button type="button" className="ww-page-btn" onClick={handleCreate}>
+          Add
+        </button>
+        {asks.length > 0 ? (
+          <button type="button" className="ww-page-btn" onClick={handleDownloadCsv}>
+            Download CSV
+          </button>
+        ) : null}
+      </div>
+
+      {asks.length === 0 ? (
+        <p className="pm-asks-empty">No asks yet — add one above.</p>
+      ) : (
+        <table className="pm-asks-table">
+          <thead>
+            <tr><th>Title</th><th>Who asked</th><th>Note</th><th></th></tr>
+          </thead>
+          <tbody>
+            {asks.map((ask) =>
+              editingId === ask.id ? (
+                <tr key={ask.id}>
+                  <td><input className="pm-asks-input" value={editDraft.title || ""} onChange={(e) => setEditDraft((d) => ({ ...d, title: e.target.value }))} /></td>
+                  <td><input className="pm-asks-input" value={editDraft.whoAsked || ""} onChange={(e) => setEditDraft((d) => ({ ...d, whoAsked: e.target.value }))} /></td>
+                  <td><input className="pm-asks-input" value={editDraft.note || ""} onChange={(e) => setEditDraft((d) => ({ ...d, note: e.target.value }))} /></td>
+                  <td>
+                    <button type="button" className="ww-page-btn" onClick={() => handleSaveEdit(ask.id)}>Save</button>
+                    <button type="button" className="ww-page-btn" onClick={() => setEditingId(null)}>Cancel</button>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={ask.id}>
+                  <td>{ask.title || "—"}</td>
+                  <td>{ask.whoAsked || "—"}</td>
+                  <td>{ask.note || "—"}</td>
+                  <td>
+                    <button type="button" className="ww-page-btn" onClick={() => handleEdit(ask)}>Edit</button>
+                    <button type="button" className="ww-page-btn" onClick={() => handleDelete(ask.id)}>Delete</button>
+                  </td>
+                </tr>
+              )
+            )}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+};
+
 const ProjectManagers = () => {
   const [tab, setTab] = React.useState("capacity");
   const [allEntries, setAllEntries] = React.useState([]);
@@ -647,10 +783,19 @@ const ProjectManagers = () => {
         >
           Gantt
         </button>
+        <button
+          type="button"
+          className={`pm-tab${tab === "asks" ? " pm-tab--active" : ""}`}
+          onClick={() => setTab("asks")}
+        >
+          Asks
+        </button>
       </div>
 
       {tab === "gantt" ? (
         <GanttChart />
+      ) : tab === "asks" ? (
+        <AsksPanel />
       ) : (
       <>
       <p className="ww-copy">

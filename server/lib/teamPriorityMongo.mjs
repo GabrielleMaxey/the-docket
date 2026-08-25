@@ -259,6 +259,12 @@ export const bulkGetTeamDates = async (issueKeys) => {
     items[row._id] = {
       startDate: String(row.startDate || ""),
       completeDate: String(row.completeDate || ""),
+      hasOpenDecision: Boolean(row.hasOpenDecision),
+      plannedStart: String(row.plannedStart || ""),
+      plannedFinish: String(row.plannedFinish || ""),
+      pmOverride: String(row.pmOverride || ""),
+      requestor: String(row.requestor || ""),
+      openDecisionNote: String(row.openDecisionNote || ""),
       updatedAt: row.updatedAt || null,
       updatedBy: String(row.updatedBy || ""),
     };
@@ -270,7 +276,18 @@ export const bulkGetTeamDates = async (issueKeys) => {
 // The row itself is never auto-deleted here — clearing a field just blanks it, so
 // PM hand-off tracking (start/complete) can't vanish from one field being emptied.
 // Use deleteTeamDate for an explicit, deliberate removal of the whole row.
-export const putTeamDate = async ({ issueKey, startDate, completeDate, updatedBy }) => {
+export const putTeamDate = async ({
+  issueKey,
+  startDate,
+  completeDate,
+  hasOpenDecision,
+  plannedStart,
+  plannedFinish,
+  pmOverride,
+  requestor,
+  openDecisionNote,
+  updatedBy,
+}) => {
   const db = await getDb();
   if (!db) {
     throw new Error("Team priority demo not configured");
@@ -282,8 +299,16 @@ export const putTeamDate = async ({ issueKey, startDate, completeDate, updatedBy
 
   const hasStartDate = startDate !== undefined;
   const hasCompleteDate = completeDate !== undefined;
-  if (!hasStartDate && !hasCompleteDate) {
-    throw new Error("Provide startDate or completeDate");
+  const hasOpenDecisionField = hasOpenDecision !== undefined;
+  const hasPlannedStart = plannedStart !== undefined;
+  const hasPlannedFinish = plannedFinish !== undefined;
+  const hasPmOverride = pmOverride !== undefined;
+  const hasRequestor = requestor !== undefined;
+  const hasOpenDecisionNote = openDecisionNote !== undefined;
+
+  if (!hasStartDate && !hasCompleteDate && !hasOpenDecisionField &&
+      !hasPlannedStart && !hasPlannedFinish && !hasPmOverride && !hasRequestor && !hasOpenDecisionNote) {
+    throw new Error("Provide startDate, completeDate, or a planning field");
   }
 
   const nextStartDate = hasStartDate ? String(startDate || "").trim() : undefined;
@@ -294,17 +319,27 @@ export const putTeamDate = async ({ issueKey, startDate, completeDate, updatedBy
   if (nextCompleteDate && !isValidDateOnly(nextCompleteDate)) {
     throw new Error("completeDate must be YYYY-MM-DD");
   }
+  const nextPlannedStart = hasPlannedStart ? String(plannedStart || "").trim() : undefined;
+  if (nextPlannedStart && !isValidDateOnly(nextPlannedStart)) {
+    throw new Error("plannedStart must be YYYY-MM-DD");
+  }
+  const nextPlannedFinish = hasPlannedFinish ? String(plannedFinish || "").trim() : undefined;
+  if (nextPlannedFinish && !isValidDateOnly(nextPlannedFinish)) {
+    throw new Error("plannedFinish must be YYYY-MM-DD");
+  }
 
   const col = db.collection(COL_DATES);
   const updatedAt = new Date();
   const by = String(updatedBy || "demo").trim() || "demo";
   const $set = { updatedAt, updatedBy: by };
-  if (hasStartDate) {
-    $set.startDate = nextStartDate;
-  }
-  if (hasCompleteDate) {
-    $set.completeDate = nextCompleteDate;
-  }
+  if (hasStartDate) $set.startDate = nextStartDate;
+  if (hasCompleteDate) $set.completeDate = nextCompleteDate;
+  if (hasOpenDecisionField) $set.hasOpenDecision = Boolean(hasOpenDecision);
+  if (hasPlannedStart) $set.plannedStart = nextPlannedStart;
+  if (hasPlannedFinish) $set.plannedFinish = nextPlannedFinish;
+  if (hasPmOverride) $set.pmOverride = String(pmOverride || "").trim();
+  if (hasRequestor) $set.requestor = String(requestor || "").trim();
+  if (hasOpenDecisionNote) $set.openDecisionNote = String(openDecisionNote);
 
   await col.updateOne({ _id: key }, { $set }, { upsert: true });
 
@@ -314,6 +349,12 @@ export const putTeamDate = async ({ issueKey, startDate, completeDate, updatedBy
     issueKey: key,
     ...(hasStartDate ? { startDate: nextStartDate } : {}),
     ...(hasCompleteDate ? { completeDate: nextCompleteDate } : {}),
+    ...(hasOpenDecisionField ? { hasOpenDecision: Boolean(hasOpenDecision) } : {}),
+    ...(hasPlannedStart ? { plannedStart: nextPlannedStart } : {}),
+    ...(hasPlannedFinish ? { plannedFinish: nextPlannedFinish } : {}),
+    ...(hasPmOverride ? { pmOverride: String(pmOverride || "").trim() } : {}),
+    ...(hasRequestor ? { requestor: String(requestor || "").trim() } : {}),
+    ...(hasOpenDecisionNote ? { openDecisionNote: String(openDecisionNote) } : {}),
     updatedAt,
     updatedBy: by,
   };

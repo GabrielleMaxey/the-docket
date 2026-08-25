@@ -265,6 +265,11 @@ export const useTaskManagerJira = () => {
   const [mrdDrafts, setMrdDrafts] = React.useState({});
   const [startDateByKey, setStartDateByKey] = React.useState({});
   const [completeDateByKey, setCompleteDateByKey] = React.useState({});
+  const [planningMetaByKey, setPlanningMetaByKey] = React.useState({});
+  const [showPlanningPanel, setShowPlanningPanel] = React.useState(() => {
+    try { return localStorage.getItem("ww_show_planning") === "true"; } catch { return false; }
+  });
+  const [expandedPlanningKey, setExpandedPlanningKey] = React.useState(null);
   const [assigneeDrafts, setAssigneeDrafts] = React.useState({});
   const [assigneeAccountIds, setAssigneeAccountIds] = React.useState({});
   const [rowUpdateState, setRowUpdateState] = React.useState({});
@@ -969,6 +974,36 @@ export const useTaskManagerJira = () => {
     });
   };
 
+  const handleTogglePlanningPanel = () => {
+    setShowPlanningPanel((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("ww_show_planning", String(next)); } catch {}
+      return next;
+    });
+  };
+
+  const handleTogglePlanningRow = (issueKey) => {
+    setExpandedPlanningKey((prev) => (prev === issueKey ? null : issueKey));
+  };
+
+  const handlePlanningFieldChange = (issueKey, field, value, options = {}) => {
+    const sharedProgramId = String(options.sharedProgramId || "").trim();
+    setPlanningMetaByKey((prev) => ({
+      ...prev,
+      [issueKey]: { ...(prev[issueKey] || {}), [field]: value },
+    }));
+    const patch = { [field]: value };
+    if (sharedProgramId) {
+      saveTeamDate({ issueKey, ...patch }).catch((error) => {
+        console.error(`Failed to persist team ${field}`, issueKey, error);
+      });
+    } else {
+      saveIssueMetadata({ issueKey, ...patch }).catch((error) => {
+        console.error(`Failed to persist ${field}`, issueKey, error);
+      });
+    }
+  };
+
   const handleAssigneeUpdate = async (issueKey) => {
     const draftOrAccount =
       assigneeAccountIds[issueKey] === JIRA_UNASSIGNED_ASSIGNEE
@@ -1064,6 +1099,7 @@ export const useTaskManagerJira = () => {
           setPrioritySourceByKey,
           setStartDateByKey,
           setCompleteDateByKey,
+          setPlanningMetaByKey,
           hydrateNoteImages: hydrateKeptNoteImages,
           fieldMappingRows,
         }),
@@ -1093,6 +1129,7 @@ export const useTaskManagerJira = () => {
           setJiraNotes,
           setStartDateByKey,
           setCompleteDateByKey,
+          setPlanningMetaByKey,
           pullLatestComment,
           fieldMappingRows,
         }),
@@ -1120,6 +1157,7 @@ export const useTaskManagerJira = () => {
         setJiraNotes,
         setStartDateByKey,
         setCompleteDateByKey,
+        setPlanningMetaByKey,
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
@@ -1152,6 +1190,7 @@ export const useTaskManagerJira = () => {
         setJiraNotes,
         setStartDateByKey,
         setCompleteDateByKey,
+        setPlanningMetaByKey,
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
@@ -1182,6 +1221,7 @@ export const useTaskManagerJira = () => {
         setJiraNotes,
         setStartDateByKey,
         setCompleteDateByKey,
+        setPlanningMetaByKey,
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
@@ -1249,6 +1289,9 @@ export const useTaskManagerJira = () => {
     mrdDrafts,
     startDateByKey,
     completeDateByKey,
+    planningMetaByKey,
+    showPlanningPanel,
+    expandedPlanningKey,
     assigneeDrafts,
     rowUpdateState,
     noteImagesByKey,
@@ -1289,6 +1332,9 @@ export const useTaskManagerJira = () => {
     handleStartDateChange,
     handleCompleteDateChange,
     handleClearDateTracking,
+    handleTogglePlanningPanel,
+    handleTogglePlanningRow,
+    handlePlanningFieldChange,
     handleAssigneeDraftChange,
     handleAssigneeUpdate,
     handleRowPriorityChange,
