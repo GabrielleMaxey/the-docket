@@ -581,8 +581,8 @@ export const registerIssueMetadataRoutes = (
     if (!issueKey) {
       return res.status(400).json({ error: "Missing issue key" });
     }
-    if (role !== "due_date" && role !== "most_recent_done_date") {
-      return res.status(400).json({ error: "role must be 'due_date' or 'most_recent_done_date'" });
+    if (role !== "due_date" && role !== "most_recent_done_date" && role !== "initial_done_date") {
+      return res.status(400).json({ error: "role must be 'due_date', 'initial_done_date', or 'most_recent_done_date'" });
     }
     if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
       return res.status(400).json({ error: "value must be YYYY-MM-DD or empty" });

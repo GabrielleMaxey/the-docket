@@ -260,6 +260,7 @@ export const useTaskManagerJira = () => {
   const [pushState, setPushState] = React.useState({});
   const [saveState, setSaveState] = React.useState({});
   const [statusDrafts, setStatusDrafts] = React.useState({});
+  const [iddDrafts, setIddDrafts] = React.useState({});
   const [dueDateDrafts, setDueDateDrafts] = React.useState({});
   const [mrdDrafts, setMrdDrafts] = React.useState({});
   const [startDateByKey, setStartDateByKey] = React.useState({});
@@ -856,6 +857,21 @@ export const useTaskManagerJira = () => {
     });
   };
 
+  const handleIddDraftChange = (issueKey, value) => {
+    setIddDrafts((prev) => patchIssueKeyed(prev, issueKey, value));
+  };
+
+  const handleIddUpdate = async (issueKey, fallbackValue, iddFieldId) => {
+    const value = String(iddDrafts[issueKey] ?? fallbackValue ?? "").trim();
+
+    await performRowFieldUpdate(issueKey, {
+      apply: () => updateJiraIssueDateField({ issueKey, role: "initial_done_date", value }),
+      patchIssue: (issue) => ({ ...issue, fields: { ...issue.fields, [iddFieldId]: value || null } }),
+      successMessage: value ? `IDD set to ${value}.` : "IDD cleared.",
+      errorFallback: "Failed to update IDD",
+    });
+  };
+
   const handleDueDateDraftChange = (issueKey, value) => {
     setDueDateDrafts((prev) => patchIssueKeyed(prev, issueKey, value));
   };
@@ -1228,6 +1244,7 @@ export const useTaskManagerJira = () => {
     pushState,
     saveState,
     statusDrafts,
+    iddDrafts,
     dueDateDrafts,
     mrdDrafts,
     startDateByKey,
@@ -1263,6 +1280,8 @@ export const useTaskManagerJira = () => {
     handleSelectAll,
     handleStatusDraftChange,
     handleStatusUpdate,
+    handleIddDraftChange,
+    handleIddUpdate,
     handleDueDateDraftChange,
     handleDueDateUpdate,
     handleMrdDraftChange,

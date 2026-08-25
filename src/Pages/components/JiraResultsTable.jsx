@@ -105,6 +105,7 @@ const JiraResultsTable = ({
   saveState,
   rowUpdateState,
   statusDrafts,
+  iddDrafts,
   dueDateDrafts,
   mrdDrafts,
   startDateByKey,
@@ -128,6 +129,8 @@ const JiraResultsTable = ({
   handleSelectAll,
   handleStatusDraftChange,
   handleStatusUpdate,
+  handleIddDraftChange,
+  handleIddUpdate,
   handleDueDateDraftChange,
   handleDueDateUpdate,
   handleMrdDraftChange,
@@ -814,14 +817,21 @@ const JiraResultsTable = ({
 
                         <td className="ww-cell-dates">
                           {(() => {
-                            const ownDue =
-                              formatDateOnly(getFieldValue(issue, run.dueFieldId || "duedate")) || "";
+                            const ownIdd = formatDateOnly(getFieldValue(issue, run.iddFieldId)) || "";
+                            const inheritedIdd = getMostRecentDoneDateForIssue(
+                              issue,
+                              run.iddFieldId,
+                              run.parentIddByKey
+                            );
                             const ownMrd = formatDateOnly(getFieldValue(issue, run.mrdFieldId)) || "";
                             const inheritedMrd = getMostRecentDoneDateForIssue(
                               issue,
                               run.mrdFieldId,
                               run.parentMostRecentDoneDateByKey
                             );
+                            const ownDue =
+                              formatDateOnly(getFieldValue(issue, run.dueFieldId || "duedate")) || "";
+                            const issueTypeName = String(issue.fields?.issuetype?.name || "Issue").trim();
                             const sharedProgramId = String(
                               run.sharedProgramId || jqlSharedProgramIds?.[runSlotIndex] || ""
                             ).trim();
@@ -829,29 +839,29 @@ const JiraResultsTable = ({
                             return (
                               <div className={"ww-edit-cell" + (isClosedOrResolved ? " ww-edit-disabled" : "")}>
                                 <div className="ww-date-row">
-                                  <label className="ww-date-label" title="Jira due date">Due</label>
+                                  <label className="ww-date-label" title="Initial Done Date — cascades from task → story → epic">IDD</label>
                                   <input
                                     type="date"
                                     className="ww-edit-input"
-                                    value={dueDateDrafts[issueKey] ?? ownDue}
+                                    value={iddDrafts[issueKey] ?? (ownIdd || inheritedIdd || "")}
                                     disabled={isClosedOrResolved}
-                                    onChange={(event) => handleDueDateDraftChange(issueKey, event.target.value)}
+                                    onChange={(event) => handleIddDraftChange(issueKey, event.target.value)}
                                   />
                                   <button
                                     type="button"
                                     className="ww-inline-action-btn"
-                                    onClick={() => handleDueDateUpdate(issueKey, ownDue)}
+                                    onClick={() => handleIddUpdate(issueKey, ownIdd || inheritedIdd || "", run.iddFieldId)}
                                     disabled={rowUpdate.loading || isClosedOrResolved}
                                   >
                                     Update
                                   </button>
                                 </div>
-                                {!ownDue && inheritedMrd ? (
-                                  <p className="ww-date-hint">from MRD: {inheritedMrd}</p>
+                                {!ownIdd && inheritedIdd ? (
+                                  <p className="ww-date-hint">from parent: {inheritedIdd}</p>
                                 ) : null}
 
                                 <div className="ww-date-row">
-                                  <label className="ww-date-label" title="Most Recent Done Date">MRD</label>
+                                  <label className="ww-date-label" title="Most Recent Done Date — cascades from task → story → epic">MRD</label>
                                   <input
                                     type="date"
                                     className="ww-edit-input"
@@ -871,6 +881,25 @@ const JiraResultsTable = ({
                                 {!ownMrd && inheritedMrd ? (
                                   <p className="ww-date-hint">from parent: {inheritedMrd}</p>
                                 ) : null}
+
+                                <div className="ww-date-row">
+                                  <label className="ww-date-label" title={`${issueTypeName} due date from Jira`}>{issueTypeName} Due</label>
+                                  <input
+                                    type="date"
+                                    className="ww-edit-input"
+                                    value={dueDateDrafts[issueKey] ?? ownDue}
+                                    disabled={isClosedOrResolved}
+                                    onChange={(event) => handleDueDateDraftChange(issueKey, event.target.value)}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="ww-inline-action-btn"
+                                    onClick={() => handleDueDateUpdate(issueKey, ownDue)}
+                                    disabled={rowUpdate.loading || isClosedOrResolved}
+                                  >
+                                    Update
+                                  </button>
+                                </div>
 
                                 <div className="ww-date-row">
                                   <label className="ww-date-label" title="Ad-hoc start date — local only, used for Gantt charts. No Jira field.">
@@ -897,7 +926,7 @@ const JiraResultsTable = ({
                                   <input
                                     type="date"
                                     className="ww-edit-input"
-                                    value={completeDateByKey[issueKey] ?? (ownMrd || inheritedMrd || "")}
+                                    value={completeDateByKey[issueKey] ?? ""}
                                     disabled={isClosedOrResolved}
                                     onChange={(event) =>
                                       handleCompleteDateChange(issueKey, event.target.value, { sharedProgramId })
