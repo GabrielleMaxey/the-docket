@@ -2,8 +2,8 @@
   "name": "task-manager",
   "private": true,
   "version": "0.0.0",
-  "description": "Task Manager desktop app with Jira integration",
-  "author": "Task Manager Team",
+  "description": "The Docket — Jira-integrated IC and PM work management",
+  "author": "The Docket Team",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -43,7 +43,7 @@
   },
   "build": {
     "appId": "com.gmaxey.taskmanager",
-    "productName": "Task Manager",
+    "productName": "The Docket",
     "asar": true,
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**"
