@@ -1,14 +1,37 @@
-# Task Manager
+# The Docket
 
-> A personal desktop productivity tool for Jira power users — Jira-connected, AI-powered, and built for one person's daily workflow.
+> A desktop and browser app for Jira-powered teams — daily task management, PM capacity planning, and AI-generated reports in one local workspace.
+
+---
+
+## Screenshots
+
+**Task Management — daily JQL runs with inline status updates, priorities, and notes**
+![Task Management table](./docs/images/screenshot-task-table.png)
+
+**My Metrics — IC capacity tracking with WIP limit and open-issue breakdown by status**
+![My Metrics — My Capacity](./docs/images/screenshot-metrics.png)
+
+**Metrics — overall project health at a glance**
+![Overall Status](./docs/images/screenshot-overall-status.png)
+
+**Metrics — per-project breakdown with status distribution charts**
+![Project Metrics](./docs/images/screenshot-project-metrics.png)
+
+**Project Managers — capacity planning with contributor workload by status**
+![Project Managers](./docs/images/screenshot-project-managers.png)
+
+**Chat — natural-language Jira questions backed by loaded data**
+![Chat](./docs/images/screenshot-chat.png)
+
+**Settings — Jira connection, presets, date fields, and contributor configuration**
+![Settings](./docs/images/screenshot-settings.png)
 
 ---
 
 ## Overview
 
-Task Manager is a private desktop and browser app for Jira-heavy work. It replaces the daily shuffle between Jira views, Excel trackers, and status-update drafts with one local workspace.
-
-The app talks to **your Jira project (ODI)** through a local Express proxy. Jira credentials stay in your local `.env`; no third-party cloud service receives them.
+The Docket connects to your Jira project through a local Express proxy. Credentials stay in your local `.env` file; no third-party cloud service receives them.
 
 ---
 
@@ -23,7 +46,7 @@ The app talks to **your Jira project (ODI)** through a local Express proxy. Jira
 | Chat | Natural-language Jira questions with app session context | Jira-backed answers, optional save to Past Reports |
 | Settings | Jira setup, presets, field mappings, report/chat preferences | Shared preset packs and connection checks |
 
-**Task Management** is the daily driver. Run up to five saved JQL queries, update status or assignee, set P1-P20 priority, write notes, push notes to Jira, create ODI issues, and generate AI reports or week plans from the loaded work.
+**Task Management** is the daily driver. Run up to five saved JQL queries, update status or assignee, set P1–P20 priority, write notes, push notes to Jira, create issues, and generate AI reports or week plans from the loaded work.
 
 **Metrics** is the project view. Pick saved Epic/JQL presets, refresh a Jira snapshot, review overall/project/contributor metrics, inspect due-date lists, and generate leadership or team-facing reports.
 
@@ -37,31 +60,9 @@ The app talks to **your Jira project (ODI)** through a local Express proxy. Jira
 
 ---
 
-## Example views
-
-Actual screenshots from the running app with project and contributor names redacted. Content may vary by local Jira presets, saved browser state, and connection settings.
-
-![Task Management screen](./docs/images/readme-task-management.png)
-
-![Metrics screen](./docs/images/readme-metrics.png)
-
-![Metrics report screen](./docs/images/readme-metrics-report.png)
-
-![Project Managers screen](./docs/images/readme-project-managers.png)
-
-![Past Reports screen](./docs/images/readme-past-reports.png)
-
-![Chat screen](./docs/images/readme-chat.png)
-
-![Settings screen](./docs/images/readme-settings.png)
-
----
-
 ## Who it's for
 
-Task Manager is built for **engineers and project managers** who work in Jira daily and want a faster, smarter alternative to juggling raw Jira views, spreadsheets, and status-update emails.
-
-The app is designed around a single Jira project (ODI) on your organization's Atlassian instance and will be distributed to team members once development is complete. All Jira credentials stay on each user's machine — no third-party cloud service ever sees them.
+The Docket is built for **engineers and project managers** who work in Jira daily and want a faster, smarter alternative to juggling raw Jira views, spreadsheets, and status-update emails.
 
 **Primary use cases:**
 - Engineers who need a focused daily view of their assigned work across multiple queries
@@ -128,21 +129,21 @@ Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 | Task Management drill-down tabs | Browser `sessionStorage` | No |
 | Chat session artifacts (reports/plans for context) | Browser `localStorage` | No |
 | On-page reports/plans (Task Management + Metrics) | Browser `localStorage` | No |
-| **Past Reports** archive | `data/workweek.sqlite` → `generated_reports`; saved under your browser's local timestamp/timezone | No |
+| **Past Reports** archive | `data/workweek.sqlite` → `generated_reports` | No |
 | Header reminders | `data/workweek.sqlite` (local file) | No |
-| Per-issue notes + P1–P20 priority | `data/workweek.sqlite` (local file); shared-program slots use Atlas demo / future MySQL | No for personal slots |
-| Start date (ad-hoc, for Gantt views) | `data/workweek.sqlite` (local file); same personal/shared split as priority | No for personal slots |
+| Per-issue notes + P1–P20 priority | `data/workweek.sqlite` (local file) | No for personal slots |
+| Start date (ad-hoc, for Gantt views) | `data/workweek.sqlite` (local file) | No for personal slots |
 | Status/assignee changes | Jira (your Atlassian instance) | Yes — visible in Jira to anyone with access |
 | Due date / MRD changes | Jira (your Atlassian instance) | Yes |
-| Notes you push as comments | Jira (your Atlassian instance) | Yes — text and attachments, rendered as markdown (bold/italic/lists/etc.) |
-| Metrics snapshot | `data/workweek.sqlite` (dev) or user data folder (packaged desktop) | No |
-| Desktop `.env` + local DB (packaged app) | OS user data folder — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) | No |
+| Notes you push as comments | Jira (your Atlassian instance) | Yes — text and attachments, rendered as markdown |
+| Metrics snapshot | `data/workweek.sqlite` | No |
+| Desktop `.env` + local DB (packaged app) | OS user data folder | No |
 | Jira credentials | `.env` file on this machine | No — only the local proxy reads them |
 | Chat message content | Your configured LLM provider (Anthropic/OpenAI/etc.) when you send a message | Yes — to that provider's API |
 
 ---
 
-## Tech stack (summary)
+## Tech stack
 
 - **Frontend**: React 18, Vite 8, Semantic UI React, React Router
 - **Backend**: Express.js proxy (`server/`), better-sqlite3

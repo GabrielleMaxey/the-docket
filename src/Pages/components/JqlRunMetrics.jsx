@@ -106,11 +106,11 @@ const JqlRunMetrics = ({ run }) => {
             current={counts.inProgress}
             limit={wipLimit}
             onLimitChange={handleWipChange}
-            limitTitle="WIP limit — ODI default: 4–5 In Progress tasks"
+            limitTitle="WIP limit — recommended: 4–5 In Progress tasks"
           />
 
           <div className="ww-capacity-benchmark">
-            ODI default WIP limit: <strong>4–5</strong> In Progress tasks
+            Recommended WIP limit: <strong>4–5</strong> In Progress tasks
           </div>
 
           <div className="ww-workload-bar-label">Open breakdown</div>

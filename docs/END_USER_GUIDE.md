@@ -83,7 +83,7 @@ These are the named saved searches that power everything else. Add them once in 
 
 | Preset type | Use when |
 |-------------|----------|
-| **Epic** | You want metrics tied to a specific Jira epic (ODI-1234) |
+| **Epic** | You want metrics tied to a specific Jira epic (PROJ-1234) |
 | **JQL** | You want a custom search — e.g. all issues assigned to you |
 
 To add a preset:
@@ -144,15 +144,15 @@ This is the main screen for managing your open work. Some older docs and code st
    - **Pull most recent Jira comment** — overwrites each row's **Notes** text with that issue's latest Jira comment. Attached files are not changed. Use **Clear** to reset to **Keep local notes**.
 4. **Run JQL** — loads fresh results from Jira, merges local (or shared-program) priorities, and saves results locally. Shortcut: **Ctrl+Enter** (Windows/Linux) or **⌘+Enter** (Mac).
 5. **Reset Saved Queries** — clears JQL text, labels, and the cached table. Does *not* delete your notes, priorities, or reminders in the local database.
-6. **Create Issue** — opens a modal to create a new Jira issue in ODI. See [Create Issue](#create-issue) below for parent selection and ODI rules. In short: pick a preset or parent, enter a title, then click **✦ AI Draft** (blue button next to the Description label) to generate a description and, for Stories, a suggested sub-task list:
+6. **Create Issue** — opens a modal to create a new Jira issue in your Jira project. See [Create Issue](#create-issue) below for parent selection and issue rules. In short: pick a preset or parent, enter a title, then click **✦ AI Draft** (blue button next to the Description label) to generate a description and, for Stories, a suggested sub-task list:
    - **Story**: AI rewrites the title into Job Story format ("When… I want… so I can…") if it isn't already, and generates a description that expands on the situation, motivation, and desired outcome. 2–5 suggested sub-tasks appear as editable checkboxes; uncheck any you don't want before clicking Create.
-   - **Bug**: AI generates a structured description covering what is broken, steps to reproduce, expected vs actual, environment, and any known workaround. A suggested priority (Low / Medium / High / Critical) appears based on ODI severity definitions.
+   - **Bug**: AI generates a structured description covering what is broken, steps to reproduce, expected vs actual, environment, and any known workaround. A suggested priority (Low / Medium / High / Critical) appears based on project severity definitions.
    - **Task**: AI generates a plain description.
    - The **Create** button label updates to show "Create + N subtasks" when Story sub-tasks are selected. Sub-tasks are created as **Task** type with the new story as parent (linked in the Task → Story → Epic chain); the success message lists each with its issue key and a link to open the new issue in Jira.
 
 ### Create Issue
 
-Use **Create Issue** on Task Management when you want a new Story, Task, or Bug in ODI without leaving the app.
+Use **Create Issue** on Task Management when you want a new Story, Task, or Bug in your Jira project without leaving the app.
 
 **1. Choose a starting point (Epic preset dropdown)**
 
@@ -160,15 +160,15 @@ Use **Create Issue** on Task Management when you want a new Story, Task, or Bug 
 |--------|----------------|
 | **Epic preset** | Loads that epic and its stories as parent choices. Story/Bug parents default to the epic; Task parents pick a story under the epic. |
 | **Saved query (JQL preset)** | Runs the preset's JQL (e.g. Dev Team, My Current Issues), lists matching issues, and derives parent chains (Task → Story → Epic). Pick an issue from the query, an epic/story parent, or enter a parent key manually. |
-| **Enter issue key manually** | Type an ODI key: Epic for Story/Bug, Story for Task. The app validates the key before unlocking the form. |
+| **Enter issue key manually** | Type a Jira key: Epic for Story/Bug, Story for Task. The app validates the key before unlocking the form. |
 
 The modal pre-selects a preset when you open it from an active Task Management JQL tab that matches a saved preset.
 
-**2. Parent rules (ODI)**
+**2. Parent rules**
 
 | Issue type | Required parent |
 |------------|-----------------|
-| Story | Epic (including ODI types like **Epic (Feature)**) |
+| Story | Epic (including types like **Epic (Feature)**) |
 | Bug | Epic only |
 | Task | Story |
 
@@ -181,7 +181,7 @@ The modal pre-selects a preset when you open it from an active Task Management J
 
   Only the basic ask is required — leave any optional prompt blank and the AI omits that section rather than guessing. Blank prompts are listed back to you as a reminder to finish them on the Jira issue after it is created. With the helper on, **Title** becomes optional: click **✦ AI Draft** and the AI writes the title (Job Story format for Stories) and description from your answers. Everything it produces stays editable before you create.
 - **Title** — required unless the AI helper is on. Stories should use Job Story format; AI Draft can rewrite and ask 2–3 clarification questions if the ask/goal is unclear.
-- **Components**, **Vertical Components** — choose from the dropdown. **Components** must already exist on the ODI Jira project (free-text names are rejected).
+- **Components**, **Vertical Components** — choose from the dropdown. **Components** must already exist on your Jira project (free-text names are rejected).
 - **BUG Tracking** (Bug only) — pick a default or type a custom value.
 - **Description** — use **✦ AI Draft** or write your own. Description and goal validation errors (including “story not fully defined”) appear **below the Description field**, not at the top of the modal.
 - **Priority** (Bug only) — required on create.
@@ -206,7 +206,7 @@ Appears after you Run JQL and get results. Shows:
   - **Status Report** *(default)* — AI-written summary *from your perspective as the assignee*: how the project is tracking, what needs attention, next steps. Reads the scope's label and JQL to frame the report correctly — a closed-work scope gets a completed-work recap instead of being asked about "what needs attention"
   - **1:1 Prep** — talking points for discussing your work with management (direct, skip-level, or otherwise) in a weekly or biweekly 1:1: workload, consistency, completion rate, potential blockers, and items to discuss now vs. coming up. Upward-facing, not a personal daily-standup recap
   - **PWB Review** — first-person self-assessment prose for a quarterly, mid-year, or yearly PWB review (choose the period once selected)
-  - For 1:1 Prep and PWB Review, you can optionally add **your goals** and/or your **company/team goals** — the report will note where your work supports them, and honestly flag anything that seems disconnected. All three report types can reference Lumen's 8 Cultural Behaviors where the work genuinely demonstrates one, never as a forced checklist. Goals you enter are saved automatically (on this machine) so you don't have to retype them next time — each field shows a **Clear** button once it has text, for removing a saved value.
+  - For 1:1 Prep and PWB Review, you can optionally add **your goals** and/or your **company/team goals** — the report will note where your work supports them, and honestly flag anything that seems disconnected. All three report types can reference your organization's cultural behaviors where the work genuinely demonstrates one, never as a forced checklist. Goals you enter are saved automatically (on this machine) so you don't have to retype them next time — each field shows a **Clear** button once it has text, for removing a saved value.
   - **Status hygiene check:** all three report types check whether any of your top-priority Backlog items have a Jira comment within the last 14 days — a sign real work is happening even though the status was never updated. When that happens, the report names the item and suggests updating its status, so workload snapshots and self-assessments (this one and future ones) read accurately at a glance.
 - When a report is showing, use **Clear report** in the report header to remove it from this page only (does not delete copies in **Past Reports**)
 
@@ -250,18 +250,18 @@ Each row is one Jira issue. What you can do per row:
 
 **Load status:** After **Run JQL**, the line above the table shows **Loaded X of Y matched** (how many rows are in the table vs how many Jira matched). If your query returns more than the first batch, click **Load remaining** to fetch the rest (up to a documented safe cap).
 
-**Deep links from Metrics:** Opening Task Management from Metrics (`?key=ODI-123` or `?assignee=Name`) applies table filters automatically.
+**Deep links from Metrics:** Opening Task Management from Metrics (`?key=PROJ-123` or `?assignee=Name`) applies table filters automatically.
 
-- **Issue key** — the app fetches that issue from Jira and opens a green **Drill-down: ODI-123** tab (first tab), even if the issue also appears in your saved JQL results.
+- **Issue key** — the app fetches that issue from Jira and opens a green **Drill-down: PROJ-123** tab (first tab), even if the issue also appears in your saved JQL results.
 - **Assignee name** — if that person is not already in your saved JQL results, the app runs `assignee = "Name"` in Jira and opens a **Drill-down: Name** tab with their tasks. If their issues are already loaded in a JQL tab, that tab is selected and filtered by assignee instead.
 
 A green banner confirms the active drill-down. Use **Clear filter** to remove the Metrics filter from the URL while keeping any drill-down tabs you opened in this browser session. Use the small **x** on an individual green drill-down tab to remove only that tab.
 
-**Dates column:** One column stacks three date fields per row — **Due** (Jira's standard due date), **MRD** (hover for "Most Recent Done Date," the same ODI field mapping used by Metrics — `customfield_10009` by default), and **Start** (local-only, see the table above). When a row's own Due date is empty, a small hint shows the inherited value used for overdue calculations elsewhere in the app (**My Metrics**, Chat context): the task's own MRD if set, otherwise the first ancestor's MRD found by walking the **parent chain** (for example Story → Epic). Editing Due or MRD here writes directly to Jira; it doesn't change that inheritance behavior for other rows.
+**Dates column:** One column stacks three date fields per row — **Due** (Jira's standard due date), **MRD** (hover for "Most Recent Done Date," the same field mapping used by Metrics — `customfield_10009` by default), and **Start** (local-only, see the table above). When a row's own Due date is empty, a small hint shows the inherited value used for overdue calculations elsewhere in the app (**My Metrics**, Chat context): the task's own MRD if set, otherwise the first ancestor's MRD found by walking the **parent chain** (for example Story → Epic). Editing Due or MRD here writes directly to Jira; it doesn't change that inheritance behavior for other rows.
 
 **Parent column:** Sits right after **Key** — links to the issue's parent (Story or Epic) when Jira reports one.
 
-On **shared projects**, link a Task Management slot to a **Shared program** (when the Atlas demo or future MySQL team DB is configured) so priorities sync across machines. Otherwise use local priority + NORA CSV import — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
+On **shared projects**, link a Task Management slot to a **Shared program** (when the Atlas demo or future MySQL team DB is configured) so priorities sync across machines. Otherwise use local priority + the priority tracker CSV import — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
 
 **Closed/resolved issues are read-only** — you can read them but not edit them.
 
@@ -427,7 +427,7 @@ For the best experience, run JQL on Task Management, refresh Metrics, or generat
 - "How many upcoming vs past due tasks are in my metrics snapshot?"
 - "Summarize open work for the selected epics"
 - "Who has the most overdue tasks in my My Work query?"
-- "What's the status of ODI-1234?"
+- "What's the status of PROJ-1234?"
 - "What did my week plan say about Tuesday?"
 - "Summarize the executive report I generated on Metrics"
 
@@ -480,7 +480,7 @@ Some teams used a shared Excel tracker so everyone sees the same ranking. In Tas
 
 1. Configure the team priority demo (`TEAM_PRIORITY_MONGODB_URI`) or wait for production MySQL sync.
 2. In Settings, seed shared programs if needed; optionally **Import team priorities** with target **Atlas (demo)** or **Seed from local priorities**.
-3. On Task Management, set the slot’s **Shared program** (e.g. NORA).
+3. On Task Management, set the slot’s **Shared program**.
 4. Change **Priority** as usual — it saves to the shared store immediately. Rows show a **Team** badge when priority comes from that store.
 5. **Run JQL** on that slot loads priorities from the shared store (not from Jira comments).
 
@@ -490,13 +490,13 @@ Personal slots (Shared program = None) keep using local SQLite only.
 
 Push notes as Jira comments when the team needs the text in Jira. Priority is **not** parsed from comment text anymore — use a shared-program slot (or local/CSV import) for ranking.
 
-### Bootstrap from the NORA Excel tracker
+### Bootstrap from the priority tracker
 
-PMs can keep rankings in the NORA spreadsheet and share a **CSV** export:
+PMs can keep rankings in the priority tracker spreadsheet and share a **CSV** export:
 
-1. In Excel: **File → Save As → CSV UTF-8** (columns: `Priority`, `ODI`, `Developer`, `Jira Status`, `notes`).
+1. In Excel: **File → Save As → CSV UTF-8** (columns: `Priority`, `Issue Key`, `Developer`, `Jira Status`, `notes`).
 2. In Task Manager: **Settings → Import team priorities** → choose target (**This machine** or **Atlas (demo)** when connected) → **Import CSV**.
-3. Matching `ODI` keys overwrite priority for that target. **Notes** fill in only when importing to this machine and the local note is empty.
+3. Matching issue keys overwrite priority for that target. **Notes** fill in only when importing to this machine and the local note is empty.
 4. Re-import when spreadsheet rankings change. Reload Task Management (or re-run JQL) if that page is already open.
 
 **Developers:** Manual export/backup of SQLite is documented in [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) — that is for backup or handoff, not live multi-user editing.
@@ -543,7 +543,7 @@ That's normal — the table was restored from the last time you ran JQL. Click *
 Expected. Notes are stored in a local file on the machine you started the app on. Use one machine, or ask a developer about exporting the SQLite file. For **shared ranking**, link a Task Management slot to a Shared program (or import CSV to Atlas) — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
 
 **How do we share priority on a project like we did in Excel?**
-Link the Task Management slot to a **Shared program** so priority reads/writes the team store (Atlas demo today). Or **Settings → Import team priorities** from the NORA CSV (local or Atlas). See [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
+Link the Task Management slot to a **Shared program** so priority reads/writes the team store (Atlas demo today). Or **Settings → Import team priorities** from the priority tracker CSV (local or Atlas). See [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
 
 **The Push note button is greyed out**
 You've already pushed that exact note (text and attachments) as a comment. Edit the note or change attached files and the button will re-enable.
@@ -573,7 +573,7 @@ If the task has no MRD, the app inherits from parents up to the epic — shown a
 Check your network/VPN, then verify `.env` has correct `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN`. See [JIRA_SETUP.md](./JIRA_SETUP.md).
 
 **Create Issue says the parent must be an Epic or Story**
-Match the parent to the issue type: Story/Bug → Epic; Task → Story. For saved JQL presets, pick an issue from the query (parent chain is filled in), choose a parent from the dropdown, or enter a valid ODI key manually. ODI epic types such as **Epic (Feature)** are supported.
+Match the parent to the issue type: Story/Bug → Epic; Task → Story. For saved JQL presets, pick an issue from the query (parent chain is filled in), choose a parent from the dropdown, or enter a valid issue key manually. Epic types such as **Epic (Feature)** are supported.
 
 **Create Issue failed but I fixed the form — Create is still greyed out**
 After a validation error, ensure **Title** is filled and a parent is selected. The Create button re-enables when those are set; you do not need to close the modal.

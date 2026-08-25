@@ -94,7 +94,7 @@ taskManager/
 │       └── reportRoutes.mjs       # /api/report/* + /api/plan/week
 ├── shared/
 │   ├── dashboardMetrics.mjs   # Pure metrics helpers (server + UI); issue type family matching
-│   ├── odiIssueStandards.mjs  # ODI create validation (Job Story, bug structure, parent rules)
+│   ├── odiIssueStandards.mjs  # create validation (Job Story, bug structure, parent rules)
 │   ├── odiCreateIssueFields.mjs # Components / Vertical / BUG Tracking defaults
 │   ├── createIssuePresetUtils.mjs # Preset dropdown values, JQL epic key extraction
 │   ├── createIssueParentUtils.mjs # Manual key validation + query-issue parent resolution
@@ -207,7 +207,7 @@ taskManager/
 
 | Column | Type | Notes |
 |--------|------|-------|
-| `issue_key` | TEXT PK | e.g. `ODI-1234` |
+| `issue_key` | TEXT PK | e.g. `PROJ-1234` |
 | `note` | TEXT | Local draft note |
 | `priority` | INTEGER | 0–20; 0 = unranked, 1 = highest |
 | `start_date` | TEXT | `YYYY-MM-DD` or `''`. Ad-hoc — no Jira field backs this; feeds Gantt-chart views |
@@ -217,7 +217,7 @@ taskManager/
 
 **Planned — team priority DB:** Shared program priority in team **MySQL**. Prefer **`jiraProxy` → MySQL** when a connection is available; optional Team Priority API only if DB access cannot be granted. Epic-root scope on writes; Task Management slots **link explicitly** to a shared program for team mode — all other slots stay local-only. Priority range **1–20**. Spec → **[specs/team-priority-sync.md](./specs/team-priority-sync.md)**; DDL → **[specs/team-priority-sync-mysql.sql](./specs/team-priority-sync-mysql.sql)**.
 
-**Current priority sources:** Local SQLite (`issue_metadata`) for personal Task Management slots; Atlas team DB for slots linked to a shared program. Jira comment text is **not** parsed for priority. NORA CSV import seeds local and/or Atlas. Clamp helper: `shared/issuePriority.mjs`. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
+**Current priority sources:** Local SQLite (`issue_metadata`) for personal Task Management slots; Atlas team DB for slots linked to a shared program. Jira comment text is **not** parsed for priority. The priority tracker CSV import seeds local and/or Atlas. Clamp helper: `shared/issuePriority.mjs`. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
 
 **Start date sources:** Same split as priority — local SQLite for personal slots, the team store (`team_issue_dates` Mongo collection / `team_issue_date` MySQL table, see specs above) for shared-program-linked issues. Deliberately a separate table/collection from priority: `team_issue_priority` deletes its row when priority hits 0, and a start date must survive that. **Due date** and **MRD** (Most Recent Done Date) are real Jira fields (`duedate` and the field mapped to the `most_recent_done_date` role — see Settings → field mappings) — editing them in Task Management pushes straight to Jira via `POST /api/jira/issues/:issueKey/date-field`, no local storage involved.
 
@@ -302,7 +302,7 @@ sqlite3 -header -csv data/workweek.sqlite \
 
 ---
 
-## Key Jira custom fields (ODI project)
+## Key Jira custom fields
 
 | Field | Custom field ID |
 |-------|----------------|
@@ -332,10 +332,10 @@ These are mapped in Settings → Jira field mapping and synced via `POST /api/ji
 
 **`dueByFallbackFieldId` rule (set in `buildRefreshContext.mjs`):**
 - When **Compare against = Task due date**: fallback is the mapped `duedate` field
-- When **Compare against = MRD or IDD**: fallback is the same as `compareFieldId` — the standard `duedate` field is intentionally excluded, because tasks at ODI often have a stale `duedate` that would otherwise override the epic’s MRD/IDD
+- When **Compare against = MRD or IDD**: fallback is the same as `compareFieldId` — the standard `duedate` field is intentionally excluded, because tasks in your Jira project often have a stale `duedate` that would otherwise override the epic’s MRD/IDD
 
 **`candidateFieldIds` rule (set in `dueByHelpers.mjs → resolveCandidateFieldIds`):**
-- When **Compare against = Task due date**: `[duedate, MRD, IDD, PED]` — ODI epics don’t use standard `duedate`, so MRD/IDD/PED are included as fallback candidate fields for epic-level date inheritance
+- When **Compare against = Task due date**: `[duedate, MRD, IDD, PED]` — project epics may not use standard `duedate`, so MRD/IDD/PED are included as fallback candidate fields for epic-level date inheritance
 - When **Compare against = MRD**: `[MRD]`
 - When **Compare against = IDD**: `[IDD]`
 
@@ -411,7 +411,7 @@ Drill-down behavior:
 3. **Pending state** — `JiraResultsTable.jsx` creates a temporary **Loading drill-down...** tab while `WorkWeekTasks.jsx` is fetching the target, so Dashboard clicks show the loading message even when regular JQL tabs already exist.
 4. **`loadDrillDownIssueByKey`** (`jiraJqlRunWorkflow.js`) — fetches `key = "ISSUE-KEY"` from Jira and prepends/refreshes a **Drill-down: ISSUE-KEY** tab (`isDrillDown: true`, `drillDownType: "issue"`, stable `drillDownId`).
 5. **`loadDrillDownIssuesByAssignee`** — when the assignee is not already in saved JQL results, runs `assignee = "Name"` in Jira and prepends/refreshes a **Drill-down: Name** tab (`drillDownType: "assignee"`). `WorkWeekTasks.jsx` triggers this from `?assignee=` when no matching run exists.
-   - **Unassigned is special-cased**, not just another assignee name: `assignee = "Unassigned"` is a literal string match against a Jira user, and no such user exists, so it always returned zero results. The fix runs `assignee is EMPTY` instead, scoped to the originating project's real JQL via `GET /api/epic-presets/:id/scope-jql` (falls back to `project = ODI` when no `epicPresetId` is available or the fetch fails). See `UNASSIGNED_DRILLDOWN_PROJECT_KEY` in `jiraJqlRunWorkflow.js`.
+   - **Unassigned is special-cased**, not just another assignee name: `assignee = "Unassigned"` is a literal string match against a Jira user, and no such user exists, so it always returned zero results. The fix runs `assignee is EMPTY` instead, scoped to the originating project's real JQL via `GET /api/epic-presets/:id/scope-jql` (falls back to `project = [PROJECT]` when no `epicPresetId` is available or the fetch fails). See `UNASSIGNED_DRILLDOWN_PROJECT_KEY` in `jiraJqlRunWorkflow.js`.
    - `JiraResultsTable.jsx` also seeds its own row-level assignee filter dropdown from the URL. That dropdown expects the sentinel `"__unassigned__"`, not the literal string `"Unassigned"` — seeding it with the raw URL value silently filters out every row even when the fetch above succeeds. Both spots need to agree on the unassigned case.
    - Because `epicPresetId` can differ per click, `matchesDrillDownAssignee` (`WorkWeekTasks.jsx`) requires **both** the assignee name and `epicPresetId` to match before treating a `jqlRuns` entry as "already loaded" — otherwise "Unassigned" clicked from two different project cards would collide into the same tab.
 
@@ -430,7 +430,7 @@ Settings UI: **Export team pack** / **Import team pack**. Align with `npm run se
 
 ### Create Issue (`CreateIssueModal.jsx` + `jiraIssueRoutes.mjs`)
 
-Work Week **Create Issue** creates Story, Task, or Bug issues in ODI with client and server validation against `shared/odiIssueStandards.mjs`.
+Work Week **Create Issue** creates Story, Task, or Bug issues in your Jira project with client and server validation against `shared/odiIssueStandards.mjs`.
 
 **Parent selection (three paths):**
 
@@ -442,23 +442,23 @@ Work Week **Create Issue** creates Story, Task, or Bug issues in ODI with client
 
 Preset preload from the active Work Week tab uses `resolveCreateIssueDefaults` in `shared/createIssuePresetUtils.mjs` (`defaultEpicSelectValue`). Manual key validation and query-issue parent resolution live in `shared/createIssueParentUtils.mjs`; the modal uses `useCreateIssueManualKey` for debounced validation and `setResolvedParent` / `applyQueryIssueParent` for a single parent-state code path.
 
-**Create payload:** `buildJiraCreatePayload` in `server/lib/jiraCreateIssueFields.mjs` reads Jira **createmeta** to choose `parent` vs Epic Link, issue type id, priority mapping (`Critical` → `Highest`), and ODI custom fields (Components, Vertical Components, BUG Tracking). Descriptions are sent as ADF via `shared/jiraDescriptionAdf.mjs`.
+**Create payload:** `buildJiraCreatePayload` in `server/lib/jiraCreateIssueFields.mjs` reads Jira **createmeta** to choose `parent` vs Epic Link, issue type id, priority mapping (`Critical` → `Highest`), and project custom fields (Components, Vertical Components, BUG Tracking). Descriptions are sent as ADF via `shared/jiraDescriptionAdf.mjs`.
 
-**Parent / issue-type rules (ODI):**
+**Parent / issue-type rules:**
 
 | Create | Issue type sent | Jira issuetype used | Parent link |
 |--------|-----------------|---------------------|-------------|
 | Story / Bug under Epic | Story / Bug | Same | `parent` preferred; Epic Link fallback |
-| Task / sub-task under Story | Task (`isSubtask: true` for story flow) | **Sub-task** (ODI Task parents to Epic only) | `fields.parent = { key: storyKey }` |
+| Task / sub-task under Story | Task (`isSubtask: true` for story flow) | **Sub-task** (Task parents to Epic only) | `fields.parent = { key: storyKey }` |
 | Standalone Task under Story | Task | **Sub-task** | `fields.parent = { key: storyKey }` |
 
-Story-backed work must use Jira **Sub-task** under a Story. ODI **Task** issues parent to Epics (`Epic (Feature)`), not Stories — forcing Task + Story parent produces Parent Link / parentId validation errors. Portfolio **Parent Link** (`customfield_10018`) is not used for story parents.
+Story-backed work must use Jira **Sub-task** under a Story. **Task** issues parent to Epics (`Epic (Feature)`), not Stories — forcing Task + Story parent produces Parent Link / parentId validation errors. Portfolio **Parent Link** (`customfield_10018`) is not used for story parents.
 
 **Components:** `loadProjectComponents` fetches `/rest/api/3/project/{key}/components`; unknown component names are rejected before the Jira API call.
 
 **Modal validation UX:** `descriptionError` state shows description/goal/clarification failures below the Description textarea; other errors stay in the top banner. `canSubmit` vs `canEditIssueFields` allows resubmit after fixing validation errors.
 
-**Issue type matching:** ODI uses variant names such as `Epic (Feature)` and `Story (User Story)`. `matchesIssueTypeFamily` in `shared/dashboardMetrics.mjs` treats these as epic/story for parent validation — not only the literal names `Epic` / `Story`.
+**Issue type matching:** Your Jira project may use variant names such as `Epic (Feature)` and `Story (User Story)`. `matchesIssueTypeFamily` in `shared/dashboardMetrics.mjs` treats these as epic/story for parent validation — not only the literal names `Epic` / `Story`.
 
 ### Past Reports archive
 
@@ -868,5 +868,5 @@ Produces artifacts: `desktop-macos` (universal `.dmg` for Intel and Apple Silico
 ---
 
 More setup detail: [JIRA_SETUP.md](./JIRA_SETUP.md)
-Non-technical usage: [END_USER_GUIDE.md](./END_USER_GUIDE.md). Mixed IC/PM/manager roadmap: [ROADMAP-ODI-MIXED-TEAM.md](./ROADMAP-ODI-MIXED-TEAM.md).
+Non-technical usage: [END_USER_GUIDE.md](./END_USER_GUIDE.md).
 App overview: [README.md](./README.md)
