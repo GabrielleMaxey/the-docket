@@ -112,7 +112,7 @@ A successful response looks like:
 
 ## 5. Set up presets (required for Metrics + Chat)
 
-**Pilot shortcut:** after `npm install` and a first API start, seed shared ODI presets:
+**Pilot shortcut:** after `npm install` and a first API start, seed shared presets:
 
 ```bash
 npm run seed:presets -- --all
@@ -124,7 +124,7 @@ See [pilot-presets.md](./pilot-presets.md) for interactive selection and catalog
 
 1. Settings → **Epic & JQL presets** → Add preset
 2. For each project you want to track, add either:
-   - **Epic preset**: epic key (e.g. `ODI-1234`) + a label
+   - **Epic preset**: epic key (e.g. `PROJ-1234`) + a label
    - **JQL preset**: a saved JQL query + a label
 
 These presets appear in the Metrics filter panel, the Task Management **Create Issue** modal (epic presets and saved queries — JQL presets can resolve parents from query results when no single epic key is embedded), and the Chat context panel.
@@ -145,7 +145,7 @@ The app needs to know which Jira custom fields hold your deadline dates.
 
 4. Click **Save field mappings**
 
-> The ODI project uses `customfield_10008` (Initial Done Date) and `customfield_10009` (Most Recent Done Date). These are pre-mapped in `server/lib/jiraSearchFields.mjs` as fallbacks.
+> Your Jira project may use `customfield_10008` (Initial Done Date) and `customfield_10009` (Most Recent Done Date). These are pre-mapped in `server/lib/jiraSearchFields.mjs` as fallbacks.
 
 ---
 
@@ -159,7 +159,7 @@ Settings → **Past due rules** → choose which date field triggers the "Past D
 | Most Recent Done Date | Only that Automated Done Date field triggers past due |
 | Project End Date | Only that field triggers past due |
 
-Open **tasks/stories** in overdue metrics also count when standard **Due date**, **Most Recent Done Date**, or **Initial Done Date** on the issue itself is before today. Epic-level Automated Done Date fields (`customfield_10008` / `customfield_10009`) are the primary deadlines for ODI epics.
+Open **tasks/stories** in overdue metrics also count when standard **Due date**, **Most Recent Done Date**, or **Initial Done Date** on the issue itself is before today. Epic-level Automated Done Date fields (`customfield_10008` / `customfield_10009`) are the primary deadlines for your Jira project's epics.
 
 ---
 
