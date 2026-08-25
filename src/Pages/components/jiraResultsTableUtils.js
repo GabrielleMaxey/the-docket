@@ -23,7 +23,7 @@ export const getKnownStatuses = (issues) =>
 
 export const filterIssues = (
   issues,
-  { keyQuery, statusFilter, assigneeFilter, subtaskBugOnly, includeStories }
+  { keyQuery, keywordQuery, statusFilter, assigneeFilter, subtaskBugOnly, includeStories }
 ) => {
   let result = issues;
   const keyTerm = String(keyQuery || "").trim().toLowerCase();
@@ -33,6 +33,12 @@ export const filterIssues = (
       const issueKey = String(issue.key || "").toLowerCase();
       return looksLikeFullKey ? issueKey === keyTerm : issueKey.includes(keyTerm);
     });
+  }
+  const kw = String(keywordQuery || "").trim().toLowerCase();
+  if (kw) {
+    result = result.filter((issue) =>
+      String(issue.fields?.summary || "").toLowerCase().includes(kw)
+    );
   }
   if (statusFilter) {
     result = result.filter((issue) => String(issue.fields?.status?.name || "") === statusFilter);

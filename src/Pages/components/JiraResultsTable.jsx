@@ -164,6 +164,7 @@ const JiraResultsTable = ({
   const [activeTab, setActiveTab] = React.useState(0);
   const [pageByRunIndex, setPageByRunIndex] = React.useState({});
   const [keyFilterByRunIndex, setKeyFilterByRunIndex] = React.useState({});
+  const [keywordFilterByRunIndex, setKeywordFilterByRunIndex] = React.useState({});
   const [statusFilterByRunIndex, setStatusFilterByRunIndex] = React.useState({});
   const [assigneeFilterByRunIndex, setAssigneeFilterByRunIndex] = React.useState({});
   const [subtaskBugOnlyByRunIndex, setSubtaskBugOnlyByRunIndex] = React.useState({});
@@ -287,12 +288,14 @@ const JiraResultsTable = ({
   const runSlotIndex = run.index ?? safeTab;
   const allLoadedIssues = run.issues || [];
   const keyFilterDraft = keyFilterByRunIndex[runStateKey] ?? "";
+  const keywordFilter = keywordFilterByRunIndex[runStateKey] ?? "";
   const statusFilter = statusFilterByRunIndex[runStateKey] ?? "";
   const assigneeFilter = assigneeFilterByRunIndex[runStateKey] ?? "";
   const subtaskBugOnly = subtaskBugOnlyByRunIndex[runStateKey] ?? false;
   const includeStories = includeStoriesByRunIndex[runStateKey] ?? false;
   const issuesMatchingKey = filterIssues(allLoadedIssues, {
     keyQuery: keyFilterDraft,
+    keywordQuery: keywordFilter,
     statusFilter,
     assigneeFilter,
     subtaskBugOnly,
@@ -350,6 +353,12 @@ const JiraResultsTable = ({
     setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
   };
 
+  const handleKeywordFilterChange = (event) => {
+    const value = event.target.value;
+    setKeywordFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: value }));
+    setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
+  };
+
   const handleStatusFilterChange = (event) => {
     const value = event.target.value;
     setStatusFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: value }));
@@ -379,6 +388,7 @@ const JiraResultsTable = ({
 
   const handleClearFilters = () => {
     setKeyFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: "" }));
+    setKeywordFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: "" }));
     setStatusFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: "" }));
     setAssigneeFilterByRunIndex((prev) => ({ ...prev, [runStateKey]: "" }));
     setPageByRunIndex((prev) => ({ ...prev, [runStateKey]: 1 }));
@@ -495,6 +505,21 @@ const JiraResultsTable = ({
             </p>
 
             <div className="ww-key-filter-row">
+              <label className="ww-key-filter-label" htmlFor={`ww-keyword-filter-${runStateKey}`}>
+                Search
+              </label>
+              <input
+                id={`ww-keyword-filter-${runStateKey}`}
+                className="ww-key-filter-input"
+                type="search"
+                placeholder="keyword or phrase in summary"
+                value={keywordFilter}
+                onChange={handleKeywordFilterChange}
+                aria-label="Search table rows by keyword or phrase in issue summary"
+                autoComplete="off"
+                spellCheck={false}
+              />
+
               <label className="ww-key-filter-label" htmlFor={`ww-key-filter-${runStateKey}`}>
                 Filter by key
               </label>
@@ -566,7 +591,7 @@ const JiraResultsTable = ({
                 </label>
               ) : null}
 
-              {(keyFilterDraft || statusFilter || assigneeFilter) ? (
+              {(keyFilterDraft || keywordFilter || statusFilter || assigneeFilter) ? (
                 <button
                   type="button"
                   className="ww-page-btn"
