@@ -2,7 +2,7 @@ import { clampIssuePriority } from "../../shared/issuePriority.mjs";
 
 const ISSUE_KEY_RE = /^[A-Z][A-Z0-9]+-\d+$/i;
 const ISSUE_KEY_FIND_RE = /\b([A-Z][A-Z0-9]+-\d+)\b/i;
-const DEFAULT_PROJECT_KEY = "ODI";
+const DEFAULT_PROJECT_KEY = "";
 
 export const normalizeImportIssueKey = (value) => {
   const raw = String(value || "").trim();
@@ -16,12 +16,12 @@ export const normalizeImportIssueKey = (value) => {
   if (found) {
     return found[1].toUpperCase();
   }
-  // "ODI 25789" / "ODI_25789" / "odi- 25789"
+  // "PROJ 25789" / "PROJ_25789" / "proj- 25789"
   const spaced = raw.match(/^([A-Z][A-Z0-9]+)[\s_-]+(\d+)$/i);
   if (spaced) {
     return `${spaced[1].toUpperCase()}-${spaced[2]}`;
   }
-  // Bare numeric key from Excel exports → assume ODI
+  // Bare numeric key from Excel exports → assume project key
   if (/^\d{3,6}$/.test(raw)) {
     return `${DEFAULT_PROJECT_KEY}-${raw}`;
   }
@@ -216,7 +216,7 @@ export const parseIssueMetadataCsv = (csvText) => {
       .join(" / ");
     return {
       ok: false,
-      error: `CSV must include ODI and Priority columns. Preview: ${preview || "(empty)"}`,
+      error: `CSV must include issue key and Priority columns. Preview: ${preview || "(empty)"}`,
     };
   }
 
@@ -260,7 +260,7 @@ export const planIssueMetadataImport = (rows, existingByKey = {}) => {
       skipped += 1;
       errors.push({
         row: row.rowNumber,
-        reason: `Missing or invalid ODI issue key (${String(row.odi || "").slice(0, 40) || "empty"})`,
+        reason: `Missing or invalid issue key (${String(row.odi || "").slice(0, 40) || "empty"})`,
       });
       continue;
     }

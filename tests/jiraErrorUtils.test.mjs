@@ -10,7 +10,7 @@ import {
 describe("jiraErrorUtils", () => {
   it("detects Workfront integration messages", () => {
     assert.equal(
-      isWorkfrontJiraErrorMessage("Workfront sync failed for issue ODI-1"),
+      isWorkfrontJiraErrorMessage("Workfront sync failed for issue PROJ-1"),
       true
     );
     assert.equal(isWorkfrontJiraErrorMessage("Invalid parent for issue type"), false);

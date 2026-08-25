@@ -55,7 +55,7 @@ describe("isImperativeSubtaskTitle", () => {
 
 describe("validateBugDescription", () => {
   it("requires structured bug descriptions", () => {
-    assert.equal(validateBugDescription(""), "Bug description is required per ODI standards.");
+    assert.equal(validateBugDescription(""), "Bug description is required.");
     assert.equal(
       validateBugDescription("Broken"),
       "Bug description is too short. Include what is broken, reproduction steps, and expected vs actual behavior."
@@ -96,7 +96,7 @@ describe("validateOdiIssueCreate", () => {
         "When SSO users sign in, I want session timeout handled, so I can stay authenticated safely.",
       description:
         "SSO sessions expire without warning.\n\nAsk:\n- Extend session handling\n\nGoal / outcome:\n- Users remain signed in during active work",
-      epicKey: "ODI-1000",
+      epicKey: "PROJ-1000",
       assignee: "",
     });
 
@@ -108,7 +108,7 @@ describe("validateOdiIssueCreate", () => {
     const result = validateOdiIssueCreate({
       issueType: "Task",
       summary: "When X, I want Y, so I can Z.",
-      epicKey: "ODI-2000",
+      epicKey: "PROJ-2000",
       isSubtask: true,
       parentRole: "story",
     });
@@ -122,7 +122,7 @@ describe("validateOdiIssueCreate", () => {
       issueType: "Bug",
       summary: "Login fails",
       description: "Login fails for SSO users.\n\nSteps to reproduce:\n- Open login\n- Choose SSO",
-      epicKey: "ODI-3000",
+      epicKey: "PROJ-3000",
       parentRole: "story",
       priority: "",
     });
@@ -136,7 +136,7 @@ describe("validateOdiIssueCreate", () => {
     const result = validateOdiIssueCreate({
       issueType: "Task",
       summary: "Configure LDAP sync",
-      epicKey: "ODI-4000",
+      epicKey: "PROJ-4000",
       parentRole: "epic",
     });
 
@@ -149,7 +149,7 @@ describe("validateOdiIssueCreate", () => {
       issueType: "Bug",
       summary: "Login fails",
       description: "too short",
-      epicKey: "ODI-3000",
+      epicKey: "PROJ-3000",
       parentRole: "epic",
       priority: "High",
       skipDescriptionStandards: true,

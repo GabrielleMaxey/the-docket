@@ -345,7 +345,7 @@ export const registerJiraIssueRoutes = (
       return;
     }
 
-    const projectKey = String(req.body?.projectKey || "ODI").trim();
+    const projectKey = String(req.body?.projectKey || "").trim();
     const issueType = String(req.body?.issueType || "Story").trim();
     const summary = String(req.body?.summary || "").trim();
     const description = String(req.body?.description || "").trim();
@@ -382,19 +382,19 @@ export const registerJiraIssueRoutes = (
       skipDescriptionStandards: overrideDescriptionStandards,
     });
     if (!standardsCheck.valid) {
-      log.warn(`create ${issueType} rejected: ODI standards`, {
+      log.warn(`create ${issueType} rejected: issue standards`, {
         epicKey,
         overrideDescriptionStandards,
         errors: standardsCheck.errors,
       });
       return res.status(400).json({
-        error: "Issue does not meet ODI Jira standards",
+        error: "Issue does not meet Jira standards",
         errors: standardsCheck.errors,
       });
     }
 
     if (overrideDescriptionStandards) {
-      log.warn(`create ${issueType}: ODI description standards overridden`, {
+      log.warn(`create ${issueType}: description standards overridden`, {
         epicKey,
         summary,
       });

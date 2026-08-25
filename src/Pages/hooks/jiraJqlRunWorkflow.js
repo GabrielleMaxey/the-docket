@@ -17,7 +17,7 @@ import {
 import { escapeJqlString } from "../../../shared/directReportsJql.mjs";
 import { errorMessage, mergeIssueMapsPreferExisting } from "../../utils/workflow.js";
 
-const UNASSIGNED_DRILLDOWN_PROJECT_KEY = "ODI";
+const UNASSIGNED_DRILLDOWN_PROJECT_KEY = "";
 
 const readCommentEntry = (entry) => {
   if (typeof entry === "string") {

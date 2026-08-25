@@ -19,17 +19,17 @@ describe("splitTrailingOrderBy", () => {
   });
 
   it("splits a simple trailing ORDER BY", () => {
-    const result = splitTrailingOrderBy("project = ODI ORDER BY updated DESC");
+    const result = splitTrailingOrderBy("project = PROJ ORDER BY updated DESC");
     assert.deepEqual(result, {
-      scope: "project = ODI",
+      scope: "project = PROJ",
       orderBy: "ORDER BY updated DESC",
     });
   });
 
   it("returns the full string as scope when there is no ORDER BY", () => {
-    const result = splitTrailingOrderBy("project = ODI AND status != Done");
+    const result = splitTrailingOrderBy("project = PROJ AND status != Done");
     assert.deepEqual(result, {
-      scope: "project = ODI AND status != Done",
+      scope: "project = PROJ AND status != Done",
       orderBy: "",
     });
   });
@@ -37,28 +37,28 @@ describe("splitTrailingOrderBy", () => {
   it("ignores an 'order by' phrase that only appears inside a quoted string", () => {
     // Regression: this exact phrase in a text-search literal used to get
     // matched by a naive regex and truncate the scope mid-string.
-    const source = 'summary ~ "purchase order by region" OR parent IN (ODI-1)';
+    const source = 'summary ~ "purchase order by region" OR parent IN (PROJ-1)';
     const result = splitTrailingOrderBy(source);
     assert.deepEqual(result, { scope: source, orderBy: "" });
   });
 
   it("still finds a real trailing ORDER BY when the scope also contains a quoted 'order by' phrase", () => {
     const source =
-      'summary ~ "purchase order by region" OR parent IN (ODI-1) ORDER BY key DESC';
+      'summary ~ "purchase order by region" OR parent IN (PROJ-1) ORDER BY key DESC';
     const result = splitTrailingOrderBy(source);
     assert.deepEqual(result, {
-      scope: 'summary ~ "purchase order by region" OR parent IN (ODI-1)',
+      scope: 'summary ~ "purchase order by region" OR parent IN (PROJ-1)',
       orderBy: "ORDER BY key DESC",
     });
   });
 
   it("handles a real-shaped multi-clause preset JQL correctly", () => {
     const source =
-      'issuekey ~ "ODI-*" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), "Sub-task") AND summary ~ "(codename OR ProjectAlpha)" OR parent IN (ODI-99001) ORDER BY key DESC, parent ASC, status ASC, rank';
+      'issuekey ~ "ODI-*" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), "Sub-task") AND summary ~ "(codename OR ProjectAlpha)" OR parent IN (PROJ-99001) ORDER BY key DESC, parent ASC, status ASC, rank';
     const result = splitTrailingOrderBy(source);
     assert.equal(
       result.scope,
-      'issuekey ~ "ODI-*" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), "Sub-task") AND summary ~ "(codename OR ProjectAlpha)" OR parent IN (ODI-99001)'
+      'issuekey ~ "ODI-*" AND issuetype IN (subTaskIssueTypes(), standardIssueTypes(), "Sub-task") AND summary ~ "(codename OR ProjectAlpha)" OR parent IN (PROJ-99001)'
     );
     assert.equal(result.orderBy, "ORDER BY key DESC, parent ASC, status ASC, rank");
   });
@@ -84,21 +84,21 @@ describe("buildDashboardMetricsJql", () => {
 
   it("strips open-only status filters while keeping scope and order", () => {
     const source =
-      "project = ODI AND status NOT IN (Done, Closed) ORDER BY updated DESC";
+      "project = PROJ AND status NOT IN (Done, Closed) ORDER BY updated DESC";
     const result = buildDashboardMetricsJql(source);
-    assert.equal(result, "project = ODI ORDER BY updated DESC");
+    assert.equal(result, "project = PROJ ORDER BY updated DESC");
   });
 
   it("removes statusCategory != Done and status IN (Open) clauses", () => {
     const source =
-      "project = ODI AND statusCategory != Done AND status IN (Open) ORDER BY priority ASC";
+      "project = PROJ AND statusCategory != Done AND status IN (Open) ORDER BY priority ASC";
     const result = buildDashboardMetricsJql(source);
-    assert.equal(result, "project = ODI ORDER BY priority ASC");
+    assert.equal(result, "project = PROJ ORDER BY priority ASC");
   });
 
   it("defaults order clause when source has no ORDER BY", () => {
-    const result = buildDashboardMetricsJql("project = ODI AND status != Done");
-    assert.match(result, /^project = ODI ORDER BY updated DESC$/);
+    const result = buildDashboardMetricsJql("project = PROJ AND status != Done");
+    assert.match(result, /^project = PROJ ORDER BY updated DESC$/);
   });
 
   it("preserves custom ORDER BY at end of query", () => {
@@ -126,8 +126,8 @@ describe("buildFieldMappingsMap", () => {
 describe("fallbackPresetJql", () => {
   it("builds parent-or-key clause for epic presets", () => {
     assert.equal(
-      fallbackPresetJql("ODI-123"),
-      "(parent = ODI-123 OR key = ODI-123) ORDER BY updated DESC"
+      fallbackPresetJql("PROJ-123"),
+      "(parent = PROJ-123 OR key = PROJ-123) ORDER BY updated DESC"
     );
     assert.equal(fallbackPresetJql(""), "");
   });
@@ -168,11 +168,11 @@ describe("buildPastDueJql", () => {
     const jql = buildPastDueJql({
       mappingsByRole,
       epicPastDueMode: "project_end_date",
-      epicKeys: ["ODI-1", "ODI-2"],
+      epicKeys: ["PROJ-1", "PROJ-2"],
     });
 
-    assert.match(jql, /parent in \(ODI-1, ODI-2\)/);
-    assert.match(jql, /key in \(ODI-1, ODI-2\)/);
+    assert.match(jql, /parent in \(PROJ-1, PROJ-2\)/);
+    assert.match(jql, /key in \(PROJ-1, PROJ-2\)/);
   });
 
   it("adds a floor date when pastDueFloorDate is provided", () => {
@@ -203,19 +203,19 @@ describe("buildUpcomingDueJql", () => {
       mappingsByRole,
       dueByField: "due_date",
       dueByDate: "2026-09-13",
-      epicKeys: ["ODI-1"],
+      epicKeys: ["PROJ-1"],
     });
     assert.match(jql, /duedate >= startOfDay\(\)/);
     assert.match(jql, /duedate <= "2026-09-13"/);
-    assert.match(jql, /parent in \(ODI-1\)/);
+    assert.match(jql, /parent in \(PROJ-1\)/);
   });
 });
 
 describe("buildStatusCategoryJql", () => {
   it("builds an In Progress query", () => {
-    const jql = buildStatusCategoryJql({ category: "In Progress", epicKeys: ["ODI-9"] });
+    const jql = buildStatusCategoryJql({ category: "In Progress", epicKeys: ["PROJ-9"] });
     assert.match(jql, /statusCategory = "In Progress"/);
-    assert.match(jql, /key in \(ODI-9\)/);
+    assert.match(jql, /key in \(PROJ-9\)/);
   });
 });
 
@@ -226,11 +226,11 @@ describe("applyJqlScope", () => {
 
   it("intersects bucket JQL with the union of saved preset queries", () => {
     const scope = buildUnionScopeFromJqls([
-      "parent = ODI-1 ORDER BY updated DESC",
-      "parent = ODI-2 ORDER BY created ASC",
+      "parent = PROJ-1 ORDER BY updated DESC",
+      "parent = PROJ-2 ORDER BY created ASC",
     ]);
     const jql = applyJqlScope('statusCategory = "To Do" ORDER BY updated DESC', scope);
     assert.match(jql, /statusCategory = "To Do"/);
-    assert.match(jql, /\(parent = ODI-1\) OR \(parent = ODI-2\)/);
+    assert.match(jql, /\(parent = PROJ-1\) OR \(parent = PROJ-2\)/);
   });
 });

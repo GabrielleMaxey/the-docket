@@ -17,7 +17,7 @@ describe("buildReportDueWindowsAndLinks", () => {
         dueByField: "due_date",
       },
       mappingsByRole,
-      presetUnionScope: '(parent = ODI-1 OR key = ODI-1)',
+      presetUnionScope: '(parent = PROJ-1 OR key = PROJ-1)',
       epicMetrics: [
         {
           overdueOpenIssues: 2,
@@ -35,7 +35,7 @@ describe("buildReportDueWindowsAndLinks", () => {
     assert.match(result.appendedSection, /Upcoming/);
     assert.match(result.appendedSection, /In progress/);
     const decodedLinks = decodeURIComponent(result.appendedSection.replace(/\+/g, " "));
-    assert.match(decodedLinks, /parent = ODI-1/);
+    assert.match(decodedLinks, /parent = PROJ-1/);
     assert.match(result.appendedSection, /Backlog/);
   });
 
@@ -69,7 +69,7 @@ describe("buildReportDueWindowsAndLinks", () => {
         dueByField: "due_date",
       },
       mappingsByRole,
-      presetUnionScope: '(parent = ODI-1 OR key = ODI-1)',
+      presetUnionScope: '(parent = PROJ-1 OR key = PROJ-1)',
       epicMetrics: [
         {
           overdueOpenIssues: 0,
@@ -90,7 +90,7 @@ describe("buildReportDueWindowsAndLinks", () => {
         dueByField: "due_date",
       },
       mappingsByRole,
-      presetUnionScope: '(parent = ODI-1 OR key = ODI-1)',
+      presetUnionScope: '(parent = PROJ-1 OR key = PROJ-1)',
       epicMetrics: [
         {
           overdueOpenIssues: 1,

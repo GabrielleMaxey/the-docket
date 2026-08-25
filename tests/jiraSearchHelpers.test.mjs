@@ -53,7 +53,7 @@ describe("searchAllIssues", () => {
       runJiraSearchRequest: async () => ({
         ok: true,
         data: {
-          issues: [{ key: "ODI-1" }, { key: "ODI-2" }],
+          issues: [{ key: "PROJ-1" }, { key: "PROJ-2" }],
           isLast: false,
           nextPageToken: "next",
         },
@@ -71,7 +71,7 @@ describe("searchAllIssues", () => {
       runJiraSearchRequest: async () => ({
         ok: true,
         data: {
-          issues: [{ key: "ODI-1" }],
+          issues: [{ key: "PROJ-1" }],
           isLast: true,
         },
       }),

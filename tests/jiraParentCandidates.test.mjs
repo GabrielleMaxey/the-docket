@@ -10,65 +10,65 @@ import {
 describe("buildParentCandidatesFromIssues", () => {
   it("walks parent chains from tasks to stories and epics", () => {
     const candidates = buildParentCandidatesFromIssues([
-      { key: "ODI-300", summary: "Platform Epic", issueType: "Epic", parentKey: "" },
-      { key: "ODI-200", summary: "Auth Story", issueType: "Story", parentKey: "ODI-300" },
-      { key: "ODI-101", summary: "Configure SSO", issueType: "Task", parentKey: "ODI-200" },
+      { key: "PROJ-300", summary: "Platform Epic", issueType: "Epic", parentKey: "" },
+      { key: "PROJ-200", summary: "Auth Story", issueType: "Story", parentKey: "PROJ-300" },
+      { key: "PROJ-101", summary: "Configure SSO", issueType: "Task", parentKey: "PROJ-200" },
     ]);
 
     assert.equal(candidates.epics.length, 1);
-    assert.equal(candidates.epics[0].key, "ODI-300");
+    assert.equal(candidates.epics[0].key, "PROJ-300");
     assert.equal(candidates.stories.length, 1);
-    assert.equal(candidates.stories[0].key, "ODI-200");
-    assert.equal(candidates.stories[0].epicKey, "ODI-300");
-    assert.match(candidates.chains[0].chainLabel, /ODI-101.*ODI-200.*ODI-300/);
+    assert.equal(candidates.stories[0].key, "PROJ-200");
+    assert.equal(candidates.stories[0].epicKey, "PROJ-300");
+    assert.match(candidates.chains[0].chainLabel, /PROJ-101.*PROJ-200.*PROJ-300/);
   });
 
   it("resolves epics from story epic link fields", () => {
     const candidates = buildParentCandidatesFromIssues([
       {
-        key: "ODI-200",
+        key: "PROJ-200",
         summary: "Auth Story",
         issueType: "Story",
         parentKey: "",
-        epicLinkKey: "ODI-300",
+        epicLinkKey: "PROJ-300",
       },
-      { key: "ODI-101", summary: "Configure SSO", issueType: "Task", parentKey: "ODI-200" },
+      { key: "PROJ-101", summary: "Configure SSO", issueType: "Task", parentKey: "PROJ-200" },
     ]);
 
-    assert.equal(candidates.epics[0].key, "ODI-300");
-    assert.equal(candidates.chains[0].epicKey, "ODI-300");
+    assert.equal(candidates.epics[0].key, "PROJ-300");
+    assert.equal(candidates.chains[0].epicKey, "PROJ-300");
     assert.equal(
       buildParentDropdownFromCandidates({ candidates, issueType: "Story" })[0].value,
-      "ODI-300"
+      "PROJ-300"
     );
   });
 
   it("builds parent dropdown options by issue type", () => {
     const candidates = buildParentCandidatesFromIssues([
-      { key: "ODI-300", summary: "Epic", issueType: "Epic", parentKey: "" },
-      { key: "ODI-200", summary: "Story", issueType: "Story", parentKey: "ODI-300" },
+      { key: "PROJ-300", summary: "Epic", issueType: "Epic", parentKey: "" },
+      { key: "PROJ-200", summary: "Story", issueType: "Story", parentKey: "PROJ-300" },
     ]);
 
     assert.equal(
       buildParentDropdownFromCandidates({ candidates, issueType: "Story" })[0].value,
-      "ODI-300"
+      "PROJ-300"
     );
     assert.equal(
       buildParentDropdownFromCandidates({ candidates, issueType: "Task" })[0].value,
-      "ODI-200"
+      "PROJ-200"
     );
   });
 
   it("builds selectable query issue options and resolves parents", () => {
     const candidates = buildParentCandidatesFromIssues([
-      { key: "ODI-300", summary: "Epic", issueType: "Epic", parentKey: "" },
-      { key: "ODI-200", summary: "Story", issueType: "Story", parentKey: "ODI-300" },
-      { key: "ODI-101", summary: "Task", issueType: "Task", parentKey: "ODI-200" },
+      { key: "PROJ-300", summary: "Epic", issueType: "Epic", parentKey: "" },
+      { key: "PROJ-200", summary: "Story", issueType: "Story", parentKey: "PROJ-300" },
+      { key: "PROJ-101", summary: "Task", issueType: "Task", parentKey: "PROJ-200" },
     ]);
 
     const options = buildQueryIssueDropdownOptions(candidates);
-    assert.equal(options[0].value, "ODI-101");
-    assert.equal(resolveParentFromChain(candidates.chains[0], "Task")?.parentKey, "ODI-200");
-    assert.equal(resolveParentFromChain(candidates.chains[0], "Story")?.parentKey, "ODI-300");
+    assert.equal(options[0].value, "PROJ-101");
+    assert.equal(resolveParentFromChain(candidates.chains[0], "Task")?.parentKey, "PROJ-200");
+    assert.equal(resolveParentFromChain(candidates.chains[0], "Story")?.parentKey, "PROJ-300");
   });
 });

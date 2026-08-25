@@ -12,8 +12,8 @@ import {
 
 describe("buildEpicStoriesJql", () => {
   it("includes parent and epic link clauses", () => {
-    assert.match(buildEpicStoriesJql("ODI-100"), /parent = ODI-100/);
-    assert.match(buildEpicStoriesJql("ODI-100"), /Epic Link/);
+    assert.match(buildEpicStoriesJql("PROJ-100"), /parent = PROJ-100/);
+    assert.match(buildEpicStoriesJql("PROJ-100"), /Epic Link/);
   });
 });
 
@@ -41,13 +41,13 @@ describe("applyParentLinkFields", () => {
     const result = applyParentLinkFields({
       fields,
       issueTypeFields: { parent: { name: "Parent" } },
-      parentKey: "ODI-10",
+      parentKey: "PROJ-10",
       parentRole: "epic",
       issueType: "Story",
     });
 
     assert.equal(result.ok, true);
-    assert.deepEqual(fields.parent, { key: "ODI-10" });
+    assert.deepEqual(fields.parent, { key: "PROJ-10" });
   });
 
   it("falls back to epic link custom field", () => {
@@ -60,13 +60,13 @@ describe("applyParentLinkFields", () => {
           schema: { custom: "com.pyxis.greenhopper.jira:gh-epic-link" },
         },
       },
-      parentKey: "ODI-10",
+      parentKey: "PROJ-10",
       parentRole: "epic",
       issueType: "Bug",
     });
 
     assert.equal(result.ok, true);
-    assert.equal(fields.customfield_10014, "ODI-10");
+    assert.equal(fields.customfield_10014, "PROJ-10");
     assert.equal(result.linkMode, "epicLink");
   });
 
@@ -81,14 +81,14 @@ describe("applyParentLinkFields", () => {
           schema: { custom: "com.atlassian.jpo:jpo-custom-field-parent" },
         },
       },
-      parentKey: "ODI-200",
+      parentKey: "PROJ-200",
       parentRole: "story",
       issueType: "Task",
       isSubtask: true,
     });
 
     assert.equal(result.ok, true);
-    assert.deepEqual(fields.parent, { key: "ODI-200" });
+    assert.deepEqual(fields.parent, { key: "PROJ-200" });
     assert.equal(fields.customfield_10018, undefined);
     assert.equal(result.linkMode, "parent");
   });
@@ -104,13 +104,13 @@ describe("applyParentLinkFields", () => {
           schema: { custom: "com.pyxis.greenhopper.jira:gh-epic-link" },
         },
       },
-      parentKey: "ODI-10",
+      parentKey: "PROJ-10",
       parentRole: "epic",
       issueType: "Story",
     });
 
     assert.equal(result.ok, true);
-    assert.deepEqual(fields.parent, { key: "ODI-10" });
+    assert.deepEqual(fields.parent, { key: "PROJ-10" });
     assert.equal(fields.customfield_10014, undefined);
     assert.equal(result.linkMode, "parent");
   });

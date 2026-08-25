@@ -50,7 +50,7 @@ describe("reconcileSelectedEntryIds", () => {
 describe("watchTypeLabel", () => {
   it("labels reporter JQL separately from a generic custom query", () => {
     assert.equal(watchTypeLabel("jql", 'reporter = "Ada" ORDER BY updated DESC'), "Reporter");
-    assert.equal(watchTypeLabel("jql", "project = ODI"), "Custom query");
+    assert.equal(watchTypeLabel("jql", "project = PROJ"), "Custom query");
     assert.equal(watchTypeLabel("person", ""), "Person");
   });
 });

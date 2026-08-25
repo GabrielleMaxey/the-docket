@@ -1,6 +1,5 @@
 /**
- * ODI Jira create standards (Confluence: Jira Standards ODI Project Space Standards).
- * Shared by server validation, UI pre-checks, and tests.
+ * Jira create standards — shared by server validation, UI pre-checks, and tests.
  */
 
 import { matchesIssueTypeFamily } from "./dashboardMetrics.mjs";
@@ -57,7 +56,7 @@ export const isImperativeSubtaskTitle = (title) => {
 export const validateBugDescription = (description) => {
   const text = String(description || "").trim();
   if (!text) {
-    return "Bug description is required per ODI standards.";
+    return "Bug description is required.";
   }
   if (text.length < 40) {
     return "Bug description is too short. Include what is broken, reproduction steps, and expected vs actual behavior.";
@@ -76,7 +75,7 @@ export const validateBugDescription = (description) => {
 export const validateStoryDescription = (description) => {
   const text = String(description || "").trim();
   if (!text) {
-    return "Story description is required per ODI standards.";
+    return "Story description is required.";
   }
   if (text.length < 20) {
     return "Story description is too short. Expand on the situation, ask, and goal outcome.";
@@ -154,7 +153,7 @@ export const validateOdiIssueCreate = ({
       );
     }
     if (String(assignee || "").trim()) {
-      errors.push("Stories are not assigned to individuals per ODI standards. Leave assignee empty.");
+      errors.push("Stories are not assigned to individuals. Leave assignee empty.");
     }
     if (parentRole && parentRole !== "epic") {
       errors.push("Stories must be created under an Epic, not a Story.");

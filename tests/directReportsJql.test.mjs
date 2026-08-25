@@ -114,14 +114,14 @@ describe("humanizeJqlAccountIds", () => {
 
   it("swaps bare (unquoted) account ids inside assignee IN (...), quoting the swapped-in name", () => {
     const jql =
-      "project = ODI AND assignee IN (5daa26bfa627f40c2f3c43be, 712020:d230216f-5197-4712-b088-0983a3d72404, currentUser()) ORDER BY created DESC";
+      "project = PROJ AND assignee IN (5daa26bfa627f40c2f3c43be, 712020:d230216f-5197-4712-b088-0983a3d72404, currentUser()) ORDER BY created DESC";
     const resolved = {
       "5daa26bfa627f40c2f3c43be": "Alice Smith",
       "712020:d230216f-5197-4712-b088-0983a3d72404": "Bob Jones",
     };
     assert.equal(
       humanizeJqlAccountIds(jql, resolved),
-      'project = ODI AND assignee IN ("Alice Smith", "Bob Jones", currentUser()) ORDER BY created DESC'
+      'project = PROJ AND assignee IN ("Alice Smith", "Bob Jones", currentUser()) ORDER BY created DESC'
     );
   });
 });
