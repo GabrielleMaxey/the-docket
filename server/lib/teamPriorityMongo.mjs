@@ -10,20 +10,7 @@ const COL_PRIORITIES = "team_issue_priorities";
 // hits 0, and a start date (used for Gantt charts) must survive that independently.
 const COL_DATES = "team_issue_dates";
 
-const SEED_PROGRAMS = [
-  {
-    slug: "nora",
-    displayName: "NORA",
-    enabled: true,
-    epicRoots: ["ODI-23957"],
-  },
-  {
-    slug: "ask-greg",
-    displayName: "MCP - Ask Greg",
-    enabled: true,
-    epicRoots: ["ODI-23066", "ODI-18520"],
-  },
-];
+const SEED_PROGRAMS = [];
 
 let clientPromise = null;
 

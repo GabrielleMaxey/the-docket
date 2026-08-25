@@ -278,7 +278,7 @@ const PresetsSection = ({ epicPresets, onPresetsChanged, onError }) => {
             <Form.Group widths="equal">
               <Form.Input label="Epic key" placeholder="ODI-1234" value={epicForm.epicKey}
                 onChange={(_e, { value }) => handleEpicFormChange("epicKey", value)} />
-              <Form.Input label="Epic name" placeholder="Nora" value={epicForm.epicName}
+              <Form.Input label="Epic name" placeholder="Epic name" value={epicForm.epicName}
                 onChange={(_e, { value }) => handleEpicFormChange("epicName", value)} />
               <Form.Input label="Jira filter ID" value={epicForm.jiraFilterId}
                 onChange={(_e, { value }) => handleEpicFormChange("jiraFilterId", value)} />

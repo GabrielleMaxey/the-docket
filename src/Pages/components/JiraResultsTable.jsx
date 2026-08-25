@@ -8,6 +8,7 @@ import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js
 import {
   getFieldValue,
   formatDateOnly,
+  matchesIssueTypeFamily,
 } from "../../../shared/dashboardMetrics.mjs";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
 import { buildNotePushFingerprint } from "../../utils/notePushFingerprint.js";
@@ -880,50 +881,56 @@ const JiraResultsTable = ({
                               run.sharedProgramId || jqlSharedProgramIds?.[runSlotIndex] || ""
                             ).trim();
 
+                            const isEpic = matchesIssueTypeFamily(issueTypeName, "epic");
+
                             return (
                               <div className={"ww-edit-cell" + (isClosedOrResolved ? " ww-edit-disabled" : "")}>
-                                <div className="ww-date-row">
-                                  <label className="ww-date-label" title="Initial Done Date — cascades from task → story → epic">IDD</label>
-                                  <input
-                                    type="date"
-                                    className="ww-edit-input"
-                                    value={iddDrafts[issueKey] ?? (ownIdd || inheritedIdd || "")}
-                                    disabled={isClosedOrResolved}
-                                    onChange={(event) => handleIddDraftChange(issueKey, event.target.value)}
-                                  />
-                                  <button
-                                    type="button"
-                                    className="ww-inline-action-btn"
-                                    onClick={() => handleIddUpdate(issueKey, ownIdd || inheritedIdd || "", run.iddFieldId)}
-                                    disabled={rowUpdate.loading || isClosedOrResolved}
-                                  >
-                                    Update
-                                  </button>
-                                </div>
-                                {!ownIdd && inheritedIdd ? (
-                                  <p className="ww-date-hint">from parent: {inheritedIdd}</p>
-                                ) : null}
+                                {isEpic ? (
+                                  <>
+                                    <div className="ww-date-row">
+                                      <label className="ww-date-label" title="Initial Done Date (Epic only)">IDD</label>
+                                      <input
+                                        type="date"
+                                        className="ww-edit-input"
+                                        value={iddDrafts[issueKey] ?? (ownIdd || inheritedIdd || "")}
+                                        disabled={isClosedOrResolved}
+                                        onChange={(event) => handleIddDraftChange(issueKey, event.target.value)}
+                                      />
+                                      <button
+                                        type="button"
+                                        className="ww-inline-action-btn"
+                                        onClick={() => handleIddUpdate(issueKey, ownIdd || inheritedIdd || "", run.iddFieldId)}
+                                        disabled={rowUpdate.loading || isClosedOrResolved}
+                                      >
+                                        Update
+                                      </button>
+                                    </div>
+                                    {!ownIdd && inheritedIdd ? (
+                                      <p className="ww-date-hint">from parent: {inheritedIdd}</p>
+                                    ) : null}
 
-                                <div className="ww-date-row">
-                                  <label className="ww-date-label" title="Most Recent Done Date — cascades from task → story → epic">MRD</label>
-                                  <input
-                                    type="date"
-                                    className="ww-edit-input"
-                                    value={mrdDrafts[issueKey] ?? ownMrd}
-                                    disabled={isClosedOrResolved}
-                                    onChange={(event) => handleMrdDraftChange(issueKey, event.target.value)}
-                                  />
-                                  <button
-                                    type="button"
-                                    className="ww-inline-action-btn"
-                                    onClick={() => handleMrdUpdate(issueKey, ownMrd, run.mrdFieldId)}
-                                    disabled={rowUpdate.loading || isClosedOrResolved}
-                                  >
-                                    Update
-                                  </button>
-                                </div>
-                                {!ownMrd && inheritedMrd ? (
-                                  <p className="ww-date-hint">from parent: {inheritedMrd}</p>
+                                    <div className="ww-date-row">
+                                      <label className="ww-date-label" title="Most Recent Done Date (Epic only)">MRD</label>
+                                      <input
+                                        type="date"
+                                        className="ww-edit-input"
+                                        value={mrdDrafts[issueKey] ?? ownMrd}
+                                        disabled={isClosedOrResolved}
+                                        onChange={(event) => handleMrdDraftChange(issueKey, event.target.value)}
+                                      />
+                                      <button
+                                        type="button"
+                                        className="ww-inline-action-btn"
+                                        onClick={() => handleMrdUpdate(issueKey, ownMrd, run.mrdFieldId)}
+                                        disabled={rowUpdate.loading || isClosedOrResolved}
+                                      >
+                                        Update
+                                      </button>
+                                    </div>
+                                    {!ownMrd && inheritedMrd ? (
+                                      <p className="ww-date-hint">from parent: {inheritedMrd}</p>
+                                    ) : null}
+                                  </>
                                 ) : null}
 
                                 <div className="ww-date-row">
