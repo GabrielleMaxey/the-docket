@@ -8,7 +8,7 @@ import {
 
 describe("getProjectKeyFromIssueKey", () => {
   it("extracts the project prefix from a standard issue key", () => {
-    assert.equal(getProjectKeyFromIssueKey("ODI-1234"), "ODI");
+    assert.equal(getProjectKeyFromIssueKey("PROJ-1234"), "PROJ");
     assert.equal(getProjectKeyFromIssueKey("SYNC-41"), "SYNC");
   });
 
@@ -37,7 +37,7 @@ describe("detectCrossTeamLinks", () => {
         ],
       },
     };
-    const found = detectCrossTeamLinks(issue, "ODI");
+    const found = detectCrossTeamLinks(issue, "PROJ");
     assert.equal(found.length, 1);
     assert.equal(found[0].linkedKey, "NET-500");
     assert.equal(found[0].linkedProject, "NET");
@@ -55,7 +55,7 @@ describe("detectCrossTeamLinks", () => {
         ],
       },
     };
-    const found = detectCrossTeamLinks(issue, "ODI");
+    const found = detectCrossTeamLinks(issue, "PROJ");
     assert.equal(found.length, 1);
     assert.equal(found[0].linkType, "is blocked by");
   });
@@ -66,17 +66,17 @@ describe("detectCrossTeamLinks", () => {
         issuelinks: [
           {
             type: { outward: "relates to" },
-            outwardIssue: buildLinkedIssue("ODI-999", "Same team task", "Done"),
+            outwardIssue: buildLinkedIssue("PROJ-999", "Same team task", "Done"),
           },
         ],
       },
     };
-    assert.deepEqual(detectCrossTeamLinks(issue, "ODI"), []);
+    assert.deepEqual(detectCrossTeamLinks(issue, "PROJ"), []);
   });
 
   it("returns an empty array for an issue with no links", () => {
-    assert.deepEqual(detectCrossTeamLinks({ fields: {} }, "ODI"), []);
-    assert.deepEqual(detectCrossTeamLinks({}, "ODI"), []);
+    assert.deepEqual(detectCrossTeamLinks({ fields: {} }, "PROJ"), []);
+    assert.deepEqual(detectCrossTeamLinks({}, "PROJ"), []);
   });
 
   it("handles a mix of same-project and cross-project links correctly", () => {
@@ -84,12 +84,12 @@ describe("detectCrossTeamLinks", () => {
       fields: {
         issuelinks: [
           { type: { outward: "blocks" }, outwardIssue: buildLinkedIssue("NET-500", "A", "Open") },
-          { type: { outward: "relates to" }, outwardIssue: buildLinkedIssue("ODI-1", "B", "Done") },
+          { type: { outward: "relates to" }, outwardIssue: buildLinkedIssue("PROJ-1", "B", "Done") },
           { type: { inward: "is blocked by" }, inwardIssue: buildLinkedIssue("SEC-1", "C", "Open") },
         ],
       },
     };
-    const found = detectCrossTeamLinks(issue, "ODI");
+    const found = detectCrossTeamLinks(issue, "PROJ");
     assert.equal(found.length, 2);
     assert.deepEqual(found.map((f) => f.linkedKey).sort(), ["NET-500", "SEC-1"]);
   });

@@ -20,7 +20,7 @@ describe("formatChatSessionContext", () => {
           upcomingDue: 2,
           topIssues: [
             {
-              key: "ODI-1",
+              key: "PROJ-1",
               summary: "Fix bug",
               status: "In Progress",
               assignee: "Jane",
@@ -29,7 +29,7 @@ describe("formatChatSessionContext", () => {
               isUpcomingDue: false,
             },
             {
-              key: "ODI-2",
+              key: "PROJ-2",
               summary: "Ship feature",
               status: "In Progress",
               assignee: "Jane",
@@ -50,8 +50,8 @@ describe("formatChatSessionContext", () => {
         dueByUpcomingCount: 5,
         epics: [
           {
-            label: "ODI Epic",
-            epicKey: "ODI-100",
+            label: "Project Epic",
+            epicKey: "PROJ-100",
             issuePercent: 60,
             overduePercent: 5,
             openIssues: 4,
@@ -66,7 +66,7 @@ describe("formatChatSessionContext", () => {
           type: "week_plan",
           label: "Week plan",
           generatedAt: "2026-06-19T13:00:00.000Z",
-          content: "Monday: ODI-1",
+          content: "Monday: PROJ-1",
         },
       ],
     });
@@ -81,7 +81,7 @@ describe("formatChatSessionContext", () => {
     assert.match(text, /EPIC PAST DUE/);
     assert.match(text, /3 upcoming due by 2099-12-31/);
     assert.match(text, /week_plan/);
-    assert.match(text, /Monday: ODI-1/);
+    assert.match(text, /Monday: PROJ-1/);
   });
 });
 

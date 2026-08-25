@@ -171,7 +171,7 @@ const buildParentDropdownOptions = ({ parentOptions, issueType }) => {
 };
 
 const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, onCreated }) => {
-  const [projectKey, setProjectKey] = React.useState("ODI");
+  const [projectKey, setProjectKey] = React.useState("");
   const [issueType, setIssueType] = React.useState("Story");
   const [summary, setSummary] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -362,7 +362,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
 
   React.useEffect(() => {
     if (!open) return;
-    setProjectKey("ODI");
+    setProjectKey("");
     setIssueType("Story");
     setEpicSelectValue(defaultEpicSelectValue || "");
     setManualEpicInput("");
@@ -619,9 +619,6 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       text: `${p.key} — ${p.name}`,
       value: p.key,
     }));
-    if (!fromApi.some((o) => o.value === "ODI")) {
-      fromApi.unshift({ key: "ODI", text: "ODI — Operations Devops Itential", value: "ODI" });
-    }
     return fromApi;
   }, [projects]);
 
@@ -1012,7 +1009,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
           <Form.Field>
             <label>Project</label>
             <Dropdown fluid search selection options={projectOptions} value={projectKey}
-              onChange={(_e, { value }) => setProjectKey(String(value || "ODI"))} />
+              onChange={(_e, { value }) => setProjectKey(String(value || ""))} />
           </Form.Field>
           <Form.Field>
             <label>Issue type</label>

@@ -21,7 +21,7 @@ const searchOk = (issues) => ({
 
 describe("fetchCapacityWorkloads contributor totals", () => {
   const watchedRows = [
-    { id: 1, displayName: "Team", watchType: "jql", jql: "project = ODI", capacity: null },
+    { id: 1, displayName: "Team", watchType: "jql", jql: "project = PROJ", capacity: null },
   ];
 
   it("counts each assignee separately so a lightly loaded person still gets a total", async () => {
@@ -135,7 +135,7 @@ describe("fetchCapacityWorkloads overdue date basis", () => {
   const past = "2020-01-01";
   const future = "2099-01-01";
   const epicIssue = {
-    key: "ODI-1",
+    key: "PROJ-1",
     fields: {
       issuetype: { name: "Epic" },
       summary: "Parent epic",
@@ -144,11 +144,11 @@ describe("fetchCapacityWorkloads overdue date basis", () => {
     },
   };
   const childWithStaleDue = {
-    key: "ODI-2",
+    key: "PROJ-2",
     fields: {
       status: { name: "In Progress", statusCategory: { key: "indeterminate" } },
       issuetype: { name: "Story" },
-      parent: { key: "ODI-1", fields: { issuetype: { name: "Epic" } } },
+      parent: { key: "PROJ-1", fields: { issuetype: { name: "Epic" } } },
       assignee: { displayName: "Busy Person", accountId: BUSY_ID },
       duedate: past,
       customfield_10008: null,
@@ -158,7 +158,7 @@ describe("fetchCapacityWorkloads overdue date basis", () => {
   };
   const childWithNoDates = {
     ...childWithStaleDue,
-    key: "ODI-3",
+    key: "PROJ-3",
     fields: {
       ...childWithStaleDue.fields,
       duedate: null,
@@ -186,12 +186,12 @@ describe("fetchCapacityWorkloads overdue date basis", () => {
   it("task_due ignores IDD/MRD and parent Epic dates", async () => {
     const items = await fetchCapacityWorkloads({
       watchedRows: [
-        { id: 1, displayName: "Team", watchType: "jql", jql: "project = ODI", overdueDateBasis: "task_due" },
+        { id: 1, displayName: "Team", watchType: "jql", jql: "project = PROJ", overdueDateBasis: "task_due" },
       ],
       runJiraSearchRequest: async () =>
         searchOk([
           {
-            key: "ODI-4",
+            key: "PROJ-4",
             fields: {
               status: { name: "In Progress", statusCategory: { key: "indeterminate" } },
               assignee: { displayName: "Busy Person", accountId: BUSY_ID },
@@ -212,7 +212,7 @@ describe("fetchCapacityWorkloads overdue date basis", () => {
   it("epic_done uses the parent Epic even when the child has a stale duedate", async () => {
     const items = await fetchCapacityWorkloads({
       watchedRows: [
-        { id: 1, displayName: "ODI", watchType: "jql", jql: "parent = ODI-1", overdueDateBasis: "epic_done" },
+        { id: 1, displayName: "ODI", watchType: "jql", jql: "parent = PROJ-1", overdueDateBasis: "epic_done" },
       ],
       runJiraSearchRequest: async () => searchOk([childWithStaleDue]),
       jiraRequest: jiraWithEpic(epicIssue),
@@ -224,7 +224,7 @@ describe("fetchCapacityWorkloads overdue date basis", () => {
   it("either uses the child's due date when present", async () => {
     const items = await fetchCapacityWorkloads({
       watchedRows: [
-        { id: 1, displayName: "Mixed", watchType: "jql", jql: "parent = ODI-1", overdueDateBasis: "either" },
+        { id: 1, displayName: "Mixed", watchType: "jql", jql: "parent = PROJ-1", overdueDateBasis: "either" },
       ],
       runJiraSearchRequest: async () => searchOk([childWithStaleDue]),
       jiraRequest: jiraWithEpic(epicIssue),
@@ -236,25 +236,25 @@ describe("fetchCapacityWorkloads overdue date basis", () => {
   it("either inherits the parent Epic when the child has no dates", async () => {
     const items = await fetchCapacityWorkloads({
       watchedRows: [
-        { id: 1, displayName: "Mixed", watchType: "jql", jql: "parent = ODI-1", overdueDateBasis: "either" },
+        { id: 1, displayName: "Mixed", watchType: "jql", jql: "parent = PROJ-1", overdueDateBasis: "either" },
       ],
       runJiraSearchRequest: async () => searchOk([childWithNoDates]),
       jiraRequest: jiraWithEpic(pastEpic),
     });
 
     assert.equal(items[0].overdueCount, 1);
-    assert.match(items[0].overdueClause, /key in \(ODI-3\)/);
+    assert.match(items[0].overdueClause, /key in \(PROJ-3\)/);
   });
 
   it("defaults an unknown basis to either", async () => {
     const items = await fetchCapacityWorkloads({
       watchedRows: [
-        { id: 1, displayName: "Team", watchType: "jql", jql: "project = ODI", overdueDateBasis: "nope" },
+        { id: 1, displayName: "Team", watchType: "jql", jql: "project = PROJ", overdueDateBasis: "nope" },
       ],
       runJiraSearchRequest: async () =>
         searchOk([
           {
-            key: "ODI-5",
+            key: "PROJ-5",
             fields: {
               status: { name: "In Progress", statusCategory: { key: "indeterminate" } },
               assignee: { displayName: "Busy Person", accountId: BUSY_ID },
@@ -274,7 +274,7 @@ describe("fetchCapacityWorkloads overdue date basis", () => {
 
 describe("fetchCapacityWorkloads blocked / on hold", () => {
   const watchedRows = [
-    { id: 1, displayName: "Team", watchType: "jql", jql: "project = ODI", capacity: null },
+    { id: 1, displayName: "Team", watchType: "jql", jql: "project = PROJ", capacity: null },
   ];
 
   const issue = (key, statusName) => ({
@@ -292,15 +292,15 @@ describe("fetchCapacityWorkloads blocked / on hold", () => {
       watchedRows,
       runJiraSearchRequest: async () =>
         searchOk([
-          issue("ODI-10", "On Hold"),
-          issue("ODI-11", "Blocked - vendor"),
-          issue("ODI-12", "In Progress"),
+          issue("PROJ-10", "On Hold"),
+          issue("PROJ-11", "Blocked - vendor"),
+          issue("PROJ-12", "In Progress"),
         ]),
       jiraRequest: async () => ({ ok: true, data: { count: 3 } }),
     });
 
     assert.equal(items[0].blockedCount, 2);
-    assert.match(items[0].blockedClause, /key in \(ODI-10,ODI-11\)/);
+    assert.match(items[0].blockedClause, /key in \(PROJ-10,PROJ-11\)/);
     assert.equal(items[0].blockedIssueKeys, undefined);
   });
 });

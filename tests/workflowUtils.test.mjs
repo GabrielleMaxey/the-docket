@@ -14,10 +14,10 @@ describe("workflow utilities", () => {
   it("merges issue maps without replacing existing values", () => {
     assert.deepEqual(
       mergeIssueMapsPreferExisting(
-        { "ODI-1": "local", "ODI-2": undefined },
-        { "ODI-1": "remote", "ODI-2": "remote", "ODI-3": "remote" }
+        { "PROJ-1": "local", "PROJ-2": undefined },
+        { "PROJ-1": "remote", "PROJ-2": "remote", "PROJ-3": "remote" }
       ),
-      { "ODI-1": "local", "ODI-2": "remote", "ODI-3": "remote" }
+      { "PROJ-1": "local", "PROJ-2": "remote", "PROJ-3": "remote" }
     );
   });
 });

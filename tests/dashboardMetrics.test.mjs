@@ -33,7 +33,7 @@ import {
 } from "../shared/dashboardMetrics.mjs";
 
 const makeIssue = ({
-  key = "ODI-1",
+  key = "PROJ-1",
   status = "In Progress",
   statusCategory = "indeterminate",
   dueValue = null,
@@ -97,7 +97,7 @@ describe("due date checks", () => {
     const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
     const upcoming = makeIssue({ dueValue: tomorrowStr });
-    const past = makeIssue({ key: "ODI-2", dueValue: "2020-01-01" });
+    const past = makeIssue({ key: "PROJ-2", dueValue: "2020-01-01" });
 
     assert.equal(isTaskDueInFuture(upcoming, "duedate"), true);
     assert.equal(isTaskDueInFuture(past, "duedate"), false);
@@ -109,7 +109,7 @@ describe("due date checks", () => {
     const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
     const upcoming = makeIssue({ dueValue: tomorrowStr });
-    const past = makeIssue({ key: "ODI-2", dueValue: "2020-01-01" });
+    const past = makeIssue({ key: "PROJ-2", dueValue: "2020-01-01" });
 
     assert.equal(isTaskDueBy(upcoming, "duedate", "2099-12-31"), true);
     assert.equal(isTaskDueBy(past, "duedate", "2099-12-31"), false);
@@ -157,7 +157,7 @@ describe("due date checks", () => {
     tomorrow.setDate(tomorrow.getDate() + 3);
     const tomorrowStr = tomorrow.toISOString().slice(0, 10);
     const issue = makeIssue({
-      key: "ODI-9",
+      key: "PROJ-9",
       dueValue: tomorrowStr,
       dueFieldId: "duedate",
     });
@@ -184,7 +184,7 @@ describe("due date checks", () => {
     const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
     const issue = makeIssue({
-      key: "ODI-10",
+      key: "PROJ-10",
       dueValue: tomorrowStr,
       dueFieldId: "duedate",
     });
@@ -204,7 +204,7 @@ describe("due date checks", () => {
     tomorrow.setDate(tomorrow.getDate() + 7);
     const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
-    const issue = makeIssue({ key: "ODI-11", dueValue: null });
+    const issue = makeIssue({ key: "PROJ-11", dueValue: null });
     issue.fields.customfield_10009 = "2020-01-01";
     const epicIssue = {
       key: "ODI-EPIC",
@@ -236,7 +236,7 @@ describe("due date checks", () => {
     const tomorrowStr = tomorrow.toISOString().slice(0, 10);
     const mrdFieldId = "customfield_10009";
 
-    const issue = makeIssue({ key: "ODI-12", dueValue: null });
+    const issue = makeIssue({ key: "PROJ-12", dueValue: null });
     const epicIssue = {
       key: "ODI-EPIC",
       fields: { [mrdFieldId]: tomorrowStr },
@@ -256,7 +256,7 @@ describe("due date checks", () => {
     const tomorrowStr = tomorrow.toISOString().slice(0, 10);
     const mrdFieldId = "customfield_10009";
 
-    const issue = makeIssue({ key: "ODI-13", dueValue: "2020-01-01", dueFieldId: "duedate" });
+    const issue = makeIssue({ key: "PROJ-13", dueValue: "2020-01-01", dueFieldId: "duedate" });
     const epicIssue = {
       key: "ODI-EPIC",
       fields: { [mrdFieldId]: tomorrowStr },
@@ -270,7 +270,7 @@ describe("due date checks", () => {
     const epicDateStr = "2026-12-26";
     const mrdFieldId = "customfield_10009";
 
-    const issue = makeIssue({ key: "ODI-14", dueValue: "2020-01-01", dueFieldId: mrdFieldId });
+    const issue = makeIssue({ key: "PROJ-14", dueValue: "2020-01-01", dueFieldId: mrdFieldId });
     const epicIssue = {
       key: "ODI-EPIC",
       fields: { [mrdFieldId]: epicDateStr },
@@ -291,9 +291,9 @@ describe("due date checks", () => {
 describe("computeChildIssueMetrics", () => {
   it("aggregates open, closed, and overdue counts", () => {
     const issues = [
-      makeIssue({ key: "ODI-1", status: "Done", statusCategory: "done" }),
-      makeIssue({ key: "ODI-2", dueValue: "2020-01-01" }),
-      makeIssue({ key: "ODI-3", status: "Backlog" }),
+      makeIssue({ key: "PROJ-1", status: "Done", statusCategory: "done" }),
+      makeIssue({ key: "PROJ-2", dueValue: "2020-01-01" }),
+      makeIssue({ key: "PROJ-3", status: "Backlog" }),
     ];
 
     const metrics = computeChildIssueMetrics(issues, "ODI-EPIC", "duedate", null);
@@ -308,7 +308,7 @@ describe("computeChildIssueMetrics", () => {
   it("uses epic MRD for upcoming due and overdue when preferEpicCompareForChildren is set", () => {
     const epicDateStr = "2026-12-26";
     const mrdFieldId = "customfield_10009";
-    const issue = makeIssue({ key: "ODI-21", dueValue: "2020-01-01", dueFieldId: mrdFieldId });
+    const issue = makeIssue({ key: "PROJ-21", dueValue: "2020-01-01", dueFieldId: mrdFieldId });
     const epicIssue = {
       key: "ODI-EPIC",
       fields: { [mrdFieldId]: epicDateStr },
@@ -337,15 +337,15 @@ describe("computeChildIssueMetrics", () => {
     const mrdFieldId = "customfield_10009";
     // Two issues under two different epics — no single epicIssue can cover both,
     // which is exactly the JQL-preset case (unlike the single-epic test above).
-    const overdueIssue = makeIssue({ key: "ODI-30", assignee: "Jane Doe" });
-    const onTrackIssue = makeIssue({ key: "ODI-31", assignee: "Jane Doe" });
+    const overdueIssue = makeIssue({ key: "PROJ-30", assignee: "Jane Doe" });
+    const onTrackIssue = makeIssue({ key: "PROJ-31", assignee: "Jane Doe" });
     const overdueEpic = { key: "ODI-EPIC-A", fields: { [mrdFieldId]: "2020-01-01" } };
     const onTrackEpic = { key: "ODI-EPIC-B", fields: { [mrdFieldId]: "2099-01-01" } };
 
     const issueEpicMaps = {
       issueToEpicKey: new Map([
-        ["ODI-30", "ODI-EPIC-A"],
-        ["ODI-31", "ODI-EPIC-B"],
+        ["PROJ-30", "ODI-EPIC-A"],
+        ["PROJ-31", "ODI-EPIC-B"],
       ]),
       epicByKey: new Map([
         ["ODI-EPIC-A", overdueEpic],
@@ -374,7 +374,7 @@ describe("computeChildIssueMetrics", () => {
 
   it("without issueEpicMaps, preferEpicCompareForChildren with no shared epicIssue finds no overdue", () => {
     const mrdFieldId = "customfield_10009";
-    const issue = makeIssue({ key: "ODI-32", assignee: "Jane Doe" });
+    const issue = makeIssue({ key: "PROJ-32", assignee: "Jane Doe" });
 
     const metrics = computeChildIssueMetrics([issue], "", "duedate", null, [mrdFieldId], {
       dueByCompareFieldId: mrdFieldId,
@@ -388,9 +388,9 @@ describe("computeChildIssueMetrics", () => {
 
 describe("buildDueIssueRow", () => {
   it("includes the issue's status alongside key/summary/dueDate/issueType", () => {
-    const issue = makeIssue({ key: "ODI-40", status: "In Progress", dueValue: "2020-01-01" });
+    const issue = makeIssue({ key: "PROJ-40", status: "In Progress", dueValue: "2020-01-01" });
     const row = buildDueIssueRow(issue, "duedate");
-    assert.equal(row.key, "ODI-40");
+    assert.equal(row.key, "PROJ-40");
     assert.equal(row.status, "In Progress");
     assert.equal(row.dueDate, "2020-01-01");
   });
@@ -401,7 +401,7 @@ describe("computeContributorMetricsFromIssues", () => {
     const epicDateStr = "2026-12-26";
     const mrdFieldId = "customfield_10009";
     const issue = makeIssue({
-      key: "ODI-20",
+      key: "PROJ-20",
       assignee: "Jane Doe",
       dueValue: "2020-01-01",
       dueFieldId: mrdFieldId,
@@ -622,8 +622,8 @@ describe("personMatchesIssue", () => {
 describe("computeAssigneeMetrics", () => {
   it("computes overdue percent for matched open issues", () => {
     const issues = [
-      makeIssue({ key: "ODI-1", assignee: "Jane Doe", dueValue: "2020-01-01" }),
-      makeIssue({ key: "ODI-2", assignee: "Jane Doe" }),
+      makeIssue({ key: "PROJ-1", assignee: "Jane Doe", dueValue: "2020-01-01" }),
+      makeIssue({ key: "PROJ-2", assignee: "Jane Doe" }),
     ];
 
     const metrics = computeAssigneeMetrics(issues, "Jane", "Jane Doe", "duedate");
@@ -631,16 +631,16 @@ describe("computeAssigneeMetrics", () => {
     assert.equal(metrics.totalOpenCount, 2);
     assert.equal(metrics.overdueOpenCount, 1);
     assert.equal(metrics.overduePercent, 50);
-    assert.deepEqual(metrics.overdueIssueKeys, ["ODI-1"]);
+    assert.deepEqual(metrics.overdueIssueKeys, ["PROJ-1"]);
     assert.equal(metrics.overdueIssues.length, 1);
-    assert.equal(metrics.overdueIssues[0].key, "ODI-1");
+    assert.equal(metrics.overdueIssues[0].key, "PROJ-1");
     assert.deepEqual(metrics.upcomingDueIssues, []);
   });
 
   it("includes upcoming due issues through the dashboard cutoff", () => {
     const issues = [
-      makeIssue({ key: "ODI-1", assignee: "Jane Doe", dueValue: "2099-06-01" }),
-      makeIssue({ key: "ODI-2", assignee: "Jane Doe", dueValue: "2020-01-01" }),
+      makeIssue({ key: "PROJ-1", assignee: "Jane Doe", dueValue: "2099-06-01" }),
+      makeIssue({ key: "PROJ-2", assignee: "Jane Doe", dueValue: "2020-01-01" }),
     ];
 
     const metrics = computeAssigneeMetrics(issues, "Jane", "Jane Doe", "duedate", "", [], {
@@ -652,17 +652,17 @@ describe("computeAssigneeMetrics", () => {
     });
 
     assert.equal(metrics.overdueIssues.length, 1);
-    assert.equal(metrics.overdueIssues[0].key, "ODI-2");
+    assert.equal(metrics.overdueIssues[0].key, "PROJ-2");
     assert.equal(metrics.upcomingDueIssues.length, 1);
-    assert.equal(metrics.upcomingDueIssues[0].key, "ODI-1");
+    assert.equal(metrics.upcomingDueIssues[0].key, "PROJ-1");
   });
 });
 
 describe("computeJqlWatchMetrics", () => {
   it("aggregates JQL scope into one card with overdue issue rows", () => {
     const issues = [
-      makeIssue({ key: "ODI-1", assignee: "Jane Doe", dueValue: "2020-01-01" }),
-      makeIssue({ key: "ODI-2", assignee: "Alex Kim" }),
+      makeIssue({ key: "PROJ-1", assignee: "Jane Doe", dueValue: "2020-01-01" }),
+      makeIssue({ key: "PROJ-2", assignee: "Alex Kim" }),
     ];
 
     const metrics = computeJqlWatchMetrics(issues, [], "duedate");
@@ -670,7 +670,7 @@ describe("computeJqlWatchMetrics", () => {
     assert.equal(metrics.totalOpenCount, 2);
     assert.equal(metrics.overdueOpenCount, 1);
     assert.equal(metrics.overdueIssues.length, 1);
-    assert.equal(metrics.overdueIssues[0].key, "ODI-1");
+    assert.equal(metrics.overdueIssues[0].key, "PROJ-1");
     assert.deepEqual(metrics.upcomingDueIssues, []);
   });
 });
@@ -678,8 +678,8 @@ describe("computeJqlWatchMetrics", () => {
 describe("computeJqlWatchMetricsByAssignee", () => {
   it("uses all JQL issues when preset scope is empty", () => {
     const jqlIssues = [
-      makeIssue({ key: "ODI-1", assignee: "Jane Doe" }),
-      makeIssue({ key: "ODI-2", assignee: "Alex Kim" }),
+      makeIssue({ key: "PROJ-1", assignee: "Jane Doe" }),
+      makeIssue({ key: "PROJ-2", assignee: "Alex Kim" }),
     ];
 
     const rows = computeJqlWatchMetricsByAssignee(jqlIssues, [], "duedate");
@@ -691,10 +691,10 @@ describe("computeJqlWatchMetricsByAssignee", () => {
 
   it("intersects JQL issues with preset scope when scope keys are provided", () => {
     const jqlIssues = [
-      makeIssue({ key: "ODI-1", assignee: "Jane Doe" }),
-      makeIssue({ key: "ODI-2", assignee: "Jane Doe" }),
+      makeIssue({ key: "PROJ-1", assignee: "Jane Doe" }),
+      makeIssue({ key: "PROJ-2", assignee: "Jane Doe" }),
     ];
-    const scopedChildIssues = [makeIssue({ key: "ODI-1", assignee: "Jane Doe" })];
+    const scopedChildIssues = [makeIssue({ key: "PROJ-1", assignee: "Jane Doe" })];
 
     const rows = computeJqlWatchMetricsByAssignee(jqlIssues, scopedChildIssues, "duedate");
 
@@ -723,7 +723,7 @@ describe("computeContributorMetricsFromIssues — overdue via extra field", () =
   it("counts overdue when the issue has no primary due date but an extra overdue field is past due", () => {
     const targetFieldId = "customfield_target";
     const issue = makeIssue({
-      key: "ODI-30",
+      key: "PROJ-30",
       assignee: "Jane Doe",
       dueValue: "2020-01-01",
       dueFieldId: targetFieldId,
@@ -734,6 +734,6 @@ describe("computeContributorMetricsFromIssues — overdue via extra field", () =
     assert.equal(rows.length, 1);
     assert.equal(rows[0].overdueOpenIssues, 1);
     assert.equal(rows[0].overdueIssues.length, 1);
-    assert.equal(rows[0].overdueIssues[0].key, "ODI-30");
+    assert.equal(rows[0].overdueIssues[0].key, "PROJ-30");
   });
 });

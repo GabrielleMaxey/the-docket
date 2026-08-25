@@ -261,7 +261,7 @@ describe("issue metadata date fields", () => {
       const response = await request("/api/jira/issue-metadata/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csvText: "ODI,Priority\nABC-1,5\n" }),
+        body: JSON.stringify({ csvText: "Key,Priority\nABC-1,5\n" }),
       });
 
       assert.equal(response.status, 200);
