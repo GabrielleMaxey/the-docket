@@ -486,7 +486,7 @@ const WorkWeekTasks = () => {
         />
         {remindersError ? <p className="ww-jira-status ww-jira-error">{remindersError}</p> : null}
 
-        <CollapsibleSection title="🗂️ Task Manager" storageKey={TASK_MANAGER_KEY} defaultOpen>
+        <CollapsibleSection title="🗂️ The Docket" storageKey={TASK_MANAGER_KEY} defaultOpen>
           <JqlControlsPanel
             epicPresets={epicPresets}
             epicPresetsLoading={epicPresetsLoading}
