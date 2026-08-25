@@ -3,6 +3,7 @@ const BASE_SEARCH_FIELDS = [
   "issuetype",
   "status",
   "assignee",
+  "reporter",
   "updated",
   "parent",
   "duedate",

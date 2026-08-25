@@ -63,16 +63,22 @@ export const registerIssueMetadataRoutes = (
   { db, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, noteImagesDir }
 ) => {
   const selectIssueMetadataStmt = db.prepare(
-    "SELECT issue_key, note, priority, start_date, complete_date FROM issue_metadata WHERE issue_key = ?"
+    "SELECT issue_key, note, priority, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note FROM issue_metadata WHERE issue_key = ?"
   );
   const upsertIssueMetadataStmt = db.prepare(`
-    INSERT INTO issue_metadata (issue_key, note, priority, start_date, complete_date, updated_at)
-    VALUES (@issueKey, @note, @priority, @startDate, @completeDate, CURRENT_TIMESTAMP)
+    INSERT INTO issue_metadata (issue_key, note, priority, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note, updated_at)
+    VALUES (@issueKey, @note, @priority, @startDate, @completeDate, @hasOpenDecision, @plannedStart, @plannedFinish, @pmOverride, @requestor, @openDecisionNote, CURRENT_TIMESTAMP)
     ON CONFLICT(issue_key) DO UPDATE SET
       note = excluded.note,
       priority = excluded.priority,
       start_date = excluded.start_date,
       complete_date = excluded.complete_date,
+      has_open_decision = excluded.has_open_decision,
+      planned_start = excluded.planned_start,
+      planned_finish = excluded.planned_finish,
+      pm_override = excluded.pm_override,
+      requestor = excluded.requestor,
+      open_decision_note = excluded.open_decision_note,
       updated_at = CURRENT_TIMESTAMP
   `);
   const listFieldMappingsStmt = db.prepare(
@@ -340,7 +346,7 @@ export const registerIssueMetadataRoutes = (
     const placeholders = issueKeys.map(() => "?").join(",");
     const rows = db
       .prepare(
-        `SELECT issue_key, note, priority, keep_note_images, start_date, complete_date FROM issue_metadata WHERE issue_key IN (${placeholders})`
+        `SELECT issue_key, note, priority, keep_note_images, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note FROM issue_metadata WHERE issue_key IN (${placeholders})`
       )
       .all(...issueKeys);
 
@@ -353,6 +359,12 @@ export const registerIssueMetadataRoutes = (
         images: keepNoteImages ? listNoteImages(db, row.issue_key) : [],
         startDate: String(row.start_date || ""),
         completeDate: String(row.complete_date || ""),
+        hasOpenDecision: Boolean(row.has_open_decision),
+        plannedStart: String(row.planned_start || ""),
+        plannedFinish: String(row.planned_finish || ""),
+        pmOverride: String(row.pm_override || ""),
+        requestor: String(row.requestor || ""),
+        openDecisionNote: String(row.open_decision_note || ""),
       };
       return acc;
     }, {});
@@ -532,9 +544,16 @@ export const registerIssueMetadataRoutes = (
     const hasPriority = req.body?.priority !== undefined;
     const hasStartDate = typeof req.body?.startDate === "string";
     const hasCompleteDate = typeof req.body?.completeDate === "string";
+    const hasOpenDecision = req.body?.hasOpenDecision !== undefined;
+    const hasPlannedStart = typeof req.body?.plannedStart === "string";
+    const hasPlannedFinish = typeof req.body?.plannedFinish === "string";
+    const hasPmOverride = typeof req.body?.pmOverride === "string";
+    const hasRequestor = typeof req.body?.requestor === "string";
+    const hasOpenDecisionNote = typeof req.body?.openDecisionNote === "string";
 
-    if (!hasNote && !hasPriority && !hasStartDate && !hasCompleteDate) {
-      return res.status(400).json({ error: "Provide note, priority, startDate, or completeDate" });
+    if (!hasNote && !hasPriority && !hasStartDate && !hasCompleteDate &&
+        !hasOpenDecision && !hasPlannedStart && !hasPlannedFinish && !hasPmOverride && !hasRequestor && !hasOpenDecisionNote) {
+      return res.status(400).json({ error: "Provide note, priority, startDate, completeDate, or a planning field" });
     }
 
     const nextNote = hasNote ? String(req.body.note) : String(current.note || "");
@@ -547,6 +566,24 @@ export const registerIssueMetadataRoutes = (
     const nextCompleteDate = hasCompleteDate
       ? String(req.body.completeDate).trim()
       : String(current.complete_date || "");
+    const nextHasOpenDecision = hasOpenDecision
+      ? (req.body.hasOpenDecision ? 1 : 0)
+      : (current.has_open_decision || 0);
+    const nextPlannedStart = hasPlannedStart
+      ? String(req.body.plannedStart).trim()
+      : String(current.planned_start || "");
+    const nextPlannedFinish = hasPlannedFinish
+      ? String(req.body.plannedFinish).trim()
+      : String(current.planned_finish || "");
+    const nextPmOverride = hasPmOverride
+      ? String(req.body.pmOverride).trim()
+      : String(current.pm_override || "");
+    const nextRequestor = hasRequestor
+      ? String(req.body.requestor).trim()
+      : String(current.requestor || "");
+    const nextOpenDecisionNote = hasOpenDecisionNote
+      ? String(req.body.openDecisionNote)
+      : String(current.open_decision_note || "");
 
     upsertIssueMetadataStmt.run({
       issueKey,
@@ -554,6 +591,12 @@ export const registerIssueMetadataRoutes = (
       priority: nextPriority,
       startDate: nextStartDate,
       completeDate: nextCompleteDate,
+      hasOpenDecision: nextHasOpenDecision,
+      plannedStart: nextPlannedStart,
+      plannedFinish: nextPlannedFinish,
+      pmOverride: nextPmOverride,
+      requestor: nextRequestor,
+      openDecisionNote: nextOpenDecisionNote,
     });
 
     return res.json({
@@ -563,6 +606,12 @@ export const registerIssueMetadataRoutes = (
       priority: nextPriority,
       startDate: nextStartDate,
       completeDate: nextCompleteDate,
+      hasOpenDecision: Boolean(nextHasOpenDecision),
+      plannedStart: nextPlannedStart,
+      plannedFinish: nextPlannedFinish,
+      pmOverride: nextPmOverride,
+      requestor: nextRequestor,
+      openDecisionNote: nextOpenDecisionNote,
     });
   });
 

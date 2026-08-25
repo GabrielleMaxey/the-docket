@@ -265,19 +265,16 @@ export const fetchLatestJiraCommentsBulk = async (issueKeys) => {
   return data?.items || {};
 };
 
-export const saveIssueMetadata = async ({ issueKey, note, priority, startDate, completeDate }) => {
+const PLANNING_FIELDS = ["hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
+
+export const saveIssueMetadata = async ({ issueKey, note, priority, startDate, completeDate, ...planningFields }) => {
   const body = {};
-  if (typeof note === "string") {
-    body.note = note;
-  }
-  if (priority !== undefined) {
-    body.priority = priority;
-  }
-  if (typeof startDate === "string") {
-    body.startDate = startDate;
-  }
-  if (typeof completeDate === "string") {
-    body.completeDate = completeDate;
+  if (typeof note === "string") body.note = note;
+  if (priority !== undefined) body.priority = priority;
+  if (typeof startDate === "string") body.startDate = startDate;
+  if (typeof completeDate === "string") body.completeDate = completeDate;
+  for (const f of PLANNING_FIELDS) {
+    if (planningFields[f] !== undefined) body[f] = planningFields[f];
   }
 
   return requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}`, {
@@ -391,13 +388,12 @@ export const fetchTeamDatesBulk = async (issueKeys) => {
   return data?.items || {};
 };
 
-export const saveTeamDate = async ({ issueKey, startDate, completeDate }) => {
+export const saveTeamDate = async ({ issueKey, startDate, completeDate, ...planningFields }) => {
   const body = {};
-  if (typeof startDate === "string") {
-    body.startDate = startDate;
-  }
-  if (typeof completeDate === "string") {
-    body.completeDate = completeDate;
+  if (typeof startDate === "string") body.startDate = startDate;
+  if (typeof completeDate === "string") body.completeDate = completeDate;
+  for (const f of PLANNING_FIELDS) {
+    if (planningFields[f] !== undefined) body[f] = planningFields[f];
   }
 
   return requestJson(`/api/team-priority/dates/${encodeURIComponent(issueKey)}`, {
@@ -849,5 +845,36 @@ export const saveCoworkWeeklyPlanToArchive = async ({ content, label, filename }
       fromCoworkFile: true,
       ...getLocalTimestampPayload(),
     }),
+  });
+};
+
+export const fetchPmAsks = async () => {
+  const data = await requestJson("/api/project-managers/asks");
+  return data?.items || [];
+};
+
+export const createPmAsk = async ({ title, whoAsked, note }) => {
+  return requestJson("/api/project-managers/asks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, whoAsked, note }),
+  });
+};
+
+export const updatePmAsk = async ({ id, title, whoAsked, note }) => {
+  const body = {};
+  if (typeof title === "string") body.title = title;
+  if (typeof whoAsked === "string") body.whoAsked = whoAsked;
+  if (typeof note === "string") body.note = note;
+  return requestJson(`/api/project-managers/asks/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+};
+
+export const deletePmAsk = async (id) => {
+  return requestJson(`/api/project-managers/asks/${encodeURIComponent(id)}`, {
+    method: "DELETE",
   });
 };

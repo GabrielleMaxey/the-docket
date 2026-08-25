@@ -207,20 +207,19 @@ export const registerTeamPriorityRoutes = (app, { db, resolveCurrentJiraUser }) 
   app.put(
     "/api/team-priority/dates/:issueKey",
     withTeamMongo("update team date tracking", async (req, res) => {
-      const hasStartDate = req.body?.startDate !== undefined;
-      const hasCompleteDate = req.body?.completeDate !== undefined;
-      if (!hasStartDate && !hasCompleteDate) {
-        return res.status(400).json({ error: "Provide startDate or completeDate" });
+      const fields = ["startDate", "completeDate", "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
+      const hasAny = fields.some((f) => req.body?.[f] !== undefined);
+      if (!hasAny) {
+        return res.status(400).json({ error: "Provide startDate, completeDate, or a planning field" });
       }
 
       const updatedBy = await resolveUpdatedBy(resolveCurrentJiraUser);
 
-      const result = await putTeamDate({
-        issueKey: req.params.issueKey,
-        ...(hasStartDate ? { startDate: req.body.startDate } : {}),
-        ...(hasCompleteDate ? { completeDate: req.body.completeDate } : {}),
-        updatedBy,
-      });
+      const patch = {};
+      for (const f of fields) {
+        if (req.body?.[f] !== undefined) patch[f] = req.body[f];
+      }
+      const result = await putTeamDate({ issueKey: req.params.issueKey, ...patch, updatedBy });
       return res.json(result);
     })
   );

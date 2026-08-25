@@ -100,6 +100,7 @@ const WorkWeekTasks = () => {
     jiraNotes, jiraRowPriorities, prioritySourceByKey, selectedForPush,
     lastPushedJiraNoteByKey, pushState, saveState,
     statusDrafts, iddDrafts, dueDateDrafts, mrdDrafts, startDateByKey, completeDateByKey,
+    planningMetaByKey, expandedPlanningKey,
     assigneeDrafts, rowUpdateState, noteImagesByKey, noteImageErrorsByKey,
     keepNoteImagesByKey, noteImageKeepPendingByKey,
     isClosedLikeStatus, clampPriority, getPriorityClass,
@@ -112,6 +113,7 @@ const WorkWeekTasks = () => {
     handleDueDateDraftChange, handleDueDateUpdate,
     handleMrdDraftChange, handleMrdUpdate, handleStartDateChange,
     handleCompleteDateChange, handleClearDateTracking,
+    handleTogglePlanningRow, handlePlanningFieldChange,
     handleAssigneeDraftChange, handleAssigneeUpdate,
     handleRowPriorityChange, handleNoteChange, handleNoteImagesAdd, handleNoteImageRemove,
     handleKeepNoteImagesToggle,
@@ -572,6 +574,9 @@ const WorkWeekTasks = () => {
           rowUpdateState={rowUpdateState} statusDrafts={statusDrafts}
           iddDrafts={iddDrafts} dueDateDrafts={dueDateDrafts} mrdDrafts={mrdDrafts} startDateByKey={startDateByKey}
           completeDateByKey={completeDateByKey}
+          planningMetaByKey={planningMetaByKey}
+
+          expandedPlanningKey={expandedPlanningKey}
           assigneeDrafts={assigneeDrafts} jiraRowPriorities={jiraRowPriorities}
           prioritySourceByKey={prioritySourceByKey}
           jiraNotes={jiraNotes} statusOptions={STATUS_OPTIONS}
@@ -588,6 +593,9 @@ const WorkWeekTasks = () => {
           handleStartDateChange={handleStartDateChange}
           handleCompleteDateChange={handleCompleteDateChange}
           handleClearDateTracking={handleClearDateTracking}
+
+          handleTogglePlanningRow={handleTogglePlanningRow}
+          handlePlanningFieldChange={handlePlanningFieldChange}
           handleAssigneeDraftChange={handleAssigneeDraftChange} handleAssigneeUpdate={handleAssigneeUpdate}
           handleRowPriorityChange={handleRowPriorityChange} handleNoteChange={handleNoteChange}
           handleNoteImagesAdd={handleNoteImagesAdd} handleNoteImageRemove={handleNoteImageRemove}

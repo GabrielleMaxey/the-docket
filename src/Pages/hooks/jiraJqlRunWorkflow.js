@@ -76,7 +76,21 @@ const applyTeamPriorityState = async ({
   }
 };
 
-const applyTeamDateState = async ({ issueKeys, setStartDateByKey, setCompleteDateByKey }) => {
+const PLANNING_FIELD_KEYS = ["hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
+
+const extractPlanningMeta = (item) => ({
+  hasOpenDecision: Boolean(item?.hasOpenDecision),
+  plannedStart: String(item?.plannedStart || ""),
+  plannedFinish: String(item?.plannedFinish || ""),
+  pmOverride: String(item?.pmOverride || ""),
+  requestor: String(item?.requestor || ""),
+  openDecisionNote: String(item?.openDecisionNote || ""),
+});
+
+const hasPlanningData = (item) =>
+  item && PLANNING_FIELD_KEYS.some((f) => item[f] !== undefined && item[f] !== "" && item[f] !== false);
+
+const applyTeamDateState = async ({ issueKeys, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }) => {
   if (!setStartDateByKey && !setCompleteDateByKey) {
     return;
   }
@@ -89,19 +103,20 @@ const applyTeamDateState = async ({ issueKeys, setStartDateByKey, setCompleteDat
     const teamItems = await fetchTeamDatesBulk(keys);
     const teamStartDates = {};
     const teamCompleteDates = {};
+    const teamPlanningMeta = {};
     Object.entries(teamItems || {}).forEach(([issueKey, item]) => {
-      if (item?.startDate) {
-        teamStartDates[issueKey] = item.startDate;
-      }
-      if (item?.completeDate) {
-        teamCompleteDates[issueKey] = item.completeDate;
-      }
+      if (item?.startDate) teamStartDates[issueKey] = item.startDate;
+      if (item?.completeDate) teamCompleteDates[issueKey] = item.completeDate;
+      if (hasPlanningData(item)) teamPlanningMeta[issueKey] = extractPlanningMeta(item);
     });
     if (setStartDateByKey && Object.keys(teamStartDates).length > 0) {
       setStartDateByKey((prev) => ({ ...prev, ...teamStartDates }));
     }
     if (setCompleteDateByKey && Object.keys(teamCompleteDates).length > 0) {
       setCompleteDateByKey((prev) => ({ ...prev, ...teamCompleteDates }));
+    }
+    if (setPlanningMetaByKey && Object.keys(teamPlanningMeta).length > 0) {
+      setPlanningMetaByKey((prev) => ({ ...prev, ...teamPlanningMeta }));
     }
   } catch (error) {
     console.error("Failed to fetch team dates", error);
@@ -116,6 +131,7 @@ const applyDrillDownMetadata = async ({
   setJiraNotes,
   setStartDateByKey,
   setCompleteDateByKey,
+  setPlanningMetaByKey,
   hydrateNoteImages,
 }) => {
   if (issueKeys.length === 0) {
@@ -145,6 +161,7 @@ const applyDrillDownMetadata = async ({
   const nextPriorities = {};
   const nextStartDates = {};
   const nextCompleteDates = {};
+  const nextPlanningMeta = {};
   issueKeys.forEach((key) => {
     const item = persisted?.[key];
     if (!item) {
@@ -162,6 +179,9 @@ const applyDrillDownMetadata = async ({
     if (typeof item.completeDate === "string" && item.completeDate) {
       nextCompleteDates[key] = item.completeDate;
     }
+    if (hasPlanningData(item)) {
+      nextPlanningMeta[key] = extractPlanningMeta(item);
+    }
     if (hydrateNoteImages) {
       hydrateNoteImages(key, { keepNoteImages: item.keepNoteImages, images: item.images });
     }
@@ -177,6 +197,9 @@ const applyDrillDownMetadata = async ({
   }
   if (setCompleteDateByKey && Object.keys(nextCompleteDates).length > 0) {
     setCompleteDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextCompleteDates));
+  }
+  if (setPlanningMetaByKey && Object.keys(nextPlanningMeta).length > 0) {
+    setPlanningMetaByKey((prev) => mergeIssueMapsPreferExisting(prev, nextPlanningMeta));
   }
 };
 
@@ -196,6 +219,7 @@ export async function runJqlWorkflow({
   setPrioritySourceByKey,
   setStartDateByKey,
   setCompleteDateByKey,
+  setPlanningMetaByKey,
   hydrateNoteImages,
   fieldMappingRows,
 }) {
@@ -294,6 +318,7 @@ export async function runJqlWorkflow({
         const nextPriorities = {};
         const nextStartDates = {};
         const nextCompleteDates = {};
+        const nextPlanningMeta = {};
 
         localKeys.forEach((issueKey) => {
           const item = persisted?.[issueKey];
@@ -313,6 +338,9 @@ export async function runJqlWorkflow({
           if (typeof item.completeDate === "string" && item.completeDate) {
             nextCompleteDates[issueKey] = item.completeDate;
           }
+          if (hasPlanningData(item)) {
+            nextPlanningMeta[issueKey] = extractPlanningMeta(item);
+          }
           if (hydrateNoteImages) {
             hydrateNoteImages(issueKey, { keepNoteImages: item.keepNoteImages, images: item.images });
           }
@@ -330,6 +358,9 @@ export async function runJqlWorkflow({
         if (setCompleteDateByKey && Object.keys(nextCompleteDates).length > 0) {
           setCompleteDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextCompleteDates));
         }
+        if (setPlanningMetaByKey && Object.keys(nextPlanningMeta).length > 0) {
+          setPlanningMetaByKey((prev) => mergeIssueMapsPreferExisting(prev, nextPlanningMeta));
+        }
       } catch (error) {
         console.error("Failed to fetch persisted issue metadata", error);
       }
@@ -341,6 +372,7 @@ export async function runJqlWorkflow({
         const nextNotes = {};
         const nextStartDates = {};
         const nextCompleteDates = {};
+        const nextPlanningMeta = {};
         [...teamIssueKeys].forEach((issueKey) => {
           const item = persisted?.[issueKey];
           if (!item) {
@@ -355,6 +387,9 @@ export async function runJqlWorkflow({
           if (typeof item.completeDate === "string" && item.completeDate) {
             nextCompleteDates[issueKey] = item.completeDate;
           }
+          if (hasPlanningData(item)) {
+            nextPlanningMeta[issueKey] = extractPlanningMeta(item);
+          }
           if (hydrateNoteImages) {
             hydrateNoteImages(issueKey, { keepNoteImages: item.keepNoteImages, images: item.images });
           }
@@ -367,6 +402,9 @@ export async function runJqlWorkflow({
         }
         if (setCompleteDateByKey && Object.keys(nextCompleteDates).length > 0) {
           setCompleteDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextCompleteDates));
+        }
+        if (setPlanningMetaByKey && Object.keys(nextPlanningMeta).length > 0) {
+          setPlanningMetaByKey((prev) => mergeIssueMapsPreferExisting(prev, nextPlanningMeta));
         }
       } catch (error) {
         console.error("Failed to fetch notes for team-slot issues", error);
@@ -381,7 +419,7 @@ export async function runJqlWorkflow({
         setJiraRowPriorities,
         setPrioritySourceByKey,
       }),
-      applyTeamDateState({ issueKeys: [...teamIssueKeys], setStartDateByKey, setCompleteDateByKey }),
+      applyTeamDateState({ issueKeys: [...teamIssueKeys], setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }),
     ]);
 
     const enrichedRuns = await Promise.all(
@@ -413,6 +451,7 @@ export async function loadRemainingJqlIssues({
   setJiraNotes,
   setStartDateByKey,
   setCompleteDateByKey,
+  setPlanningMetaByKey,
   pullLatestComment,
   fieldMappingRows,
 }) {
@@ -465,7 +504,7 @@ export async function loadRemainingJqlIssues({
           setJiraRowPriorities,
           setPrioritySourceByKey,
         }),
-        applyTeamDateState({ issueKeys, setStartDateByKey, setCompleteDateByKey }),
+        applyTeamDateState({ issueKeys, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }),
       ]);
       return;
     }
@@ -489,6 +528,7 @@ export async function loadRemainingJqlIssues({
       const nextPriorities = {};
       const nextStartDates = {};
       const nextCompleteDates = {};
+      const nextPlanningMeta = {};
       issueKeys.forEach((issueKey) => {
         const item = persisted?.[issueKey];
         if (item?.priority !== undefined) {
@@ -500,6 +540,9 @@ export async function loadRemainingJqlIssues({
         if (typeof item?.completeDate === "string" && item.completeDate) {
           nextCompleteDates[issueKey] = item.completeDate;
         }
+        if (hasPlanningData(item)) {
+          nextPlanningMeta[issueKey] = extractPlanningMeta(item);
+        }
       });
       if (Object.keys(nextPriorities).length > 0) {
         setJiraRowPriorities((prev) => mergeIssueMapsPreferExisting(prev, nextPriorities));
@@ -509,6 +552,9 @@ export async function loadRemainingJqlIssues({
       }
       if (setCompleteDateByKey && Object.keys(nextCompleteDates).length > 0) {
         setCompleteDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextCompleteDates));
+      }
+      if (setPlanningMetaByKey && Object.keys(nextPlanningMeta).length > 0) {
+        setPlanningMetaByKey((prev) => mergeIssueMapsPreferExisting(prev, nextPlanningMeta));
       }
     } catch (error) {
       console.error("Failed to fetch persisted issue metadata", error);
@@ -536,6 +582,7 @@ export async function loadDrillDownIssueByKey({
   setJiraNotes,
   setStartDateByKey,
   setCompleteDateByKey,
+  setPlanningMetaByKey,
   setJqlError,
   hydrateNoteImages,
   fieldMappingRows,
@@ -596,6 +643,7 @@ export async function loadDrillDownIssueByKey({
         setJiraNotes,
         setStartDateByKey,
         setCompleteDateByKey,
+        setPlanningMetaByKey,
         hydrateNoteImages,
       });
     } catch (error) {
@@ -639,6 +687,7 @@ export async function loadDrillDownIssuesByAssignee({
   setJiraNotes,
   setStartDateByKey,
   setCompleteDateByKey,
+  setPlanningMetaByKey,
   setJqlError,
   hydrateNoteImages,
   fieldMappingRows,
@@ -735,6 +784,7 @@ export async function loadDrillDownIssuesByAssignee({
         setJiraNotes,
         setStartDateByKey,
         setCompleteDateByKey,
+        setPlanningMetaByKey,
         hydrateNoteImages,
       });
     } catch (error) {
@@ -778,6 +828,7 @@ export async function loadDrillDownByJql({
   setJiraNotes,
   setStartDateByKey,
   setCompleteDateByKey,
+  setPlanningMetaByKey,
   setJqlError,
   hydrateNoteImages,
   fieldMappingRows,
@@ -834,6 +885,7 @@ export async function loadDrillDownByJql({
         setJiraNotes,
         setStartDateByKey,
         setCompleteDateByKey,
+        setPlanningMetaByKey,
         hydrateNoteImages,
       });
     } catch (error) {

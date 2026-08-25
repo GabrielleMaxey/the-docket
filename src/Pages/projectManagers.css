@@ -235,11 +235,17 @@
 .pm-contributor-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0;
   font-size: 0.8rem;
   color: #334155;
-  padding: 0.15rem 0;
+  padding: 0.2rem 0.3rem;
+  border-radius: 5px;
+  margin: 0 -0.3rem;
+  transition: background 0.1s;
+}
+
+.pm-contributor-row:hover {
+  background: #f1f5f9;
 }
 
 .pm-contributor-row-name {
@@ -706,4 +712,62 @@
   font-size: 0.75rem;
   color: #94a3b8;
   font-style: italic;
+}
+
+/* ── Asks panel ── */
+.pm-asks-panel {
+  padding: 0.75rem 0;
+}
+
+.pm-asks-new-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.pm-asks-input {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  min-width: 10rem;
+}
+
+.pm-asks-input--note {
+  flex: 1;
+}
+
+.pm-asks-empty {
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.pm-asks-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.pm-asks-table th,
+.pm-asks-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.pm-asks-table th {
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+
+.pm-asks-table td:last-child {
+  white-space: nowrap;
+  display: flex;
+  gap: 0.35rem;
 }

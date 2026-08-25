@@ -197,6 +197,23 @@ const migrateDatabase = (db) => {
   // NULL capacity = no target; 0 = zero capacity.
   ensureColumn(db, "watched_assignees", "capacity", "INTEGER");
   ensureColumn(db, "watched_assignees", "overdue_date_basis", "TEXT NOT NULL DEFAULT 'either'");
+  // PM planning fields — additive only; rollback-safe via ensureColumn.
+  ensureColumn(db, "issue_metadata", "has_open_decision", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "issue_metadata", "planned_start", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "issue_metadata", "planned_finish", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "issue_metadata", "pm_override", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "issue_metadata", "requestor", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "issue_metadata", "open_decision_note", "TEXT NOT NULL DEFAULT ''");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pm_asks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL DEFAULT '',
+      who_asked TEXT NOT NULL DEFAULT '',
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
   db.prepare(
     "UPDATE jira_field_mappings SET field_id = 'customfield_10008' WHERE role = 'initial_done_date' AND TRIM(field_id) = ''"

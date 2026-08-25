@@ -95,6 +95,8 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
           dueDate: String(fields.duedate || ""),
           startDate: String(dates.startDate || ""),
           completeDate: String(dates.completeDate || ""),
+          plannedStart: String(dates.plannedStart || ""),
+          plannedFinish: String(dates.plannedFinish || ""),
         };
       });
 

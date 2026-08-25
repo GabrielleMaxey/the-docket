@@ -110,6 +110,8 @@ const JiraResultsTable = ({
   mrdDrafts,
   startDateByKey,
   completeDateByKey,
+  planningMetaByKey,
+  expandedPlanningKey,
   assigneeDrafts,
   jiraRowPriorities,
   jiraNotes,
@@ -138,6 +140,8 @@ const JiraResultsTable = ({
   handleStartDateChange,
   handleCompleteDateChange,
   handleClearDateTracking,
+  handleTogglePlanningRow,
+  handlePlanningFieldChange,
   handleAssigneeDraftChange,
   handleAssigneeUpdate,
   handleRowPriorityChange,
@@ -740,12 +744,27 @@ const JiraResultsTable = ({
                     });
                     const isNoteAlreadyPushed = noteMatchesLastJiraPush(noteFingerprint, pushedNoteSnapshot);
 
+                    const isExpandedPlanning = expandedPlanningKey === issueKey;
+                    const planningMeta = planningMetaByKey[issueKey] || {};
+                    const hasAnyTracking = startDateByKey[issueKey] || completeDateByKey[issueKey] ||
+                      planningMeta.plannedStart || planningMeta.plannedFinish || planningMeta.pmOverride ||
+                      planningMeta.requestor;
+
                     return (
+                      <React.Fragment key={issue.id}>
                       <tr
-                        key={issue.id}
-                        className={isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}
+                        className={`${isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}${planningMeta.hasOpenDecision ? " ww-row-open-decision" : ""}${hasAnyTracking ? " ww-row-has-tracking" : ""}`}
                       >
                         <td className="ww-cell-key">
+                          <button
+                            type="button"
+                            className={`ww-planning-expand-btn${isExpandedPlanning ? " ww-planning-expand-btn--open" : ""}`}
+                            onClick={() => handleTogglePlanningRow(issueKey)}
+                            title={isExpandedPlanning ? "Collapse planning" : "Expand planning"}
+                            aria-label={`${isExpandedPlanning ? "Collapse" : "Expand"} planning for ${issueKey}`}
+                          >
+                            {isExpandedPlanning ? "Plan ▾" : "Plan ▸"}
+                          </button>
                           {issueBrowseUrl ? (
                             <a href={issueBrowseUrl} target="_blank" rel="noreferrer noopener">
                               {issueKey}
@@ -901,57 +920,6 @@ const JiraResultsTable = ({
                                   </button>
                                 </div>
 
-                                <div className="ww-date-row">
-                                  <label className="ww-date-label" title="Ad-hoc start date — local only, used for Gantt charts. No Jira field.">
-                                    Start
-                                  </label>
-                                  <input
-                                    type="date"
-                                    className="ww-edit-input"
-                                    value={startDateByKey[issueKey] || ""}
-                                    disabled={isClosedOrResolved}
-                                    onChange={(event) =>
-                                      handleStartDateChange(issueKey, event.target.value, { sharedProgramId })
-                                    }
-                                  />
-                                </div>
-
-                                <div className="ww-date-row">
-                                  <label
-                                    className="ww-date-label"
-                                    title="Ad-hoc complete date — local only, used for Gantt charts. Defaults from MRD if empty. No Jira field."
-                                  >
-                                    Complete
-                                  </label>
-                                  <input
-                                    type="date"
-                                    className="ww-edit-input"
-                                    value={completeDateByKey[issueKey] ?? ""}
-                                    disabled={isClosedOrResolved}
-                                    onChange={(event) =>
-                                      handleCompleteDateChange(issueKey, event.target.value, { sharedProgramId })
-                                    }
-                                  />
-                                </div>
-
-                                {startDateByKey[issueKey] || completeDateByKey[issueKey] ? (
-                                  <button
-                                    type="button"
-                                    className="ww-date-clear-btn"
-                                    onClick={() => {
-                                      if (
-                                        window.confirm(
-                                          `Clear start/complete date tracking for ${issueKey}? This can't be undone.`
-                                        )
-                                      ) {
-                                        handleClearDateTracking(issueKey, { sharedProgramId });
-                                      }
-                                    }}
-                                    disabled={isClosedOrResolved}
-                                  >
-                                    Clear tracking
-                                  </button>
-                                ) : null}
                               </div>
                             );
                           })()}
@@ -1062,6 +1030,124 @@ const JiraResultsTable = ({
                           {rowUpdate.success && <p className="ww-inline-success">{rowUpdate.success}</p>}
                         </td>
                       </tr>
+                      {isExpandedPlanning ? (() => {
+                        const sharedProgramId = String(run.sharedProgramId || jqlSharedProgramIds?.[runSlotIndex] || "").trim();
+                        const reporterName = String(issue.fields?.reporter?.displayName || "");
+                        return (
+                          <tr className="ww-planning-panel-row">
+                            <td colSpan={10} className="ww-planning-panel-cell">
+                              <div className="ww-planning-panel">
+                                <div className="ww-planning-panel-fields">
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label">Open decision</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(planningMeta.hasOpenDecision)}
+                                      disabled={isClosedOrResolved}
+                                      onChange={(e) =>
+                                        handlePlanningFieldChange(issueKey, "hasOpenDecision", e.target.checked, { sharedProgramId })
+                                      }
+                                    />
+                                  </label>
+                                  {planningMeta.hasOpenDecision ? (
+                                    <label className="ww-planning-field ww-planning-field--decision-note">
+                                      <span className="ww-planning-label">Decision note</span>
+                                      <textarea
+                                        className="ww-edit-input ww-planning-decision-note"
+                                        rows={3}
+                                        value={planningMeta.openDecisionNote || ""}
+                                        disabled={isClosedOrResolved}
+                                        placeholder="Describe the open decision…"
+                                        onChange={(e) =>
+                                          handlePlanningFieldChange(issueKey, "openDecisionNote", e.target.value, { sharedProgramId })
+                                        }
+                                      />
+                                    </label>
+                                  ) : null}
+
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label" title="Actual start date — used for Gantt">Start</span>
+                                    <input
+                                      type="date"
+                                      className="ww-edit-input"
+                                      value={startDateByKey[issueKey] || ""}
+                                      disabled={isClosedOrResolved}
+                                      onChange={(e) => handleStartDateChange(issueKey, e.target.value, { sharedProgramId })}
+                                    />
+                                  </label>
+
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label" title="Actual complete date — used for Gantt">Complete</span>
+                                    <input
+                                      type="date"
+                                      className="ww-edit-input"
+                                      value={completeDateByKey[issueKey] || ""}
+                                      disabled={isClosedOrResolved}
+                                      onChange={(e) => handleCompleteDateChange(issueKey, e.target.value, { sharedProgramId })}
+                                    />
+                                  </label>
+
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label" title="PM's planned start — not Jira, not Gantt">Planned start</span>
+                                    <input
+                                      type="date"
+                                      className="ww-edit-input"
+                                      value={planningMeta.plannedStart || ""}
+                                      disabled={isClosedOrResolved}
+                                      onChange={(e) =>
+                                        handlePlanningFieldChange(issueKey, "plannedStart", e.target.value, { sharedProgramId })
+                                      }
+                                    />
+                                  </label>
+
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label" title="PM's planned finish — not Jira, not Gantt">Planned finish</span>
+                                    <input
+                                      type="date"
+                                      className="ww-edit-input"
+                                      value={planningMeta.plannedFinish || ""}
+                                      disabled={isClosedOrResolved}
+                                      onChange={(e) =>
+                                        handlePlanningFieldChange(issueKey, "plannedFinish", e.target.value, { sharedProgramId })
+                                      }
+                                    />
+                                  </label>
+
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label" title="Who originally requested this work — free text, not from Jira">Requestor</span>
+                                    <input
+                                      type="text"
+                                      className="ww-edit-input"
+                                      value={planningMeta.requestor || ""}
+                                      disabled={isClosedOrResolved}
+                                      placeholder="Name, team, or role…"
+                                      onChange={(e) =>
+                                        handlePlanningFieldChange(issueKey, "requestor", e.target.value, { sharedProgramId })
+                                      }
+                                    />
+                                  </label>
+
+                                  {(startDateByKey[issueKey] || completeDateByKey[issueKey]) ? (
+                                    <button
+                                      type="button"
+                                      className="ww-date-clear-btn"
+                                      disabled={isClosedOrResolved}
+                                      onClick={() => {
+                                        if (window.confirm(`Clear start/complete date tracking for ${issueKey}?`)) {
+                                          handleClearDateTracking(issueKey, { sharedProgramId });
+                                        }
+                                      }}
+                                    >
+                                      Clear tracking
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })() : null}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
