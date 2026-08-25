@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, Icon, Message } from "semantic-ui-react";
+import { Message } from "semantic-ui-react";
 import { MAX_JQL_SLOTS } from "../../utils/workWeekStorage.js";
 
 const JQL_COUNT_OPTIONS = Array.from({ length: MAX_JQL_SLOTS }, (_, index) => index + 1);
@@ -52,7 +52,7 @@ const JqlControlsPanel = ({
     ) : null}
 
     <div className="ww-create-issue-row">
-      <Button primary onClick={onCreateIssue}>Create Issue</Button>
+      <button type="button" className="ui primary button" onClick={onCreateIssue}>Create Issue</button>
     </div>
 
     <div className="ww-jql-controls">
@@ -201,12 +201,22 @@ const JqlControlsPanel = ({
     </div>
 
     <div className="ww-jql-action-row">
-      <Button secondary size="small" onClick={onRunJql} loading={jqlLoading} disabled={filtersLoading}>
+      <button
+        type="button"
+        className={`ui secondary small button${jqlLoading ? " loading" : ""}`}
+        onClick={onRunJql}
+        disabled={jqlLoading || filtersLoading}
+      >
         Run JQL
-      </Button>
-      <Button size="small" className="ww-reset-btn" onClick={onResetSavedQueries} disabled={filtersLoading}>
-        <Icon name="warning sign" />Reset Saved Queries
-      </Button>
+      </button>
+      <button
+        type="button"
+        className="ui small button ww-reset-btn"
+        onClick={onResetSavedQueries}
+        disabled={filtersLoading}
+      >
+        ⚠ Reset Saved Queries
+      </button>
     </div>
 
     {jqlError ? <p className="ww-jira-status ww-jira-error">{jqlError}</p> : null}
