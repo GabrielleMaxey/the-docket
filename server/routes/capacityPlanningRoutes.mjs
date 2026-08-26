@@ -78,10 +78,36 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
       const { issues: loaded } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 2000 });
 
       const issueKeys = loaded.map((i) => i.key);
-      const datesByKey =
+      const mongoDatesByKey =
         isTeamPriorityMongoConfigured() && issueKeys.length > 0
           ? await bulkGetTeamDates(issueKeys)
           : {};
+
+      // SQLite fallback for keys that have no MongoDB dates
+      const keysWithoutMongoDates = issueKeys.filter((k) => {
+        const d = mongoDatesByKey[k];
+        return !d || (!d.startDate && !d.completeDate && !d.plannedStart && !d.plannedFinish);
+      });
+      const sqliteDatesByKey = {};
+      if (keysWithoutMongoDates.length > 0) {
+        const placeholders = keysWithoutMongoDates.map(() => "?").join(",");
+        const rows = db
+          .prepare(
+            `SELECT issue_key, start_date, complete_date, planned_start, planned_finish
+             FROM issue_metadata WHERE issue_key IN (${placeholders})`
+          )
+          .all(...keysWithoutMongoDates);
+        for (const row of rows) {
+          sqliteDatesByKey[row.issue_key] = {
+            startDate: String(row.start_date || ""),
+            completeDate: String(row.complete_date || ""),
+            plannedStart: String(row.planned_start || ""),
+            plannedFinish: String(row.planned_finish || ""),
+          };
+        }
+      }
+
+      const datesByKey = { ...sqliteDatesByKey, ...mongoDatesByKey };
 
       const issues = loaded.map((issue) => {
         const fields = issue.fields || {};

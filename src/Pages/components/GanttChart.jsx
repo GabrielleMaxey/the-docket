@@ -135,10 +135,16 @@ const GanttChart = () => {
 
   const issues = data?.issues || [];
 
-  // Compute date range from issues that have both start and due dates
+  // Compute date range from all issues that have any kind of date (actual or planned)
   const datedIssues = issues.filter((i) => parseDate(i.startDate) && parseDate(i.dueDate || i.completeDate));
-  const allStarts = datedIssues.map((i) => parseDate(i.startDate).getTime());
-  const allEnds = datedIssues.map((i) => parseDate(i.dueDate || i.completeDate).getTime());
+  const allStarts = [
+    ...datedIssues.map((i) => parseDate(i.startDate).getTime()),
+    ...issues.filter((i) => parseDate(i.plannedStart)).map((i) => parseDate(i.plannedStart).getTime()),
+  ];
+  const allEnds = [
+    ...datedIssues.map((i) => parseDate(i.dueDate || i.completeDate).getTime()),
+    ...issues.filter((i) => parseDate(i.plannedFinish)).map((i) => parseDate(i.plannedFinish).getTime()),
+  ];
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
