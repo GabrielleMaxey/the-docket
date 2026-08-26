@@ -7,6 +7,7 @@ const ALLOWED_MIMES = new Set([
   "image/gif",
   "image/webp",
   "text/plain",
+  "text/markdown",
   "application/pdf",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -22,6 +23,7 @@ const ALLOWED_EXTENSIONS = new Set([
   ".gif",
   ".webp",
   ".txt",
+  ".md",
   ".pdf",
   ".doc",
   ".docx",
@@ -49,7 +51,7 @@ export const isAllowedNoteImageMime = (mime, filename = "") => {
 
 export const NOTE_IMAGE_TOO_MANY_MESSAGE = `You can add up to ${NOTE_IMAGE_MAX_COUNT} files.`;
 export const NOTE_IMAGE_BAD_MIME_MESSAGE =
-  "Choose a PNG, JPEG, GIF, WebP, TXT, PDF, DOC, DOCX, XLSX, or CSV file.";
+  "Choose a PNG, JPEG, GIF, WebP, TXT, MD, PDF, DOC, DOCX, XLSX, or CSV file.";
 export const NOTE_IMAGE_TOO_LARGE_MESSAGE = `Each file must be ${
   NOTE_IMAGE_MAX_BYTES / (1024 * 1024)
 } MB or smaller.`;

@@ -1,7 +1,7 @@
 import React from "react";
 
 const ACCEPT_TYPES =
-  "image/png,image/jpeg,image/gif,image/webp,text/plain,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/vnd.ms-excel,.txt,.pdf,.doc,.docx,.xlsx,.csv";
+  "image/png,image/jpeg,image/gif,image/webp,text/plain,text/markdown,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/vnd.ms-excel,.txt,.md,.pdf,.doc,.docx,.xlsx,.csv";
 
 const formatByteSize = (byteSize) => `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
 
