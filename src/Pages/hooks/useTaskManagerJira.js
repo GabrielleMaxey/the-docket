@@ -22,6 +22,7 @@ import {
   updateJiraIssueAssignee,
   updateJiraIssueStatus,
   updateJiraIssueDateField,
+  updatePinnedGantt,
   JIRA_UNASSIGNED_ASSIGNEE,
   isJiraUnassignValue,
 } from "../../services/jiraClient";
@@ -1023,6 +1024,16 @@ export const useTaskManagerJira = () => {
     }
   };
 
+  const handlePinnedGanttChange = React.useCallback((issueKey, pinned) => {
+    setPlanningMetaByKey((prev) => ({
+      ...prev,
+      [issueKey]: { ...(prev[issueKey] || {}), pinnedGantt: pinned },
+    }));
+    updatePinnedGantt(issueKey, pinned).catch((err) => {
+      console.error("Failed to update Gantt pin for", issueKey, err);
+    });
+  }, []);
+
   const handleAssigneeUpdate = async (issueKey) => {
     const draftOrAccount =
       assigneeAccountIds[issueKey] === JIRA_UNASSIGNED_ASSIGNEE
@@ -1355,6 +1366,7 @@ export const useTaskManagerJira = () => {
     handleTogglePlanningRow,
     handleSavePlanningAll,
     handlePlanningFieldChange,
+    handlePinnedGanttChange,
     handleAssigneeDraftChange,
     handleAssigneeUpdate,
     handleRowPriorityChange,

@@ -144,6 +144,7 @@ const JiraResultsTable = ({
   handleTogglePlanningRow,
   handleSavePlanningAll,
   handlePlanningFieldChange,
+  handlePinnedGanttChange,
   handleAssigneeDraftChange,
   handleAssigneeUpdate,
   handleRowPriorityChange,
@@ -1186,6 +1187,15 @@ const JiraResultsTable = ({
                                       {formatDate(issue.fields?.created) || "—"}
                                     </span>
                                   </div>
+
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label" title="Include this issue in the Pinned Issues view on the Gantt chart">Pin to Gantt</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(planningMeta.pinnedGantt)}
+                                      onChange={(e) => handlePinnedGanttChange && handlePinnedGanttChange(issueKey, e.target.checked)}
+                                    />
+                                  </label>
 
                                   {(startDateByKey[issueKey] || completeDateByKey[issueKey]) ? (
                                     <button

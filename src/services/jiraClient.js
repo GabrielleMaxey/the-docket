@@ -722,6 +722,13 @@ export const fetchGanttData = async (slug) => {
   return data;
 };
 
+export const updatePinnedGantt = (issueKey, pinned) =>
+  requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/pin-gantt`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pinned: Boolean(pinned) }),
+  });
+
 export const searchEpics = async (query) => {
   const q = String(query || "").trim();
   if (q.length < 2) {

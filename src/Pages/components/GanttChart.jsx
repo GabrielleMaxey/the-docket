@@ -1,6 +1,5 @@
 import React from "react";
 import { fetchSharedPrograms, fetchGanttData } from "../../services/jiraClient";
-import { formatDate } from "../../utils/format.js";
 
 const parseDate = (str) => {
   if (!str) return null;
@@ -14,17 +13,30 @@ const addDays = (date, n) => {
   return d;
 };
 
-const fmtMonthYear = (date) =>
-  formatDate(date, { locale: "en-US", month: "short", year: "numeric" });
+const diffDays = (a, b) => Math.round((b.getTime() - a.getTime()) / 86400000);
 
-const STATUS_CATEGORY_COLOR = {
+const fmtMonthYear = (date) =>
+  date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+
+const fmtShort = (str) => {
+  const d = parseDate(str);
+  return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+};
+
+const OVERDUE_COLOR = "#dc2626";
+const STATUS_COLORS = {
   "In Progress": "#3b82f6",
   "Done": "#94a3b8",
   "To Do": "#64748b",
 };
 
-const barColor = (statusCategory) =>
-  STATUS_CATEGORY_COLOR[statusCategory] || "#64748b";
+const barColor = (issue, today) => {
+  if (issue.statusCategory !== "Done") {
+    const due = parseDate(issue.dueDate || issue.completeDate);
+    if (due && due < today) return OVERDUE_COLOR;
+  }
+  return STATUS_COLORS[issue.statusCategory] || "#64748b";
+};
 
 const generateMonths = (start, end) => {
   const months = [];
@@ -46,14 +58,55 @@ const generateMonths = (start, end) => {
 const pct = (date, rangeStart, rangeMs) =>
   ((date.getTime() - rangeStart.getTime()) / rangeMs) * 100;
 
-const JIRA_BASE_RE = /^https?:\/\/[^/]+/;
-
 const issueUrl = (key) => {
   const base = window.__JIRA_BASE_URL__ || "";
   return base ? `${base}/browse/${key}` : null;
 };
 
-const GanttBar = ({ issue, rangeStart, rangeMs }) => {
+const GanttTooltip = ({ issue, x, y, today }) => {
+  const end = parseDate(issue.dueDate || issue.completeDate);
+  const planEnd = parseDate(issue.plannedFinish);
+  const isOverdue = issue.statusCategory !== "Done" && end && end < today;
+
+  let delta = null;
+  if (planEnd && end && issue.statusCategory !== "Done") {
+    const d = diffDays(planEnd, end);
+    if (d > 0) delta = { text: `${d}d behind plan`, cls: "pm-gantt-tooltip-late" };
+    else if (d < 0) delta = { text: `${Math.abs(d)}d ahead of plan`, cls: "pm-gantt-tooltip-ahead" };
+    else delta = { text: "on plan", cls: "" };
+  }
+
+  const style = {
+    position: "fixed",
+    left: Math.min(x + 14, (window.innerWidth || 800) - 270),
+    top: y - 8,
+    transform: "translateY(-100%)",
+    zIndex: 9999,
+    pointerEvents: "none",
+  };
+
+  return (
+    <div className="pm-gantt-tooltip" style={style}>
+      <div className="pm-gantt-tooltip-key">
+        {issue.key}
+        {isOverdue && <span className="pm-gantt-tooltip-overdue-badge">Overdue</span>}
+      </div>
+      <div className="pm-gantt-tooltip-summary">{issue.summary}</div>
+      <div className="pm-gantt-tooltip-grid">
+        <span>Status</span><span>{issue.status || "—"}</span>
+        <span>Assignee</span><span>{issue.assignee || "—"}</span>
+        {issue.requestor ? <><span>Requestor</span><span>{issue.requestor}</span></> : null}
+        <span>Start</span><span>{fmtShort(issue.startDate)}</span>
+        <span>Due / Complete</span><span>{fmtShort(issue.dueDate || issue.completeDate)}</span>
+        {issue.plannedStart ? <><span>Planned start</span><span>{fmtShort(issue.plannedStart)}</span></> : null}
+        {issue.plannedFinish ? <><span>Planned finish</span><span>{fmtShort(issue.plannedFinish)}</span></> : null}
+        {delta ? <><span>vs Plan</span><span className={delta.cls}>{delta.text}</span></> : null}
+      </div>
+    </div>
+  );
+};
+
+const GanttBar = ({ issue, rangeStart, rangeMs, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
   const start = parseDate(issue.startDate);
   const end = parseDate(issue.dueDate || issue.completeDate);
   const planStart = parseDate(issue.plannedStart);
@@ -64,25 +117,39 @@ const GanttBar = ({ issue, rangeStart, rangeMs }) => {
 
   if (!hasActualBar && !hasPlanBar) {
     return (
-      <div className="pm-gantt-row-bars">
-        <span className="pm-gantt-no-date">no start date</span>
+      <div className="pm-gantt-row-bars" onMouseLeave={onMouseLeave}>
+        <span className="pm-gantt-no-date">no dates</span>
       </div>
     );
   }
 
   const url = issueUrl(issue.key);
+  const color = barColor(issue, today);
 
-  const renderBar = (s, e, className, title, barStyle) => {
+  const renderBar = (s, e, className, barStyle) => {
     const leftPct = Math.max(0, pct(s, rangeStart, rangeMs));
     const rightPct = Math.min(100, pct(e, rangeStart, rangeMs));
-    const widthPct = Math.max(0.5, rightPct - leftPct);
+    const widthPct = Math.max(0.3, rightPct - leftPct);
     const style = { left: `${leftPct}%`, width: `${widthPct}%`, ...barStyle };
+    const handlers = {
+      onMouseEnter: (e) => onMouseEnter(issue, e),
+      onMouseMove,
+      onMouseLeave,
+    };
     return url ? (
-      <a key={className} className={`pm-gantt-bar ${className}`} href={url} target="_blank" rel="noreferrer noopener" title={title} style={style}>
+      <a
+        key={className}
+        className={`pm-gantt-bar ${className}`}
+        href={url}
+        target="_blank"
+        rel="noreferrer noopener"
+        style={style}
+        {...handlers}
+      >
         <span className="pm-gantt-bar-label">{issue.key}</span>
       </a>
     ) : (
-      <div key={className} className={`pm-gantt-bar ${className}`} title={title} style={style}>
+      <div key={className} className={`pm-gantt-bar ${className}`} style={style} {...handlers}>
         <span className="pm-gantt-bar-label">{issue.key}</span>
       </div>
     );
@@ -90,32 +157,65 @@ const GanttBar = ({ issue, rangeStart, rangeMs }) => {
 
   return (
     <div className="pm-gantt-row-bars">
-      {hasPlanBar && renderBar(planStart, planEnd, "pm-gantt-bar--plan",
-        `${issue.key} planned: ${issue.plannedStart} → ${issue.plannedFinish}`,
-        { background: "transparent", border: "2px dashed var(--pm-gantt-plan-bar-color, #a0a0c0)", opacity: 0.65 }
-      )}
-      {hasActualBar && renderBar(start, end, "pm-gantt-bar--actual",
-        `${issue.key}: ${issue.summary}\n${issue.startDate} → ${issue.dueDate || issue.completeDate}`,
-        { background: barColor(issue.statusCategory) }
-      )}
+      {hasPlanBar &&
+        renderBar(planStart, planEnd, "pm-gantt-bar--plan", {
+          background: "transparent",
+          border: "2px dashed var(--pm-gantt-plan-bar-color, #a0a0c0)",
+          opacity: 0.65,
+        })}
+      {hasActualBar && renderBar(start, end, "pm-gantt-bar--actual", { background: color })}
     </div>
   );
 };
 
+const LEGEND_ITEMS = [
+  { color: "#3b82f6", label: "In Progress" },
+  { color: OVERDUE_COLOR, label: "Overdue" },
+  { color: "#64748b", label: "To Do" },
+  { color: "#94a3b8", label: "Done" },
+];
+
+const GanttLegend = () => (
+  <div className="pm-gantt-legend">
+    {LEGEND_ITEMS.map(({ color, label }) => (
+      <span key={label} className="pm-gantt-legend-item">
+        <span className="pm-gantt-legend-swatch" style={{ background: color }} />
+        {label}
+      </span>
+    ))}
+    <span className="pm-gantt-legend-item">
+      <span className="pm-gantt-legend-swatch pm-gantt-legend-swatch--plan" />
+      Planned (dashed)
+    </span>
+  </div>
+);
+
+const GROUP_DOT_COLORS = { "In Progress": "#3b82f6", "Done": "#94a3b8", "To Do": "#64748b" };
+const GROUP_ORDER = ["In Progress", "To Do", "Done"];
+const PINNED_SLUG = "__pinned__";
+const ZOOM_LABELS = { "3mo": "3 mo", "6mo": "6 mo", "1yr": "1 yr", all: "All" };
+
+const sortGroup = (items) => {
+  const dated = items
+    .filter((i) => parseDate(i.startDate))
+    .sort((a, b) => parseDate(a.startDate).getTime() - parseDate(b.startDate).getTime());
+  return [...dated, ...items.filter((i) => !parseDate(i.startDate))];
+};
+
 const GanttChart = () => {
   const [programs, setPrograms] = React.useState([]);
-  const [slug, setSlug] = React.useState("");
+  const [slug, setSlug] = React.useState(PINNED_SLUG);
   const [data, setData] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [zoom, setZoom] = React.useState("all");
+  const [hiddenStatuses, setHiddenStatuses] = React.useState(new Set());
+  const [collapsedGroups, setCollapsedGroups] = React.useState(new Set());
+  const [tooltip, setTooltip] = React.useState(null);
 
   React.useEffect(() => {
     fetchSharedPrograms()
-      .then((items) => {
-        const enabled = items.filter((p) => p.enabled !== false);
-        setPrograms(enabled);
-        if (enabled.length > 0) setSlug(enabled[0].slug);
-      })
+      .then((items) => setPrograms(items.filter((p) => p.enabled !== false)))
       .catch(() => {});
   }, []);
 
@@ -129,139 +229,241 @@ const GanttChart = () => {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  React.useEffect(() => {
-    void load();
-  }, [load]);
+  React.useEffect(() => { void load(); }, [load]);
+
+  const today = React.useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
   const issues = data?.issues || [];
 
-  // Compute date range from all issues that have any kind of date (actual or planned)
-  const datedIssues = issues.filter((i) => parseDate(i.startDate) && parseDate(i.dueDate || i.completeDate));
-  const allStarts = [
-    ...datedIssues.map((i) => parseDate(i.startDate).getTime()),
-    ...issues.filter((i) => parseDate(i.plannedStart)).map((i) => parseDate(i.plannedStart).getTime()),
-  ];
-  const allEnds = [
-    ...datedIssues.map((i) => parseDate(i.dueDate || i.completeDate).getTime()),
-    ...issues.filter((i) => parseDate(i.plannedFinish)).map((i) => parseDate(i.plannedFinish).getTime()),
-  ];
+  const allStarts = issues
+    .flatMap((i) => [parseDate(i.startDate)?.getTime(), parseDate(i.plannedStart)?.getTime()])
+    .filter(Boolean);
+  const allEnds = issues
+    .flatMap((i) => [
+      parseDate(i.dueDate || i.completeDate)?.getTime(),
+      parseDate(i.plannedFinish)?.getTime(),
+    ])
+    .filter(Boolean);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const dataRangeStart =
+    allStarts.length > 0 ? addDays(new Date(Math.min(...allStarts)), -14) : addDays(today, -30);
+  const dataRangeEnd =
+    allEnds.length > 0 ? addDays(new Date(Math.max(...allEnds)), 14) : addDays(today, 60);
 
-  const rangeStart = allStarts.length > 0
-    ? addDays(new Date(Math.min(...allStarts)), -14)
-    : addDays(today, -30);
-  const rangeEnd = allEnds.length > 0
-    ? addDays(new Date(Math.max(...allEnds)), 14)
-    : addDays(today, 60);
+  const rangeStart =
+    zoom === "3mo" ? addDays(today, -30)
+    : zoom === "6mo" ? addDays(today, -60)
+    : zoom === "1yr" ? addDays(today, -90)
+    : dataRangeStart;
+  const rangeEnd =
+    zoom === "3mo" ? addDays(today, 62)
+    : zoom === "6mo" ? addDays(today, 124)
+    : zoom === "1yr" ? addDays(today, 275)
+    : dataRangeEnd;
 
   const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
   const months = generateMonths(rangeStart, rangeEnd);
   const todayPct = Math.max(0, Math.min(100, pct(today, rangeStart, rangeMs)));
 
-  const withDate = issues.filter((i) => parseDate(i.startDate));
-  const withoutDate = issues.filter((i) => !parseDate(i.startDate));
-  const sorted = [...withDate, ...withoutDate];
+  const statusCategories = [...new Set(issues.map((i) => i.statusCategory).filter(Boolean))];
+  const visibleIssues = issues.filter((i) => !hiddenStatuses.has(i.statusCategory));
+
+  const groups = [];
+  const seen = new Set();
+  for (const cat of [...GROUP_ORDER, ...statusCategories]) {
+    if (seen.has(cat)) continue;
+    seen.add(cat);
+    const items = sortGroup(visibleIssues.filter((i) => i.statusCategory === cat));
+    if (items.length > 0) groups.push({ key: cat, label: cat, items });
+  }
+
+  const flatRows = [];
+  for (const group of groups) {
+    flatRows.push({ type: "header", group });
+    if (!collapsedGroups.has(group.key)) {
+      for (const issue of group.items) flatRows.push({ type: "issue", issue });
+    }
+  }
+
+  const toggleGroup = (key) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+
+  const toggleStatus = (cat) =>
+    setHiddenStatuses((prev) => {
+      const next = new Set(prev);
+      next.has(cat) ? next.delete(cat) : next.add(cat);
+      return next;
+    });
+
+  const handleMouseEnter = (issue, e) => setTooltip({ issue, x: e.clientX, y: e.clientY });
+  const handleMouseMove = (e) =>
+    setTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
+  const handleMouseLeave = () => setTooltip(null);
+
+  const visibleCount = visibleIssues.length;
+  const noDateCount = visibleIssues.filter((i) => !parseDate(i.startDate)).length;
+
+  const emptyMsg =
+    slug === PINNED_SLUG
+      ? "No pinned issues. Open the planning panel for any issue in Task Manager and check 'Pin to Gantt'."
+      : "No issues found for this program.";
 
   return (
     <div className="pm-gantt">
+      {/* Row 1: program select + meta + refresh */}
       <div className="pm-gantt-toolbar">
         <div className="pm-gantt-toolbar-left">
-          {programs.length > 0 ? (
-            <select
-              className="pm-gantt-program-select"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-            >
-              {programs.map((p) => (
-                <option key={p.slug} value={p.slug}>
-                  {p.displayName}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span className="pm-gantt-no-programs">
-              No shared programs configured.
-            </span>
-          )}
+          <select
+            className="pm-gantt-program-select"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+          >
+            <option value={PINNED_SLUG}>Pinned Issues</option>
+            {programs.map((p) => (
+              <option key={p.slug} value={p.slug}>
+                {p.displayName}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="pm-gantt-toolbar-right">
           {!loading && data && (
             <span className="pm-gantt-meta">
-              {issues.length} issue{issues.length !== 1 ? "s" : ""}
-              {withoutDate.length > 0
-                ? ` · ${withoutDate.length} without start date`
-                : ""}
+              {visibleCount} issue{visibleCount !== 1 ? "s" : ""}
+              {noDateCount > 0 ? ` · ${noDateCount} without dates` : ""}
             </span>
           )}
-          <button
-            type="button"
-            className="pm-gantt-refresh"
-            onClick={load}
-            disabled={loading}
-          >
+          <button type="button" className="pm-gantt-refresh" onClick={load} disabled={loading}>
             {loading ? "Loading…" : "Refresh"}
           </button>
         </div>
       </div>
 
+      {/* Row 2: zoom + status filters */}
+      {data && (
+        <div className="pm-gantt-controls">
+          <div className="pm-gantt-zoom">
+            {Object.entries(ZOOM_LABELS).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                className={`pm-gantt-zoom-btn${zoom === key ? " pm-gantt-zoom-btn--active" : ""}`}
+                onClick={() => setZoom(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {statusCategories.length > 1 && (
+            <div className="pm-gantt-filters">
+              {statusCategories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`pm-gantt-filter-chip${hiddenStatuses.has(cat) ? " pm-gantt-filter-chip--off" : ""}`}
+                  onClick={() => toggleStatus(cat)}
+                >
+                  <span
+                    className="pm-gantt-filter-dot"
+                    style={{ background: STATUS_COLORS[cat] || "#64748b" }}
+                  />
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {data && <GanttLegend />}
+
+      {/* Chart body */}
       {error ? (
         <div className="pm-gantt-error">{error}</div>
       ) : loading && !data ? (
         <div className="pm-gantt-loading">Loading…</div>
-      ) : sorted.length === 0 ? (
-        <div className="pm-gantt-empty">
-          {slug ? "No issues found for this program." : "Select a program above."}
-        </div>
-      ) : (
+      ) : !loading && flatRows.length === 0 ? (
+        <div className="pm-gantt-empty">{emptyMsg}</div>
+      ) : flatRows.length > 0 ? (
         <div className="pm-gantt-chart">
           {/* Label column */}
           <div className="pm-gantt-labels">
             <div className="pm-gantt-label-header">Task</div>
-            {sorted.map((issue) => (
-              <div key={issue.key} className="pm-gantt-label-row">
-                <span className="pm-gantt-label-key">{issue.key}</span>
-                <span className="pm-gantt-label-summary" title={issue.summary}>
-                  {issue.summary}
-                </span>
-                <span className="pm-gantt-label-assignee">{issue.assignee}</span>
-              </div>
-            ))}
+            {flatRows.map((row) =>
+              row.type === "header" ? (
+                <div
+                  key={`lh-${row.group.key}`}
+                  className="pm-gantt-group-label-header"
+                  onClick={() => toggleGroup(row.group.key)}
+                >
+                  <span className="pm-gantt-group-chevron">
+                    {collapsedGroups.has(row.group.key) ? "▶" : "▼"}
+                  </span>
+                  <span
+                    className="pm-gantt-group-dot"
+                    style={{ background: GROUP_DOT_COLORS[row.group.label] || "#64748b" }}
+                  />
+                  <span className="pm-gantt-group-name">{row.group.label}</span>
+                  <span className="pm-gantt-group-count">({row.group.items.length})</span>
+                </div>
+              ) : (
+                <div key={row.issue.key} className="pm-gantt-label-row">
+                  <span className="pm-gantt-label-key">{row.issue.key}</span>
+                  <span className="pm-gantt-label-summary" title={row.issue.summary}>
+                    {row.issue.summary}
+                  </span>
+                </div>
+              )
+            )}
           </div>
 
           {/* Timeline column */}
           <div className="pm-gantt-timeline">
-            {/* Month headers */}
             <div className="pm-gantt-months">
               {months.map((m, i) => (
-                <div
-                  key={i}
-                  className="pm-gantt-month"
-                  style={{ width: `${m.widthPct}%` }}
-                >
+                <div key={i} className="pm-gantt-month" style={{ width: `${m.widthPct}%` }}>
                   {m.label}
                 </div>
               ))}
             </div>
-
-            {/* Rows */}
             <div className="pm-gantt-rows">
-              {/* Today marker */}
-              <div
-                className="pm-gantt-today"
-                style={{ left: `${todayPct}%` }}
-                aria-label="Today"
-              />
-
-              {sorted.map((issue) => (
-                <div key={issue.key} className="pm-gantt-row">
-                  <GanttBar issue={issue} rangeStart={rangeStart} rangeMs={rangeMs} />
-                </div>
-              ))}
+              <div className="pm-gantt-today" style={{ left: `${todayPct}%` }} aria-label="Today" />
+              {flatRows.map((row) =>
+                row.type === "header" ? (
+                  <div
+                    key={`th-${row.group.key}`}
+                    className="pm-gantt-group-timeline-header"
+                    onClick={() => toggleGroup(row.group.key)}
+                  />
+                ) : (
+                  <div key={row.issue.key} className="pm-gantt-row">
+                    <GanttBar
+                      issue={row.issue}
+                      rangeStart={rangeStart}
+                      rangeMs={rangeMs}
+                      today={today}
+                      onMouseEnter={handleMouseEnter}
+                      onMouseMove={handleMouseMove}
+                      onMouseLeave={handleMouseLeave}
+                    />
+                  </div>
+                )
+              )}
             </div>
           </div>
         </div>
+      ) : null}
+
+      {tooltip && (
+        <GanttTooltip issue={tooltip.issue} x={tooltip.x} y={tooltip.y} today={today} />
       )}
     </div>
   );

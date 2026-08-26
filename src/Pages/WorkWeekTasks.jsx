@@ -118,7 +118,7 @@ const WorkWeekTasks = () => {
     handleDueDateDraftChange, handleDueDateUpdate,
     handleMrdDraftChange, handleMrdUpdate, handleStartDateChange,
     handleCompleteDateChange, handleClearDateTracking,
-    handleTogglePlanningRow, handleSavePlanningAll, handlePlanningFieldChange,
+    handleTogglePlanningRow, handleSavePlanningAll, handlePlanningFieldChange, handlePinnedGanttChange,
     handleAssigneeDraftChange, handleAssigneeUpdate,
     handleRowPriorityChange, handleNoteChange, handleNoteImagesAdd, handleNoteImageRemove,
     handleKeepNoteImagesToggle,
@@ -607,6 +607,7 @@ const WorkWeekTasks = () => {
           handleTogglePlanningRow={handleTogglePlanningRow}
           handleSavePlanningAll={handleSavePlanningAll}
           handlePlanningFieldChange={handlePlanningFieldChange}
+          handlePinnedGanttChange={handlePinnedGanttChange}
           handleAssigneeDraftChange={handleAssigneeDraftChange} handleAssigneeUpdate={handleAssigneeUpdate}
           handleRowPriorityChange={handleRowPriorityChange} handleNoteChange={handleNoteChange}
           handleNoteImagesAdd={handleNoteImagesAdd} handleNoteImageRemove={handleNoteImageRemove}
