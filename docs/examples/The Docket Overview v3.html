@@ -126,6 +126,15 @@
     padding: 14px 40px; display: none; z-index: 99;
   }
   #notes-panel.visible { display: block; }
+
+  @media (max-width: 767px) {
+    #nav { height: 56px; gap: 12px; }
+    #nav button { font-size: 22px; padding: 8px 20px; min-width: 48px; }
+    #slide-counter { font-size: 15px; }
+    #slide-label { display: none; }
+    #btn-notes { display: none; }
+    #notes-panel { bottom: 56px; font-size: 13px; padding: 10px 16px; }
+  }
 </style>
 </head>
 <body>
@@ -781,8 +790,9 @@
   slides.forEach(function(s) { s.style.display = 'none'; });
 
   function scale() {
+    var navH = document.getElementById('nav').offsetHeight;
     var vw = viewport.clientWidth;
-    var vh = viewport.clientHeight - 48;
+    var vh = viewport.clientHeight - navH;
     var s = Math.min(vw / 1920, vh / 1080);
     scaler.style.transform = 'scale(' + s + ')';
     scaler.style.left = Math.max(0, (vw - 1920 * s) / 2) + 'px';
@@ -819,6 +829,21 @@
     else if (e.key === 'Home') { show(0); }
     else if (e.key === 'End') { show(total - 1); }
   });
+
+  var touchStartX = 0;
+  var touchStartY = 0;
+  document.addEventListener('touchstart', function(e) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - touchStartX;
+    var dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+      if (dx < 0) show(cur + 1);
+      else show(cur - 1);
+    }
+  }, { passive: true });
 
   window.addEventListener('resize', scale);
   scale();
