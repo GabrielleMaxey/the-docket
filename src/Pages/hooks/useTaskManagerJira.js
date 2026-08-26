@@ -986,6 +986,25 @@ export const useTaskManagerJira = () => {
     setExpandedPlanningKey((prev) => (prev === issueKey ? null : issueKey));
   };
 
+  const handleSavePlanningAll = React.useCallback(async (issueKey, options = {}) => {
+    const sharedProgramId = String(options.sharedProgramId || "").trim();
+    const meta = planningMetaByKey[issueKey] || {};
+    const patch = {
+      plannedStart: meta.plannedStart || "",
+      plannedFinish: meta.plannedFinish || "",
+      requestor: meta.requestor || "",
+      hasOpenDecision: Boolean(meta.hasOpenDecision),
+      openDecisionNote: meta.openDecisionNote || "",
+      pmOverride: meta.pmOverride || "",
+      startDate: startDateByKey[issueKey] || "",
+      completeDate: completeDateByKey[issueKey] || "",
+    };
+    if (sharedProgramId) {
+      return saveTeamDate({ issueKey, ...patch });
+    }
+    return saveIssueMetadata({ issueKey, ...patch });
+  }, [planningMetaByKey, startDateByKey, completeDateByKey]);
+
   const handlePlanningFieldChange = (issueKey, field, value, options = {}) => {
     const sharedProgramId = String(options.sharedProgramId || "").trim();
     setPlanningMetaByKey((prev) => ({
@@ -1334,6 +1353,7 @@ export const useTaskManagerJira = () => {
     handleClearDateTracking,
     handleTogglePlanningPanel,
     handleTogglePlanningRow,
+    handleSavePlanningAll,
     handlePlanningFieldChange,
     handleAssigneeDraftChange,
     handleAssigneeUpdate,

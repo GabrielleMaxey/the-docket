@@ -142,6 +142,7 @@ const JiraResultsTable = ({
   handleCompleteDateChange,
   handleClearDateTracking,
   handleTogglePlanningRow,
+  handleSavePlanningAll,
   handlePlanningFieldChange,
   handleAssigneeDraftChange,
   handleAssigneeUpdate,
@@ -173,6 +174,26 @@ const JiraResultsTable = ({
   const [sortField, setSortField] = React.useState("default");
   const [sortDirection, setSortDirection] = React.useState("asc");
   const [expandedNoteKey, setExpandedNoteKey] = React.useState(null);
+  const [planSaveStatus, setPlanSaveStatus] = React.useState({});
+  const planSaveTimers = React.useRef({});
+
+  const triggerPlanSave = React.useCallback((issueKey, sharedProgramId) => {
+    setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "saving" }));
+    clearTimeout(planSaveTimers.current[issueKey]);
+    handleSavePlanningAll(issueKey, { sharedProgramId })
+      .then(() => {
+        setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "saved" }));
+        planSaveTimers.current[issueKey] = setTimeout(() => {
+          setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "idle" }));
+        }, 3000);
+      })
+      .catch(() => {
+        setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "error" }));
+        planSaveTimers.current[issueKey] = setTimeout(() => {
+          setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "idle" }));
+        }, 5000);
+      });
+  }, [handleSavePlanningAll]);
 
   const pendingDrillDownRun = React.useMemo(() => {
     if (!drillDownPending) {
@@ -1180,6 +1201,27 @@ const JiraResultsTable = ({
                                       Clear tracking
                                     </button>
                                   ) : null}
+                                </div>
+
+                                <div className="ww-planning-save-row">
+                                  <button
+                                    type="button"
+                                    className="ww-planning-save-btn"
+                                    disabled={planSaveStatus[issueKey] === "saving"}
+                                    onClick={() => triggerPlanSave(issueKey, sharedProgramId)}
+                                  >
+                                    {planSaveStatus[issueKey] === "saving" ? "Saving…" : "Save to database"}
+                                  </button>
+                                  {planSaveStatus[issueKey] === "saved" && (
+                                    <span className="ww-planning-save-indicator ww-planning-save-indicator--ok">
+                                      ✓ Saved
+                                    </span>
+                                  )}
+                                  {planSaveStatus[issueKey] === "error" && (
+                                    <span className="ww-planning-save-indicator ww-planning-save-indicator--err">
+                                      Save failed — check connection
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </td>

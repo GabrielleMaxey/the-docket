@@ -2122,6 +2122,50 @@
   margin-bottom: 0.1rem;
 }
 
+.work-week-page .ww-planning-save-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 0.4rem;
+}
+
+.work-week-page .ww-planning-save-btn {
+  padding: 0.3rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid #0c93d9;
+  border-radius: 8px;
+  background: none;
+  color: #0c93d9;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.work-week-page .ww-planning-save-btn:hover:not(:disabled) {
+  background: #0c93d9;
+  color: #fff;
+}
+
+.work-week-page .ww-planning-save-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.work-week-page .ww-planning-save-indicator {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.work-week-page .ww-planning-save-indicator--ok {
+  color: #16a34a;
+}
+
+.work-week-page .ww-planning-save-indicator--err {
+  color: #dc2626;
+}
+
 .work-week-page .ww-planning-readonly {
   font-size: 0.82rem;
   color: var(--color-text-secondary, #555);
