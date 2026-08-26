@@ -5,6 +5,7 @@ const BASE_SEARCH_FIELDS = [
   "assignee",
   "reporter",
   "updated",
+  "created",
   "parent",
   "duedate",
 ];

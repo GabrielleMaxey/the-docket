@@ -2167,10 +2167,10 @@
 }
 
 .work-week-page .ww-planning-readonly {
-  font-size: 0.82rem;
-  color: var(--color-text-secondary, #555);
-  padding: 0.25rem 0.3rem;
-  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary, #64748b);
+  padding: 0.3rem 0.4rem;
+  display: inline-block;
 }
 
 .work-week-page .ww-planning-field--decision-note {
