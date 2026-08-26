@@ -32,7 +32,7 @@ const AppLayout = () => (
   <>
     <nav className="app-nav">
       <NavLink to="/" className="app-nav-logo">
-        <img src="/task-manager-favicon.svg" alt="" aria-hidden="true" className="app-nav-logo-icon" />
+        <img src="/the-docket-favicon.svg" alt="" aria-hidden="true" className="app-nav-logo-icon" />
         The Docket
       </NavLink>
       <BackgroundJobIndicator />

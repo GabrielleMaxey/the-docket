@@ -22,6 +22,7 @@ import {
   updateJiraIssueAssignee,
   updateJiraIssueStatus,
   updateJiraIssueDateField,
+  updatePinnedGantt,
   JIRA_UNASSIGNED_ASSIGNEE,
   isJiraUnassignValue,
 } from "../../services/jiraClient";
@@ -986,6 +987,25 @@ export const useTaskManagerJira = () => {
     setExpandedPlanningKey((prev) => (prev === issueKey ? null : issueKey));
   };
 
+  const handleSavePlanningAll = React.useCallback(async (issueKey, options = {}) => {
+    const sharedProgramId = String(options.sharedProgramId || "").trim();
+    const meta = planningMetaByKey[issueKey] || {};
+    const patch = {
+      plannedStart: meta.plannedStart || "",
+      plannedFinish: meta.plannedFinish || "",
+      requestor: meta.requestor || "",
+      hasOpenDecision: Boolean(meta.hasOpenDecision),
+      openDecisionNote: meta.openDecisionNote || "",
+      pmOverride: meta.pmOverride || "",
+      startDate: startDateByKey[issueKey] || "",
+      completeDate: completeDateByKey[issueKey] || "",
+    };
+    if (sharedProgramId) {
+      return saveTeamDate({ issueKey, ...patch });
+    }
+    return saveIssueMetadata({ issueKey, ...patch });
+  }, [planningMetaByKey, startDateByKey, completeDateByKey]);
+
   const handlePlanningFieldChange = (issueKey, field, value, options = {}) => {
     const sharedProgramId = String(options.sharedProgramId || "").trim();
     setPlanningMetaByKey((prev) => ({
@@ -1003,6 +1023,16 @@ export const useTaskManagerJira = () => {
       });
     }
   };
+
+  const handlePinnedGanttChange = React.useCallback((issueKey, pinned) => {
+    setPlanningMetaByKey((prev) => ({
+      ...prev,
+      [issueKey]: { ...(prev[issueKey] || {}), pinnedGantt: pinned },
+    }));
+    updatePinnedGantt(issueKey, pinned).catch((err) => {
+      console.error("Failed to update Gantt pin for", issueKey, err);
+    });
+  }, []);
 
   const handleAssigneeUpdate = async (issueKey) => {
     const draftOrAccount =
@@ -1334,7 +1364,9 @@ export const useTaskManagerJira = () => {
     handleClearDateTracking,
     handleTogglePlanningPanel,
     handleTogglePlanningRow,
+    handleSavePlanningAll,
     handlePlanningFieldChange,
+    handlePinnedGanttChange,
     handleAssigneeDraftChange,
     handleAssigneeUpdate,
     handleRowPriorityChange,

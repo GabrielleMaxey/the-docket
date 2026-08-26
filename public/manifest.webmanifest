@@ -1,6 +1,6 @@
 {
-  "name": "Task Manager",
-  "short_name": "Task Manager",
+  "name": "The Docket",
+  "short_name": "The Docket",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1b1c1d",

@@ -366,6 +366,93 @@
   cursor: pointer;
 }
 
+/* ── To Do ── */
+.work-week-page .ww-todo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+}
+
+.work-week-page .ww-todo-text {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.work-week-page .ww-todo-priority {
+  flex-shrink: 0;
+  width: 8.5rem;
+  font-size: 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.3rem 0.4rem;
+  background: #fff;
+  color: #0f172a;
+}
+
+.work-week-page .ww-todo-due {
+  flex-shrink: 0;
+  width: 9rem;
+  font-size: 0.78rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.3rem 0.4rem;
+  background: #fff;
+  color: #0f172a;
+}
+
+.work-week-page .ww-todo-delete {
+  flex-shrink: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.work-week-page .ww-todo-delete:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.work-week-page .ww-reminder-row-done .ww-todo-priority,
+.work-week-page .ww-reminder-row-done .ww-todo-due {
+  background: #e2e8f0;
+  color: #94a3b8;
+  border-color: #94a3b8;
+}
+
+.work-week-page .ww-todo-add {
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  background: none;
+  color: #475569;
+  cursor: pointer;
+}
+
+.work-week-page .ww-todo-add:hover {
+  border-color: #0c93d9;
+  color: #0c93d9;
+}
+
+.work-week-page .ww-todo-error {
+  font-size: 0.78rem;
+  color: #dc2626;
+  margin: 0 0 0.4rem;
+}
+
 @media (max-width: 900px) {
   .work-week-page .ww-date-calendar-segment {
     grid-template-columns: 1fr;
@@ -1529,12 +1616,12 @@
   white-space: nowrap;
 }
 
-/* Jira Type — kept narrow (Task/Bug/Story/Sub-task are all short) so Summary
-   starts right after it instead of trailing a wide, mostly-empty column. */
+/* Jira Type */
 .work-week-page .ww-results-table th:nth-child(3),
 .work-week-page .ww-results-table td:nth-child(3) {
   width: 5%;
-  min-width: 72px;
+  min-width: 90px;
+  white-space: nowrap;
   padding-right: 0.2rem;
 }
 
@@ -1542,7 +1629,7 @@
 .work-week-page .ww-results-table th:nth-child(4),
 .work-week-page .ww-results-table td:nth-child(4) {
   width: 28%;
-  max-width: 400px;
+  min-width: 220px;
   padding-left: 0.3rem;
 }
 
@@ -2033,6 +2120,57 @@
   font-size: 0.78rem;
   color: var(--color-text, #333);
   margin-bottom: 0.1rem;
+}
+
+.work-week-page .ww-planning-save-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 0.4rem;
+}
+
+.work-week-page .ww-planning-save-btn {
+  padding: 0.3rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid #0c93d9;
+  border-radius: 8px;
+  background: none;
+  color: #0c93d9;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.work-week-page .ww-planning-save-btn:hover:not(:disabled) {
+  background: #0c93d9;
+  color: #fff;
+}
+
+.work-week-page .ww-planning-save-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.work-week-page .ww-planning-save-indicator {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.work-week-page .ww-planning-save-indicator--ok {
+  color: #16a34a;
+}
+
+.work-week-page .ww-planning-save-indicator--err {
+  color: #dc2626;
+}
+
+.work-week-page .ww-planning-readonly {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary, #64748b);
+  padding: 0.3rem 0.4rem;
+  display: inline-block;
 }
 
 .work-week-page .ww-planning-field--decision-note {
