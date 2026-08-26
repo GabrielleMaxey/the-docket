@@ -6,7 +6,7 @@ const { app, BrowserWindow, Menu } = require("electron");
 let apiPort = process.env.API_PORT || "8787";
 let apiProcess = null;
 
-const PACKAGED_ENV_TEMPLATE = `# Task Manager — edit this file with your Jira credentials, then restart the app.
+const PACKAGED_ENV_TEMPLATE = `# The Docket — edit this file with your Jira credentials, then restart the app.
 # See docs/JIRA_SETUP.md in the project repo for full setup help.
 
 JIRA_BASE_URL=https://your-domain.atlassian.net
@@ -19,7 +19,7 @@ API_PORT=8787
 `;
 
 function getWindowIconPath() {
-  return path.join(app.getAppPath(), "public", "task-manager-favicon.svg");
+  return path.join(app.getAppPath(), "public", "the-docket-favicon.svg");
 }
 
 function getApiScriptPath() {
