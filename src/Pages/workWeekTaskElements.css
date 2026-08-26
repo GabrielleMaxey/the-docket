@@ -1585,6 +1585,7 @@
 
 .work-week-page .ww-results-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   min-width: 1160px;
   background: #ffffff;
@@ -1629,8 +1630,11 @@
 .work-week-page .ww-results-table th:nth-child(4),
 .work-week-page .ww-results-table td:nth-child(4) {
   width: 28%;
-  max-width: 400px;
+  min-width: 220px;
   padding-left: 0.3rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* Status / Assignee */
