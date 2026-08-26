@@ -17,7 +17,7 @@ import { useCalendarData } from "./hooks/useCalendarData";
 import { useWorkWeekHeaderPreferences } from "./hooks/useWorkWeekHeaderPreferences";
 import { useUpcomingDueBanner } from "./hooks/useUpcomingDueBanner";
 import { usePersistedState } from "./hooks/usePersistedState";
-import { useReminders } from "./hooks/useReminders";
+import { useTodos } from "./hooks/useTodos";
 import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.js";
 import {
   fetchSharedPrograms,
@@ -67,11 +67,16 @@ const WorkWeekTasks = () => {
   const { todayDay, monthLabel, fullDateLabel, calendarCells } = useCalendarData();
 
   const {
-    reminders,
-    error: remindersError,
-    handleReminderTextChange,
-    handleReminderDoneChange,
-  } = useReminders();
+    sorted: todosSorted,
+    error: todosError,
+    canAdd: canAddTodo,
+    handleTextChange: handleTodoTextChange,
+    handlePriorityChange: handleTodoPriorityChange,
+    handleDueDateChange: handleTodoDueDateChange,
+    handleDoneChange: handleTodoDoneChange,
+    handleDelete: handleTodoDelete,
+    handleAdd: handleTodoAdd,
+  } = useTodos();
   const [importSlotIndex, setImportSlotIndex] = React.useState(null);
   const [createIssueOpen, setCreateIssueOpen] = React.useState(false);
   const [quickPickValueBySlot, setQuickPickValueBySlot] = React.useState({});
@@ -477,14 +482,19 @@ const WorkWeekTasks = () => {
           currentUserDisplayName={currentUserDisplayName}
           fullDateLabel={fullDateLabel} monthLabel={monthLabel}
           calendarCells={calendarCells} todayDay={todayDay}
-          reminders={reminders}
-          onReminderTextChange={handleReminderTextChange}
-          onReminderDoneChange={handleReminderDoneChange}
+          todos={todosSorted}
+          todosError={todosError}
+          canAddTodo={canAddTodo}
+          onTodoTextChange={handleTodoTextChange}
+          onTodoPriorityChange={handleTodoPriorityChange}
+          onTodoDueDateChange={handleTodoDueDateChange}
+          onTodoDoneChange={handleTodoDoneChange}
+          onTodoDelete={handleTodoDelete}
+          onTodoAdd={handleTodoAdd}
           weeklyPlanPanel={
             <WeeklyPlanPanel jqlRuns={jqlRuns} jiraRowPriorities={jiraRowPriorities} />
           }
         />
-        {remindersError ? <p className="ww-jira-status ww-jira-error">{remindersError}</p> : null}
 
         <CollapsibleSection title="🗂️ The Docket" storageKey={TASK_MANAGER_KEY} defaultOpen>
           <JqlControlsPanel
