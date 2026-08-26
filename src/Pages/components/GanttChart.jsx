@@ -225,7 +225,14 @@ const GanttChart = () => {
     setError("");
     fetchGanttData(slug)
       .then((d) => setData(d))
-      .catch((err) => setError(err?.message || "Failed to load Gantt data"))
+      .catch((err) => {
+        const msg = err?.message || "";
+        if (msg.toLowerCase().includes("jira environment") || msg.toLowerCase().includes("missing required")) {
+          setError("Jira is not configured. Set JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN in your .env file and restart the API server.");
+        } else {
+          setError(msg || "Failed to load Gantt data");
+        }
+      })
       .finally(() => setLoading(false));
   }, [slug]);
 

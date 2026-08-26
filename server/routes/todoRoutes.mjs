@@ -21,9 +21,7 @@ export const registerTodoRoutes = (app, { db }) => {
     `SELECT * FROM todos ORDER BY done ASC, priority ASC,
      CASE WHEN due_date = '' THEN 1 ELSE 0 END ASC, due_date ASC, created_at ASC`
   );
-  const listCompleted = db.prepare(
-    `SELECT * FROM todos WHERE done = 1 ORDER BY completed_at DESC`
-  );
+  const deleteAllCompleted = db.prepare(`DELETE FROM todos WHERE done = 1`);
   const getOne = db.prepare(`SELECT * FROM todos WHERE id = ?`);
   const countActive = db.prepare(`SELECT COUNT(*) as n FROM todos WHERE done = 0`);
   const insert = db.prepare(
@@ -62,12 +60,27 @@ export const registerTodoRoutes = (app, { db }) => {
     }
   });
 
-  app.get("/api/todos/completed", (_req, res) => {
+  app.get("/api/todos/completed", (req, res) => {
     try {
-      return res.json({ items: listCompleted.all().map(mapRow) });
+      const days = Math.max(0, Math.min(3650, Math.floor(Number(req.query?.days) || 90)));
+      const sql =
+        days > 0
+          ? `SELECT * FROM todos WHERE done = 1 AND completed_at >= date('now', '-${days} days') ORDER BY completed_at DESC`
+          : `SELECT * FROM todos WHERE done = 1 ORDER BY completed_at DESC`;
+      return res.json({ items: db.prepare(sql).all().map(mapRow), days });
     } catch (err) {
       log.error("GET /api/todos/completed failed", err.message);
       return res.status(500).json({ error: "Failed to load completed to dos" });
+    }
+  });
+
+  app.delete("/api/todos/completed", (_req, res) => {
+    try {
+      const info = deleteAllCompleted.run();
+      return res.json({ ok: true, deleted: info.changes });
+    } catch (err) {
+      log.error("DELETE /api/todos/completed failed", err.message);
+      return res.status(500).json({ error: "Failed to clear completed to dos" });
     }
   });
 

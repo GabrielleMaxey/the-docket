@@ -76,6 +76,7 @@ const WorkWeekTasks = () => {
     handleDoneChange: handleTodoDoneChange,
     handleDelete: handleTodoDelete,
     handleAdd: handleTodoAdd,
+    handleClearCompleted: handleTodoClearCompleted,
   } = useTodos();
   const [importSlotIndex, setImportSlotIndex] = React.useState(null);
   const [createIssueOpen, setCreateIssueOpen] = React.useState(false);
@@ -491,6 +492,7 @@ const WorkWeekTasks = () => {
           onTodoDoneChange={handleTodoDoneChange}
           onTodoDelete={handleTodoDelete}
           onTodoAdd={handleTodoAdd}
+          onTodoClearCompleted={handleTodoClearCompleted}
           weeklyPlanPanel={
             <WeeklyPlanPanel jqlRuns={jqlRuns} jiraRowPriorities={jiraRowPriorities} />
           }

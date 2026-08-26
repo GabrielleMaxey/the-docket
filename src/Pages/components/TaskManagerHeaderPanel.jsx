@@ -38,6 +38,7 @@ const TaskManagerHeaderPanel = ({
   onTodoDoneChange,
   onTodoDelete,
   onTodoAdd,
+  onTodoClearCompleted,
   weeklyPlanPanel,
 }) => {
   const [detailsOpen, setDetailsOpen] = usePersistedState(TODAY_DETAILS_COLLAPSE_KEY, true);
@@ -165,15 +166,26 @@ const TaskManagerHeaderPanel = ({
                       ))}
                     </ul>
 
-                    {canAddTodo ? (
-                      <button
-                        type="button"
-                        className="ww-todo-add"
-                        onClick={onTodoAdd}
-                      >
-                        + Add to do
-                      </button>
-                    ) : null}
+                    <div className="ww-todo-actions">
+                      {canAddTodo ? (
+                        <button
+                          type="button"
+                          className="ww-todo-add"
+                          onClick={onTodoAdd}
+                        >
+                          + Add to do
+                        </button>
+                      ) : null}
+                      {(todos || []).some((t) => t.done) ? (
+                        <button
+                          type="button"
+                          className="ww-todo-clear-completed"
+                          onClick={onTodoClearCompleted}
+                        >
+                          Clear completed
+                        </button>
+                      ) : null}
+                    </div>
 
                     {weeklyPlanPanel ? (
                       <div className="ww-weekly-plan-block">{weeklyPlanPanel}</div>

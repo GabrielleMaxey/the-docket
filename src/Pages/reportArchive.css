@@ -42,3 +42,37 @@
 .report-archive-detail-collapsible .app-collapsible-body {
   padding-top: 0.5rem;
 }
+
+.report-completed-filter {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.report-completed-chip {
+  padding: 0.2rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: none;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.report-completed-chip:hover {
+  border-color: #0c93d9;
+  color: #0c93d9;
+}
+
+.report-completed-chip--active {
+  background: #0c93d9;
+  border-color: #0c93d9;
+  color: #fff;
+}
+
+.report-completed-chip--active:hover {
+  background: #0a7fb8;
+  border-color: #0a7fb8;
+  color: #fff;
+}

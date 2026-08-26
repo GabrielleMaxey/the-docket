@@ -534,44 +534,71 @@ const ReportArchivePanel = ({
   );
 };
 
+const COMPLETED_RANGE_OPTIONS = [
+  { label: "Last 30 days", days: 30 },
+  { label: "Last 90 days", days: 90 },
+  { label: "All time", days: 0 },
+];
+
 const CompletedTodosPanel = () => {
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
+  const [days, setDays] = React.useState(90);
 
   React.useEffect(() => {
-    fetchCompletedTodos()
-      .then((data) => { setItems(data); setLoading(false); })
+    setLoading(true);
+    setError("");
+    fetchCompletedTodos(days)
+      .then(({ items: fetched }) => { setItems(fetched); setLoading(false); })
       .catch(() => { setError("Could not load completed to dos."); setLoading(false); });
-  }, []);
-
-  if (loading) return <Message info size="small">Loading completed to dos…</Message>;
-  if (error) return <Message negative size="small">{error}</Message>;
-  if (items.length === 0) return <Message info size="small">No completed to dos yet.</Message>;
+  }, [days]);
 
   return (
-    <Table celled compact size="small" className="report-archive-table">
-      <Table.Header>
-        <Table.Row>
-          <Table.HeaderCell>To Do</Table.HeaderCell>
-          <Table.HeaderCell>Priority</Table.HeaderCell>
-          <Table.HeaderCell>Due By</Table.HeaderCell>
-          <Table.HeaderCell>Date Entered</Table.HeaderCell>
-          <Table.HeaderCell>Date Completed</Table.HeaderCell>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {items.map((item) => (
-          <Table.Row key={item.id}>
-            <Table.Cell style={{ textDecoration: "line-through", color: "#64748b" }}>{item.text}</Table.Cell>
-            <Table.Cell>P{item.priority}</Table.Cell>
-            <Table.Cell>{item.dueDate ? formatDate(item.dueDate + "T00:00:00") : "—"}</Table.Cell>
-            <Table.Cell>{item.createdAt ? formatDate(item.createdAt) : "—"}</Table.Cell>
-            <Table.Cell>{item.completedAt ? formatDate(item.completedAt + "T00:00:00") : "—"}</Table.Cell>
-          </Table.Row>
+    <>
+      <div className="report-completed-filter">
+        {COMPLETED_RANGE_OPTIONS.map((opt) => (
+          <button
+            key={opt.days}
+            type="button"
+            className={`report-completed-chip${days === opt.days ? " report-completed-chip--active" : ""}`}
+            onClick={() => setDays(opt.days)}
+          >
+            {opt.label}
+          </button>
         ))}
-      </Table.Body>
-    </Table>
+      </div>
+      {loading ? (
+        <Message info size="small">Loading completed to dos…</Message>
+      ) : error ? (
+        <Message negative size="small">{error}</Message>
+      ) : items.length === 0 ? (
+        <Message info size="small">No completed to dos in this range.</Message>
+      ) : (
+        <Table celled compact size="small" className="report-archive-table">
+          <Table.Header>
+            <Table.Row>
+              <Table.HeaderCell>To Do</Table.HeaderCell>
+              <Table.HeaderCell>Priority</Table.HeaderCell>
+              <Table.HeaderCell>Due By</Table.HeaderCell>
+              <Table.HeaderCell>Date Entered</Table.HeaderCell>
+              <Table.HeaderCell>Date Completed</Table.HeaderCell>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {items.map((item) => (
+              <Table.Row key={item.id}>
+                <Table.Cell style={{ textDecoration: "line-through", color: "#64748b" }}>{item.text}</Table.Cell>
+                <Table.Cell>P{item.priority}</Table.Cell>
+                <Table.Cell>{item.dueDate ? formatDate(item.dueDate + "T00:00:00") : "—"}</Table.Cell>
+                <Table.Cell>{item.createdAt ? formatDate(item.createdAt) : "—"}</Table.Cell>
+                <Table.Cell>{item.completedAt ? formatDate(item.completedAt + "T00:00:00") : "—"}</Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table>
+      )}
+    </>
   );
 };
 

@@ -453,6 +453,34 @@
   margin: 0 0 0.4rem;
 }
 
+.work-week-page .ww-todo-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.work-week-page .ww-todo-actions .ww-todo-add {
+  margin-top: 0;
+}
+
+.work-week-page .ww-todo-clear-completed {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: none;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.work-week-page .ww-todo-clear-completed:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
 @media (max-width: 900px) {
   .work-week-page .ww-date-calendar-segment {
     grid-template-columns: 1fr;
