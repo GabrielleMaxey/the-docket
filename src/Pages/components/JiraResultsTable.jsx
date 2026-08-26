@@ -1098,29 +1098,7 @@ const JiraResultsTable = ({
                                   ) : null}
 
                                   <label className="ww-planning-field">
-                                    <span className="ww-planning-label" title="Actual start date — used for Gantt">Start</span>
-                                    <input
-                                      type="date"
-                                      className="ww-edit-input"
-                                      value={startDateByKey[issueKey] || ""}
-                                      disabled={isClosedOrResolved}
-                                      onChange={(e) => handleStartDateChange(issueKey, e.target.value, { sharedProgramId })}
-                                    />
-                                  </label>
-
-                                  <label className="ww-planning-field">
-                                    <span className="ww-planning-label" title="Actual complete date — used for Gantt">Complete</span>
-                                    <input
-                                      type="date"
-                                      className="ww-edit-input"
-                                      value={completeDateByKey[issueKey] || ""}
-                                      disabled={isClosedOrResolved}
-                                      onChange={(e) => handleCompleteDateChange(issueKey, e.target.value, { sharedProgramId })}
-                                    />
-                                  </label>
-
-                                  <label className="ww-planning-field">
-                                    <span className="ww-planning-label" title="PM's planned start — not Jira, not Gantt">Planned start</span>
+                                    <span className="ww-planning-label" title="PM's planned start — shown as dashed bar on Gantt">Planned start</span>
                                     <input
                                       type="date"
                                       className="ww-edit-input"
@@ -1133,7 +1111,18 @@ const JiraResultsTable = ({
                                   </label>
 
                                   <label className="ww-planning-field">
-                                    <span className="ww-planning-label" title="PM's planned finish — not Jira, not Gantt">Planned finish</span>
+                                    <span className="ww-planning-label" title="Actual start date — used for Gantt">Start</span>
+                                    <input
+                                      type="date"
+                                      className="ww-edit-input"
+                                      value={startDateByKey[issueKey] || ""}
+                                      disabled={isClosedOrResolved}
+                                      onChange={(e) => handleStartDateChange(issueKey, e.target.value, { sharedProgramId })}
+                                    />
+                                  </label>
+
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label" title="PM's planned finish — shown as dashed bar on Gantt">Planned finish</span>
                                     <input
                                       type="date"
                                       className="ww-edit-input"
@@ -1142,6 +1131,17 @@ const JiraResultsTable = ({
                                       onChange={(e) =>
                                         handlePlanningFieldChange(issueKey, "plannedFinish", e.target.value, { sharedProgramId })
                                       }
+                                    />
+                                  </label>
+
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label" title="Actual complete date — used for Gantt">Complete</span>
+                                    <input
+                                      type="date"
+                                      className="ww-edit-input"
+                                      value={completeDateByKey[issueKey] || ""}
+                                      disabled={isClosedOrResolved}
+                                      onChange={(e) => handleCompleteDateChange(issueKey, e.target.value, { sharedProgramId })}
                                     />
                                   </label>
 
@@ -1158,6 +1158,13 @@ const JiraResultsTable = ({
                                       }
                                     />
                                   </label>
+
+                                  <div className="ww-planning-field">
+                                    <span className="ww-planning-label" title="Date the issue was created in Jira">Created</span>
+                                    <span className="ww-edit-input ww-planning-readonly">
+                                      {formatDate(issue.fields?.created) || "—"}
+                                    </span>
+                                  </div>
 
                                   {(startDateByKey[issueKey] || completeDateByKey[issueKey]) ? (
                                     <button

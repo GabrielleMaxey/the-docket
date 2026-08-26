@@ -2035,6 +2035,13 @@
   margin-bottom: 0.1rem;
 }
 
+.work-week-page .ww-planning-readonly {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary, #555);
+  padding: 0.25rem 0.3rem;
+  font-style: italic;
+}
+
 .work-week-page .ww-planning-field--decision-note {
   flex-direction: column;
   align-items: flex-start;
