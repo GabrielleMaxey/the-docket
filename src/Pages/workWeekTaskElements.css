@@ -1585,7 +1585,6 @@
 
 .work-week-page .ww-results-table {
   width: 100%;
-  table-layout: fixed;
   border-collapse: collapse;
   min-width: 1160px;
   background: #ffffff;
@@ -1617,12 +1616,12 @@
   white-space: nowrap;
 }
 
-/* Jira Type — kept narrow (Task/Bug/Story/Sub-task are all short) so Summary
-   starts right after it instead of trailing a wide, mostly-empty column. */
+/* Jira Type */
 .work-week-page .ww-results-table th:nth-child(3),
 .work-week-page .ww-results-table td:nth-child(3) {
   width: 5%;
-  min-width: 72px;
+  min-width: 90px;
+  white-space: nowrap;
   padding-right: 0.2rem;
 }
 
@@ -1632,9 +1631,6 @@
   width: 28%;
   min-width: 220px;
   padding-left: 0.3rem;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 /* Status / Assignee */
