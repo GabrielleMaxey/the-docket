@@ -1,10 +1,10 @@
-# Task Manager — User Guide
+# The Docket — User Guide
 
 This guide covers how to use the app day-to-day. No programming knowledge needed.
 
 ---
 
-## Using Task Manager in the browser (when the desktop app is unavailable)
+## Using The Docket in the browser (when the desktop app is unavailable)
 
 If the packaged desktop app or Electron window is unavailable or blocked (for example on a corporate secure laptop, by macOS, or by work security software), use the **browser UI** instead and install it as its own application window. You get the same pages; only the window chrome is different.
 
@@ -26,14 +26,14 @@ Chrome and Edge can open the site in a standalone window (similar to Microsoft 3
 
 1. Open **http://localhost:5173** while `npm run dev:all` is running.
 2. Menu (**⋮**) → **Cast, save, and share** → **Install page as app…**  
-   (wording may vary slightly by Chrome version; look for **Install app** / **Install Task Manager**).
+   (wording may vary slightly by Chrome version; look for **Install app** / **Install The Docket**).
 3. Confirm. A separate window opens; you can pin it to the Dock.
 
 **Microsoft Edge**
 
 1. Open **http://localhost:5173**.
 2. Menu (**⋯**) → **Apps** → **Install this site as an app**.
-3. Name it **Task Manager** if prompted, then install.
+3. Name it **The Docket** if prompted, then install.
 
 **Safari (macOS)**
 
@@ -42,7 +42,7 @@ With the site open: **File → Add to Dock** (label may vary by macOS version).
 ### Important
 
 - The installed window still needs **`npm run dev:all` running** in a terminal. If you quit that process, the app cannot reach Jira or save notes.
-- Prefer Chrome or Edge for “Install as app.” The install dialog shows the name **Task Manager** and the app icon (not “localhost”).
+- Prefer Chrome or Edge for “Install as app.” The install dialog shows the name **The Docket** and the app icon (not “localhost”).
 - For packaged DMG/NSIS that warn on first open (unsigned builds), see [unsigned-installs.md](./unsigned-installs.md).
 
 ---
@@ -67,8 +67,8 @@ Before anything else works, your Jira credentials need to be in place.
 
 | OS | Open this file |
 |----|----------------|
-| macOS | `~/Library/Application Support/Task Manager/.env` |
-| Windows | `%APPDATA%\Task Manager\.env` |
+| macOS | `~/Library/Application Support/The Docket/.env` |
+| Windows | `%APPDATA%\The Docket\.env` |
 
 Then in the app:
 
@@ -108,13 +108,13 @@ Keep answers short. Always include the issue key. Use bullet points.
 
 ## Task Management — daily driver
 
-This is the main screen for managing your open work. Some older docs and code still call this page "Work Week."
+This is the main screen for managing your open work.
 
 ```
 ┌──────────────────────────────────────┐
 │  Header: jokes · date · to do       │
 ├──────────────────────────────────────┤
-│  🗂️ Task Manager  [collapsible]      │
+│  🗂️ The Docket  [collapsible]        │
 │    [Create Issue]                    │
 │    JQL inputs + Run JQL              │
 ├──────────────────────────────────────┤
@@ -130,12 +130,12 @@ This is the main screen for managing your open work. Some older docs and code st
 
 ### Header
 
-- **Header banners** (optional) — at the top of Task Management, toggle **Joke ticker** and/or **My upcoming due dates**. The due-date banner lists **only your** assigned issues (matched by your Jira display name) from the latest Metrics snapshot's upcoming due-date window. Refresh Metrics after changing due-date filters or if the banner is empty when you expect tasks. Same toggles in **Settings → Work Week header**.
+- **Header banners** (optional) — at the top of Task Management, toggle **Joke ticker** and/or **My upcoming due dates**. The due-date banner lists **only your** assigned issues (matched by your Jira display name) from the latest Metrics snapshot's upcoming due-date window. Refresh Metrics after changing due-date filters or if the banner is empty when you expect tasks. Same toggles in **Settings → Task Management header**.
 - **Date & calendar** — shows today; useful when planning.
 - **To Do** — supports up to 15 active to-dos. Each to-do has a text field, a priority (P1–P5), a due date, and a done checkbox. Active to-dos are sorted automatically by priority then due date — changing a priority immediately re-orders the list. A **Clear completed** button appears below the list whenever any to-dos are checked done; clicking it removes all completed items at once. To-dos are saved to your local database and are never sent to Jira.
 - **Hide calendar & to do / Show calendar & to do** — click the link under the date to collapse or expand the calendar, to do, and week-plan panel together; that state is remembered too.
 
-### Task Manager card
+### The Docket card
 
 1. **JQL count** — choose 1–5 query slots. Each has a label (your name for it) and a JQL box.
 2. **Max results** — first page size per query. The app can load **all** matching issues (up to a safe cap) — see Results table below.
@@ -195,7 +195,7 @@ On success, use **Add more detail in Jira** to open the new issue in your browse
 
 > **Background work:** Metrics refresh, report generation, week plan, project report, and **Run JQL** keep running if you switch pages. A yellow status pill in the top nav shows what's in progress. Return to the page when it finishes — results are saved automatically.
 
-> **Tip:** Click the **🗂️ Task Manager** header to collapse/expand the whole section once your queries are saved.
+> **Tip:** Click the **🗂️ The Docket** header to collapse/expand the whole section once your queries are saved.
 
 ### My Metrics
 
@@ -425,9 +425,9 @@ When you open an issue's planning panel in Project Managers, the available field
 
 For each tab: pick a row → **View** → expand the report to read, copy, or download. Dashboard archived reports may include the status chart that was shown at generation time.
 
-**Deleting:** Work Week, Dashboard, and Ad-hoc each have a **Delete** button per row and a **Delete all** button for the whole tab (both ask for confirmation first — this cannot be undone). **Files** never deletes the actual file on disk; instead, a file that's already been **Save to archive**d shows a **Remove from archive** button (and a **Remove all from archive** button appears once at least one file has an archived copy) that removes just the saved database copy — the file itself is untouched. Files with no archived copy show neither button, since there's nothing to remove; use **Save to archive** first if you want a removable copy.
+**Deleting:** Task Management, Dashboard, and Ad-hoc each have a **Delete** button per row and a **Delete all** button for the whole tab (both ask for confirmation first — this cannot be undone). **Files** never deletes the actual file on disk; instead, a file that's already been **Save to archive**d shows a **Remove from archive** button (and a **Remove all from archive** button appears once at least one file has an archived copy) that removes just the saved database copy — the file itself is untouched. Files with no archived copy show neither button, since there's nothing to remove; use **Save to archive** first if you want a removable copy.
 
-**CoWork weekly plans:** When Claude CoWork writes `weekly-plan-<date>.md` into the Task Manager `data/` folder, those files show under **Files**. Content is read live from disk until you click **Save to archive**, which copies it into the local Past Reports database as a week plan (so it remains after the file is moved or deleted).
+**CoWork weekly plans:** When Claude CoWork writes `weekly-plan-<date>.md` into the app's `data/` folder, those files show under **Files**. Content is read live from disk until you click **Save to archive**, which copies it into the local Past Reports database as a week plan (so it remains after the file is moved or deleted).
 
 **Clear report** on Task Management or Metrics removes the on-page copy and browser cache only — it does **not** delete items already listed here.
 
@@ -491,7 +491,7 @@ Check readiness: `GET /api/chat/status` returns `provider`, `ready`, and for Rov
 
 ## Shared projects — notes and priority (PMs and managers)
 
-Some teams used a shared Excel tracker so everyone sees the same ranking. In Task Manager:
+Some teams used a shared Excel tracker so everyone sees the same ranking. In The Docket:
 
 | What | Shared across the team? |
 |------|-------------------------|
@@ -524,7 +524,7 @@ Push notes as Jira comments when the team needs the text in Jira. Priority is **
 PMs can keep rankings in the priority tracker spreadsheet and share a **CSV** export:
 
 1. In Excel: **File → Save As → CSV UTF-8** (columns: `Priority`, `Issue Key`, `Developer`, `Jira Status`, `notes`).
-2. In Task Manager: **Settings → Import team priorities** → choose target (**This machine** or **Atlas (demo)** when connected) → **Import CSV**.
+2. In The Docket: **Settings → Import team priorities** → choose target (**This machine** or **Atlas (demo)** when connected) → **Import CSV**.
 3. Matching issue keys overwrite priority for that target. **Notes** fill in only when importing to this machine and the local note is empty.
 4. Re-import when spreadsheet rankings change. Reload Task Management (or re-run JQL) if that page is already open.
 
@@ -541,7 +541,7 @@ PMs can keep rankings in the priority tracker spreadsheet and share a **CSV** ex
 | On-page report/plan display (before archive) | This browser only (`localStorage`) | No |
 | **Past Reports** archive | Local file (`data/workweek.sqlite` → `generated_reports`), saved with your browser's local timestamp/timezone | No |
 | Chat session artifacts (for Chat context) | This browser only (`localStorage`) | No |
-| Desktop app credentials + DB (packaged) | `%APPDATA%\Task Manager\` (Windows) or `~/Library/Application Support/Task Manager/` (Mac) | No |
+| Desktop app credentials + DB (packaged) | `%APPDATA%\The Docket\` (Windows) or `~/Library/Application Support/The Docket/` (Mac) | No |
 | To-dos (Header To Do panel) | Local file (`data/workweek.sqlite`) | No |
 | Issue notes + priorities (P1–P20) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL | No for personal slots — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) |
 | Start date (ad-hoc, for Gantt views) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL, same as priority | No for personal slots |
