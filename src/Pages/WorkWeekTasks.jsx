@@ -294,7 +294,7 @@ const WorkWeekTasks = () => {
 
   const handleResetSavedQueriesWithConfirm = React.useCallback(() => {
     if (!window.confirm(
-      "Reset saved queries?\n\nThis will remove: saved JQL text and labels, the cached results table, and 'last pushed note' markers.\n\nThis will NOT remove: notes or priorities in your local database, or header reminders.\n\nClick OK to reset, or Cancel to keep your settings."
+      "Reset saved queries?\n\nThis will remove: saved JQL text and labels, the cached results table, and 'last pushed note' markers.\n\nThis will NOT remove: notes or priorities in your local database, or to dos.\n\nClick OK to reset, or Cancel to keep your settings."
     )) return;
     handleResetSavedQueries();
   }, [handleResetSavedQueries]);

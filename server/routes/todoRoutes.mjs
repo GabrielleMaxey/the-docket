@@ -18,14 +18,14 @@ const isValidDate = (v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(String(v));
 
 export const registerTodoRoutes = (app, { db }) => {
   const listAll = db.prepare(
-    `SELECT * FROM todos ORDER BY done ASC, priority ASC, due_date ASC, created_at ASC`
+    `SELECT * FROM todos ORDER BY done ASC, priority ASC,
+     CASE WHEN due_date = '' THEN 1 ELSE 0 END ASC, due_date ASC, created_at ASC`
   );
   const listCompleted = db.prepare(
     `SELECT * FROM todos WHERE done = 1 ORDER BY completed_at DESC`
   );
   const getOne = db.prepare(`SELECT * FROM todos WHERE id = ?`);
   const countActive = db.prepare(`SELECT COUNT(*) as n FROM todos WHERE done = 0`);
-  const countTotal = db.prepare(`SELECT COUNT(*) as n FROM todos`);
   const insert = db.prepare(
     `INSERT INTO todos (text, priority, due_date, done, created_at, completed_at)
      VALUES (@text, @priority, @dueDate, 0, CURRENT_TIMESTAMP, '')`
@@ -37,6 +37,7 @@ export const registerTodoRoutes = (app, { db }) => {
   const deleteStmt = db.prepare(`DELETE FROM todos WHERE id = ?`);
 
   // Migration: pull legacy reminders into todos on first GET if todos table is empty
+  const countTotal = db.prepare(`SELECT COUNT(*) as n FROM todos`);
   const migrateReminders = db.transaction(() => {
     if (countTotal.get().n > 0) return;
     const legacy = db.prepare(
@@ -72,8 +73,8 @@ export const registerTodoRoutes = (app, { db }) => {
 
   app.post("/api/todos", (req, res) => {
     try {
-      if (countTotal.get().n >= MAX_TODOS) {
-        return res.status(400).json({ error: `Maximum of ${MAX_TODOS} to dos reached.` });
+      if (countActive.get().n >= MAX_TODOS) {
+        return res.status(400).json({ error: `Maximum of ${MAX_TODOS} active to dos reached.` });
       }
       const text = String(req.body?.text || "").slice(0, TEXT_MAX);
       const priority = Math.min(5, Math.max(1, Number(req.body?.priority ?? 3)));
@@ -119,7 +120,7 @@ export const registerTodoRoutes = (app, { db }) => {
       const id = Number(req.params.id);
       if (!getOne.get(id)) return res.status(404).json({ error: "To do not found" });
       deleteStmt.run(id);
-      return res.status(204).end();
+      return res.json({ ok: true });
     } catch (err) {
       log.error("DELETE /api/todos/:id failed", err.message);
       return res.status(500).json({ error: "Failed to delete to do" });

@@ -136,7 +136,7 @@ export const useTodos = () => {
     });
   }, []);
 
-  const canAdd = todos.length < MAX_TODOS;
+  const canAdd = todos.filter((t) => !t.done).length < MAX_TODOS;
 
   // Split active (sorted by priority then due) and done (sorted by completedAt desc)
   const active = todos
