@@ -141,7 +141,15 @@ export const useTodos = () => {
   // Split active (sorted by priority then due) and done (sorted by completedAt desc)
   const active = todos
     .map((t, i) => ({ ...t, _index: i }))
-    .filter((t) => !t.done);
+    .filter((t) => !t.done)
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      const aHasDue = Boolean(a.dueDate);
+      const bHasDue = Boolean(b.dueDate);
+      if (aHasDue !== bHasDue) return aHasDue ? -1 : 1;
+      if (aHasDue && bHasDue) return a.dueDate.localeCompare(b.dueDate);
+      return 0;
+    });
   const done = todos
     .map((t, i) => ({ ...t, _index: i }))
     .filter((t) => t.done)
