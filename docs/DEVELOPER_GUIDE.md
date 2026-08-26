@@ -212,6 +212,7 @@ taskManager/
 | `priority` | INTEGER | 0–20; 0 = unranked, 1 = highest |
 | `start_date` | TEXT | `YYYY-MM-DD` or `''`. Ad-hoc — no Jira field backs this; feeds Gantt-chart views |
 | `updated_at` | TEXT | ISO 8601 |
+| `pinned_gantt` | INTEGER | 0/1; 1 = issue appears in Gantt Pinned Issues view |
 
 **Multi-user / shared projects (today):** `issue_metadata` is **per machine** for personal slots. Slots linked to a shared program use Atlas (`TEAM_PRIORITY_MONGODB_URI`) for priority and start date; production target is MySQL (see below).
 
@@ -257,6 +258,20 @@ Notable snapshot fields used by the UI and Chat context:
 | `text` | TEXT | Reminder text, max 500 chars |
 | `done` | INTEGER | 0/1 |
 | `updated_at` | TEXT | ISO 8601 |
+
+**`todos`** — to-do list (replaces the legacy reminders system)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PK | Auto-increment |
+| `text` | TEXT | To-do text, max 500 chars |
+| `priority` | INTEGER | 1–5; 1 = highest |
+| `due_date` | TEXT | `YYYY-MM-DD` or empty |
+| `done` | INTEGER | 0/1 |
+| `created_at` | TEXT | ISO timestamp |
+| `completed_at` | TEXT | `YYYY-MM-DD` when done, empty otherwise |
+
+Max 15 active todos. Migrates legacy `reminders` rows on first GET when table is empty.
 
 **`watched_assignees`** — saved people and custom queries for the Individual contributors tab's "Layered in" panel (not the auto-derived "From your selected projects" panel, which has no dedicated table — it's computed from epic `contributorMetrics` at read time)
 
@@ -522,6 +537,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 | POST | `/api/jira/issue-metadata/bulk` | Bulk read notes + priority (SQLite) |
 | GET | `/api/jira/issue-metadata/recent-notes?since=YYYY-MM-DD` | Issue keys with a local note added/edited on or after `since` - used by Work Week's "All my assigned work" report scope |
 | PUT | `/api/jira/issue-metadata/:issueKey` | Update note + priority (SQLite) |
+| PATCH | `/api/jira/issue-metadata/:issueKey/pin-gantt` | Toggle Gantt pin (body: `{ pinned: boolean }`) |
 | GET/POST/PUT/DELETE | `/api/epic-presets` | Epic/JQL presets CRUD |
 | GET | `/api/epic-presets/export` | Team preset pack (JSON) |
 | POST | `/api/epic-presets/import` | Import team pack (`merge` or `replace`) |
@@ -534,8 +550,15 @@ All routes mounted by `server/jiraProxy.mjs`.
 | POST | `/api/jira/field-mappings/sync` | Sync mappings from Jira |
 | GET/PUT | `/api/settings` | App settings key-value |
 | GET/PUT | `/api/reminders` | Header reminders (4 fixed slots; body for PUT: `{ reminders: [{ text, done }, ...] }`) |
+| GET | `/api/todos` | All todos (active + completed), sorted by done→priority→due |
+| GET | `/api/todos/completed?days=N` | Completed todos from last N days (default 90, 0 = all time) |
+| POST | `/api/todos` | Create todo (max 15 active; body: `{ text, priority, dueDate }`) |
+| PUT | `/api/todos/:id` | Update todo (body: any subset of text/priority/dueDate/done) |
+| DELETE | `/api/todos/:id` | Delete one todo |
+| DELETE | `/api/todos/completed` | Bulk delete all completed todos |
 | GET/POST/PUT/DELETE | `/api/watched-assignees` | Contributor Metrics entries, including capacity targets |
 | GET | `/api/project-managers/capacity` | Capacity planning data for selected Contributor Metrics entries |
+| GET | `/api/project-managers/gantt?slug=` | Gantt data for a shared program or `__pinned__` for pinned issues view |
 | POST | `/api/dashboard/refresh` | Pull + store metrics snapshot |
 | GET | `/api/dashboard/metrics` | Read stored snapshot |
 | POST | `/api/report/generate` | Dashboard AI report (Executive/PO/Developer) |

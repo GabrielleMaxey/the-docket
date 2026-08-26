@@ -112,7 +112,7 @@ This is the main screen for managing your open work. Some older docs and code st
 
 ```
 ┌──────────────────────────────────────┐
-│  Header: jokes · date · reminders   │
+│  Header: jokes · date · to do       │
 ├──────────────────────────────────────┤
 │  🗂️ Task Manager  [collapsible]      │
 │    [Create Issue]                    │
@@ -132,8 +132,8 @@ This is the main screen for managing your open work. Some older docs and code st
 
 - **Header banners** (optional) — at the top of Task Management, toggle **Joke ticker** and/or **My upcoming due dates**. The due-date banner lists **only your** assigned issues (matched by your Jira display name) from the latest Metrics snapshot's upcoming due-date window. Refresh Metrics after changing due-date filters or if the banner is empty when you expect tasks. Same toggles in **Settings → Work Week header**.
 - **Date & calendar** — shows today; useful when planning.
-- **Reminders** — four short text lines, for your eyes only, saved to your local database as you type. Check the box to mark done (greyed out). They are never sent to Jira.
-- **Hide calendar & reminders / Show calendar & reminders** — click the link under the date to collapse or expand the calendar, reminders, and week-plan panel together; that state is remembered too.
+- **To Do** — supports up to 15 active to-dos. Each to-do has a text field, a priority (P1–P5), a due date, and a done checkbox. Active to-dos are sorted automatically by priority then due date — changing a priority immediately re-orders the list. A **Clear completed** button appears below the list whenever any to-dos are checked done; clicking it removes all completed items at once. To-dos are saved to your local database and are never sent to Jira.
+- **Hide calendar & to do / Show calendar & to do** — click the link under the date to collapse or expand the calendar, to do, and week-plan panel together; that state is remembered too.
 
 ### Task Manager card
 
@@ -381,6 +381,35 @@ Each card shows open issue count, capacity status, status/assignee breakdowns, a
 
 Use **Save to Reports** to archive the current view, or download the planning summary as `.md` or `.csv`.
 
+### Gantt tab
+
+The **Gantt** tab visualizes issue timelines with the following capabilities:
+
+**Pinned Issues view** (default program selection)  
+Pin any issue to the Gantt by opening its planning panel and checking **Pin to Gantt**. Pinned issues from across all programs appear together in this view. When no issues are pinned yet, an empty-state message explains how to pin.
+
+**Zoom controls** — narrow or widen the visible date range: **3 mo**, **6 mo**, **1 yr**, or **All**.
+
+**Status filter chips** — click any status category chip (**In Progress**, **Done**, **To Do**) to hide or show those rows.
+
+**Collapsible groups** — issues are grouped by status category. Click a group header to collapse or expand it.
+
+**Overdue coloring** — non-Done issues whose due date is in the past are shown in red.
+
+**Rich hover tooltip** — hovering a bar shows the issue key, summary, status, assignee, requestor, dates, and plan delta (how many days ahead or behind the planned dates).
+
+**Legend** — a small color legend at the top of the chart explains bar types.
+
+### Asks panel
+
+The text inputs for **Title**, **Who Asked**, and **Note** in the Asks panel auto-expand as you type — each field grows to fit your text rather than requiring you to scroll within a cramped fixed-height box.
+
+### Planning panel fields
+
+When you open an issue's planning panel in Project Managers, the available fields include:
+
+- **Pin to Gantt** — a checkbox that adds the issue to the Pinned Issues view on the Gantt tab. Uncheck it to remove the issue from that view.
+
 ---
 
 ## Past Reports — saved outputs
@@ -389,7 +418,7 @@ Use **Save to Reports** to archive the current view, or download the planning su
 
 | Tab | Contents |
 |-----|----------|
-| **Work Week** | Project reports and week plans (saved automatically when you click Generate) |
+| **Task Management** | Project reports and week plans (saved automatically when you click Generate). Also includes a **Completed To Dos** section showing completed to-dos with date range filter chips: **Last 30 days**, **Last 90 days**, **All time** (default is last 90 days). |
 | **Dashboard** | Executive / PM / Developer audience reports (saved automatically on Generate) |
 | **Ad-hoc** | Chat assistant replies you explicitly saved with **Save to Past Reports** |
 | **Files** | Live list of CoWork `weekly-plan-*.md` files in the data folder (read from disk; optional **Save to archive**) |
@@ -513,7 +542,7 @@ PMs can keep rankings in the priority tracker spreadsheet and share a **CSV** ex
 | **Past Reports** archive | Local file (`data/workweek.sqlite` → `generated_reports`), saved with your browser's local timestamp/timezone | No |
 | Chat session artifacts (for Chat context) | This browser only (`localStorage`) | No |
 | Desktop app credentials + DB (packaged) | `%APPDATA%\Task Manager\` (Windows) or `~/Library/Application Support/Task Manager/` (Mac) | No |
-| Header reminders | Local file (`data/workweek.sqlite`) | No |
+| To-dos (Header To Do panel) | Local file (`data/workweek.sqlite`) | No |
 | Issue notes + priorities (P1–P20) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL | No for personal slots — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) |
 | Start date (ad-hoc, for Gantt views) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL, same as priority | No for personal slots |
 | Note attachments (**Keep on this machine**) | Local file (`data/note-images/` + SQLite) | No — cleared after a successful **Push note** |
