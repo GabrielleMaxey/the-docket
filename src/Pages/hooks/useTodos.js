@@ -1,5 +1,5 @@
 import React from "react";
-import { fetchTodos, createTodo, updateTodo, deleteTodo } from "../../services/jiraClient.js";
+import { fetchTodos, createTodo, updateTodo, deleteTodo, clearCompletedTodos } from "../../services/jiraClient.js";
 
 const MAX_TODOS = 15;
 const DEFAULT_PLACEHOLDER_COUNT = 5;
@@ -136,6 +136,13 @@ export const useTodos = () => {
     });
   }, []);
 
+  const handleClearCompleted = React.useCallback(() => {
+    clearCompletedTodos().catch(() =>
+      setError("Could not clear completed to dos.")
+    );
+    setTodos((prev) => prev.filter((t) => !t.done));
+  }, []);
+
   const canAdd = todos.filter((t) => !t.done).length < MAX_TODOS;
 
   // Split active (sorted by priority then due) and done (sorted by completedAt desc)
@@ -168,5 +175,6 @@ export const useTodos = () => {
     handleDoneChange,
     handleDelete,
     handleAdd,
+    handleClearCompleted,
   };
 };

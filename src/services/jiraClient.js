@@ -549,10 +549,14 @@ export const fetchTodos = async () => {
   return data?.items || [];
 };
 
-export const fetchCompletedTodos = async () => {
-  const data = await requestJson("/api/todos/completed");
-  return data?.items || [];
+export const fetchCompletedTodos = async (days = 90) => {
+  const param = Number(days) >= 0 ? Number(days) : 90;
+  const data = await requestJson(`/api/todos/completed?days=${param}`);
+  return { items: data?.items || [], days: data?.days ?? param };
 };
+
+export const clearCompletedTodos = async () =>
+  requestJson("/api/todos/completed", { method: "DELETE" });
 
 export const createTodo = async ({ text, priority, dueDate }) => {
   const data = await requestJson("/api/todos", {
