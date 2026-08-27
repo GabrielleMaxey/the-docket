@@ -54,38 +54,77 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
     if (!ensureEnvOrRespond(res)) return;
 
     const slug = String(req.query?.slug || "").trim();
-    if (!slug) {
-      return res.status(400).json({ error: "slug is required" });
-    }
+    if (!slug) return res.status(400).json({ error: "slug is required" });
 
     try {
-      const programs = await listSharedPrograms();
-      const program = programs.find((p) => p.slug === slug);
-      if (!program) {
-        return res.status(404).json({ error: "Program not found" });
+      let loaded = [];
+      let displayName = "";
+
+      if (slug === "__pinned__") {
+        displayName = "Pinned Issues";
+        const pinnedRows = db
+          .prepare("SELECT issue_key FROM issue_metadata WHERE pinned_gantt = 1")
+          .all();
+        const pinnedKeys = pinnedRows.map((r) => r.issue_key);
+        if (pinnedKeys.length === 0) {
+          return res.json({ slug, displayName, issues: [] });
+        }
+        const keyList = pinnedKeys.join(", ");
+        const jql = `key in (${keyList}) ORDER BY updated DESC`;
+        ({ issues: loaded } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 500 }));
+      } else {
+        const programs = await listSharedPrograms();
+        const program = programs.find((p) => p.slug === slug);
+        if (!program) return res.status(404).json({ error: "Program not found" });
+        displayName = program.displayName;
+
+        const roots = (program.epicRoots || [])
+          .map((k) => String(k || "").trim().toUpperCase())
+          .filter(Boolean);
+        if (roots.length === 0) return res.json({ slug, displayName, issues: [] });
+
+        const rootList = roots.join(", ");
+        const jql = `(parent in (${rootList}) OR key in (${rootList})) ORDER BY updated DESC`;
+        ({ issues: loaded } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 2000 }));
       }
-
-      const roots = (program.epicRoots || [])
-        .map((k) => String(k || "").trim().toUpperCase())
-        .filter(Boolean);
-      if (roots.length === 0) {
-        return res.json({ slug, displayName: program.displayName, issues: [] });
-      }
-
-      const rootList = roots.join(", ");
-      const jql = `(parent in (${rootList}) OR key in (${rootList})) ORDER BY updated DESC`;
-
-      const { issues: loaded } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 2000 });
 
       const issueKeys = loaded.map((i) => i.key);
-      const datesByKey =
+
+      // MongoDB dates (if configured)
+      const mongoDatesByKey =
         isTeamPriorityMongoConfigured() && issueKeys.length > 0
           ? await bulkGetTeamDates(issueKeys)
           : {};
 
+      // SQLite metadata (dates + requestor) for all keys
+      const sqliteMetaByKey = {};
+      if (issueKeys.length > 0) {
+        const placeholders = issueKeys.map(() => "?").join(",");
+        const rows = db
+          .prepare(
+            `SELECT issue_key, start_date, complete_date, planned_start, planned_finish, requestor
+             FROM issue_metadata WHERE issue_key IN (${placeholders})`
+          )
+          .all(...issueKeys);
+        for (const row of rows) {
+          sqliteMetaByKey[row.issue_key] = {
+            startDate: String(row.start_date || ""),
+            completeDate: String(row.complete_date || ""),
+            plannedStart: String(row.planned_start || ""),
+            plannedFinish: String(row.planned_finish || ""),
+            requestor: String(row.requestor || ""),
+          };
+        }
+      }
+
       const issues = loaded.map((issue) => {
         const fields = issue.fields || {};
-        const dates = datesByKey[issue.key] || {};
+        const mongo = mongoDatesByKey[issue.key] || {};
+        const sqlite = sqliteMetaByKey[issue.key] || {};
+        // MongoDB wins for dates; SQLite provides requestor
+        const hasMongoDate =
+          mongo.startDate || mongo.completeDate || mongo.plannedStart || mongo.plannedFinish;
+        const dateSrc = hasMongoDate ? mongo : sqlite;
         return {
           key: issue.key,
           summary: String(fields.summary || ""),
@@ -93,14 +132,15 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
           statusCategory: String(fields.status?.statusCategory?.name || ""),
           assignee: String(fields.assignee?.displayName || "Unassigned"),
           dueDate: String(fields.duedate || ""),
-          startDate: String(dates.startDate || ""),
-          completeDate: String(dates.completeDate || ""),
-          plannedStart: String(dates.plannedStart || ""),
-          plannedFinish: String(dates.plannedFinish || ""),
+          startDate: String(dateSrc.startDate || ""),
+          completeDate: String(dateSrc.completeDate || ""),
+          plannedStart: String(dateSrc.plannedStart || ""),
+          plannedFinish: String(dateSrc.plannedFinish || ""),
+          requestor: String(sqlite.requestor || ""),
         };
       });
 
-      return res.json({ slug, displayName: program.displayName, issues });
+      return res.json({ slug, displayName, issues });
     } catch (error) {
       log.error("gantt fetch failed", error instanceof Error ? error.message : error);
       return res.status(500).json({

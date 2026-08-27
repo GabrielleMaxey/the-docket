@@ -17,7 +17,7 @@ import { useCalendarData } from "./hooks/useCalendarData";
 import { useWorkWeekHeaderPreferences } from "./hooks/useWorkWeekHeaderPreferences";
 import { useUpcomingDueBanner } from "./hooks/useUpcomingDueBanner";
 import { usePersistedState } from "./hooks/usePersistedState";
-import { useReminders } from "./hooks/useReminders";
+import { useTodos } from "./hooks/useTodos";
 import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.js";
 import {
   fetchSharedPrograms,
@@ -67,11 +67,17 @@ const WorkWeekTasks = () => {
   const { todayDay, monthLabel, fullDateLabel, calendarCells } = useCalendarData();
 
   const {
-    reminders,
-    error: remindersError,
-    handleReminderTextChange,
-    handleReminderDoneChange,
-  } = useReminders();
+    sorted: todosSorted,
+    error: todosError,
+    canAdd: canAddTodo,
+    handleTextChange: handleTodoTextChange,
+    handlePriorityChange: handleTodoPriorityChange,
+    handleDueDateChange: handleTodoDueDateChange,
+    handleDoneChange: handleTodoDoneChange,
+    handleDelete: handleTodoDelete,
+    handleAdd: handleTodoAdd,
+    handleClearCompleted: handleTodoClearCompleted,
+  } = useTodos();
   const [importSlotIndex, setImportSlotIndex] = React.useState(null);
   const [createIssueOpen, setCreateIssueOpen] = React.useState(false);
   const [quickPickValueBySlot, setQuickPickValueBySlot] = React.useState({});
@@ -113,7 +119,7 @@ const WorkWeekTasks = () => {
     handleDueDateDraftChange, handleDueDateUpdate,
     handleMrdDraftChange, handleMrdUpdate, handleStartDateChange,
     handleCompleteDateChange, handleClearDateTracking,
-    handleTogglePlanningRow, handlePlanningFieldChange,
+    handleTogglePlanningRow, handleSavePlanningAll, handlePlanningFieldChange, handlePinnedGanttChange,
     handleAssigneeDraftChange, handleAssigneeUpdate,
     handleRowPriorityChange, handleNoteChange, handleNoteImagesAdd, handleNoteImageRemove,
     handleKeepNoteImagesToggle,
@@ -289,7 +295,7 @@ const WorkWeekTasks = () => {
 
   const handleResetSavedQueriesWithConfirm = React.useCallback(() => {
     if (!window.confirm(
-      "Reset saved queries?\n\nThis will remove: saved JQL text and labels, the cached results table, and 'last pushed note' markers.\n\nThis will NOT remove: notes or priorities in your local database, or header reminders.\n\nClick OK to reset, or Cancel to keep your settings."
+      "Reset saved queries?\n\nThis will remove: saved JQL text and labels, the cached results table, and 'last pushed note' markers.\n\nThis will NOT remove: notes or priorities in your local database, or to dos.\n\nClick OK to reset, or Cancel to keep your settings."
     )) return;
     handleResetSavedQueries();
   }, [handleResetSavedQueries]);
@@ -477,14 +483,20 @@ const WorkWeekTasks = () => {
           currentUserDisplayName={currentUserDisplayName}
           fullDateLabel={fullDateLabel} monthLabel={monthLabel}
           calendarCells={calendarCells} todayDay={todayDay}
-          reminders={reminders}
-          onReminderTextChange={handleReminderTextChange}
-          onReminderDoneChange={handleReminderDoneChange}
+          todos={todosSorted}
+          todosError={todosError}
+          canAddTodo={canAddTodo}
+          onTodoTextChange={handleTodoTextChange}
+          onTodoPriorityChange={handleTodoPriorityChange}
+          onTodoDueDateChange={handleTodoDueDateChange}
+          onTodoDoneChange={handleTodoDoneChange}
+          onTodoDelete={handleTodoDelete}
+          onTodoAdd={handleTodoAdd}
+          onTodoClearCompleted={handleTodoClearCompleted}
           weeklyPlanPanel={
             <WeeklyPlanPanel jqlRuns={jqlRuns} jiraRowPriorities={jiraRowPriorities} />
           }
         />
-        {remindersError ? <p className="ww-jira-status ww-jira-error">{remindersError}</p> : null}
 
         <CollapsibleSection title="🗂️ The Docket" storageKey={TASK_MANAGER_KEY} defaultOpen>
           <JqlControlsPanel
@@ -595,7 +607,9 @@ const WorkWeekTasks = () => {
           handleClearDateTracking={handleClearDateTracking}
 
           handleTogglePlanningRow={handleTogglePlanningRow}
+          handleSavePlanningAll={handleSavePlanningAll}
           handlePlanningFieldChange={handlePlanningFieldChange}
+          handlePinnedGanttChange={handlePinnedGanttChange}
           handleAssigneeDraftChange={handleAssigneeDraftChange} handleAssigneeUpdate={handleAssigneeUpdate}
           handleRowPriorityChange={handleRowPriorityChange} handleNoteChange={handleNoteChange}
           handleNoteImagesAdd={handleNoteImagesAdd} handleNoteImageRemove={handleNoteImageRemove}

@@ -346,7 +346,7 @@ export const registerIssueMetadataRoutes = (
     const placeholders = issueKeys.map(() => "?").join(",");
     const rows = db
       .prepare(
-        `SELECT issue_key, note, priority, keep_note_images, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note FROM issue_metadata WHERE issue_key IN (${placeholders})`
+        `SELECT issue_key, note, priority, keep_note_images, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note, pinned_gantt FROM issue_metadata WHERE issue_key IN (${placeholders})`
       )
       .all(...issueKeys);
 
@@ -365,6 +365,7 @@ export const registerIssueMetadataRoutes = (
         pmOverride: String(row.pm_override || ""),
         requestor: String(row.requestor || ""),
         openDecisionNote: String(row.open_decision_note || ""),
+        pinnedGantt: Boolean(row.pinned_gantt),
       };
       return acc;
     }, {});
@@ -387,6 +388,20 @@ export const registerIssueMetadataRoutes = (
       .all(`${since} 00:00:00`);
 
     return res.json({ issueKeys: rows.map((row) => row.issue_key) });
+  });
+
+  app.patch("/api/jira/issue-metadata/:issueKey/pin-gantt", (req, res) => {
+    const issueKey = String(req.params.issueKey || "").trim().toUpperCase();
+    if (!issueKey) return res.status(400).json({ error: "Missing issue key" });
+    const pinned = Boolean(req.body?.pinned);
+    db.prepare(`
+      INSERT INTO issue_metadata (issue_key, pinned_gantt, updated_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(issue_key) DO UPDATE SET
+        pinned_gantt = excluded.pinned_gantt,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(issueKey, pinned ? 1 : 0);
+    return res.json({ ok: true, pinnedGantt: pinned });
   });
 
   app.post("/api/jira/issue-metadata/import", (req, res) => {

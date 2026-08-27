@@ -544,6 +544,42 @@ export const saveReminders = async (reminders) => {
   return data?.items || [];
 };
 
+export const fetchTodos = async () => {
+  const data = await requestJson("/api/todos");
+  return data?.items || [];
+};
+
+export const fetchCompletedTodos = async (days = 90) => {
+  const param = Number(days) >= 0 ? Number(days) : 90;
+  const data = await requestJson(`/api/todos/completed?days=${param}`);
+  return { items: data?.items || [], days: data?.days ?? param };
+};
+
+export const clearCompletedTodos = async () =>
+  requestJson("/api/todos/completed", { method: "DELETE" });
+
+export const createTodo = async ({ text, priority, dueDate }) => {
+  const data = await requestJson("/api/todos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, priority, dueDate }),
+  });
+  return data;
+};
+
+export const updateTodo = async (id, fields) => {
+  const data = await requestJson(`/api/todos/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+  return data;
+};
+
+export const deleteTodo = async (id) => {
+  await requestJson(`/api/todos/${id}`, { method: "DELETE" });
+};
+
 export const fetchWatchedAssignees = async () => {
   const data = await requestJson("/api/watched-assignees");
   return data?.items || [];
@@ -689,6 +725,13 @@ export const fetchGanttData = async (slug) => {
   const data = await requestJson(`/api/project-managers/gantt?slug=${encodeURIComponent(slug)}`);
   return data;
 };
+
+export const updatePinnedGantt = (issueKey, pinned) =>
+  requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/pin-gantt`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pinned: Boolean(pinned) }),
+  });
 
 export const searchEpics = async (query) => {
   const q = String(query || "").trim();

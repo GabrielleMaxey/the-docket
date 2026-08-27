@@ -5,6 +5,14 @@ import { usePersistedState } from "../hooks/usePersistedState";
 
 const TODAY_DETAILS_COLLAPSE_KEY = "ww-today-details-open";
 
+const PRIORITY_LABELS = {
+  1: "P1 – Highest",
+  2: "P2 – High",
+  3: "P3 – Medium",
+  4: "P4 – Low",
+  5: "P5 – Lowest",
+};
+
 const TaskManagerHeaderPanel = ({
   showJokeTicker,
   showUpcomingDueBanner,
@@ -21,9 +29,16 @@ const TaskManagerHeaderPanel = ({
   monthLabel,
   calendarCells,
   todayDay,
-  reminders,
-  onReminderTextChange,
-  onReminderDoneChange,
+  todos,
+  todosError,
+  canAddTodo,
+  onTodoTextChange,
+  onTodoPriorityChange,
+  onTodoDueDateChange,
+  onTodoDoneChange,
+  onTodoDelete,
+  onTodoAdd,
+  onTodoClearCompleted,
   weeklyPlanPanel,
 }) => {
   const [detailsOpen, setDetailsOpen] = usePersistedState(TODAY_DETAILS_COLLAPSE_KEY, true);
@@ -57,7 +72,7 @@ const TaskManagerHeaderPanel = ({
                   onClick={() => setDetailsOpen((open) => !open)}
                   aria-expanded={detailsOpen}
                 >
-                  {detailsOpen ? "Hide calendar & reminders" : "Show calendar & reminders"}
+                  {detailsOpen ? "Hide calendar & to do" : "Show calendar & to do"}
                   <span className={`ww-date-toggle-chevron${detailsOpen ? " open" : ""}`}>›</span>
                 </button>
               </div>
@@ -87,39 +102,90 @@ const TaskManagerHeaderPanel = ({
                   </div>
 
                   <div className="ww-reminders-block">
-                    <p className="ww-reminders-label">Reminders</p>
+                    <p className="ww-reminders-label">To Do</p>
+                    {todosError ? (
+                      <p className="ww-todo-error">{todosError}</p>
+                    ) : null}
                     <ul className="ww-reminders-list">
-                      {reminders.map((row, index) => (
+                      {(todos || []).map((row) => (
                         <li
-                          key={`reminder-${index}`}
-                          className={`ww-reminder-row ${row.done ? "ww-reminder-row-done" : ""}`}
+                          key={row._index}
+                          className={`ww-reminder-row ww-todo-row${row.done ? " ww-reminder-row-done" : ""}`}
                         >
-                          <label className="ww-reminder-label">
-                            <input
-                              type="checkbox"
-                              className="ww-reminder-check"
-                              checked={row.done}
-                              onChange={(event) => onReminderDoneChange(index, event.target.checked)}
-                              disabled={!String(row.text || "").trim()}
-                              title={
-                                !String(row.text || "").trim()
-                                  ? "Enter a reminder before marking it done."
-                                  : undefined
-                              }
-                              aria-label={`Reminder ${index + 1} done`}
-                            />
-                            <input
-                              type="text"
-                              className="ww-reminder-input"
-                              value={row.text}
-                              onChange={(event) => onReminderTextChange(index, event.target.value)}
-                              placeholder={`Reminder ${index + 1}`}
-                              aria-label={`Reminder ${index + 1} text`}
-                            />
-                          </label>
+                          <input
+                            type="checkbox"
+                            className="ww-reminder-check"
+                            checked={row.done}
+                            onChange={(e) => onTodoDoneChange(row._index, e.target.checked)}
+                            disabled={!String(row.text || "").trim()}
+                            title={
+                              !String(row.text || "").trim()
+                                ? "Enter a to do before marking it done."
+                                : undefined
+                            }
+                            aria-label={`To do ${row._index + 1} done`}
+                          />
+                          <input
+                            type="text"
+                            className="ww-reminder-input ww-todo-text"
+                            value={row.text}
+                            onChange={(e) => onTodoTextChange(row._index, e.target.value)}
+                            placeholder="To do…"
+                            aria-label={`To do ${row._index + 1} text`}
+                            disabled={row.done}
+                          />
+                          <select
+                            className="ww-todo-priority"
+                            value={row.priority}
+                            onChange={(e) => onTodoPriorityChange(row._index, e.target.value)}
+                            aria-label={`To do ${row._index + 1} priority`}
+                            disabled={row.done}
+                          >
+                            {[1, 2, 3, 4, 5].map((p) => (
+                              <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="date"
+                            className="ww-todo-due"
+                            value={row.dueDate || ""}
+                            onChange={(e) => onTodoDueDateChange(row._index, e.target.value)}
+                            aria-label={`To do ${row._index + 1} due date`}
+                            disabled={row.done}
+                          />
+                          <button
+                            type="button"
+                            className="ww-todo-delete"
+                            onClick={() => onTodoDelete(row._index)}
+                            aria-label={`Delete to do ${row._index + 1}`}
+                            title="Delete"
+                          >
+                            ×
+                          </button>
                         </li>
                       ))}
                     </ul>
+
+                    <div className="ww-todo-actions">
+                      {canAddTodo ? (
+                        <button
+                          type="button"
+                          className="ww-todo-add"
+                          onClick={onTodoAdd}
+                        >
+                          + Add to do
+                        </button>
+                      ) : null}
+                      {(todos || []).some((t) => t.done) ? (
+                        <button
+                          type="button"
+                          className="ww-todo-clear-completed"
+                          onClick={onTodoClearCompleted}
+                        >
+                          Clear completed
+                        </button>
+                      ) : null}
+                    </div>
 
                     {weeklyPlanPanel ? (
                       <div className="ww-weekly-plan-block">{weeklyPlanPanel}</div>

@@ -85,6 +85,7 @@ const extractPlanningMeta = (item) => ({
   pmOverride: String(item?.pmOverride || ""),
   requestor: String(item?.requestor || ""),
   openDecisionNote: String(item?.openDecisionNote || ""),
+  pinnedGantt: Boolean(item?.pinnedGantt),
 });
 
 const hasPlanningData = (item) =>

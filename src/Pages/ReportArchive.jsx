@@ -12,8 +12,9 @@ import {
   fetchCoworkWeeklyPlanByFilename,
   fetchCoworkWeeklyPlans,
   saveCoworkWeeklyPlanToArchive,
+  fetchCompletedTodos,
 } from "../services/jiraClient";
-import { formatTimestamp } from "../utils/format";
+import { formatTimestamp, formatDate } from "../utils/format";
 import "./reportArchive.css";
 
 const REPORT_TYPE_LABELS = {
@@ -533,6 +534,74 @@ const ReportArchivePanel = ({
   );
 };
 
+const COMPLETED_RANGE_OPTIONS = [
+  { label: "Last 30 days", days: 30 },
+  { label: "Last 90 days", days: 90 },
+  { label: "All time", days: 0 },
+];
+
+const CompletedTodosPanel = () => {
+  const [items, setItems] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState("");
+  const [days, setDays] = React.useState(90);
+
+  React.useEffect(() => {
+    setLoading(true);
+    setError("");
+    fetchCompletedTodos(days)
+      .then(({ items: fetched }) => { setItems(fetched); setLoading(false); })
+      .catch(() => { setError("Could not load completed to dos."); setLoading(false); });
+  }, [days]);
+
+  return (
+    <>
+      <div className="report-completed-filter">
+        {COMPLETED_RANGE_OPTIONS.map((opt) => (
+          <button
+            key={opt.days}
+            type="button"
+            className={`report-completed-chip${days === opt.days ? " report-completed-chip--active" : ""}`}
+            onClick={() => setDays(opt.days)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      {loading ? (
+        <Message info size="small">Loading completed to dos…</Message>
+      ) : error ? (
+        <Message negative size="small">{error}</Message>
+      ) : items.length === 0 ? (
+        <Message info size="small">No completed to dos in this range.</Message>
+      ) : (
+        <Table celled compact size="small" className="report-archive-table">
+          <Table.Header>
+            <Table.Row>
+              <Table.HeaderCell>To Do</Table.HeaderCell>
+              <Table.HeaderCell>Priority</Table.HeaderCell>
+              <Table.HeaderCell>Due By</Table.HeaderCell>
+              <Table.HeaderCell>Date Entered</Table.HeaderCell>
+              <Table.HeaderCell>Date Completed</Table.HeaderCell>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {items.map((item) => (
+              <Table.Row key={item.id}>
+                <Table.Cell style={{ textDecoration: "line-through", color: "#64748b" }}>{item.text}</Table.Cell>
+                <Table.Cell>P{item.priority}</Table.Cell>
+                <Table.Cell>{item.dueDate ? formatDate(item.dueDate + "T00:00:00") : "—"}</Table.Cell>
+                <Table.Cell>{item.createdAt ? formatDate(item.createdAt) : "—"}</Table.Cell>
+                <Table.Cell>{item.completedAt ? formatDate(item.completedAt + "T00:00:00") : "—"}</Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table>
+      )}
+    </>
+  );
+};
+
 const ReportArchive = () => {
   const panes = [
     {
@@ -572,6 +641,15 @@ const ReportArchive = () => {
             title="CoWork weekly plan files"
             emptyMessage="No weekly-plan-*.md files in the data folder yet."
           />
+        </Tab.Pane>
+      ),
+    },
+    {
+      menuItem: "Completed To Dos",
+      render: () => (
+        <Tab.Pane attached={false}>
+          <Header as="h4" style={{ marginBottom: "1rem" }}>Completed To Dos</Header>
+          <CompletedTodosPanel />
         </Tab.Pane>
       ),
     },

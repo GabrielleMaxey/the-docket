@@ -591,6 +591,31 @@ const buildCapacityReportCsv = (sortedItems) => {
   return rows.join("\r\n");
 };
 
+const AutoTextarea = ({ className, placeholder, value, onChange }) => {
+  const ref = React.useRef(null);
+
+  const resize = React.useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, []);
+
+  React.useLayoutEffect(() => { resize(); }, [value, resize]);
+
+  return (
+    <textarea
+      ref={ref}
+      className={className}
+      placeholder={placeholder}
+      value={value}
+      rows={1}
+      onChange={onChange}
+      onInput={resize}
+    />
+  );
+};
+
 const AsksPanel = () => {
   const [asks, setAsks] = React.useState([]);
   const [error, setError] = React.useState("");
@@ -661,19 +686,19 @@ const AsksPanel = () => {
       {error ? <p className="ww-inline-error">{error}</p> : null}
 
       <div className="pm-asks-new-row">
-        <input
+        <AutoTextarea
           className="pm-asks-input"
           placeholder="Title"
           value={draft.title}
           onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
         />
-        <input
+        <AutoTextarea
           className="pm-asks-input"
           placeholder="Who asked"
           value={draft.whoAsked}
           onChange={(e) => setDraft((d) => ({ ...d, whoAsked: e.target.value }))}
         />
-        <input
+        <AutoTextarea
           className="pm-asks-input pm-asks-input--note"
           placeholder="Note"
           value={draft.note}
@@ -700,9 +725,9 @@ const AsksPanel = () => {
             {asks.map((ask) =>
               editingId === ask.id ? (
                 <tr key={ask.id}>
-                  <td><input className="pm-asks-input" value={editDraft.title || ""} onChange={(e) => setEditDraft((d) => ({ ...d, title: e.target.value }))} /></td>
-                  <td><input className="pm-asks-input" value={editDraft.whoAsked || ""} onChange={(e) => setEditDraft((d) => ({ ...d, whoAsked: e.target.value }))} /></td>
-                  <td><input className="pm-asks-input" value={editDraft.note || ""} onChange={(e) => setEditDraft((d) => ({ ...d, note: e.target.value }))} /></td>
+                  <td><AutoTextarea className="pm-asks-input" value={editDraft.title || ""} onChange={(e) => setEditDraft((d) => ({ ...d, title: e.target.value }))} /></td>
+                  <td><AutoTextarea className="pm-asks-input" value={editDraft.whoAsked || ""} onChange={(e) => setEditDraft((d) => ({ ...d, whoAsked: e.target.value }))} /></td>
+                  <td><AutoTextarea className="pm-asks-input pm-asks-input--note" value={editDraft.note || ""} onChange={(e) => setEditDraft((d) => ({ ...d, note: e.target.value }))} /></td>
                   <td>
                     <button type="button" className="ww-page-btn" onClick={() => handleSaveEdit(ask.id)}>Save</button>
                     <button type="button" className="ww-page-btn" onClick={() => setEditingId(null)}>Cancel</button>

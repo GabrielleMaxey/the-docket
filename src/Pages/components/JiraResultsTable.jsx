@@ -142,7 +142,9 @@ const JiraResultsTable = ({
   handleCompleteDateChange,
   handleClearDateTracking,
   handleTogglePlanningRow,
+  handleSavePlanningAll,
   handlePlanningFieldChange,
+  handlePinnedGanttChange,
   handleAssigneeDraftChange,
   handleAssigneeUpdate,
   handleRowPriorityChange,
@@ -173,6 +175,26 @@ const JiraResultsTable = ({
   const [sortField, setSortField] = React.useState("default");
   const [sortDirection, setSortDirection] = React.useState("asc");
   const [expandedNoteKey, setExpandedNoteKey] = React.useState(null);
+  const [planSaveStatus, setPlanSaveStatus] = React.useState({});
+  const planSaveTimers = React.useRef({});
+
+  const triggerPlanSave = React.useCallback((issueKey, sharedProgramId) => {
+    setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "saving" }));
+    clearTimeout(planSaveTimers.current[issueKey]);
+    handleSavePlanningAll(issueKey, { sharedProgramId })
+      .then(() => {
+        setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "saved" }));
+        planSaveTimers.current[issueKey] = setTimeout(() => {
+          setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "idle" }));
+        }, 3000);
+      })
+      .catch(() => {
+        setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "error" }));
+        planSaveTimers.current[issueKey] = setTimeout(() => {
+          setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "idle" }));
+        }, 5000);
+      });
+  }, [handleSavePlanningAll]);
 
   const pendingDrillDownRun = React.useMemo(() => {
     if (!drillDownPending) {
@@ -1098,29 +1120,7 @@ const JiraResultsTable = ({
                                   ) : null}
 
                                   <label className="ww-planning-field">
-                                    <span className="ww-planning-label" title="Actual start date — used for Gantt">Start</span>
-                                    <input
-                                      type="date"
-                                      className="ww-edit-input"
-                                      value={startDateByKey[issueKey] || ""}
-                                      disabled={isClosedOrResolved}
-                                      onChange={(e) => handleStartDateChange(issueKey, e.target.value, { sharedProgramId })}
-                                    />
-                                  </label>
-
-                                  <label className="ww-planning-field">
-                                    <span className="ww-planning-label" title="Actual complete date — used for Gantt">Complete</span>
-                                    <input
-                                      type="date"
-                                      className="ww-edit-input"
-                                      value={completeDateByKey[issueKey] || ""}
-                                      disabled={isClosedOrResolved}
-                                      onChange={(e) => handleCompleteDateChange(issueKey, e.target.value, { sharedProgramId })}
-                                    />
-                                  </label>
-
-                                  <label className="ww-planning-field">
-                                    <span className="ww-planning-label" title="PM's planned start — not Jira, not Gantt">Planned start</span>
+                                    <span className="ww-planning-label" title="PM's planned start — shown as dashed bar on Gantt">Planned start</span>
                                     <input
                                       type="date"
                                       className="ww-edit-input"
@@ -1133,7 +1133,18 @@ const JiraResultsTable = ({
                                   </label>
 
                                   <label className="ww-planning-field">
-                                    <span className="ww-planning-label" title="PM's planned finish — not Jira, not Gantt">Planned finish</span>
+                                    <span className="ww-planning-label" title="Actual start date — used for Gantt">Start</span>
+                                    <input
+                                      type="date"
+                                      className="ww-edit-input"
+                                      value={startDateByKey[issueKey] || ""}
+                                      disabled={isClosedOrResolved}
+                                      onChange={(e) => handleStartDateChange(issueKey, e.target.value, { sharedProgramId })}
+                                    />
+                                  </label>
+
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label" title="PM's planned finish — shown as dashed bar on Gantt">Planned finish</span>
                                     <input
                                       type="date"
                                       className="ww-edit-input"
@@ -1142,6 +1153,17 @@ const JiraResultsTable = ({
                                       onChange={(e) =>
                                         handlePlanningFieldChange(issueKey, "plannedFinish", e.target.value, { sharedProgramId })
                                       }
+                                    />
+                                  </label>
+
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label" title="Actual complete date — used for Gantt">Complete</span>
+                                    <input
+                                      type="date"
+                                      className="ww-edit-input"
+                                      value={completeDateByKey[issueKey] || ""}
+                                      disabled={isClosedOrResolved}
+                                      onChange={(e) => handleCompleteDateChange(issueKey, e.target.value, { sharedProgramId })}
                                     />
                                   </label>
 
@@ -1159,6 +1181,22 @@ const JiraResultsTable = ({
                                     />
                                   </label>
 
+                                  <div className="ww-planning-field">
+                                    <span className="ww-planning-label" title="Date the issue was created in Jira">Created</span>
+                                    <span className="ww-edit-input ww-planning-readonly">
+                                      {formatDate(issue.fields?.created) || "—"}
+                                    </span>
+                                  </div>
+
+                                  <label className="ww-planning-field">
+                                    <span className="ww-planning-label" title="Include this issue in the Pinned Issues view on the Gantt chart">Pin to Gantt</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(planningMeta.pinnedGantt)}
+                                      onChange={(e) => handlePinnedGanttChange && handlePinnedGanttChange(issueKey, e.target.checked)}
+                                    />
+                                  </label>
+
                                   {(startDateByKey[issueKey] || completeDateByKey[issueKey]) ? (
                                     <button
                                       type="button"
@@ -1173,6 +1211,27 @@ const JiraResultsTable = ({
                                       Clear tracking
                                     </button>
                                   ) : null}
+                                </div>
+
+                                <div className="ww-planning-save-row">
+                                  <button
+                                    type="button"
+                                    className="ww-planning-save-btn"
+                                    disabled={planSaveStatus[issueKey] === "saving"}
+                                    onClick={() => triggerPlanSave(issueKey, sharedProgramId)}
+                                  >
+                                    {planSaveStatus[issueKey] === "saving" ? "Saving…" : "Save to database"}
+                                  </button>
+                                  {planSaveStatus[issueKey] === "saved" && (
+                                    <span className="ww-planning-save-indicator ww-planning-save-indicator--ok">
+                                      ✓ Saved
+                                    </span>
+                                  )}
+                                  {planSaveStatus[issueKey] === "error" && (
+                                    <span className="ww-planning-save-indicator ww-planning-save-indicator--err">
+                                      Save failed — check connection
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </td>

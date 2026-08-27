@@ -1,4 +1,4 @@
-# Task Manager — Developer Guide
+# The Docket — Developer Guide
 
 Internal reference for code structure, data flow, scripts, and extension points.
 
@@ -137,7 +137,7 @@ taskManager/
 │   │   ├── Settings.jsx            # Re-exports Settings/index
 │   │   ├── Chat.jsx                # Chat page (+ Save to Past Reports)
 │   │   ├── ProjectManagers.jsx     # Capacity planning from Contributor Metrics entries
-│   │   ├── ReportArchive.jsx       # Past Reports page (Work Week / Dashboard / Ad-hoc tabs)
+│   │   ├── ReportArchive.jsx       # Past Reports page (Task Management / Dashboard / Ad-hoc tabs)
 │   │   ├── workWeekTaskElements.css
 │   │   ├── priorityScale.css               # Priority colour data encoding (P1–P20, do not retint)
 │   │   ├── dashboard.css
@@ -153,7 +153,7 @@ taskManager/
 │   │   │   ├── ProjectReportPanel.jsx       # Per-run AI project report (extracted)
 │   │   │   └── JqlRunMetrics.jsx            # Chips + progress bar (extracted)
 │   │   └── hooks/
-│   │       ├── useTaskManagerJira.js        # All Work Week Jira state + handlers
+│   │       ├── useTaskManagerJira.js        # All Task Management Jira state + handlers
 │   │       ├── jiraJqlRunWorkflow.js        # Run JQL, load remaining, priority-from-comment sync
 │   │       ├── useEpicFilters.js            # Thin re-export shim (kept for any legacy uses)
 │   │       ├── usePersistedState.js         # localStorage wrapper
@@ -212,6 +212,7 @@ taskManager/
 | `priority` | INTEGER | 0–20; 0 = unranked, 1 = highest |
 | `start_date` | TEXT | `YYYY-MM-DD` or `''`. Ad-hoc — no Jira field backs this; feeds Gantt-chart views |
 | `updated_at` | TEXT | ISO 8601 |
+| `pinned_gantt` | INTEGER | 0/1; 1 = issue appears in Gantt Pinned Issues view |
 
 **Multi-user / shared projects (today):** `issue_metadata` is **per machine** for personal slots. Slots linked to a shared program use Atlas (`TEAM_PRIORITY_MONGODB_URI`) for priority and start date; production target is MySQL (see below).
 
@@ -257,6 +258,20 @@ Notable snapshot fields used by the UI and Chat context:
 | `text` | TEXT | Reminder text, max 500 chars |
 | `done` | INTEGER | 0/1 |
 | `updated_at` | TEXT | ISO 8601 |
+
+**`todos`** — to-do list (replaces the legacy reminders system)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PK | Auto-increment |
+| `text` | TEXT | To-do text, max 500 chars |
+| `priority` | INTEGER | 1–5; 1 = highest |
+| `due_date` | TEXT | `YYYY-MM-DD` or empty |
+| `done` | INTEGER | 0/1 |
+| `created_at` | TEXT | ISO timestamp |
+| `completed_at` | TEXT | `YYYY-MM-DD` when done, empty otherwise |
+
+Max 15 active todos. Migrates legacy `reminders` rows on first GET when table is empty.
 
 **`watched_assignees`** — saved people and custom queries for the Individual contributors tab's "Layered in" panel (not the auto-derived "From your selected projects" panel, which has no dedicated table — it's computed from epic `contributorMetrics` at read time)
 
@@ -380,11 +395,11 @@ Display logic in `getMostRecentDoneDateForIssue`:
 
 `buildParentMostRecentDoneDateMap` fetches missing parents from Jira and walks up to **five** ancestor levels (Story → Epic, etc.) until an MRD is found. When a row's own Due/MRD field is empty, the Dates column shows a small "from MRD: …" / "from parent: …" hint below that field with the inherited value used for overdue calculations elsewhere in the app — editing the field writes only the issue's own value, it does not change the inheritance.
 
-### Work Week JQL — full result loading
+### Task Management JQL — full result loading
 
 `POST /api/jira/search/all` (`server/lib/jiraSearchHelpers.mjs` → `searchAllIssues`) paginates with Jira `nextPageToken` until all matches are loaded or `maxTotal` is reached (cap **5000**). Work Week **Run JQL** calls `fetchJiraSearchAll` per slot (`jiraJqlRunWorkflow.js`). Each run stores `total`, `loaded`, and `loadComplete`; the UI shows **Load remaining** when incomplete. `persistJqlRunsToStorage()` writes results when a run finishes so navigation mid-JQL does not lose the table.
 
-### Work Week notes from Jira comments
+### Task Management notes from Jira comments
 
 On each **Run JQL** (and **Load remaining**), when **Pull most recent Jira comment** is off, local SQLite notes merge into row Notes as before. When it is on (`pullLatestComment` in `workWeekTasksJiraPreferences`), `fetchLatestJiraCommentsBulk` overwrites Notes from Jira and skips local note merge for those keys.
 
@@ -394,11 +409,11 @@ Priority is **not** read from comment text. Shared-program slots load priority v
 
 `GET /api/jira/users/search?query=…` → `searchJiraUsers` / `pickBestJiraUser` in `server/lib/jiraSearchHelpers.mjs`. Resolves display names, emails, and usernames for `POST /api/jira/issues/:issueKey/assignee`. UI: `AssigneeCell.jsx` debounces suggestions; Enter or **Update Assignee** commits.
 
-### Dashboard → Work Week drill-down
+### Dashboard → Task Management drill-down
 
 `src/utils/workWeekNavigation.js` → `buildWorkWeekHref({ key, assignee, epicPresetId })` returns `/work-week?key=…&assignee=…&epicPresetId=…` (hash router). `epicPresetId` is only set when `assignee` is also set, and only matters for the unassigned case (see point 5). Dashboard components link via React Router `Link`:
 
-- `DueByHierarchicalList.jsx` — issue keys, assignees, epic **Work Week** links
+- `DueByHierarchicalList.jsx` — issue keys, assignees, epic **Task Management** links
 - `EpicMetricCard.jsx` — epic key, overdue task keys; passes `epic.epicPresetId` down to `ProjectContributorMetrics.jsx` for its contributor-name links
 - `AssigneeMetricCard.jsx` — person name, overdue issue keys (no `epicPresetId` — this card aggregates across every selected project, so there's no single project to scope to)
 
@@ -430,7 +445,7 @@ Settings UI: **Export team pack** / **Import team pack**. Align with `npm run se
 
 ### Create Issue (`CreateIssueModal.jsx` + `jiraIssueRoutes.mjs`)
 
-Work Week **Create Issue** creates Story, Task, or Bug issues in your Jira project with client and server validation against `shared/odiIssueStandards.mjs`.
+Task Management **Create Issue** creates Story, Task, or Bug issues in your Jira project with client and server validation against `shared/odiIssueStandards.mjs`.
 
 **Parent selection (three paths):**
 
@@ -440,7 +455,7 @@ Work Week **Create Issue** creates Story, Task, or Bug issues in your Jira proje
 | JQL preset (no embedded epic key) | `POST /api/jira/issues/parent-candidates` | Runs preset JQL, walks `parent` + Epic Link (`customfield_10014`), returns `epics`, `stories`, `chains` |
 | Manual key | `GET /api/jira/issues/:issueKey/summary` | Validates epic vs story for the chosen issue type |
 
-Preset preload from the active Work Week tab uses `resolveCreateIssueDefaults` in `shared/createIssuePresetUtils.mjs` (`defaultEpicSelectValue`). Manual key validation and query-issue parent resolution live in `shared/createIssueParentUtils.mjs`; the modal uses `useCreateIssueManualKey` for debounced validation and `setResolvedParent` / `applyQueryIssueParent` for a single parent-state code path.
+Preset preload from the active Task Management tab uses `resolveCreateIssueDefaults` in `shared/createIssuePresetUtils.mjs` (`defaultEpicSelectValue`). Manual key validation and query-issue parent resolution live in `shared/createIssueParentUtils.mjs`; the modal uses `useCreateIssueManualKey` for debounced validation and `setResolvedParent` / `applyQueryIssueParent` for a single parent-state code path.
 
 **Create payload:** `buildJiraCreatePayload` in `server/lib/jiraCreateIssueFields.mjs` reads Jira **createmeta** to choose `parent` vs Epic Link, issue type id, priority mapping (`Critical` → `Highest`), and project custom fields (Components, Vertical Components, BUG Tracking). Descriptions are sent as ADF via `shared/jiraDescriptionAdf.mjs`.
 
@@ -520,13 +535,14 @@ All routes mounted by `server/jiraProxy.mjs`.
 | GET | `/api/jira/projects` | List projects |
 | GET | `/api/jira/projects/:key/createmeta` | Create-issue field metadata |
 | POST | `/api/jira/issue-metadata/bulk` | Bulk read notes + priority (SQLite) |
-| GET | `/api/jira/issue-metadata/recent-notes?since=YYYY-MM-DD` | Issue keys with a local note added/edited on or after `since` - used by Work Week's "All my assigned work" report scope |
+| GET | `/api/jira/issue-metadata/recent-notes?since=YYYY-MM-DD` | Issue keys with a local note added/edited on or after `since` - used by Task Management's "All my assigned work" report scope |
 | PUT | `/api/jira/issue-metadata/:issueKey` | Update note + priority (SQLite) |
+| PATCH | `/api/jira/issue-metadata/:issueKey/pin-gantt` | Toggle Gantt pin (body: `{ pinned: boolean }`) |
 | GET/POST/PUT/DELETE | `/api/epic-presets` | Epic/JQL presets CRUD |
 | GET | `/api/epic-presets/export` | Team preset pack (JSON) |
 | POST | `/api/epic-presets/import` | Import team pack (`merge` or `replace`) |
 | GET | `/api/epic-presets/:id/scope-jql` | Resolves a preset's real JQL (epic-key, Jira filter, or hand-authored) with any trailing `ORDER BY` stripped — `{ scopeJql }`. Caller wraps it: `(${scopeJql}) AND <clause>` |
-| POST | `/api/epic-filters/run` | Run preset JQL (Work Week) |
+| POST | `/api/epic-filters/run` | Run preset JQL (Task Management) |
 | GET | `/api/jira/filters` | Jira filters list |
 | GET | `/api/jira/filters/favourite` | Favourite filters |
 | GET | `/api/jira/filters/:id` | Single filter by ID |
@@ -534,8 +550,15 @@ All routes mounted by `server/jiraProxy.mjs`.
 | POST | `/api/jira/field-mappings/sync` | Sync mappings from Jira |
 | GET/PUT | `/api/settings` | App settings key-value |
 | GET/PUT | `/api/reminders` | Header reminders (4 fixed slots; body for PUT: `{ reminders: [{ text, done }, ...] }`) |
+| GET | `/api/todos` | All todos (active + completed), sorted by done→priority→due |
+| GET | `/api/todos/completed?days=N` | Completed todos from last N days (default 90, 0 = all time) |
+| POST | `/api/todos` | Create todo (max 15 active; body: `{ text, priority, dueDate }`) |
+| PUT | `/api/todos/:id` | Update todo (body: any subset of text/priority/dueDate/done) |
+| DELETE | `/api/todos/:id` | Delete one todo |
+| DELETE | `/api/todos/completed` | Bulk delete all completed todos |
 | GET/POST/PUT/DELETE | `/api/watched-assignees` | Contributor Metrics entries, including capacity targets |
 | GET | `/api/project-managers/capacity` | Capacity planning data for selected Contributor Metrics entries |
+| GET | `/api/project-managers/gantt?slug=` | Gantt data for a shared program or `__pinned__` for pinned issues view |
 | POST | `/api/dashboard/refresh` | Pull + store metrics snapshot |
 | GET | `/api/dashboard/metrics` | Read stored snapshot |
 | POST | `/api/report/generate` | Dashboard AI report (Executive/PO/Developer) |
@@ -545,8 +568,8 @@ All routes mounted by `server/jiraProxy.mjs`.
 | DELETE | `/api/reports/archive/:id` | Delete one archived report |
 | DELETE | `/api/reports/archive?source=...` | Delete every archived report matching `source` (`work_week\|dashboard\|adhoc` required - refuses an empty/unknown source rather than deleting the whole table) |
 | POST | `/api/reports/archive` | Manual save (Chat → Ad-hoc; body: `content`, optional `label`, `userPrompt`, `provider`) |
-| POST | `/api/report/project` | Work Week per-query AI report (auto-archived) |
-| POST | `/api/plan/week` | Work Week AI week planner (auto-archived) |
+| POST | `/api/report/project` | Task Management per-query AI report (auto-archived) |
+| POST | `/api/plan/week` | Task Management AI week planner (auto-archived) |
 | GET | `/api/chat/status` | Chat provider readiness + OAuth state |
 | GET | `/api/chat/auth/start` | Start Atlassian OAuth (Rovo); `?format=json` returns URL |
 | GET | `/api/chat/auth/callback` | OAuth callback (browser redirect target) |
@@ -557,7 +580,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 
 ## AI report system prompts
 
-### `/api/report/project` (Work Week — My Metrics)
+### `/api/report/project` (Task Management — My Metrics)
 Written **from the assignee's perspective**, second person ("you have", "your open items"). Tone: supportive colleague, not manager status update. Covers: overall tracking %, key open items, overdue concerns, recommended next steps. Flowing prose, no bullet lists.
 
 ### `/api/report/generate` (Dashboard — Generate Report)
@@ -567,7 +590,7 @@ Four audience variants — `AUDIENCE_CONFIGS` in `server/lib/aiInstructions.mjs`
 - **`developer`** — Developer Report: team workload and WIP, plus a full per-contributor status breakdown (`rollupEpicContributorPeople` + `ContributorStatusBar`, not just overdue counts)
 - **`direct_reports`** — Ad-hoc team report: `isAdhocTeamReport` in `reportRoutes.mjs`; scoped to Settings → My Direct Reports rather than the selected project presets
 
-### `/api/plan/week` (Work Week — Help me plan my week)
+### `/api/plan/week` (Task Management — Help me plan my week)
 Day-by-day Monday–Friday plan using actual issue keys from the loaded JQL runs. Respects `focusStyle` (balance / overdue-first / single-project / meeting-heavy), `capacityHours`, `fixedCommitments`, and `additionalContext`. Flags overdue items with ⚠️.
 
 ---
@@ -580,7 +603,7 @@ Each `POST /api/chat` request includes an `epicContext` object from the browser:
 |-------|--------|---------|
 | `selectedEpics` | Chat epic filter panel | Preset labels, keys, and JQL for scoped searches |
 | `includePastDue` | Chat epic filter panel | Whether past-due filter is active |
-| `sessionContext` | `buildChatSessionContext()` in `src/utils/chatSessionContext.js` | Work Week queries, dashboard snapshot, generated artifacts |
+| `sessionContext` | `buildChatSessionContext()` in `src/utils/chatSessionContext.js` | Task Management queries, dashboard snapshot, generated artifacts |
 
 `sessionContext` is built client-side on each send:
 
@@ -593,7 +616,7 @@ Artifacts are saved when the user generates:
 | Artifact `type` | Saved from |
 |-----------------|------------|
 | `work_week_project_report` | Work Week → My Metrics → Project Report |
-| `week_plan` | Work Week → Help me plan my week |
+| `week_plan` | Task Management → Help me plan my week |
 | `dashboard_report` | Dashboard → Generate Report |
 
 Ad-hoc Chat saves use `saveAdHocReport()` → `POST /api/reports/archive` (not added to the 8-artifact Chat cache unless the user also generated a report in-session).
@@ -667,8 +690,8 @@ When `TASK_MANAGER_USER_DATA` is set by Electron main (packaged app only):
 | `{userData}/.env` | Jira + LLM credentials (created from template on first launch) |
 | `{userData}/data/workweek.sqlite` | Notes, dashboard snapshots, archived reports, settings |
 
-**macOS:** `~/Library/Application Support/Task Manager/`  
-**Windows:** `%APPDATA%\Task Manager\`
+**macOS:** `~/Library/Application Support/The Docket/`  
+**Windows:** `%APPDATA%\The Docket\`
 
 Dev desktop (`npm run desktop:dev`) and browser dev use the repo `data/` folder and project-root `.env` instead.
 
@@ -678,7 +701,7 @@ Packaged builds load the UI from `http://127.0.0.1:{API_PORT}` (proxy serves `di
 
 ## Collapsible component pattern
 
-Work Week and Dashboard share `src/Components/CollapsibleSection.jsx` (CSS: `src/Components/collapsible.css`):
+Task Management and Dashboard share `src/Components/CollapsibleSection.jsx` (CSS: `src/Components/collapsible.css`):
 
 ```jsx
 <CollapsibleSection title="Project Metrics" storageKey="epicMetrics" badge="3 projects">
@@ -784,14 +807,14 @@ node --check server/routes/dashboardRoutes.mjs
 npm run build
 
 # 4. Smoke test (with a real Jira test site):
-#    - Run JQL on Work Week; confirm Loaded X of Y and Load remaining when needed
+#    - Run JQL on Task Management; confirm Loaded X of Y and Load remaining when needed
 #    - Confirm shared-program slot priority loads from Atlas (Team badge); personal slot stays local
 #    - Generate a project report; navigate away and back while it runs
 #    - Generate a week plan
-#    - Dashboard refresh + weekly digest + Generate Report; drill-down link to Work Week (?key=, ?assignee=)
-#    - Work Week drill-down tabs persist for the browser session; clear one tab and clear the URL filter separately
-#    - Past Reports: view archived Work Week / Dashboard / Ad-hoc items; Chat Save to Past Reports
-#    - Clear report on Work Week / Dashboard (on-page only)
+#    - Dashboard refresh + weekly digest + Generate Report; drill-down link to Task Management (?key=, ?assignee=)
+#    - Task Management drill-down tabs persist for the browser session; clear one tab and clear the URL filter separately
+#    - Past Reports: view archived Task Management / Dashboard / Ad-hoc items; Chat Save to Past Reports
+#    - Clear report on Task Management / Dashboard (on-page only)
 #    - Assignee cell: type name/email, pick suggestion, Update Assignee
 #    - Notes on run: Pull most recent Jira comment vs Keep local notes
 #    - Settings: export/import team preset pack
@@ -862,7 +885,7 @@ Produces artifacts: `desktop-macos` (universal `.dmg` for Intel and Apple Silico
 1. Add a new route in `server/routes/reportRoutes.mjs` following the `app.post("/api/report/project", ...)` pattern — call `callLLMForReport({ systemPrompt, context, label })` (pass a human-readable `label` string so the info log reads correctly) and return `res.json({ report, label })`.
 2. Add a client function in `src/services/jiraClient.js`.
 3. Create a panel component (or extend an existing one) following the `ProjectReportPanel` pattern: `loading`, `report`, `error`, `copied` state; `Generate` → `Copy` → `Download` buttons. Use `runBackgroundJob()` if generation can take long and users may navigate away.
-4. Wrap in `<CollapsibleSection>` on Work Week or Dashboard.
+4. Wrap in `<CollapsibleSection>` on Task Management or Dashboard.
 5. If the output should be available in Chat, call `saveChatSessionArtifact()` from `src/utils/chatSessionContext.js` after a successful generation (see existing report/plan panels).
 
 ---
