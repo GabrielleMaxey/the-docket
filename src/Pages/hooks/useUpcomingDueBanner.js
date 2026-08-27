@@ -41,6 +41,8 @@ export const useUpcomingDueBanner = (enabled) => {
   const [currentUser, setCurrentUser] = React.useState(null);
   const [error, setError] = React.useState("");
 
+  const [reloadToken, setReloadToken] = React.useState(0);
+
   React.useEffect(() => {
     if (!enabled) {
       return;
@@ -75,7 +77,11 @@ export const useUpcomingDueBanner = (enabled) => {
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, reloadToken]);
+
+  const refresh = React.useCallback(() => {
+    setReloadToken((token) => token + 1);
+  }, []);
 
   const upcomingIssues = React.useMemo(() => {
     const issues = Array.isArray(snapshot?.dueByIssues) ? snapshot.dueByIssues : [];
@@ -92,5 +98,6 @@ export const useUpcomingDueBanner = (enabled) => {
     refreshedAt: snapshot?.refreshedAt || "",
     upcomingIssues,
     currentUserDisplayName: String(currentUser?.displayName || "").trim(),
+    refresh,
   };
 };

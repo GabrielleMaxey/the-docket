@@ -14,6 +14,7 @@ const WorkWeekHeaderBanners = ({
   dueByDate,
   upcomingIssues,
   currentUserDisplayName,
+  onRefreshUpcomingDue,
 }) => {
   const showBannerArea = showJokeTicker || showUpcomingDueBanner;
 
@@ -71,7 +72,10 @@ const WorkWeekHeaderBanners = ({
               ) : upcomingIssues.length === 0 ? (
                 <p className="ww-header-banner-due-status">
                   No upcoming tasks assigned to you in the current Dashboard due-date window.{" "}
-                  <Link to="/dashboard">Refresh Dashboard</Link> to update.
+                  <button type="button" className="ww-header-banner-due-refresh" onClick={onRefreshUpcomingDue}>
+                    Check again
+                  </button>{" "}
+                  or <Link to="/dashboard">refresh the Dashboard</Link> for the latest data.
                 </p>
               ) : (
                 <ul className="ww-header-banner-due-list">
