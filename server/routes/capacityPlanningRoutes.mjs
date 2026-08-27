@@ -121,10 +121,8 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
         const fields = issue.fields || {};
         const mongo = mongoDatesByKey[issue.key] || {};
         const sqlite = sqliteMetaByKey[issue.key] || {};
-        // MongoDB wins for dates; SQLite provides requestor
-        const hasMongoDate =
-          mongo.startDate || mongo.completeDate || mongo.plannedStart || mongo.plannedFinish;
-        const dateSrc = hasMongoDate ? mongo : sqlite;
+        // Merge per-field (Mongo wins when set) rather than picking one source for
+        // the whole issue — a partial Mongo save must not blank out unrelated SQLite fields.
         return {
           key: issue.key,
           summary: String(fields.summary || ""),
@@ -132,11 +130,11 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
           statusCategory: String(fields.status?.statusCategory?.name || ""),
           assignee: String(fields.assignee?.displayName || "Unassigned"),
           dueDate: String(fields.duedate || ""),
-          startDate: String(dateSrc.startDate || ""),
-          completeDate: String(dateSrc.completeDate || ""),
-          plannedStart: String(dateSrc.plannedStart || ""),
-          plannedFinish: String(dateSrc.plannedFinish || ""),
-          requestor: String(sqlite.requestor || ""),
+          startDate: String(mongo.startDate || sqlite.startDate || ""),
+          completeDate: String(mongo.completeDate || sqlite.completeDate || ""),
+          plannedStart: String(mongo.plannedStart || sqlite.plannedStart || ""),
+          plannedFinish: String(mongo.plannedFinish || sqlite.plannedFinish || ""),
+          requestor: String(mongo.requestor || sqlite.requestor || ""),
         };
       });
 

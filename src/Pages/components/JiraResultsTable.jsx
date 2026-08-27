@@ -155,6 +155,7 @@ const JiraResultsTable = ({
   handleSelectForPush,
   handlePushNote,
   onActiveTabChange,
+  initialActiveRunIndex,
   prioritySourceByKey,
   jqlSharedProgramIds,
   onLoadRemaining,
@@ -164,7 +165,19 @@ const JiraResultsTable = ({
   drillDownFilters,
   drillDownPending,
 }) => {
-  const [activeTab, setActiveTab] = React.useState(0);
+  // Restore the previously-active tab (by jqlRuns index) on mount — falls back to 0
+  // when the index is unset, out of range, or that run is no longer configured.
+  const [activeTab, setActiveTab] = React.useState(() => {
+    if (!Number.isFinite(initialActiveRunIndex) || initialActiveRunIndex < 0) {
+      return 0;
+    }
+    const targetRun = (jqlRuns || [])[initialActiveRunIndex];
+    if (!targetRun) {
+      return 0;
+    }
+    const idx = (jqlRuns || []).filter(isConfiguredJqlRun).indexOf(targetRun);
+    return idx >= 0 ? idx : 0;
+  });
   const [pageByRunIndex, setPageByRunIndex] = React.useState({});
   const [keyFilterByRunIndex, setKeyFilterByRunIndex] = React.useState({});
   const [keywordFilterByRunIndex, setKeywordFilterByRunIndex] = React.useState({});

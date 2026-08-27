@@ -8,6 +8,7 @@ export const WORK_WEEK_STORAGE_KEYS = {
   dismissedDrillDownIds: "workWeekTasksJiraDismissedDrillDownIds",
   reminders: "workWeekTasksReminders",
   generatedSharedProgramJqlBySlot: "workWeekTasksGeneratedSharedProgramJqlBySlot",
+  activeRunIndex: "workWeekTasksActiveRunIndex",
 };
 
 export const MAX_JQL_SLOTS = 5;
