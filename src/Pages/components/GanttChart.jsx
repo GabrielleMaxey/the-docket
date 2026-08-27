@@ -34,9 +34,12 @@ const barColor = (issue, today, statusIndex) => {
   return getStatusColor(issue.status, statusIndex);
 };
 
-const generateMonths = (start, end) => {
+// Fixed px-per-day (not a percentage of viewport width) so wide ranges actually
+// overflow their container and scroll, instead of squeezing to fit.
+const DAY_WIDTH = 18;
+
+const generateMonths = (start, end, dayWidth) => {
   const months = [];
-  const totalMs = end.getTime() - start.getTime();
   let cur = new Date(start.getFullYear(), start.getMonth(), 1);
   while (cur <= end) {
     const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
@@ -44,15 +47,15 @@ const generateMonths = (start, end) => {
     const mEnd = Math.min(next.getTime(), end.getTime());
     months.push({
       label: fmtMonthYear(cur),
-      widthPct: ((mEnd - mStart) / totalMs) * 100,
+      widthPx: ((mEnd - mStart) / 86400000) * dayWidth,
     });
     cur = next;
   }
   return months;
 };
 
-const pct = (date, rangeStart, rangeMs) =>
-  ((date.getTime() - rangeStart.getTime()) / rangeMs) * 100;
+const pxPos = (date, rangeStart, dayWidth) =>
+  ((date.getTime() - rangeStart.getTime()) / 86400000) * dayWidth;
 
 const issueUrl = (key) => {
   const base = window.__JIRA_BASE_URL__ || "";
@@ -174,7 +177,7 @@ const GanttTooltip = ({ issue, x, y, today }) => {
   );
 };
 
-const GanttBar = ({ issue, statusIndex, rangeStart, rangeMs, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
+const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
   const start = parseDate(issue.startDate);
   const end = parseDate(issue.dueDate || issue.completeDate);
   const planStart = parseDate(issue.plannedStart);
@@ -195,10 +198,10 @@ const GanttBar = ({ issue, statusIndex, rangeStart, rangeMs, today, onMouseEnter
   const color = barColor(issue, today, statusIndex);
 
   const renderBar = (s, e, className, barStyle) => {
-    const leftPct = Math.max(0, pct(s, rangeStart, rangeMs));
-    const rightPct = Math.min(100, pct(e, rangeStart, rangeMs));
-    const widthPct = Math.max(0.3, rightPct - leftPct);
-    const style = { left: `${leftPct}%`, width: `${widthPct}%`, ...barStyle };
+    const leftPx = Math.max(0, pxPos(s, rangeStart, DAY_WIDTH));
+    const rightPx = Math.min(totalWidthPx, pxPos(e, rangeStart, DAY_WIDTH));
+    const widthPx = Math.max(3, rightPx - leftPx);
+    const style = { left: `${leftPx}px`, width: `${widthPx}px`, ...barStyle };
     const handlers = {
       onMouseEnter: (e) => onMouseEnter(issue, e),
       onMouseMove,
@@ -345,9 +348,9 @@ const GanttChart = () => {
     : zoom === "1yr" ? addDays(today, 275)
     : dataRangeEnd;
 
-  const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
-  const months = generateMonths(rangeStart, rangeEnd);
-  const todayPct = Math.max(0, Math.min(100, pct(today, rangeStart, rangeMs)));
+  const totalWidthPx = Math.max(1, diffDays(rangeStart, rangeEnd)) * DAY_WIDTH;
+  const months = generateMonths(rangeStart, rangeEnd, DAY_WIDTH);
+  const todayPx = Math.max(0, Math.min(totalWidthPx, pxPos(today, rangeStart, DAY_WIDTH)));
 
   const statusCategoryByStatus = {};
   for (const i of issues) {
@@ -545,15 +548,15 @@ const GanttChart = () => {
 
           {/* Timeline column */}
           <div className="pm-gantt-timeline">
-            <div className="pm-gantt-months">
+            <div className="pm-gantt-months" style={{ width: `${totalWidthPx}px` }}>
               {months.map((m, i) => (
-                <div key={i} className="pm-gantt-month" style={{ width: `${m.widthPct}%` }}>
+                <div key={i} className="pm-gantt-month" style={{ width: `${m.widthPx}px` }}>
                   {m.label}
                 </div>
               ))}
             </div>
-            <div className="pm-gantt-rows">
-              <div className="pm-gantt-today" style={{ left: `${todayPct}%` }} aria-label="Today" />
+            <div className="pm-gantt-rows" style={{ width: `${totalWidthPx}px` }}>
+              <div className="pm-gantt-today" style={{ left: `${todayPx}px` }} aria-label="Today" />
               {flatRows.map((row) =>
                 row.type === "header" ? (
                   <div
@@ -567,7 +570,7 @@ const GanttChart = () => {
                       issue={row.issue}
                       statusIndex={statuses.indexOf(row.issue.status)}
                       rangeStart={rangeStart}
-                      rangeMs={rangeMs}
+                      totalWidthPx={totalWidthPx}
                       today={today}
                       onMouseEnter={handleMouseEnter}
                       onMouseMove={handleMouseMove}
