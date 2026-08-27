@@ -1,5 +1,5 @@
 import React from "react";
-import { fetchSharedPrograms, fetchGanttData } from "../../services/jiraClient";
+import { fetchSharedPrograms, fetchGanttData, fetchGanttStatusHistory } from "../../services/jiraClient";
 import { getStatusColor } from "../../utils/statusScale";
 
 const parseDate = (str) => {
@@ -177,7 +177,7 @@ const GanttTooltip = ({ issue, x, y, today }) => {
   );
 };
 
-const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
+const GanttBar = ({ issue, statusIndex, statusHistory, rangeStart, totalWidthPx, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
   const start = parseDate(issue.startDate);
   const end = parseDate(issue.dueDate || issue.completeDate);
   const planStart = parseDate(issue.plannedStart);
@@ -185,10 +185,19 @@ const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouse
 
   const hasActualBar = start && end && end > start;
   const hasPlanBar = planStart && planEnd && planEnd > planStart;
+  const hasHistory = Array.isArray(statusHistory) && statusHistory.length > 0;
 
-  if (!hasActualBar && !hasPlanBar) {
+  if (!hasActualBar && !hasPlanBar && !hasHistory) {
+    // Still hoverable — most issues have no manually-tracked start/complete date,
+    // but Jira's own created date + changelog almost always exists, so hovering
+    // here can still reveal a real status-history bar once it loads.
     return (
-      <div className="pm-gantt-row-bars" onMouseLeave={onMouseLeave}>
+      <div
+        className="pm-gantt-row-bars"
+        onMouseEnter={(e) => onMouseEnter(issue, e)}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+      >
         <span className="pm-gantt-no-date">no dates</span>
       </div>
     );
@@ -197,7 +206,7 @@ const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouse
   const url = issueUrl(issue.key);
   const color = barColor(issue, today, statusIndex);
 
-  const renderBar = (s, e, className, barStyle) => {
+  const renderBar = (s, e, key, className, barStyle, { title, showLabel = true } = {}) => {
     const leftPx = Math.max(0, pxPos(s, rangeStart, DAY_WIDTH));
     const rightPx = Math.min(totalWidthPx, pxPos(e, rangeStart, DAY_WIDTH));
     const widthPx = Math.max(3, rightPx - leftPx);
@@ -207,21 +216,23 @@ const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouse
       onMouseMove,
       onMouseLeave,
     };
+    const label = showLabel ? <span className="pm-gantt-bar-label">{issue.key}</span> : null;
     return url ? (
       <a
-        key={className}
+        key={key}
         className={`pm-gantt-bar ${className}`}
         href={url}
         target="_blank"
         rel="noreferrer noopener"
         style={style}
+        title={title}
         {...handlers}
       >
-        <span className="pm-gantt-bar-label">{issue.key}</span>
+        {label}
       </a>
     ) : (
-      <div key={className} className={`pm-gantt-bar ${className}`} style={style} {...handlers}>
-        <span className="pm-gantt-bar-label">{issue.key}</span>
+      <div key={key} className={`pm-gantt-bar ${className}`} style={style} title={title} {...handlers}>
+        {label}
       </div>
     );
   };
@@ -229,12 +240,26 @@ const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouse
   return (
     <div className="pm-gantt-row-bars">
       {hasPlanBar &&
-        renderBar(planStart, planEnd, "pm-gantt-bar--plan", {
+        renderBar(planStart, planEnd, "plan", "pm-gantt-bar--plan", {
           background: "transparent",
           border: "2px dashed var(--pm-gantt-plan-bar-color, #a0a0c0)",
           opacity: 0.65,
         })}
-      {hasActualBar && renderBar(start, end, "pm-gantt-bar--actual", { background: color })}
+      {hasHistory
+        ? statusHistory.map((seg, i) => {
+            const segStart = parseDate(seg.from);
+            const segEnd = parseDate(seg.to);
+            if (!segStart || !segEnd || segEnd < segStart) return null;
+            return renderBar(
+              segStart,
+              segEnd,
+              `seg-${i}`,
+              "pm-gantt-bar--actual pm-gantt-bar--segment",
+              { background: getStatusColor(seg.status, i) },
+              { title: `${seg.status}: ${seg.from} → ${seg.to}`, showLabel: i === 0 }
+            );
+          })
+        : hasActualBar && renderBar(start, end, "actual", "pm-gantt-bar--actual", { background: color })}
     </div>
   );
 };
@@ -287,12 +312,28 @@ const GanttChart = () => {
   const [hiddenStatuses, setHiddenStatuses] = React.useState(new Set());
   const [collapsedGroups, setCollapsedGroups] = React.useState(new Set());
   const [tooltip, setTooltip] = React.useState(null);
+  // Keyed by issue key; undefined = not yet fetched, [] = fetched (no history / failed),
+  // populated = real segments. Hover-triggered only — never part of the bulk Gantt load.
+  const [statusHistoryByKey, setStatusHistoryByKey] = React.useState({});
 
   React.useEffect(() => {
     fetchSharedPrograms()
       .then((items) => setPrograms(items.filter((p) => p.enabled !== false)))
       .catch(() => {});
   }, []);
+
+  // Debounced, cached, hover-triggered status-history fetch — fires ~250ms after
+  // the hovered bar settles on one issue, and only once per issue per session.
+  React.useEffect(() => {
+    const key = tooltip?.issue?.key;
+    if (!key || statusHistoryByKey[key] !== undefined) return;
+    const timer = setTimeout(() => {
+      fetchGanttStatusHistory(key)
+        .then((segments) => setStatusHistoryByKey((prev) => ({ ...prev, [key]: segments })))
+        .catch(() => setStatusHistoryByKey((prev) => ({ ...prev, [key]: [] })));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [tooltip?.issue?.key, statusHistoryByKey]);
 
   const load = React.useCallback(() => {
     if (!slug) return;
@@ -629,6 +670,7 @@ const GanttChart = () => {
                     <GanttBar
                       issue={row.issue}
                       statusIndex={statuses.indexOf(row.issue.status)}
+                      statusHistory={statusHistoryByKey[row.issue.key]}
                       rangeStart={rangeStart}
                       totalWidthPx={totalWidthPx}
                       today={today}

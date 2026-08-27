@@ -915,6 +915,16 @@
   opacity: 0.85;
 }
 
+/* Status-history segments (hover-loaded) — flat blocks with a thin divider
+   between them, rather than each segment getting its own rounded corners. */
+.pm-gantt-bar--segment {
+  border-radius: 0;
+}
+
+.pm-gantt-bar--segment:not(:last-child) {
+  border-right: 1px solid rgba(255, 255, 255, 0.55);
+}
+
 .pm-gantt-bar-label {
   font-size: 0.7rem;
   font-weight: 600;

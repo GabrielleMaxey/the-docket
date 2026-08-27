@@ -9,6 +9,72 @@ import { chunkValues } from "../../shared/jiraBatch.mjs";
 const log = createLogger("capacity-planning");
 
 export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
+  // On-demand only (hover-triggered on the frontend) — a single-issue changelog
+  // fetch, not part of the bulk Gantt load. Bulk-fetching changelogs for every
+  // issue would bloat every Gantt load; this stays cheap by only firing per bar.
+  app.get("/api/project-managers/gantt/status-history/:issueKey", async (req, res) => {
+    if (!ensureEnvOrRespond(res)) return;
+
+    const issueKey = String(req.params.issueKey || "").trim();
+    if (!issueKey) return res.status(400).json({ error: "issueKey is required" });
+
+    try {
+      const result = await jiraRequest({
+        pathWithQuery: `/rest/api/3/issue/${encodeURIComponent(issueKey)}?expand=changelog&fields=created,status`,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json(result.data);
+      }
+
+      const created = String(result.data?.fields?.created || "").slice(0, 10);
+      const currentStatus = String(result.data?.fields?.status?.name || "");
+      const today = new Date().toISOString().slice(0, 10);
+      const histories = Array.isArray(result.data?.changelog?.histories)
+        ? result.data.changelog.histories
+        : [];
+
+      // Flatten to status-only transitions — a single history entry can bundle
+      // unrelated field changes (assignee, priority, etc.) together.
+      const transitions = [];
+      for (const h of histories) {
+        const at = String(h?.created || "").slice(0, 10);
+        for (const item of h?.items || []) {
+          if (item?.field === "status") {
+            transitions.push({
+              at,
+              fromStatus: String(item.fromString || ""),
+              toStatus: String(item.toString || ""),
+            });
+          }
+        }
+      }
+      transitions.sort((a, b) => a.at.localeCompare(b.at));
+
+      // Build contiguous segments from the transition log. Real issues can move
+      // backward (reopened work) — render exactly what happened, chronologically,
+      // never assume forward-only progression.
+      const segments = [];
+      if (transitions.length === 0) {
+        segments.push({ status: currentStatus, from: created || today, to: today });
+      } else {
+        segments.push({ status: transitions[0].fromStatus, from: created, to: transitions[0].at });
+        for (let i = 0; i < transitions.length; i++) {
+          const from = transitions[i].at;
+          const to = i + 1 < transitions.length ? transitions[i + 1].at : today;
+          segments.push({ status: transitions[i].toStatus, from, to });
+        }
+      }
+
+      return res.json({ issueKey, segments });
+    } catch (error) {
+      log.error("status history fetch failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({
+        error: "Failed to load status history",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   app.get("/api/project-managers/capacity", async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
