@@ -1,5 +1,6 @@
 import React from "react";
 import { fetchSharedPrograms, fetchGanttData } from "../../services/jiraClient";
+import { getStatusColor } from "../../utils/statusScale";
 
 const parseDate = (str) => {
   if (!str) return null;
@@ -24,18 +25,13 @@ const fmtShort = (str) => {
 };
 
 const OVERDUE_COLOR = "#dc2626";
-const STATUS_COLORS = {
-  "In Progress": "#3b82f6",
-  "Done": "#94a3b8",
-  "To Do": "#64748b",
-};
 
-const barColor = (issue, today) => {
+const barColor = (issue, today, statusIndex) => {
   if (issue.statusCategory !== "Done") {
     const due = parseDate(issue.dueDate || issue.completeDate);
     if (due && due < today) return OVERDUE_COLOR;
   }
-  return STATUS_COLORS[issue.statusCategory] || "#64748b";
+  return getStatusColor(issue.status, statusIndex);
 };
 
 const generateMonths = (start, end) => {
@@ -178,7 +174,7 @@ const GanttTooltip = ({ issue, x, y, today }) => {
   );
 };
 
-const GanttBar = ({ issue, rangeStart, rangeMs, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
+const GanttBar = ({ issue, statusIndex, rangeStart, rangeMs, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
   const start = parseDate(issue.startDate);
   const end = parseDate(issue.dueDate || issue.completeDate);
   const planStart = parseDate(issue.plannedStart);
@@ -196,7 +192,7 @@ const GanttBar = ({ issue, rangeStart, rangeMs, today, onMouseEnter, onMouseMove
   }
 
   const url = issueUrl(issue.key);
-  const color = barColor(issue, today);
+  const color = barColor(issue, today, statusIndex);
 
   const renderBar = (s, e, className, barStyle) => {
     const leftPct = Math.max(0, pct(s, rangeStart, rangeMs));
@@ -240,21 +236,14 @@ const GanttBar = ({ issue, rangeStart, rangeMs, today, onMouseEnter, onMouseMove
   );
 };
 
-const LEGEND_ITEMS = [
-  { color: "#3b82f6", label: "In Progress" },
-  { color: OVERDUE_COLOR, label: "Overdue" },
-  { color: "#64748b", label: "To Do" },
-  { color: "#94a3b8", label: "Done" },
-];
-
+// Status colors/labels now come from getStatusColor per-issue (see filter chips,
+// which double as a dynamic legend for whatever statuses are actually in view).
 const GanttLegend = () => (
   <div className="pm-gantt-legend">
-    {LEGEND_ITEMS.map(({ color, label }) => (
-      <span key={label} className="pm-gantt-legend-item">
-        <span className="pm-gantt-legend-swatch" style={{ background: color }} />
-        {label}
-      </span>
-    ))}
+    <span className="pm-gantt-legend-item">
+      <span className="pm-gantt-legend-swatch" style={{ background: OVERDUE_COLOR }} />
+      Overdue
+    </span>
     <span className="pm-gantt-legend-item">
       <span className="pm-gantt-legend-swatch pm-gantt-legend-swatch--plan" />
       Planned (dashed)
@@ -262,10 +251,20 @@ const GanttLegend = () => (
   </div>
 );
 
-const GROUP_DOT_COLORS = { "In Progress": "#3b82f6", "Done": "#94a3b8", "To Do": "#64748b" };
-const GROUP_ORDER = ["In Progress", "To Do", "Done"];
+// Preferred left-to-right workflow order for known statuses; anything unrecognized
+// (custom workflow states) sorts alphabetically after these, terminal states last.
+const KNOWN_STATUS_ORDER = ["In Progress", "Ready for Verification", "Analyzing", "Ready for Work", "Backlog"];
 const PINNED_SLUG = "__pinned__";
 const ZOOM_LABELS = { "30d": "30 day", "3mo": "3 mo", "6mo": "6 mo", "1yr": "1 yr", all: "All" };
+
+const orderStatuses = (statuses, isDoneStatus) => {
+  const known = KNOWN_STATUS_ORDER.filter((s) => statuses.includes(s));
+  const rest = statuses
+    .filter((s) => !KNOWN_STATUS_ORDER.includes(s))
+    .sort((a, b) => a.localeCompare(b));
+  const [doneRest, activeRest] = [rest.filter(isDoneStatus), rest.filter((s) => !isDoneStatus(s))];
+  return [...known, ...activeRest, ...doneRest];
+};
 
 const sortGroup = (items) => {
   const dated = items
@@ -350,16 +349,21 @@ const GanttChart = () => {
   const months = generateMonths(rangeStart, rangeEnd);
   const todayPct = Math.max(0, Math.min(100, pct(today, rangeStart, rangeMs)));
 
-  const statusCategories = [...new Set(issues.map((i) => i.statusCategory).filter(Boolean))];
-  const visibleIssues = issues.filter((i) => !hiddenStatuses.has(i.statusCategory));
+  const statusCategoryByStatus = {};
+  for (const i of issues) {
+    if (i.status) statusCategoryByStatus[i.status] = i.statusCategory;
+  }
+  const isDoneStatus = (status) => statusCategoryByStatus[status] === "Done";
+  const statuses = orderStatuses(
+    [...new Set(issues.map((i) => i.status).filter(Boolean))],
+    isDoneStatus
+  );
+  const visibleIssues = issues.filter((i) => !hiddenStatuses.has(i.status));
 
   const groups = [];
-  const seen = new Set();
-  for (const cat of [...GROUP_ORDER, ...statusCategories]) {
-    if (seen.has(cat)) continue;
-    seen.add(cat);
-    const items = sortGroup(visibleIssues.filter((i) => i.statusCategory === cat));
-    if (items.length > 0) groups.push({ key: cat, label: cat, items });
+  for (const status of statuses) {
+    const items = sortGroup(visibleIssues.filter((i) => i.status === status));
+    if (items.length > 0) groups.push({ key: status, label: status, items });
   }
 
   const flatRows = [];
@@ -469,20 +473,20 @@ const GanttChart = () => {
               </button>
             ))}
           </div>
-          {statusCategories.length > 1 && (
+          {statuses.length > 1 && (
             <div className="pm-gantt-filters">
-              {statusCategories.map((cat) => (
+              {statuses.map((status, index) => (
                 <button
-                  key={cat}
+                  key={status}
                   type="button"
-                  className={`pm-gantt-filter-chip${hiddenStatuses.has(cat) ? " pm-gantt-filter-chip--off" : ""}`}
-                  onClick={() => toggleStatus(cat)}
+                  className={`pm-gantt-filter-chip${hiddenStatuses.has(status) ? " pm-gantt-filter-chip--off" : ""}`}
+                  onClick={() => toggleStatus(status)}
                 >
                   <span
                     className="pm-gantt-filter-dot"
-                    style={{ background: STATUS_COLORS[cat] || "#64748b" }}
+                    style={{ background: getStatusColor(status, index) }}
                   />
-                  {cat}
+                  {status}
                 </button>
               ))}
             </div>
@@ -516,7 +520,7 @@ const GanttChart = () => {
                   </span>
                   <span
                     className="pm-gantt-group-dot"
-                    style={{ background: GROUP_DOT_COLORS[row.group.label] || "#64748b" }}
+                    style={{ background: getStatusColor(row.group.label, statuses.indexOf(row.group.label)) }}
                   />
                   <span className="pm-gantt-group-name">{row.group.label}</span>
                   <span className="pm-gantt-group-count">({row.group.items.length})</span>
@@ -561,6 +565,7 @@ const GanttChart = () => {
                   <div key={row.issue.key} className="pm-gantt-row">
                     <GanttBar
                       issue={row.issue}
+                      statusIndex={statuses.indexOf(row.issue.status)}
                       rangeStart={rangeStart}
                       rangeMs={rangeMs}
                       today={today}
