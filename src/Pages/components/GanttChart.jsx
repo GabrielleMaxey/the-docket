@@ -265,7 +265,7 @@ const GanttLegend = () => (
 const GROUP_DOT_COLORS = { "In Progress": "#3b82f6", "Done": "#94a3b8", "To Do": "#64748b" };
 const GROUP_ORDER = ["In Progress", "To Do", "Done"];
 const PINNED_SLUG = "__pinned__";
-const ZOOM_LABELS = { "3mo": "3 mo", "6mo": "6 mo", "1yr": "1 yr", all: "All" };
+const ZOOM_LABELS = { "30d": "30 day", "3mo": "3 mo", "6mo": "6 mo", "1yr": "1 yr", all: "All" };
 
 const sortGroup = (items) => {
   const dated = items
@@ -334,12 +334,14 @@ const GanttChart = () => {
     allEnds.length > 0 ? addDays(new Date(Math.max(...allEnds)), 14) : addDays(today, 60);
 
   const rangeStart =
-    zoom === "3mo" ? addDays(today, -30)
+    zoom === "30d" ? addDays(today, -3)
+    : zoom === "3mo" ? addDays(today, -30)
     : zoom === "6mo" ? addDays(today, -60)
     : zoom === "1yr" ? addDays(today, -90)
     : dataRangeStart;
   const rangeEnd =
-    zoom === "3mo" ? addDays(today, 62)
+    zoom === "30d" ? addDays(today, 27)
+    : zoom === "3mo" ? addDays(today, 62)
     : zoom === "6mo" ? addDays(today, 124)
     : zoom === "1yr" ? addDays(today, 275)
     : dataRangeEnd;
