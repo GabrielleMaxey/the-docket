@@ -63,6 +63,7 @@ const WorkWeekTasks = () => {
     dueByDate,
     upcomingIssues,
     currentUserDisplayName,
+    refresh: refreshUpcomingDue,
   } = useUpcomingDueBanner(showUpcomingDueBanner);
   const { todayDay, monthLabel, fullDateLabel, calendarCells } = useCalendarData();
 
@@ -481,6 +482,7 @@ const WorkWeekTasks = () => {
           dueByDate={dueByDate}
           upcomingIssues={upcomingIssues}
           currentUserDisplayName={currentUserDisplayName}
+          onRefreshUpcomingDue={refreshUpcomingDue}
           fullDateLabel={fullDateLabel} monthLabel={monthLabel}
           calendarCells={calendarCells} todayDay={todayDay}
           todos={todosSorted}

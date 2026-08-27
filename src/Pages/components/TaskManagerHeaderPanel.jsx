@@ -25,6 +25,7 @@ const TaskManagerHeaderPanel = ({
   dueByDate,
   upcomingIssues,
   currentUserDisplayName,
+  onRefreshUpcomingDue,
   fullDateLabel,
   monthLabel,
   calendarCells,
@@ -57,6 +58,7 @@ const TaskManagerHeaderPanel = ({
         dueByDate={dueByDate}
         upcomingIssues={upcomingIssues}
         currentUserDisplayName={currentUserDisplayName}
+        onRefreshUpcomingDue={onRefreshUpcomingDue}
       />
 
       <Grid columns={1} stackable>
