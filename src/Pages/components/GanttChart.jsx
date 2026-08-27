@@ -63,6 +63,78 @@ const issueUrl = (key) => {
   return base ? `${base}/browse/${key}` : null;
 };
 
+const assigneeInitials = (name) => {
+  const trimmed = String(name || "").trim();
+  if (!trimmed || trimmed.toLowerCase() === "unassigned") return "";
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  return parts.length === 1 ? parts[0].slice(0, 2).toUpperCase() : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const escapeCsvField = (value) => {
+  const str = String(value === null || value === undefined ? "" : value);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+};
+
+const csvRow = (fields) => fields.map(escapeCsvField).join(",");
+
+const EXPORT_CSV_HEADER = [
+  "Key",
+  "Summary",
+  "Status",
+  "Status Category",
+  "Assignee",
+  "Start Date",
+  "Due / Complete Date",
+  "Planned Start",
+  "Planned Finish",
+  "Requestor",
+];
+
+const buildPlanReportCsv = (issues) => {
+  const rows = [csvRow(EXPORT_CSV_HEADER)];
+  for (const issue of issues) {
+    rows.push(
+      csvRow([
+        issue.key,
+        issue.summary,
+        issue.status,
+        issue.statusCategory,
+        issue.assignee,
+        issue.startDate,
+        issue.dueDate || issue.completeDate,
+        issue.plannedStart,
+        issue.plannedFinish,
+        issue.requestor,
+      ])
+    );
+  }
+  return rows.join("\r\n");
+};
+
+const buildPlanReportMarkdown = (displayName, issues) => {
+  const lines = [`# Gantt Plan — ${displayName}`, "", `_Generated ${new Date().toLocaleString()}_`, ""];
+  lines.push("| Key | Summary | Status | Assignee | Start | Due/Complete | Planned Start | Planned Finish | Requestor |");
+  lines.push("|---|---|---|---|---|---|---|---|---|");
+  for (const issue of issues) {
+    lines.push(
+      `| ${issue.key} | ${(issue.summary || "").replace(/\|/g, "\\|")} | ${issue.status || ""} | ${issue.assignee || ""} | ${issue.startDate || ""} | ${issue.dueDate || issue.completeDate || ""} | ${issue.plannedStart || ""} | ${issue.plannedFinish || ""} | ${issue.requestor || ""} |`
+    );
+  }
+  return lines.join("\n");
+};
+
+const downloadBlob = (content, filename, type) => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+};
+
 const GanttTooltip = ({ issue, x, y, today }) => {
   const end = parseDate(issue.dueDate || issue.completeDate);
   const planEnd = parseDate(issue.plannedFinish);
@@ -318,6 +390,22 @@ const GanttChart = () => {
   const visibleCount = visibleIssues.length;
   const noDateCount = visibleIssues.filter((i) => !parseDate(i.startDate)).length;
 
+  const exportFilenameBase = `gantt_plan_${(data?.displayName || slug).replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_${new Date().toISOString().slice(0, 10)}`;
+
+  const handleExportCsv = () => {
+    if (visibleIssues.length === 0) return;
+    downloadBlob(`﻿${buildPlanReportCsv(visibleIssues)}`, `${exportFilenameBase}.csv`, "text/csv;charset=utf-8");
+  };
+
+  const handleExportMarkdown = () => {
+    if (visibleIssues.length === 0) return;
+    downloadBlob(
+      buildPlanReportMarkdown(data?.displayName || slug, visibleIssues),
+      `${exportFilenameBase}.md`,
+      "text/markdown;charset=utf-8"
+    );
+  };
+
   const emptyMsg =
     slug === PINNED_SLUG
       ? "No pinned issues. Open the planning panel for any issue in Task Manager and check 'Pin to Gantt'."
@@ -348,6 +436,16 @@ const GanttChart = () => {
               {noDateCount > 0 ? ` · ${noDateCount} without dates` : ""}
             </span>
           )}
+          {!loading && data && visibleIssues.length > 0 ? (
+            <>
+              <button type="button" className="pm-gantt-refresh" onClick={handleExportMarkdown}>
+                Export (.md)
+              </button>
+              <button type="button" className="pm-gantt-refresh" onClick={handleExportCsv}>
+                Export (.csv)
+              </button>
+            </>
+          ) : null}
           <button type="button" className="pm-gantt-refresh" onClick={load} disabled={loading}>
             {loading ? "Loading…" : "Refresh"}
           </button>
@@ -423,7 +521,14 @@ const GanttChart = () => {
                 </div>
               ) : (
                 <div key={row.issue.key} className="pm-gantt-label-row">
-                  <span className="pm-gantt-label-key">{row.issue.key}</span>
+                  <span className="pm-gantt-label-top">
+                    <span className="pm-gantt-label-key">{row.issue.key}</span>
+                    {assigneeInitials(row.issue.assignee) ? (
+                      <span className="pm-gantt-label-assignee" title={row.issue.assignee}>
+                        {assigneeInitials(row.issue.assignee)}
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="pm-gantt-label-summary" title={row.issue.summary}>
                     {row.issue.summary}
                   </span>
