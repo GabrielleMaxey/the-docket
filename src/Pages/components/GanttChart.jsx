@@ -283,6 +283,7 @@ const GanttChart = () => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [zoom, setZoom] = React.useState("all");
+  const [groupMode, setGroupMode] = React.useState("status");
   const [hiddenStatuses, setHiddenStatuses] = React.useState(new Set());
   const [collapsedGroups, setCollapsedGroups] = React.useState(new Set());
   const [tooltip, setTooltip] = React.useState(null);
@@ -363,17 +364,47 @@ const GanttChart = () => {
   );
   const visibleIssues = issues.filter((i) => !hiddenStatuses.has(i.status));
 
-  const groups = [];
-  for (const status of statuses) {
-    const items = sortGroup(visibleIssues.filter((i) => i.status === status));
-    if (items.length > 0) groups.push({ key: status, label: status, items });
-  }
-
   const flatRows = [];
-  for (const group of groups) {
-    flatRows.push({ type: "header", group });
-    if (!collapsedGroups.has(group.key)) {
-      for (const issue of group.items) flatRows.push({ type: "issue", issue });
+  if (groupMode === "story") {
+    // Group by parent (Story/Bug → its Sub-tasks). An issue only becomes a group
+    // header if it's both present in the visible set AND has ≥1 visible child —
+    // a filtered-out parent's children fall back to flat rows rather than orphaning
+    // under a header that isn't there, and a childless story is just a normal row.
+    // Only actual Sub-tasks nest — Story/Bug's own parent is the Epic, and that
+    // relationship isn't part of this grouping (no separate Epic tier).
+    const visibleKeys = new Set(visibleIssues.map((i) => i.key));
+    const childrenByParent = {};
+    for (const i of visibleIssues) {
+      if (i.isSubtask && i.parentKey) (childrenByParent[i.parentKey] ||= []).push(i);
+    }
+    const groupParentKeys = new Set(
+      Object.keys(childrenByParent).filter((pk) => visibleKeys.has(pk))
+    );
+    const topLevel = sortGroup(
+      visibleIssues.filter((i) => !(i.parentKey && groupParentKeys.has(i.parentKey)))
+    );
+    for (const issue of topLevel) {
+      if (groupParentKeys.has(issue.key)) {
+        const children = sortGroup(childrenByParent[issue.key]);
+        flatRows.push({ type: "issue", issue, isGroupHeader: true, groupKey: issue.key, childCount: children.length });
+        if (!collapsedGroups.has(issue.key)) {
+          for (const child of children) flatRows.push({ type: "issue", issue: child, indent: true });
+        }
+      } else {
+        flatRows.push({ type: "issue", issue });
+      }
+    }
+  } else {
+    const groups = [];
+    for (const status of statuses) {
+      const items = sortGroup(visibleIssues.filter((i) => i.status === status));
+      if (items.length > 0) groups.push({ key: status, label: status, items });
+    }
+    for (const group of groups) {
+      flatRows.push({ type: "header", group });
+      if (!collapsedGroups.has(group.key)) {
+        for (const issue of group.items) flatRows.push({ type: "issue", issue });
+      }
     }
   }
 
@@ -476,6 +507,23 @@ const GanttChart = () => {
               </button>
             ))}
           </div>
+          <div className="pm-gantt-group-mode">
+            <span className="pm-gantt-group-mode-label">Group by</span>
+            <button
+              type="button"
+              className={`pm-gantt-zoom-btn${groupMode === "status" ? " pm-gantt-zoom-btn--active" : ""}`}
+              onClick={() => setGroupMode("status")}
+            >
+              Status
+            </button>
+            <button
+              type="button"
+              className={`pm-gantt-zoom-btn${groupMode === "story" ? " pm-gantt-zoom-btn--active" : ""}`}
+              onClick={() => setGroupMode("story")}
+            >
+              Story
+            </button>
+          </div>
           {statuses.length > 1 && (
             <div className="pm-gantt-filters">
               {statuses.map((status, index) => (
@@ -529,9 +577,21 @@ const GanttChart = () => {
                   <span className="pm-gantt-group-count">({row.group.items.length})</span>
                 </div>
               ) : (
-                <div key={row.issue.key} className="pm-gantt-label-row">
+                <div
+                  key={row.issue.key}
+                  className={`pm-gantt-label-row${row.indent ? " pm-gantt-label-row--indent" : ""}${row.isGroupHeader ? " pm-gantt-label-row--group-header" : ""}`}
+                  onClick={row.isGroupHeader ? () => toggleGroup(row.groupKey) : undefined}
+                >
                   <span className="pm-gantt-label-top">
+                    {row.isGroupHeader ? (
+                      <span className="pm-gantt-group-chevron pm-gantt-group-chevron--inline">
+                        {collapsedGroups.has(row.groupKey) ? "▶" : "▼"}
+                      </span>
+                    ) : null}
                     <span className="pm-gantt-label-key">{row.issue.key}</span>
+                    {row.isGroupHeader ? (
+                      <span className="pm-gantt-group-count">({row.childCount})</span>
+                    ) : null}
                     {assigneeInitials(row.issue.assignee) ? (
                       <span className="pm-gantt-label-assignee" title={row.issue.assignee}>
                         {assigneeInitials(row.issue.assignee)}

@@ -4,6 +4,7 @@ import { mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildFieldMappingsMap } from "../lib/epicFilterJql.mjs";
 import { listSharedPrograms, bulkGetTeamDates, isTeamPriorityMongoConfigured } from "../lib/teamPriorityMongo.mjs";
 import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
+import { chunkValues } from "../../shared/jiraBatch.mjs";
 
 const log = createLogger("capacity-planning");
 
@@ -84,8 +85,31 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
         if (roots.length === 0) return res.json({ slug, displayName, issues: [] });
 
         const rootList = roots.join(", ");
-        const jql = `(parent in (${rootList}) OR key in (${rootList})) ORDER BY updated DESC`;
-        ({ issues: loaded } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 2000 }));
+        const firstPassJql = `(parent in (${rootList}) OR key in (${rootList})) ORDER BY updated DESC`;
+        const { issues: firstPass } = await searchAllIssues({
+          jql: firstPassJql,
+          runJiraSearchRequest,
+          maxTotal: 2000,
+        });
+
+        // Second pass: subtasks of those direct children — for story-mode grouping
+        // on the Gantt. Epic roots are excluded since we're after grandchildren, not
+        // the epics' own direct children again.
+        const rootSet = new Set(roots);
+        const childKeys = firstPass.map((i) => i.key).filter((k) => !rootSet.has(k));
+        const secondPassBatches = await Promise.all(
+          chunkValues(childKeys).map(async (batch) => {
+            const jql = `parent in (${batch.join(", ")}) ORDER BY updated DESC`;
+            const { issues } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 2000 });
+            return issues;
+          })
+        );
+
+        const byKey = new Map();
+        for (const issue of [...firstPass, ...secondPassBatches.flat()]) {
+          byKey.set(issue.key, issue);
+        }
+        loaded = [...byKey.values()];
       }
 
       const issueKeys = loaded.map((i) => i.key);
@@ -125,6 +149,8 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
         // the whole issue — a partial Mongo save must not blank out unrelated SQLite fields.
         return {
           key: issue.key,
+          parentKey: String(fields.parent?.key || ""),
+          isSubtask: Boolean(fields.issuetype?.subtask),
           summary: String(fields.summary || ""),
           status: String(fields.status?.name || ""),
           statusCategory: String(fields.status?.statusCategory?.name || ""),
