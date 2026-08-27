@@ -1,5 +1,5 @@
 import React from "react";
-import { fetchSharedPrograms, fetchGanttData } from "../../services/jiraClient";
+import { fetchSharedPrograms, fetchGanttData, fetchGanttStatusHistory } from "../../services/jiraClient";
 import { getStatusColor } from "../../utils/statusScale";
 
 const parseDate = (str) => {
@@ -177,7 +177,7 @@ const GanttTooltip = ({ issue, x, y, today }) => {
   );
 };
 
-const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
+const GanttBar = ({ issue, statusIndex, statusHistory, rangeStart, totalWidthPx, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
   const start = parseDate(issue.startDate);
   const end = parseDate(issue.dueDate || issue.completeDate);
   const planStart = parseDate(issue.plannedStart);
@@ -185,10 +185,19 @@ const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouse
 
   const hasActualBar = start && end && end > start;
   const hasPlanBar = planStart && planEnd && planEnd > planStart;
+  const hasHistory = Array.isArray(statusHistory) && statusHistory.length > 0;
 
-  if (!hasActualBar && !hasPlanBar) {
+  if (!hasActualBar && !hasPlanBar && !hasHistory) {
+    // Still hoverable — most issues have no manually-tracked start/complete date,
+    // but Jira's own created date + changelog almost always exists, so hovering
+    // here can still reveal a real status-history bar once it loads.
     return (
-      <div className="pm-gantt-row-bars" onMouseLeave={onMouseLeave}>
+      <div
+        className="pm-gantt-row-bars"
+        onMouseEnter={(e) => onMouseEnter(issue, e)}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+      >
         <span className="pm-gantt-no-date">no dates</span>
       </div>
     );
@@ -197,7 +206,7 @@ const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouse
   const url = issueUrl(issue.key);
   const color = barColor(issue, today, statusIndex);
 
-  const renderBar = (s, e, className, barStyle) => {
+  const renderBar = (s, e, key, className, barStyle, { title, showLabel = true } = {}) => {
     const leftPx = Math.max(0, pxPos(s, rangeStart, DAY_WIDTH));
     const rightPx = Math.min(totalWidthPx, pxPos(e, rangeStart, DAY_WIDTH));
     const widthPx = Math.max(3, rightPx - leftPx);
@@ -207,21 +216,23 @@ const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouse
       onMouseMove,
       onMouseLeave,
     };
+    const label = showLabel ? <span className="pm-gantt-bar-label">{issue.key}</span> : null;
     return url ? (
       <a
-        key={className}
+        key={key}
         className={`pm-gantt-bar ${className}`}
         href={url}
         target="_blank"
         rel="noreferrer noopener"
         style={style}
+        title={title}
         {...handlers}
       >
-        <span className="pm-gantt-bar-label">{issue.key}</span>
+        {label}
       </a>
     ) : (
-      <div key={className} className={`pm-gantt-bar ${className}`} style={style} {...handlers}>
-        <span className="pm-gantt-bar-label">{issue.key}</span>
+      <div key={key} className={`pm-gantt-bar ${className}`} style={style} title={title} {...handlers}>
+        {label}
       </div>
     );
   };
@@ -229,12 +240,26 @@ const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouse
   return (
     <div className="pm-gantt-row-bars">
       {hasPlanBar &&
-        renderBar(planStart, planEnd, "pm-gantt-bar--plan", {
+        renderBar(planStart, planEnd, "plan", "pm-gantt-bar--plan", {
           background: "transparent",
           border: "2px dashed var(--pm-gantt-plan-bar-color, #a0a0c0)",
           opacity: 0.65,
         })}
-      {hasActualBar && renderBar(start, end, "pm-gantt-bar--actual", { background: color })}
+      {hasHistory
+        ? statusHistory.map((seg, i) => {
+            const segStart = parseDate(seg.from);
+            const segEnd = parseDate(seg.to);
+            if (!segStart || !segEnd || segEnd < segStart) return null;
+            return renderBar(
+              segStart,
+              segEnd,
+              `seg-${i}`,
+              "pm-gantt-bar--actual pm-gantt-bar--segment",
+              { background: getStatusColor(seg.status, i) },
+              { title: `${seg.status}: ${seg.from} → ${seg.to}`, showLabel: i === 0 }
+            );
+          })
+        : hasActualBar && renderBar(start, end, "actual", "pm-gantt-bar--actual", { background: color })}
     </div>
   );
 };
@@ -283,15 +308,32 @@ const GanttChart = () => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [zoom, setZoom] = React.useState("all");
+  const [groupMode, setGroupMode] = React.useState("status");
   const [hiddenStatuses, setHiddenStatuses] = React.useState(new Set());
   const [collapsedGroups, setCollapsedGroups] = React.useState(new Set());
   const [tooltip, setTooltip] = React.useState(null);
+  // Keyed by issue key; undefined = not yet fetched, [] = fetched (no history / failed),
+  // populated = real segments. Hover-triggered only — never part of the bulk Gantt load.
+  const [statusHistoryByKey, setStatusHistoryByKey] = React.useState({});
 
   React.useEffect(() => {
     fetchSharedPrograms()
       .then((items) => setPrograms(items.filter((p) => p.enabled !== false)))
       .catch(() => {});
   }, []);
+
+  // Debounced, cached, hover-triggered status-history fetch — fires ~250ms after
+  // the hovered bar settles on one issue, and only once per issue per session.
+  React.useEffect(() => {
+    const key = tooltip?.issue?.key;
+    if (!key || statusHistoryByKey[key] !== undefined) return;
+    const timer = setTimeout(() => {
+      fetchGanttStatusHistory(key)
+        .then((segments) => setStatusHistoryByKey((prev) => ({ ...prev, [key]: segments })))
+        .catch(() => setStatusHistoryByKey((prev) => ({ ...prev, [key]: [] })));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [tooltip?.issue?.key, statusHistoryByKey]);
 
   const load = React.useCallback(() => {
     if (!slug) return;
@@ -363,17 +405,47 @@ const GanttChart = () => {
   );
   const visibleIssues = issues.filter((i) => !hiddenStatuses.has(i.status));
 
-  const groups = [];
-  for (const status of statuses) {
-    const items = sortGroup(visibleIssues.filter((i) => i.status === status));
-    if (items.length > 0) groups.push({ key: status, label: status, items });
-  }
-
   const flatRows = [];
-  for (const group of groups) {
-    flatRows.push({ type: "header", group });
-    if (!collapsedGroups.has(group.key)) {
-      for (const issue of group.items) flatRows.push({ type: "issue", issue });
+  if (groupMode === "story") {
+    // Group by parent (Story/Bug → its Sub-tasks). An issue only becomes a group
+    // header if it's both present in the visible set AND has ≥1 visible child —
+    // a filtered-out parent's children fall back to flat rows rather than orphaning
+    // under a header that isn't there, and a childless story is just a normal row.
+    // Only actual Sub-tasks nest — Story/Bug's own parent is the Epic, and that
+    // relationship isn't part of this grouping (no separate Epic tier).
+    const visibleKeys = new Set(visibleIssues.map((i) => i.key));
+    const childrenByParent = {};
+    for (const i of visibleIssues) {
+      if (i.isSubtask && i.parentKey) (childrenByParent[i.parentKey] ||= []).push(i);
+    }
+    const groupParentKeys = new Set(
+      Object.keys(childrenByParent).filter((pk) => visibleKeys.has(pk))
+    );
+    const topLevel = sortGroup(
+      visibleIssues.filter((i) => !(i.parentKey && groupParentKeys.has(i.parentKey)))
+    );
+    for (const issue of topLevel) {
+      if (groupParentKeys.has(issue.key)) {
+        const children = sortGroup(childrenByParent[issue.key]);
+        flatRows.push({ type: "issue", issue, isGroupHeader: true, groupKey: issue.key, childCount: children.length });
+        if (!collapsedGroups.has(issue.key)) {
+          for (const child of children) flatRows.push({ type: "issue", issue: child, indent: true });
+        }
+      } else {
+        flatRows.push({ type: "issue", issue });
+      }
+    }
+  } else {
+    const groups = [];
+    for (const status of statuses) {
+      const items = sortGroup(visibleIssues.filter((i) => i.status === status));
+      if (items.length > 0) groups.push({ key: status, label: status, items });
+    }
+    for (const group of groups) {
+      flatRows.push({ type: "header", group });
+      if (!collapsedGroups.has(group.key)) {
+        for (const issue of group.items) flatRows.push({ type: "issue", issue });
+      }
     }
   }
 
@@ -476,6 +548,23 @@ const GanttChart = () => {
               </button>
             ))}
           </div>
+          <div className="pm-gantt-group-mode">
+            <span className="pm-gantt-group-mode-label">Group by</span>
+            <button
+              type="button"
+              className={`pm-gantt-zoom-btn${groupMode === "status" ? " pm-gantt-zoom-btn--active" : ""}`}
+              onClick={() => setGroupMode("status")}
+            >
+              Status
+            </button>
+            <button
+              type="button"
+              className={`pm-gantt-zoom-btn${groupMode === "story" ? " pm-gantt-zoom-btn--active" : ""}`}
+              onClick={() => setGroupMode("story")}
+            >
+              Story
+            </button>
+          </div>
           {statuses.length > 1 && (
             <div className="pm-gantt-filters">
               {statuses.map((status, index) => (
@@ -529,9 +618,21 @@ const GanttChart = () => {
                   <span className="pm-gantt-group-count">({row.group.items.length})</span>
                 </div>
               ) : (
-                <div key={row.issue.key} className="pm-gantt-label-row">
+                <div
+                  key={row.issue.key}
+                  className={`pm-gantt-label-row${row.indent ? " pm-gantt-label-row--indent" : ""}${row.isGroupHeader ? " pm-gantt-label-row--group-header" : ""}`}
+                  onClick={row.isGroupHeader ? () => toggleGroup(row.groupKey) : undefined}
+                >
                   <span className="pm-gantt-label-top">
+                    {row.isGroupHeader ? (
+                      <span className="pm-gantt-group-chevron pm-gantt-group-chevron--inline">
+                        {collapsedGroups.has(row.groupKey) ? "▶" : "▼"}
+                      </span>
+                    ) : null}
                     <span className="pm-gantt-label-key">{row.issue.key}</span>
+                    {row.isGroupHeader ? (
+                      <span className="pm-gantt-group-count">({row.childCount})</span>
+                    ) : null}
                     {assigneeInitials(row.issue.assignee) ? (
                       <span className="pm-gantt-label-assignee" title={row.issue.assignee}>
                         {assigneeInitials(row.issue.assignee)}
@@ -569,6 +670,7 @@ const GanttChart = () => {
                     <GanttBar
                       issue={row.issue}
                       statusIndex={statuses.indexOf(row.issue.status)}
+                      statusHistory={statusHistoryByKey[row.issue.key]}
                       rangeStart={rangeStart}
                       totalWidthPx={totalWidthPx}
                       today={today}

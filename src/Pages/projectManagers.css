@@ -820,6 +820,26 @@
   letter-spacing: 0.01em;
 }
 
+/* Story-grouping mode: subtasks nested under their parent story/bug row */
+.pm-gantt-label-row--indent {
+  padding-left: 1.75rem;
+}
+
+.pm-gantt-label-row--group-header {
+  cursor: pointer;
+  background: #f8fafc;
+}
+
+.pm-gantt-label-row--group-header:hover {
+  background: #f1f5f9;
+}
+
+.pm-gantt-group-chevron--inline {
+  font-size: 0.6rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
 /* Timeline column */
 .pm-gantt-timeline {
   flex: 1 1 0;
@@ -895,6 +915,16 @@
   opacity: 0.85;
 }
 
+/* Status-history segments (hover-loaded) — flat blocks with a thin divider
+   between them, rather than each segment getting its own rounded corners. */
+.pm-gantt-bar--segment {
+  border-radius: 0;
+}
+
+.pm-gantt-bar--segment:not(:last-child) {
+  border-right: 1px solid rgba(255, 255, 255, 0.55);
+}
+
 .pm-gantt-bar-label {
   font-size: 0.7rem;
   font-weight: 600;
@@ -953,6 +983,31 @@
   background: #eaf6fd;
   color: #0c93d9;
   font-weight: 600;
+}
+
+.pm-gantt-group-mode {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pm-gantt-group-mode-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.pm-gantt-group-mode .pm-gantt-zoom-btn {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.pm-gantt-group-mode .pm-gantt-zoom-btn:first-of-type {
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+}
+
+.pm-gantt-group-mode .pm-gantt-zoom-btn:last-of-type {
+  border-radius: 0 6px 6px 0;
 }
 
 .pm-gantt-filters {
