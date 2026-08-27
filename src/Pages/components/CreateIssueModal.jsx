@@ -9,7 +9,55 @@ import {
   fetchJiraParentCandidates,
   fetchJiraProjects,
   generateIssueDescription,
+  fetchTeamDatesBulk,
+  fetchIssueMetadataBulk,
+  saveTeamDate,
+  saveIssueMetadata,
 } from "../../services/jiraClient";
+
+// Fields a child issue should inherit from its parent at creation time —
+// actual/tracked dates (startDate/completeDate) are per-issue and never cascade.
+const CASCADABLE_PLANNING_FIELDS = [
+  "plannedStart",
+  "plannedFinish",
+  "requestor",
+  "pmOverride",
+  "hasOpenDecision",
+  "openDecisionNote",
+];
+
+// Best-effort: copies the parent's planning fields (if any) down to newly created
+// children, from whichever store (shared/Mongo or personal/SQLite) actually has them.
+const cascadePlanningFieldsToChildren = async (parentKey, childKeys) => {
+  if (!parentKey || !Array.isArray(childKeys) || childKeys.length === 0) {
+    return;
+  }
+
+  try {
+    const [teamDates, personalMeta] = await Promise.all([
+      fetchTeamDatesBulk([parentKey]).catch(() => ({})),
+      fetchIssueMetadataBulk([parentKey]).catch(() => ({})),
+    ]);
+    const teamSource = teamDates?.[parentKey];
+    const personalSource = personalMeta?.[parentKey];
+    const isShared = CASCADABLE_PLANNING_FIELDS.some((f) => teamSource?.[f] !== undefined && teamSource[f] !== "");
+    const source = isShared ? teamSource : personalSource;
+    if (!source) return;
+
+    const patch = {};
+    for (const field of CASCADABLE_PLANNING_FIELDS) {
+      if (source[field] !== undefined && source[field] !== "") {
+        patch[field] = source[field];
+      }
+    }
+    if (Object.keys(patch).length === 0) return;
+
+    const save = isShared ? saveTeamDate : saveIssueMetadata;
+    await Promise.all(childKeys.map((issueKey) => save({ issueKey, ...patch }).catch(() => null)));
+  } catch {
+    // Best-effort — never block issue creation on cascade failure.
+  }
+};
 import {
   ODI_BUG_PRIORITIES,
   partitionOdiStandardsErrors,
@@ -888,6 +936,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       });
       createdParentKey = result?.issueKey || "";
       setCreatedIssueKey(createdParentKey);
+      void cascadePlanningFieldsToChildren(parentKey, [createdParentKey]);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to create issue");
       setSubmitting(false);
@@ -933,6 +982,8 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       }
       setSubtaskResults(results);
       setCreatingSubtasks(false);
+      const createdSubtaskKeys = results.filter((r) => r.issueKey).map((r) => r.issueKey);
+      void cascadePlanningFieldsToChildren(createdParentKey, createdSubtaskKeys);
       const failed = results.filter((r) => r.error);
       setSuccess(
         `Created ${createdParentKey}` +

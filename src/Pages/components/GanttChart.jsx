@@ -1,5 +1,6 @@
 import React from "react";
 import { fetchSharedPrograms, fetchGanttData } from "../../services/jiraClient";
+import { getStatusColor } from "../../utils/statusScale";
 
 const parseDate = (str) => {
   if (!str) return null;
@@ -24,23 +25,21 @@ const fmtShort = (str) => {
 };
 
 const OVERDUE_COLOR = "#dc2626";
-const STATUS_COLORS = {
-  "In Progress": "#3b82f6",
-  "Done": "#94a3b8",
-  "To Do": "#64748b",
-};
 
-const barColor = (issue, today) => {
+const barColor = (issue, today, statusIndex) => {
   if (issue.statusCategory !== "Done") {
     const due = parseDate(issue.dueDate || issue.completeDate);
     if (due && due < today) return OVERDUE_COLOR;
   }
-  return STATUS_COLORS[issue.statusCategory] || "#64748b";
+  return getStatusColor(issue.status, statusIndex);
 };
 
-const generateMonths = (start, end) => {
+// Fixed px-per-day (not a percentage of viewport width) so wide ranges actually
+// overflow their container and scroll, instead of squeezing to fit.
+const DAY_WIDTH = 18;
+
+const generateMonths = (start, end, dayWidth) => {
   const months = [];
-  const totalMs = end.getTime() - start.getTime();
   let cur = new Date(start.getFullYear(), start.getMonth(), 1);
   while (cur <= end) {
     const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
@@ -48,19 +47,91 @@ const generateMonths = (start, end) => {
     const mEnd = Math.min(next.getTime(), end.getTime());
     months.push({
       label: fmtMonthYear(cur),
-      widthPct: ((mEnd - mStart) / totalMs) * 100,
+      widthPx: ((mEnd - mStart) / 86400000) * dayWidth,
     });
     cur = next;
   }
   return months;
 };
 
-const pct = (date, rangeStart, rangeMs) =>
-  ((date.getTime() - rangeStart.getTime()) / rangeMs) * 100;
+const pxPos = (date, rangeStart, dayWidth) =>
+  ((date.getTime() - rangeStart.getTime()) / 86400000) * dayWidth;
 
 const issueUrl = (key) => {
   const base = window.__JIRA_BASE_URL__ || "";
   return base ? `${base}/browse/${key}` : null;
+};
+
+const assigneeInitials = (name) => {
+  const trimmed = String(name || "").trim();
+  if (!trimmed || trimmed.toLowerCase() === "unassigned") return "";
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  return parts.length === 1 ? parts[0].slice(0, 2).toUpperCase() : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const escapeCsvField = (value) => {
+  const str = String(value === null || value === undefined ? "" : value);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+};
+
+const csvRow = (fields) => fields.map(escapeCsvField).join(",");
+
+const EXPORT_CSV_HEADER = [
+  "Key",
+  "Summary",
+  "Status",
+  "Status Category",
+  "Assignee",
+  "Start Date",
+  "Due / Complete Date",
+  "Planned Start",
+  "Planned Finish",
+  "Requestor",
+];
+
+const buildPlanReportCsv = (issues) => {
+  const rows = [csvRow(EXPORT_CSV_HEADER)];
+  for (const issue of issues) {
+    rows.push(
+      csvRow([
+        issue.key,
+        issue.summary,
+        issue.status,
+        issue.statusCategory,
+        issue.assignee,
+        issue.startDate,
+        issue.dueDate || issue.completeDate,
+        issue.plannedStart,
+        issue.plannedFinish,
+        issue.requestor,
+      ])
+    );
+  }
+  return rows.join("\r\n");
+};
+
+const buildPlanReportMarkdown = (displayName, issues) => {
+  const lines = [`# Gantt Plan — ${displayName}`, "", `_Generated ${new Date().toLocaleString()}_`, ""];
+  lines.push("| Key | Summary | Status | Assignee | Start | Due/Complete | Planned Start | Planned Finish | Requestor |");
+  lines.push("|---|---|---|---|---|---|---|---|---|");
+  for (const issue of issues) {
+    lines.push(
+      `| ${issue.key} | ${(issue.summary || "").replace(/\|/g, "\\|")} | ${issue.status || ""} | ${issue.assignee || ""} | ${issue.startDate || ""} | ${issue.dueDate || issue.completeDate || ""} | ${issue.plannedStart || ""} | ${issue.plannedFinish || ""} | ${issue.requestor || ""} |`
+    );
+  }
+  return lines.join("\n");
+};
+
+const downloadBlob = (content, filename, type) => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
 };
 
 const GanttTooltip = ({ issue, x, y, today }) => {
@@ -106,7 +177,7 @@ const GanttTooltip = ({ issue, x, y, today }) => {
   );
 };
 
-const GanttBar = ({ issue, rangeStart, rangeMs, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
+const GanttBar = ({ issue, statusIndex, rangeStart, totalWidthPx, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
   const start = parseDate(issue.startDate);
   const end = parseDate(issue.dueDate || issue.completeDate);
   const planStart = parseDate(issue.plannedStart);
@@ -124,13 +195,13 @@ const GanttBar = ({ issue, rangeStart, rangeMs, today, onMouseEnter, onMouseMove
   }
 
   const url = issueUrl(issue.key);
-  const color = barColor(issue, today);
+  const color = barColor(issue, today, statusIndex);
 
   const renderBar = (s, e, className, barStyle) => {
-    const leftPct = Math.max(0, pct(s, rangeStart, rangeMs));
-    const rightPct = Math.min(100, pct(e, rangeStart, rangeMs));
-    const widthPct = Math.max(0.3, rightPct - leftPct);
-    const style = { left: `${leftPct}%`, width: `${widthPct}%`, ...barStyle };
+    const leftPx = Math.max(0, pxPos(s, rangeStart, DAY_WIDTH));
+    const rightPx = Math.min(totalWidthPx, pxPos(e, rangeStart, DAY_WIDTH));
+    const widthPx = Math.max(3, rightPx - leftPx);
+    const style = { left: `${leftPx}px`, width: `${widthPx}px`, ...barStyle };
     const handlers = {
       onMouseEnter: (e) => onMouseEnter(issue, e),
       onMouseMove,
@@ -168,21 +239,14 @@ const GanttBar = ({ issue, rangeStart, rangeMs, today, onMouseEnter, onMouseMove
   );
 };
 
-const LEGEND_ITEMS = [
-  { color: "#3b82f6", label: "In Progress" },
-  { color: OVERDUE_COLOR, label: "Overdue" },
-  { color: "#64748b", label: "To Do" },
-  { color: "#94a3b8", label: "Done" },
-];
-
+// Status colors/labels now come from getStatusColor per-issue (see filter chips,
+// which double as a dynamic legend for whatever statuses are actually in view).
 const GanttLegend = () => (
   <div className="pm-gantt-legend">
-    {LEGEND_ITEMS.map(({ color, label }) => (
-      <span key={label} className="pm-gantt-legend-item">
-        <span className="pm-gantt-legend-swatch" style={{ background: color }} />
-        {label}
-      </span>
-    ))}
+    <span className="pm-gantt-legend-item">
+      <span className="pm-gantt-legend-swatch" style={{ background: OVERDUE_COLOR }} />
+      Overdue
+    </span>
     <span className="pm-gantt-legend-item">
       <span className="pm-gantt-legend-swatch pm-gantt-legend-swatch--plan" />
       Planned (dashed)
@@ -190,10 +254,20 @@ const GanttLegend = () => (
   </div>
 );
 
-const GROUP_DOT_COLORS = { "In Progress": "#3b82f6", "Done": "#94a3b8", "To Do": "#64748b" };
-const GROUP_ORDER = ["In Progress", "To Do", "Done"];
+// Preferred left-to-right workflow order for known statuses; anything unrecognized
+// (custom workflow states) sorts alphabetically after these, terminal states last.
+const KNOWN_STATUS_ORDER = ["In Progress", "Ready for Verification", "Analyzing", "Ready for Work", "Backlog"];
 const PINNED_SLUG = "__pinned__";
-const ZOOM_LABELS = { "3mo": "3 mo", "6mo": "6 mo", "1yr": "1 yr", all: "All" };
+const ZOOM_LABELS = { "30d": "30 day", "3mo": "3 mo", "6mo": "6 mo", "1yr": "1 yr", all: "All" };
+
+const orderStatuses = (statuses, isDoneStatus) => {
+  const known = KNOWN_STATUS_ORDER.filter((s) => statuses.includes(s));
+  const rest = statuses
+    .filter((s) => !KNOWN_STATUS_ORDER.includes(s))
+    .sort((a, b) => a.localeCompare(b));
+  const [doneRest, activeRest] = [rest.filter(isDoneStatus), rest.filter((s) => !isDoneStatus(s))];
+  return [...known, ...activeRest, ...doneRest];
+};
 
 const sortGroup = (items) => {
   const dated = items
@@ -262,30 +336,37 @@ const GanttChart = () => {
     allEnds.length > 0 ? addDays(new Date(Math.max(...allEnds)), 14) : addDays(today, 60);
 
   const rangeStart =
-    zoom === "3mo" ? addDays(today, -30)
+    zoom === "30d" ? addDays(today, -3)
+    : zoom === "3mo" ? addDays(today, -30)
     : zoom === "6mo" ? addDays(today, -60)
     : zoom === "1yr" ? addDays(today, -90)
     : dataRangeStart;
   const rangeEnd =
-    zoom === "3mo" ? addDays(today, 62)
+    zoom === "30d" ? addDays(today, 27)
+    : zoom === "3mo" ? addDays(today, 62)
     : zoom === "6mo" ? addDays(today, 124)
     : zoom === "1yr" ? addDays(today, 275)
     : dataRangeEnd;
 
-  const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
-  const months = generateMonths(rangeStart, rangeEnd);
-  const todayPct = Math.max(0, Math.min(100, pct(today, rangeStart, rangeMs)));
+  const totalWidthPx = Math.max(1, diffDays(rangeStart, rangeEnd)) * DAY_WIDTH;
+  const months = generateMonths(rangeStart, rangeEnd, DAY_WIDTH);
+  const todayPx = Math.max(0, Math.min(totalWidthPx, pxPos(today, rangeStart, DAY_WIDTH)));
 
-  const statusCategories = [...new Set(issues.map((i) => i.statusCategory).filter(Boolean))];
-  const visibleIssues = issues.filter((i) => !hiddenStatuses.has(i.statusCategory));
+  const statusCategoryByStatus = {};
+  for (const i of issues) {
+    if (i.status) statusCategoryByStatus[i.status] = i.statusCategory;
+  }
+  const isDoneStatus = (status) => statusCategoryByStatus[status] === "Done";
+  const statuses = orderStatuses(
+    [...new Set(issues.map((i) => i.status).filter(Boolean))],
+    isDoneStatus
+  );
+  const visibleIssues = issues.filter((i) => !hiddenStatuses.has(i.status));
 
   const groups = [];
-  const seen = new Set();
-  for (const cat of [...GROUP_ORDER, ...statusCategories]) {
-    if (seen.has(cat)) continue;
-    seen.add(cat);
-    const items = sortGroup(visibleIssues.filter((i) => i.statusCategory === cat));
-    if (items.length > 0) groups.push({ key: cat, label: cat, items });
+  for (const status of statuses) {
+    const items = sortGroup(visibleIssues.filter((i) => i.status === status));
+    if (items.length > 0) groups.push({ key: status, label: status, items });
   }
 
   const flatRows = [];
@@ -318,6 +399,22 @@ const GanttChart = () => {
   const visibleCount = visibleIssues.length;
   const noDateCount = visibleIssues.filter((i) => !parseDate(i.startDate)).length;
 
+  const exportFilenameBase = `gantt_plan_${(data?.displayName || slug).replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_${new Date().toISOString().slice(0, 10)}`;
+
+  const handleExportCsv = () => {
+    if (visibleIssues.length === 0) return;
+    downloadBlob(`﻿${buildPlanReportCsv(visibleIssues)}`, `${exportFilenameBase}.csv`, "text/csv;charset=utf-8");
+  };
+
+  const handleExportMarkdown = () => {
+    if (visibleIssues.length === 0) return;
+    downloadBlob(
+      buildPlanReportMarkdown(data?.displayName || slug, visibleIssues),
+      `${exportFilenameBase}.md`,
+      "text/markdown;charset=utf-8"
+    );
+  };
+
   const emptyMsg =
     slug === PINNED_SLUG
       ? "No pinned issues. Open the planning panel for any issue in Task Manager and check 'Pin to Gantt'."
@@ -348,6 +445,16 @@ const GanttChart = () => {
               {noDateCount > 0 ? ` · ${noDateCount} without dates` : ""}
             </span>
           )}
+          {!loading && data && visibleIssues.length > 0 ? (
+            <>
+              <button type="button" className="pm-gantt-refresh" onClick={handleExportMarkdown}>
+                Export (.md)
+              </button>
+              <button type="button" className="pm-gantt-refresh" onClick={handleExportCsv}>
+                Export (.csv)
+              </button>
+            </>
+          ) : null}
           <button type="button" className="pm-gantt-refresh" onClick={load} disabled={loading}>
             {loading ? "Loading…" : "Refresh"}
           </button>
@@ -369,20 +476,20 @@ const GanttChart = () => {
               </button>
             ))}
           </div>
-          {statusCategories.length > 1 && (
+          {statuses.length > 1 && (
             <div className="pm-gantt-filters">
-              {statusCategories.map((cat) => (
+              {statuses.map((status, index) => (
                 <button
-                  key={cat}
+                  key={status}
                   type="button"
-                  className={`pm-gantt-filter-chip${hiddenStatuses.has(cat) ? " pm-gantt-filter-chip--off" : ""}`}
-                  onClick={() => toggleStatus(cat)}
+                  className={`pm-gantt-filter-chip${hiddenStatuses.has(status) ? " pm-gantt-filter-chip--off" : ""}`}
+                  onClick={() => toggleStatus(status)}
                 >
                   <span
                     className="pm-gantt-filter-dot"
-                    style={{ background: STATUS_COLORS[cat] || "#64748b" }}
+                    style={{ background: getStatusColor(status, index) }}
                   />
-                  {cat}
+                  {status}
                 </button>
               ))}
             </div>
@@ -416,14 +523,21 @@ const GanttChart = () => {
                   </span>
                   <span
                     className="pm-gantt-group-dot"
-                    style={{ background: GROUP_DOT_COLORS[row.group.label] || "#64748b" }}
+                    style={{ background: getStatusColor(row.group.label, statuses.indexOf(row.group.label)) }}
                   />
                   <span className="pm-gantt-group-name">{row.group.label}</span>
                   <span className="pm-gantt-group-count">({row.group.items.length})</span>
                 </div>
               ) : (
                 <div key={row.issue.key} className="pm-gantt-label-row">
-                  <span className="pm-gantt-label-key">{row.issue.key}</span>
+                  <span className="pm-gantt-label-top">
+                    <span className="pm-gantt-label-key">{row.issue.key}</span>
+                    {assigneeInitials(row.issue.assignee) ? (
+                      <span className="pm-gantt-label-assignee" title={row.issue.assignee}>
+                        {assigneeInitials(row.issue.assignee)}
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="pm-gantt-label-summary" title={row.issue.summary}>
                     {row.issue.summary}
                   </span>
@@ -434,15 +548,15 @@ const GanttChart = () => {
 
           {/* Timeline column */}
           <div className="pm-gantt-timeline">
-            <div className="pm-gantt-months">
+            <div className="pm-gantt-months" style={{ width: `${totalWidthPx}px` }}>
               {months.map((m, i) => (
-                <div key={i} className="pm-gantt-month" style={{ width: `${m.widthPct}%` }}>
+                <div key={i} className="pm-gantt-month" style={{ width: `${m.widthPx}px` }}>
                   {m.label}
                 </div>
               ))}
             </div>
-            <div className="pm-gantt-rows">
-              <div className="pm-gantt-today" style={{ left: `${todayPct}%` }} aria-label="Today" />
+            <div className="pm-gantt-rows" style={{ width: `${totalWidthPx}px` }}>
+              <div className="pm-gantt-today" style={{ left: `${todayPx}px` }} aria-label="Today" />
               {flatRows.map((row) =>
                 row.type === "header" ? (
                   <div
@@ -454,8 +568,9 @@ const GanttChart = () => {
                   <div key={row.issue.key} className="pm-gantt-row">
                     <GanttBar
                       issue={row.issue}
+                      statusIndex={statuses.indexOf(row.issue.status)}
                       rangeStart={rangeStart}
-                      rangeMs={rangeMs}
+                      totalWidthPx={totalWidthPx}
                       today={today}
                       onMouseEnter={handleMouseEnter}
                       onMouseMove={handleMouseMove}

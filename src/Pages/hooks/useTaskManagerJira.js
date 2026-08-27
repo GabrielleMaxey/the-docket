@@ -235,6 +235,7 @@ export const useTaskManagerJira = () => {
   const stored = loadStoredPreferences();
   const storedNotes = readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraNotes);
   const storedRowPriorities = readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraRowPriorities);
+  const storedPlanningMeta = readJsonObject(WORK_WEEK_STORAGE_KEYS.planningMetaByKey);
 
   const [jqlCount, setJqlCount] = React.useState(stored.jqlCount);
   const [jqlInputs, setJqlInputs] = React.useState(stored.jqlInputs);
@@ -266,7 +267,7 @@ export const useTaskManagerJira = () => {
   const [mrdDrafts, setMrdDrafts] = React.useState({});
   const [startDateByKey, setStartDateByKey] = React.useState({});
   const [completeDateByKey, setCompleteDateByKey] = React.useState({});
-  const [planningMetaByKey, setPlanningMetaByKey] = React.useState({});
+  const [planningMetaByKey, setPlanningMetaByKey] = React.useState(storedPlanningMeta);
   const [showPlanningPanel, setShowPlanningPanel] = React.useState(() => {
     try { return localStorage.getItem("ww_show_planning") === "true"; } catch { return false; }
   });
@@ -384,6 +385,10 @@ export const useTaskManagerJira = () => {
       WORK_WEEK_STORAGE_KEYS.jiraRowPriorities,
       JSON.stringify(jiraRowPriorities)
     );
+    window.localStorage.setItem(
+      WORK_WEEK_STORAGE_KEYS.planningMetaByKey,
+      JSON.stringify(planningMetaByKey)
+    );
   }, [
     jqlCount,
     jqlInputs,
@@ -392,6 +397,7 @@ export const useTaskManagerJira = () => {
     pullLatestComment,
     jiraNotes,
     jiraRowPriorities,
+    planningMetaByKey,
   ]);
 
   React.useEffect(() => {

@@ -784,6 +784,12 @@
   overflow: hidden;
 }
 
+.pm-gantt-label-top {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .pm-gantt-label-key {
   font-weight: 600;
   color: #334155;
@@ -800,7 +806,18 @@
 }
 
 .pm-gantt-label-assignee {
-  display: none;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 /* Timeline column */
