@@ -284,11 +284,11 @@
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:36px;">
       <div style="border:1px solid rgba(255,255,255,.22); border-radius:12px; padding:44px 36px; background:rgba(255,255,255,.06);">
         <div style="font-family:var(--mono); font-size:56px; font-weight:600; color:var(--accent); margin-bottom:22px;">P1–P20</div>
-        <div style="font-size:26px; line-height:1.45; color:rgba(255,255,255,.9);">Your own ranking, saved in the local database. A Jira badge marks a priority read from the latest comment on Run JQL.</div>
+        <div style="font-size:26px; line-height:1.45; color:rgba(255,255,255,.9);">Your own ranking, saved in the local database. A Jira badge marks a priority read from a shared database TBD.</div>
       </div>
       <div style="border:1px solid rgba(255,255,255,.22); border-radius:12px; padding:44px 36px; background:rgba(255,255,255,.06);">
         <div style="font-family:var(--mono); font-size:56px; font-weight:600; color:var(--accent); margin-bottom:22px;">5 files</div>
-        <div style="font-size:26px; line-height:1.45; color:rgba(255,255,255,.9);">Per note, 5 MB each — images plus TXT, PDF, DOC/DOCX, XLSX, CSV. Paste, drag, or Add file. Pop-out editor for longer notes.</div>
+        <div style="font-size:26px; line-height:1.45; color:rgba(255,255,255,.9);">Per note, 5 MB each — images plus TXT, PDF, DOC/DOCX, XLSX, CSV, MD. Paste, drag, or Add file. Pop-out editor for longer notes.</div>
       </div>
       <div style="border:1px solid rgba(255,255,255,.22); border-radius:12px; padding:44px 36px; background:rgba(255,255,255,.06);">
         <div style="font-family:var(--mono); font-size:56px; font-weight:600; color:var(--accent); margin-bottom:22px;">Push</div>
@@ -434,7 +434,7 @@
     <p style="margin:auto 0 0; font-size:26px; line-height:1.45; color:var(--muted);">All three Task Management report types flag top-priority Backlog items that have recent comments — work happening under a stale status.</p>
   </section>
 
-  <section data-label="Project Managers screen" data-screen-label="11" data-speaker-notes="Capacity planning. Each tracked entry shows a WIP limits bar across workflow columns and open count against an optional capacity target, plus overdue, blocked, and stale signals. Export as .md or .csv, or save the view to Past Reports." style="display:grid; grid-template-columns:1fr 1000px; gap:70px; padding:var(--pad-top) var(--pad-x) var(--pad-bottom); background:#fff; color:var(--ink); font-family:var(--sans);">
+  <section data-label="Project Managers screen" data-screen-label="11" data-speaker-notes="Capacity planning. Each tracked entry shows a WIP limits bar across workflow columns and open count against an optional capacity target, plus overdue, blocked, and stale signals. Know what your developers workfload is at a glance.  Export as .md or .csv, or save the view to Past Reports." style="display:grid; grid-template-columns:1fr 1000px; gap:70px; padding:var(--pad-top) var(--pad-x) var(--pad-bottom); background:#fff; color:var(--ink); font-family:var(--sans);">
     <div style="display:flex; flex-direction:column;">
       <h2 style="margin:0 0 24px; font-size:var(--type-title); font-weight:600; letter-spacing:-.02em;">Project Managers</h2>
       <p style="margin:0 0 40px; font-size:30px; line-height:1.45; color:var(--muted); text-wrap:pretty;">Who is over capacity, and whether their work is actually moving.</p>
@@ -639,7 +639,7 @@
           </div>
           <div style="font-size:25px; line-height:1.45; color:var(--muted);">A checkbox that adds this issue to the Pinned Issues view on the Gantt chart — collect cross-program issues in one timeline without switching programs.</div>
         </div>
-        <p style="margin:6px 0 0; font-size:25px; line-height:1.45; color:var(--muted); text-wrap:pretty;">All fields save locally on change — no Update button. Shared-program issues write to the team store.</p>
+        <p style="margin:6px 0 0; font-size:25px; line-height:1.45; color:var(--muted); text-wrap:pretty;">All fields save locally on change — or via Save to database button. Shared-program issues write to the team store.</p>
       </div>
     </div>
   </section>
