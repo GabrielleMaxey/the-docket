@@ -644,47 +644,59 @@
     </div>
   </section>
 
-  <section data-label="Gantt timeline" data-screen-label="13" data-speaker-notes="The Gantt tab in Project Managers plots two bar types per issue. The solid bar is actual: start date to IDD or complete date; overdue non-Done issues show in red. The dashed bar is planned: planned start to planned finish from the planning panel. Pin any issue to Gantt from its planning panel — the Pinned Issues view collects cross-program issues in one timeline. Zoom controls (3 mo / 6 mo / 1 yr / All) focus the date range. Status filter chips show or hide In Progress, Done, and To Do rows. Groups collapse with one click. Hover a bar for a rich tooltip: key, summary, status, assignee, requestor, dates, and days ahead or behind plan." style="display:flex; flex-direction:column; padding:var(--pad-top) var(--pad-x) var(--pad-bottom); background:var(--paper); color:var(--ink); font-family:var(--sans);">
+  <section data-label="Gantt timeline" data-screen-label="13" data-speaker-notes="The Gantt tab in Project Managers scrolls horizontally at a fixed, readable scale — wider zoom ranges scroll for full-resolution bars rather than squeezing to fit. Group by Status (every real workflow status — Backlog, Analyzing, Ready for Work, In Progress, Ready for Verification, Done — not just Jira's 3-bucket To Do/In Progress/Done) or by Story, which nests each Story or Bug's Sub-tasks underneath it, collapsible, so you can see one story's whole progress at a glance. Hovering any bar — including a 'no dates' row, since most issues never got a manually-tracked start/complete date — loads that issue's real Jira status-transition history and re-renders it as colored segments sized by how long it actually sat in each status, surfacing stalls a flat-color bar can't show. The dashed bar is the planned window from the planning panel. Zoom: 30 day / 3 mo / 6 mo / 1 yr / All. Status filter chips and Export (.md/.csv) both respect whichever grouping mode is active." style="display:flex; flex-direction:column; padding:var(--pad-top) var(--pad-x) var(--pad-bottom); background:var(--paper); color:var(--ink); font-family:var(--sans);">
     <h2 style="margin:0 0 20px; font-size:var(--type-title); font-weight:600; letter-spacing:-.02em;">Gantt timeline</h2>
-    <p style="margin:0 0 var(--gap-title); font-size:var(--type-body); line-height:1.4; color:var(--muted); max-width:1400px; text-wrap:pretty;">Actual progress and planned schedule in one view — so you can see where the two diverge.</p>
+    <p style="margin:0 0 var(--gap-title); font-size:var(--type-body); line-height:1.4; color:var(--muted); max-width:1400px; text-wrap:pretty;">Actual progress and planned schedule in one view — and hover any bar for the real story of how it got there.</p>
     <div style="display:grid; grid-template-columns:360px 1fr; gap:60px; align-items:start; flex:1;">
-      <div style="display:flex; flex-direction:column; gap:22px;">
-        <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <div style="display:flex; flex-direction:column; gap:6px;">
           <div style="font-size:var(--type-small); font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);">Actual bar</div>
           <div style="display:flex; align-items:center; gap:14px;">
-            <div style="width:80px; height:14px; background:#3b82f6; border-radius:3px; flex-shrink:0;"></div>
-            <div style="font-size:22px; line-height:1.45; color:var(--muted);">Start → IDD or complete date; color = status category</div>
+            <div style="width:70px; height:13px; background:#FB9429; border-radius:3px; flex-shrink:0;"></div>
+            <div style="font-size:18px; line-height:1.3; color:var(--muted);">Color = real workflow status, not a 3-bucket category</div>
           </div>
         </div>
-        <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <div style="font-size:var(--type-small); font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);">Status history (hover)</div>
+          <div style="display:flex; align-items:center; gap:14px;">
+            <div style="width:70px; height:13px; border-radius:3px; flex-shrink:0; overflow:hidden; display:flex;">
+              <div style="width:15%; height:100%; background:#b0b0b0;"></div>
+              <div style="width:55%; height:100%; background:#FDD219;"></div>
+              <div style="width:20%; height:100%; background:#FB9429;"></div>
+              <div style="width:10%; height:100%; background:#0c93d9;"></div>
+            </div>
+            <div style="font-size:18px; line-height:1.3; color:var(--muted);">Hover any bar, even "no dates," for real time-in-status</div>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
           <div style="font-size:var(--type-small); font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);">Overdue bar</div>
           <div style="display:flex; align-items:center; gap:14px;">
-            <div style="width:80px; height:14px; background:#dc2626; border-radius:3px; flex-shrink:0;"></div>
-            <div style="font-size:22px; line-height:1.45; color:var(--muted);">Non-Done issues past their due date</div>
+            <div style="width:70px; height:13px; background:#dc2626; border-radius:3px; flex-shrink:0;"></div>
+            <div style="font-size:18px; line-height:1.3; color:var(--muted);">Non-Done issues past their due date</div>
           </div>
         </div>
-        <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; flex-direction:column; gap:6px;">
           <div style="font-size:var(--type-small); font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);">Planned bar</div>
           <div style="display:flex; align-items:center; gap:14px;">
-            <div style="width:80px; height:14px; border:2px dashed #94a3b8; border-radius:3px; flex-shrink:0;"></div>
-            <div style="font-size:22px; line-height:1.45; color:var(--muted);">Planned start → planned finish from the planning panel</div>
+            <div style="width:70px; height:13px; border:2px dashed #94a3b8; border-radius:3px; flex-shrink:0;"></div>
+            <div style="font-size:18px; line-height:1.3; color:var(--muted);">Planned start → finish from the planning panel</div>
           </div>
         </div>
-        <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; flex-direction:column; gap:6px;">
           <div style="font-size:var(--type-small); font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);">Controls</div>
-          <div style="font-size:22px; line-height:1.5; color:var(--muted);">
-            <div>📌 <strong>Pinned Issues</strong> — default view; pin from planning panel</div>
-            <div>🔍 Zoom: 3 mo / 6 mo / 1 yr / All</div>
-            <div>🏷 Status filter chips — toggle rows by category</div>
-            <div>▸ Collapsible groups per status category</div>
-            <div>💬 Hover tooltip — key, dates, plan delta</div>
+          <div style="font-size:18px; line-height:1.4; color:var(--muted);">
+            <div>📌 <strong>Pinned Issues</strong> — default view</div>
+            <div>🔍 Zoom: 30 day → All, scrolls not squeezes</div>
+            <div>🗂 Group by: <strong>Status</strong> or <strong>Story</strong> (nested Sub-tasks)</div>
+            <div>🏷 Status chips — every real status</div>
+            <div>⬇ Export .md / .csv</div>
           </div>
         </div>
       </div>
       <!-- Mockup Gantt chart -->
-      <div style="background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px 28px; display:flex; flex-direction:column; gap:0; font-family:var(--mono); font-size:20px;">
+      <div style="background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px 28px; display:flex; flex-direction:column; gap:0; font-family:var(--mono); font-size:19px;">
         <!-- Month ruler -->
-        <div style="display:flex; border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:10px; color:var(--muted); font-size:18px;">
+        <div style="display:flex; border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:10px; color:var(--muted); font-size:17px;">
           <div style="width:220px; flex-shrink:0;"></div>
           <div style="flex:1; display:flex;">
             <div style="flex:1.2; text-align:left;">Jun 2026</div>
@@ -692,39 +704,57 @@
             <div style="flex:1.4; text-align:left;">Aug 2026</div>
           </div>
         </div>
-        <!-- Row 1 - In Progress -->
-        <div style="display:flex; align-items:center; padding:9px 0; border-bottom:1px solid rgba(217,227,234,.5);">
-          <div style="width:220px; flex-shrink:0; color:var(--ink); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">PROJ-1042</div>
+        <!-- Row 1 - hovered: segmented status history -->
+        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid rgba(217,227,234,.5);">
+          <div style="width:220px; flex-shrink:0; color:var(--ink); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">PROJ-1042 <span style="color:var(--blue); font-size:15px;">(hovered)</span></div>
           <div style="flex:1; position:relative; height:20px;">
-            <div style="position:absolute; left:5%; width:45%; height:14px; top:3px; background:#3b82f6; border-radius:3px;"></div>
+            <div style="position:absolute; left:5%; width:45%; height:14px; top:3px; border-radius:3px; overflow:hidden; display:flex;">
+              <div style="width:10%; height:100%; background:#b0b0b0;"></div>
+              <div style="width:60%; height:100%; background:#FDD219;"></div>
+              <div style="width:20%; height:100%; background:#FB9429;"></div>
+              <div style="width:10%; height:100%; background:#0c93d9;"></div>
+            </div>
           </div>
         </div>
         <!-- Row 2 - planned + actual -->
-        <div style="display:flex; align-items:center; padding:9px 0; border-bottom:1px solid rgba(217,227,234,.5);">
+        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid rgba(217,227,234,.5);">
           <div style="width:220px; flex-shrink:0; color:var(--ink); font-weight:500;">PROJ-1089</div>
           <div style="flex:1; position:relative; height:24px;">
             <div style="position:absolute; left:30%; width:35%; height:13px; top:1px; background:#94a3b8; border-radius:3px; opacity:.45; border:2px dashed #94a3b8;"></div>
-            <div style="position:absolute; left:30%; width:18%; height:13px; top:10px; background:#3b82f6; border-radius:3px;"></div>
+            <div style="position:absolute; left:30%; width:18%; height:13px; top:10px; background:#FB9429; border-radius:3px;"></div>
           </div>
         </div>
         <!-- Row 3 - overdue (red bar) -->
-        <div style="display:flex; align-items:center; padding:9px 0; border-bottom:1px solid rgba(217,227,234,.5);">
+        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid rgba(217,227,234,.5);">
           <div style="width:220px; flex-shrink:0; color:#dc2626; font-weight:600;">PROJ-1103</div>
           <div style="flex:1; position:relative; height:20px;">
             <div style="position:absolute; left:18%; width:40%; height:14px; top:3px; background:#dc2626; border-radius:3px;"></div>
           </div>
         </div>
         <!-- Row 4 - Done -->
-        <div style="display:flex; align-items:center; padding:9px 0; border-bottom:1px solid rgba(217,227,234,.5);">
+        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid rgba(217,227,234,.5);">
           <div style="width:220px; flex-shrink:0; color:var(--muted);">PROJ-1058</div>
           <div style="flex:1; position:relative; height:20px;">
-            <div style="position:absolute; left:0%; width:30%; height:14px; top:3px; background:#94a3b8; border-radius:3px;"></div>
+            <div style="position:absolute; left:0%; width:30%; height:14px; top:3px; background:#0c93d9; border-radius:3px;"></div>
           </div>
         </div>
-        <!-- Row 5 - no date -->
-        <div style="display:flex; align-items:center; padding:9px 0;">
+        <!-- Row 5 - Group by Story: parent + nested sub-task -->
+        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid rgba(217,227,234,.5); background:#f8fafc;">
+          <div style="width:220px; flex-shrink:0; color:var(--ink); font-weight:700;">▾ PROJ-1071 <span style="color:var(--muted); font-weight:400; font-size:15px;">(3)</span></div>
+          <div style="flex:1; position:relative; height:20px;">
+            <div style="position:absolute; left:8%; width:38%; height:14px; top:3px; background:#fdb95e; border-radius:3px;"></div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; padding:8px 0 8px 32px; border-bottom:1px solid rgba(217,227,234,.5);">
+          <div style="width:188px; flex-shrink:0; color:var(--muted); font-size:17px;">PROJ-1072</div>
+          <div style="flex:1; position:relative; height:20px;">
+            <div style="position:absolute; left:12%; width:22%; height:14px; top:3px; background:#0c93d9; border-radius:3px;"></div>
+          </div>
+        </div>
+        <!-- Row 6 - no date, still hoverable -->
+        <div style="display:flex; align-items:center; padding:8px 0;">
           <div style="width:220px; flex-shrink:0; color:var(--muted);">PROJ-1118</div>
-          <div style="flex:1; font-size:18px; color:#b0bec5; font-style:italic;">no start date</div>
+          <div style="flex:1; font-size:17px; color:#b0bec5; font-style:italic;">no dates — hover for history</div>
         </div>
       </div>
     </div>
