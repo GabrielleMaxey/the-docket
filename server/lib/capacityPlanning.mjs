@@ -166,6 +166,7 @@ const computeIssueBreakdown = ( issues, fieldIds, basis, epicContext ) => {
   const { dueFieldId, iddFieldId, mrdFieldId } = fieldIds;
   const statusCounts = {};
   const contributorCounts = {};
+  const contributorStatusCounts = {};
   const contributorAccountIds = {};
   const overdueIssueKeys = [];
   const blockedIssueKeys = [];
@@ -182,6 +183,8 @@ const computeIssueBreakdown = ( issues, fieldIds, basis, epicContext ) => {
 
     const assigneeName = String( issue?.fields?.assignee?.displayName || "Unassigned" ).trim() || "Unassigned";
     contributorCounts[ assigneeName ] = ( contributorCounts[ assigneeName ] || 0 ) + 1;
+    if ( !contributorStatusCounts[ assigneeName ] ) contributorStatusCounts[ assigneeName ] = {};
+    contributorStatusCounts[ assigneeName ][ statusName ] = ( contributorStatusCounts[ assigneeName ][ statusName ] || 0 ) + 1;
     const accountId = String( issue?.fields?.assignee?.accountId || "" ).trim();
     if ( assigneeName !== "Unassigned" && accountId && !contributorAccountIds[ assigneeName ] )
     {
@@ -218,7 +221,7 @@ const computeIssueBreakdown = ( issues, fieldIds, basis, epicContext ) => {
     }
   }
 
-  return { statusCounts, contributorCounts, contributorAccountIds, overdueCount, overdueIssueKeys, blockedCount, blockedIssueKeys, staleCount };
+  return { statusCounts, contributorCounts, contributorStatusCounts, contributorAccountIds, overdueCount, overdueIssueKeys, blockedCount, blockedIssueKeys, staleCount };
 };
 
 const resolveOverdueClause = ( basis, dueFieldId, overdueFieldIds, overdueIssueKeys, usedEpicContext ) => {
@@ -270,6 +273,7 @@ export const fetchCapacityWorkloads = async ( { watchedRows, jiraRequest, runJir
           openCount: 0,
           statusCounts: {},
           contributorCounts: {},
+          contributorStatusCounts: {},
           contributorTotalCounts: {},
           overdueCount: 0,
           blockedCount: 0,
