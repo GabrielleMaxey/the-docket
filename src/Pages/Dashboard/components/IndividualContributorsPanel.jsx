@@ -48,8 +48,6 @@ const IndividualContributorsPanel = ({
               dueByDate={dueByDate}
               showBar={false}
               showResolvedBar
-              showOverdueList={false}
-              showUpcomingList={false}
             />
           ))
         ) : (
