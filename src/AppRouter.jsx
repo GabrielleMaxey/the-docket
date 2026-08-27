@@ -1,5 +1,6 @@
 import React from "react";
 import { createHashRouter, Outlet, NavLink } from "react-router-dom";
+import { FiSettings } from "react-icons/fi";
 import Errors from "./Pages/Errors.jsx";
 import "semantic-ui-css/semantic.min.css";
 import "./AppRouter.css";
@@ -19,7 +20,7 @@ const NAV_LINKS = [
   { to: "/project-managers", label: "Project Managers" },
   { to: "/reports", label: "Past Reports" },
   { to: "/chat", label: "Chat" },
-  { to: "/settings", label: "Settings", icon: "⚙️" },
+  { to: "/settings", label: "Settings", icon: <FiSettings /> },
 ];
 
 const PageFallback = () => (
@@ -32,7 +33,7 @@ const AppLayout = () => (
   <>
     <nav className="app-nav">
       <NavLink to="/" className="app-nav-logo">
-        <img src="/task-manager-favicon.svg" alt="" aria-hidden="true" className="app-nav-logo-icon" />
+        <img src="/icons/app-icon.svg" alt="" aria-hidden="true" className="app-nav-logo-icon" />
         The Docket
       </NavLink>
       <BackgroundJobIndicator />
