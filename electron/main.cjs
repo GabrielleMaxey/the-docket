@@ -19,7 +19,7 @@ API_PORT=8787
 `;
 
 function getWindowIconPath() {
-  return path.join(app.getAppPath(), "public", "the-docket-favicon.svg");
+  return path.join(app.getAppPath(), "public", "icons", "app-icon.svg");
 }
 
 function getApiScriptPath() {

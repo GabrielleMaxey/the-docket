@@ -125,13 +125,14 @@
 
 .pm-wip-bar {
   display: flex;
-  gap: 3px;
   height: 14px;
-  overflow: visible;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
 }
 
 .pm-wip-bar--mini {
-  height: 6px;
+  height: 8px;
 }
 
 .pm-wip-bar-labels {
@@ -157,15 +158,23 @@
 
 .pm-wip-segment-label-text--ok   { color: #15803d; }
 .pm-wip-segment-label-text--near { color: #a16207; }
-.pm-wip-segment-label-text--over { color: #dc2626; }
+.pm-wip-segment-label-text--over { color: #dc2626; font-weight: 700; }
 .pm-wip-segment-label-text--empty { color: #94a3b8; }
 
 .pm-wip-segment {
-  border-radius: 4px;
-  background: #e2e8f0;
-  overflow: hidden;
+  position: relative;
   height: 100%;
   flex-shrink: 0;
+}
+
+.pm-wip-segment:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 100%;
+  background: #ffffff;
 }
 
 .pm-wip-segment-fill {

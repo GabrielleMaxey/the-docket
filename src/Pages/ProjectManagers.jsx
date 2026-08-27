@@ -84,7 +84,7 @@ const WipBar = ({ statusCounts, wipLimits, numICs = 1, mini = false }) => {
         {segments.map(({ status, abbr, count, teamLimit, segWidth, segStatus }) => (
           <div key={status} className="pm-wip-segment-label" style={{ width: `${segWidth}%` }}>
             <span className={`pm-wip-segment-label-text pm-wip-segment-label-text--${count > 0 ? segStatus : "empty"}`}>
-              {abbr} {count}/{teamLimit}
+              {abbr} {count}/{teamLimit}{segStatus === "over" ? " !" : ""}
             </span>
           </div>
         ))}
