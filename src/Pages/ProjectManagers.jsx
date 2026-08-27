@@ -38,6 +38,128 @@ const capacityStatus = (openCount, capacity) => {
   return "ok";
 };
 
+const DEFAULT_WIP_LIMITS = [
+  { status: "In Progress", abbr: "In Prog", limit: 6 },
+  { status: "Ready for Verification", abbr: "RtV", limit: 3 },
+  { status: "Backlog", abbr: "Backlog", limit: 15 },
+  { status: "Analyzing", abbr: "Anlyz", limit: 2 },
+  { status: "Ready for Work", abbr: "RtW", limit: 2 },
+];
+
+const wipSegmentStatus = (count, teamLimit) => {
+  if (teamLimit <= 0) return count > 0 ? "ok" : "empty";
+  if (count > teamLimit) return "over";
+  if (count / teamLimit >= 0.85) return "near";
+  return count > 0 ? "ok" : "empty";
+};
+
+const WipBar = ({ statusCounts, wipLimits, numICs = 1, mini = false }) => {
+  const limits = wipLimits || DEFAULT_WIP_LIMITS;
+  const totalLimit = limits.reduce((s, { limit }) => s + limit, 0);
+  if (totalLimit === 0) return null;
+  const counts = statusCounts || {};
+  const segments = limits.map(({ status, abbr, limit }) => {
+    const count = counts[status] ?? 0;
+    const teamLimit = limit * numICs;
+    const fillPct = teamLimit > 0 ? Math.min(100, Math.round((count / teamLimit) * 100)) : 0;
+    const segStatus = wipSegmentStatus(count, teamLimit);
+    const segWidth = (limit / totalLimit) * 100;
+    return { status, abbr: abbr || status, count, teamLimit, fillPct, segStatus, segWidth };
+  });
+  return (
+    <div className={`pm-wip-bar-wrap${mini ? " pm-wip-bar-wrap--mini" : ""}`}>
+      <div className={`pm-wip-bar${mini ? " pm-wip-bar--mini" : ""}`}>
+        {segments.map(({ status, count, teamLimit, fillPct, segStatus, segWidth }) => (
+          <div
+            key={status}
+            className="pm-wip-segment"
+            style={{ width: `${segWidth}%` }}
+            title={`${status}: ${count} / ${teamLimit}`}
+          >
+            <div className={`pm-wip-segment-fill pm-wip-segment-fill--${segStatus}`} style={{ width: `${fillPct}%` }} />
+          </div>
+        ))}
+      </div>
+      <div className="pm-wip-bar-labels">
+        {segments.map(({ status, abbr, count, teamLimit, segWidth, segStatus }) => (
+          <div key={status} className="pm-wip-segment-label" style={{ width: `${segWidth}%` }}>
+            <span className={`pm-wip-segment-label-text pm-wip-segment-label-text--${count > 0 ? segStatus : "empty"}`}>
+              {abbr} {count}/{teamLimit}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const wipCardStatus = (statusCounts, wipLimits, numICs) => {
+  const limits = wipLimits || DEFAULT_WIP_LIMITS;
+  const counts = statusCounts || {};
+  let hasNear = false;
+  for (const { status, limit } of limits) {
+    const seg = wipSegmentStatus(counts[status] ?? 0, limit * numICs);
+    if (seg === "over") return "over";
+    if (seg === "near") hasNear = true;
+  }
+  return hasNear ? "near" : null;
+};
+
+const WipLimitsEditor = ({ wipLimits, onSave }) => {
+  const [open, setOpen] = React.useState(false);
+  const [drafts, setDrafts] = React.useState(null);
+  const current = drafts || wipLimits || DEFAULT_WIP_LIMITS;
+
+  const handleChange = (status, value) => {
+    setDrafts(current.map((e) => (e.status === status ? { ...e, limit: Math.max(0, Number(value) || 0) } : e)));
+  };
+
+  const handleSave = () => {
+    onSave(current);
+    setDrafts(null);
+    setOpen(false);
+  };
+
+  const handleReset = () => {
+    setDrafts(DEFAULT_WIP_LIMITS.map((d) => ({ ...d })));
+  };
+
+  return (
+    <div className="pm-wip-editor">
+      <button type="button" className="pm-wip-editor-toggle" onClick={() => setOpen((v) => !v)}>
+        WIP limits {open ? "▲" : "▼"}
+      </button>
+      {open ? (
+        <div className="pm-wip-editor-body">
+          {current.map(({ status, limit }) => (
+            <label key={status} className="pm-wip-editor-row">
+              <span className="pm-wip-editor-label">{status}</span>
+              <input
+                type="number"
+                min="0"
+                className="pm-wip-editor-input"
+                value={limit}
+                onChange={(e) => handleChange(status, e.target.value)}
+              />
+            </label>
+          ))}
+          <div className="pm-wip-editor-actions">
+            <button type="button" className="pm-wip-editor-btn pm-wip-editor-btn--save" onClick={handleSave}>
+              Save
+            </button>
+            <button type="button" className="pm-wip-editor-btn" onClick={handleReset}>
+              Reset to defaults
+            </button>
+            <button type="button" className="pm-wip-editor-btn" onClick={() => { setDrafts(null); setOpen(false); }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const StatusBreakdown = ({ scopeJql, displayName, statusCounts }) => {
   const entries = Object.entries(statusCounts || {}).sort((a, b) => b[1] - a[1]);
   if (entries.length === 0) return null;
@@ -112,7 +234,7 @@ const RiskFlags = ({ scopeJql, displayName, overdueCount, blockedCount, staleCou
 
 const CONTRIBUTOR_BREAKDOWN_LIMIT = 6;
 
-const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contributorTotalCounts }) => {
+const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contributorTotalCounts, contributorStatusCounts, wipLimits }) => {
   const [expanded, setExpanded] = React.useState(false);
   const entries = Object.entries(contributorCounts || {}).sort((a, b) => b[1] - a[1]);
   if (entries.length <= 1) return null;
@@ -121,9 +243,8 @@ const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contri
 
   return (
     <div className="pm-contributor-breakdown">
-      <div className="pm-contributor-breakdown-label">Share of this query, by assignee</div>
+      <div className="pm-contributor-breakdown-label">By assignee</div>
       {shown.map(([name, count]) => {
-        // Jira has no assignee named "Unassigned"; empty assignee is `assignee is EMPTY`.
         const assigneeClause = name === "Unassigned" ? "assignee is EMPTY" : `assignee = "${escapeJqlString(name)}"`;
         const clause = `${assigneeClause} AND statusCategory != Done`;
         const href = drillDownHref(scopeJql, clause, `${displayName} — ${name}`);
@@ -132,42 +253,48 @@ const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contri
         const totalHref = hasTotal
           ? buildWorkWeekHref({ jql: `assignee = "${escapeJqlString(name)}" AND statusCategory != Done`, label: `${name} — All open work` })
           : null;
+        const icStatusCounts = name !== "Unassigned" ? contributorStatusCounts?.[name] : null;
         return (
           <div key={name} className="pm-contributor-row">
-            {href ? (
-              <Link to={href} className="pm-contributor-row-name pm-contributor-row-name--link">
-                {name}
-              </Link>
-            ) : (
-              <span className="pm-contributor-row-name">{name}</span>
-            )}
-            <span className="pm-contributor-row-counts">
+            <div className="pm-contributor-row-top">
               {href ? (
-                <Link to={href} className="pm-contributor-row-here" title="Open issues within this query">
-                  {count} here
+                <Link to={href} className="pm-contributor-row-name pm-contributor-row-name--link">
+                  {name}
                 </Link>
               ) : (
-                <span title="Open issues within this query">{count} here</span>
+                <span className="pm-contributor-row-name">{name}</span>
               )}
-              {name === "Unassigned" ? null : hasTotal ? (
-                <>
-                  {" · "}
-                  <Link to={totalHref} className="pm-contributor-row-total" title="Total open issues everywhere">
-                    {total} total
+              <span className="pm-contributor-row-counts">
+                {href ? (
+                  <Link to={href} className="pm-contributor-row-here" title="Open issues within this query">
+                    {count} here
                   </Link>
-                </>
-              ) : (
-                <>
-                  {" · "}
-                  <span
-                    className="pm-contributor-row-total pm-contributor-row-total--unknown"
-                    title="Couldn't resolve this person's total workload"
-                  >
-                    N/A total
-                  </span>
-                </>
-              )}
-            </span>
+                ) : (
+                  <span title="Open issues within this query">{count} here</span>
+                )}
+                {name === "Unassigned" ? null : hasTotal ? (
+                  <>
+                    {" · "}
+                    <Link to={totalHref} className="pm-contributor-row-total" title="Total open issues everywhere">
+                      {total} total
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    {" · "}
+                    <span
+                      className="pm-contributor-row-total pm-contributor-row-total--unknown"
+                      title="Couldn't resolve this person's total workload"
+                    >
+                      N/A total
+                    </span>
+                  </>
+                )}
+              </span>
+            </div>
+            {icStatusCounts ? (
+              <WipBar statusCounts={icStatusCounts} wipLimits={wipLimits} numICs={1} mini />
+            ) : null}
           </div>
         );
       })}
@@ -180,29 +307,30 @@ const ContributorBreakdown = ({ scopeJql, displayName, contributorCounts, contri
   );
 };
 
-const CapacityCard = ({ item }) => {
+const CapacityCard = ({ item, wipLimits }) => {
   const {
     displayName,
     watchType,
-    capacity,
     openCount,
     openCountIncomplete,
     scopeJql,
     statusCounts,
     contributorCounts,
     contributorTotalCounts,
+    contributorStatusCounts,
     overdueCount,
     blockedCount,
     staleCount,
     error,
   } = item;
-  const status = error ? null : capacityStatus(openCount, capacity);
-  const hasCapacity = capacity !== null && capacity !== undefined;
-  const percent = hasCapacity && capacity > 0 ? Math.min(100, Math.round((openCount / capacity) * 100)) : 0;
-  const countLabel = formatOpenCount(openCount, openCountIncomplete);
+  const unassignedCount = contributorCounts?.["Unassigned"] ?? 0;
+  const assignedCount = Math.max(0, openCount - unassignedCount);
+  const numICs = Math.max(1, Object.keys(contributorCounts || {}).filter((n) => n !== "Unassigned").length);
+  const cardStatus = error ? null : wipCardStatus(statusCounts, wipLimits, numICs);
+  const assignedLabel = formatOpenCount(assignedCount, openCountIncomplete);
 
   return (
-    <div className={`pm-capacity-card${status ? ` pm-capacity-card--${status}` : ""}`}>
+    <div className={`pm-capacity-card${cardStatus ? ` pm-capacity-card--${cardStatus}` : ""}`}>
       <div className="pm-capacity-card-head">
         <span className="pm-capacity-name">{displayName}</span>
         {watchType === "jql" ? <span className="pm-capacity-badge">{watchTypeLabel(watchType, item.jql)}</span> : null}
@@ -213,39 +341,23 @@ const CapacityCard = ({ item }) => {
         </Message>
       ) : (
         <>
-          {hasCapacity ? (
-            <>
-              <div className="pm-capacity-numbers">
-                <strong>{countLabel}</strong> of <strong>{capacity}</strong> open issues
-                {status === "over" ? <span className="pm-capacity-flag">Over capacity</span> : null}
-                {status === "near" ? <span className="pm-capacity-flag pm-capacity-flag--near">Near capacity</span> : null}
-                {openCountIncomplete ? (
-                  <span
-                    className="pm-capacity-flag pm-capacity-flag--near"
-                    title="Stopped at the fetch limit; more open issues exist, so this bar is a lower bound"
-                  >
-                    Count incomplete
-                  </span>
-                ) : null}
-              </div>
-              <div className="pm-capacity-bar">
-                <div className={`pm-capacity-bar-fill pm-capacity-bar-fill--${status}`} style={{ width: `${percent}%` }} />
-              </div>
-            </>
-          ) : (
-            <div className="pm-capacity-numbers pm-capacity-numbers--no-target">
-              <strong>{countLabel}</strong> open issues
-              <span className="pm-capacity-no-target-note">No capacity target set</span>
-              {openCountIncomplete ? (
-                <span
-                  className="pm-capacity-flag pm-capacity-flag--near"
-                  title="Stopped at the fetch limit; more open issues exist"
-                >
-                  Count incomplete
-                </span>
-              ) : null}
-            </div>
-          )}
+          <div className="pm-capacity-numbers">
+            <strong>{assignedLabel}</strong> assigned
+            {unassignedCount > 0 ? (
+              <span className="pm-capacity-flag pm-capacity-flag--unassigned" title="Open issues in this query with no assignee">
+                {unassignedCount} unassigned
+              </span>
+            ) : null}
+            {openCountIncomplete ? (
+              <span
+                className="pm-capacity-flag pm-capacity-flag--near"
+                title="Stopped at the fetch limit; actual counts may be higher"
+              >
+                Count incomplete
+              </span>
+            ) : null}
+          </div>
+          <WipBar statusCounts={statusCounts} wipLimits={wipLimits} numICs={numICs} />
           <RiskFlags
             scopeJql={scopeJql}
             displayName={displayName}
@@ -261,6 +373,8 @@ const CapacityCard = ({ item }) => {
             displayName={displayName}
             contributorCounts={contributorCounts}
             contributorTotalCounts={contributorTotalCounts}
+            contributorStatusCounts={contributorStatusCounts}
+            wipLimits={wipLimits}
           />
         </>
       )}
@@ -651,6 +765,12 @@ const ProjectManagers = () => {
   const [knownIds, setKnownIds] = usePersistedState("pm-known-entry-ids", null, {
     sanitize: sanitizeIdList,
   });
+  const [wipLimits, setWipLimits] = usePersistedState("pm-wip-limits", DEFAULT_WIP_LIMITS, {
+    sanitize: (parsed) =>
+      Array.isArray(parsed) && parsed.every((e) => typeof e.status === "string" && typeof e.limit === "number")
+        ? parsed
+        : DEFAULT_WIP_LIMITS,
+  });
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
@@ -877,6 +997,7 @@ const ProjectManagers = () => {
                 }${staleTotalCount > 0 ? ` · ${staleTotalCount} stale issues total` : ""}`}
           </span>
           <div className="pm-toolbar-actions">
+            <WipLimitsEditor wipLimits={wipLimits} onSave={setWipLimits} />
             <Button
               size="small"
               basic
@@ -915,7 +1036,7 @@ const ProjectManagers = () => {
       ) : entriesError && items.length === 0 ? null : (
         <div className="pm-capacity-grid">
           {sortedItems.map((item) => (
-            <CapacityCard key={item.id} item={item} />
+            <CapacityCard key={item.id} item={item} wipLimits={wipLimits} />
           ))}
         </div>
       )}

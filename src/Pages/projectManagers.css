@@ -109,6 +109,172 @@
   background: #fef3c7;
 }
 
+.pm-capacity-flag--unassigned {
+  color: #475569;
+  background: #f1f5f9;
+}
+
+/* WIP segmented bar */
+.pm-wip-bar-wrap {
+  margin-top: 0.35rem;
+}
+
+.pm-wip-bar-wrap--mini {
+  margin-top: 0.3rem;
+}
+
+.pm-wip-bar {
+  display: flex;
+  gap: 3px;
+  height: 14px;
+  overflow: visible;
+}
+
+.pm-wip-bar--mini {
+  height: 6px;
+}
+
+.pm-wip-bar-labels {
+  display: flex;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.pm-wip-segment-label {
+  overflow: hidden;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pm-wip-segment-label-text {
+  font-size: 0.65rem;
+  color: #94a3b8;
+}
+
+.pm-wip-bar-wrap--mini .pm-wip-segment-label-text {
+  font-size: 0.6rem;
+}
+
+.pm-wip-segment-label-text--ok   { color: #15803d; }
+.pm-wip-segment-label-text--near { color: #a16207; }
+.pm-wip-segment-label-text--over { color: #dc2626; }
+.pm-wip-segment-label-text--empty { color: #94a3b8; }
+
+.pm-wip-segment {
+  border-radius: 4px;
+  background: #e2e8f0;
+  overflow: hidden;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.pm-wip-segment-fill {
+  height: 100%;
+  transition: width 0.2s;
+}
+
+.pm-wip-segment-fill--ok    { background: #4ade80; }
+.pm-wip-segment-fill--near  { background: #fbbf24; }
+.pm-wip-segment-fill--over  { background: #f87171; }
+.pm-wip-segment-fill--empty { background: transparent; }
+
+/* WIP limits editor */
+.pm-wip-editor {
+  position: relative;
+}
+
+.pm-wip-editor-toggle {
+  background: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pm-wip-editor-toggle:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.pm-wip-editor-body {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 100;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(15,23,42,.10);
+  padding: 0.75rem 1rem 0.85rem;
+  min-width: 220px;
+}
+
+.pm-wip-editor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.2rem 0;
+}
+
+.pm-wip-editor-label {
+  font-size: 0.8rem;
+  color: #334155;
+  flex: 1 1 auto;
+}
+
+.pm-wip-editor-input {
+  width: 52px;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  text-align: right;
+  color: #0f172a;
+}
+
+.pm-wip-editor-input:focus {
+  outline: none;
+  border-color: #0c93d9;
+}
+
+.pm-wip-editor-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.pm-wip-editor-btn {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+}
+
+.pm-wip-editor-btn:hover {
+  background: #f8fafc;
+}
+
+.pm-wip-editor-btn--save {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+
+.pm-wip-editor-btn--save:hover {
+  background: #1e293b;
+}
+
 .pm-capacity-bar {
   height: 7px;
   border-radius: 999px;
@@ -234,14 +400,19 @@
 
 .pm-contributor-row {
   display: flex;
-  align-items: center;
-  gap: 0;
+  flex-direction: column;
   font-size: 0.8rem;
   color: #334155;
-  padding: 0.2rem 0.3rem;
+  padding: 0.2rem 0.3rem 0.3rem;
   border-radius: 5px;
   margin: 0 -0.3rem;
   transition: background 0.1s;
+}
+
+.pm-contributor-row-top {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 .pm-contributor-row:hover {
