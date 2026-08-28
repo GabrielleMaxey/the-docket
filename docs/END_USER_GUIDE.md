@@ -388,17 +388,23 @@ The **Gantt** tab visualizes issue timelines with the following capabilities:
 **Pinned Issues view** (default program selection)  
 Pin any issue to the Gantt by opening its planning panel and checking **Pin to Gantt**. Pinned issues from across all programs appear together in this view. When no issues are pinned yet, an empty-state message explains how to pin.
 
-**Zoom controls** — narrow or widen the visible date range: **3 mo**, **6 mo**, **1 yr**, or **All**.
+**Zoom controls** — narrow or widen the visible date range: **30 day**, **3 mo**, **6 mo**, **1 yr**, or **All**. Whatever range you pick, the timeline scrolls horizontally within the chart for full-resolution bars — it never squeezes everything into one screen width, so bars stay a comfortable, comparable size regardless of range.
 
-**Status filter chips** — click any status category chip (**In Progress**, **Done**, **To Do**) to hide or show those rows.
+**Group by: Status or Story** — toggle how rows are organized. **Status** groups every issue by its actual workflow status (Backlog, Analyzing, Ready for Work, In Progress, Ready for Verification, Done/Closed/Resolved, etc.) — not just Jira's flattened To Do/In Progress/Done buckets. **Story** groups by hierarchy instead: any Story or Bug with Sub-tasks becomes a collapsible group showing its Sub-tasks nested underneath, so you can see a whole story's progress at a glance. Issues without Sub-tasks (or without a parent) just render as normal rows in either mode.
 
-**Collapsible groups** — issues are grouped by status category. Click a group header to collapse or expand it.
+**Status filter chips** — every status actually present in the current view gets its own chip (colors match the same palette used on WIP bars and status breakdowns elsewhere in the app); click one to hide or show those rows. Filtering works the same way in both Status and Story grouping.
 
-**Overdue coloring** — non-Done issues whose due date is in the past are shown in red.
+**Collapsible groups** — click a group header (a status bucket, or a story with Sub-tasks) to collapse or expand it.
 
-**Rich hover tooltip** — hovering a bar shows the issue key, summary, status, assignee, requestor, dates, and plan delta (how many days ahead or behind the planned dates).
+**Overdue coloring** — non-Done issues whose due date is in the past are shown in red, overriding the status color.
 
-**Legend** — a small color legend at the top of the chart explains bar types.
+**Status-history bars (hover)** — hover a bar (including a "no dates" row — most issues don't have a manually-tracked start/complete date, but this still works off Jira's own history) to load that issue's real status-transition timeline. The bar re-renders as colored segments — one per status it actually passed through, sized proportionally to how long it sat there — instead of one flat color for the whole span. Useful for spotting where a task actually stalled (e.g., "seven days in Ready for Work") rather than just its current status.
+
+**Rich hover tooltip** — hovering a bar also shows the issue key, summary, status, assignee, requestor, dates, and plan delta (how many days ahead or behind the planned dates).
+
+**Export** — download the current view (respecting active status filters) as **.md** or **.csv**.
+
+**Legend** — a small color legend at the top of the chart explains the Overdue color and the dashed Planned-bar style; the status filter chips double as the color legend for every status.
 
 ### Asks panel
 

@@ -559,6 +559,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 | GET/POST/PUT/DELETE | `/api/watched-assignees` | Contributor Metrics entries, including capacity targets |
 | GET | `/api/project-managers/capacity` | Capacity planning data for selected Contributor Metrics entries |
 | GET | `/api/project-managers/gantt?slug=` | Gantt data for a shared program or `__pinned__` for pinned issues view |
+| GET | `/api/project-managers/gantt/status-history/:issueKey` | On-demand only (hover-triggered) — real Jira status-transition history for one issue, as contiguous segments |
 | POST | `/api/dashboard/refresh` | Pull + store metrics snapshot |
 | GET | `/api/dashboard/metrics` | Read stored snapshot |
 | POST | `/api/report/generate` | Dashboard AI report (Executive/PO/Developer) |
