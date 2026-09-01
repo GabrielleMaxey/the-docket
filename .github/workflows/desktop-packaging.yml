@@ -1,0 +1,79 @@
+name: Desktop Packaging
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-mac:
+    name: Build macOS DMG
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify jiraClient exports
+        run: npm run check:jira-client-exports
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build macOS package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run desktop:dist:mac -- --publish never
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: desktop-macos
+          path: |
+            release/*.dmg
+            release/*.zip
+          if-no-files-found: warn
+
+  build-win:
+    name: Build Windows NSIS
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify jiraClient exports
+        run: npm run check:jira-client-exports
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build Windows package
+        run: npm run desktop:dist:win
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: desktop-windows
+          path: |
+            release/*.exe
+            release/*.msi
+            release/*.blockmap
+          if-no-files-found: warn

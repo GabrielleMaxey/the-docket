@@ -1,0 +1,56 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies & build output
+node_modules
+dist
+dist-ssr
+out
+release
+
+# Vite / build cache
+*.local
+.cache
+
+# Test coverage
+coverage
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Local app data (SQLite, exports) — never commit personal DBs or snapshots
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+
+# Electron-builder debug artifacts (generated at project root on some builds)
+builder-debug.yml
+builder-effective-config.yaml
+
+# Local misc notes (folder name varies by machine)
+MiscFiles/
+MiscFIles/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local secrets
+.env
+.env.*
+!.env.example
