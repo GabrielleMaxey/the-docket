@@ -1,6 +1,6 @@
 import React from "react";
 import { Button, Modal, Table, Message } from "semantic-ui-react";
-import { fetchFavouriteJiraFilters } from "../../services/jiraClient";
+import { fetchJiraFilters } from "../../services/jiraClient";
 import { useJiraAccountIdResolver } from "../hooks/useJiraAccountIdResolver.js";
 
 const JiraFilterImportModal = ({ open, onClose, onImport, slotLabel }) => {
@@ -21,7 +21,7 @@ const JiraFilterImportModal = ({ open, onClose, onImport, slotLabel }) => {
       setLoading(true);
       setError("");
       try {
-        const items = await fetchFavouriteJiraFilters();
+        const items = await fetchJiraFilters();
         if (!cancelled) {
           setFilters(items);
         }
@@ -51,10 +51,11 @@ const JiraFilterImportModal = ({ open, onClose, onImport, slotLabel }) => {
 
   return (
     <Modal open={open} onClose={onClose} size="large">
-      <Modal.Header>Import Jira favourite filter</Modal.Header>
+      <Modal.Header>Import Jira filter</Modal.Header>
       <Modal.Content scrolling>
         <p className="ww-copy">
-          Choose a favourite saved filter to fill {slotLabel}. The filter JQL is copied into the slot.
+          Choose a Jira filter you own or that is shared with you to fill {slotLabel}. The
+          filter JQL is copied into the slot.
         </p>
         {error ? (
           <Message negative size="small">
@@ -73,11 +74,11 @@ const JiraFilterImportModal = ({ open, onClose, onImport, slotLabel }) => {
           <Table.Body>
             {loading ? (
               <Table.Row>
-                <Table.Cell colSpan="4">Loading favourite filters...</Table.Cell>
+                <Table.Cell colSpan="4">Loading Jira filters...</Table.Cell>
               </Table.Row>
             ) : filters.length === 0 ? (
               <Table.Row>
-                <Table.Cell colSpan="4">No favourite filters found in Jira.</Table.Cell>
+                <Table.Cell colSpan="4">No available filters found in Jira.</Table.Cell>
               </Table.Row>
             ) : (
               filters.map((filter) => (

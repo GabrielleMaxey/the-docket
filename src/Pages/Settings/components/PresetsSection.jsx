@@ -136,7 +136,7 @@ const PresetsSection = ({ epicPresets, onPresetsChanged, onError }) => {
     try {
       const filters = await fetchJiraFilters();
       setJiraFilters(filters);
-      if (filters.length === 0) onError("No saved Jira filters found for your account.");
+      if (filters.length === 0) onError("No available Jira filters found for your account.");
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to load Jira filters");
     } finally {
@@ -238,10 +238,10 @@ const PresetsSection = ({ epicPresets, onPresetsChanged, onError }) => {
               onChange={(_e, { value }) => handleEpicFormChange("epicName", value)} />
             <div style={{ marginBottom: "0.75rem" }}>
               <label style={{ display: "block", fontWeight: 700, fontSize: "0.85rem", marginBottom: "0.4rem", color: "#334155" }}>
-                Option A — Import from a saved Jira filter
+                Option A — Import from a Jira filter
               </label>
               <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-                <Button type="button" size="small" onClick={handleLoadJiraFilters} loading={loadingFilters} disabled={loadingFilters}>Browse saved Jira filters</Button>
+                <Button type="button" size="small" onClick={handleLoadJiraFilters} loading={loadingFilters} disabled={loadingFilters}>Browse Jira filters</Button>
                 {jiraFilters.length > 0 ? (
                   <select value={epicForm.jiraFilterId || ""}
                     onChange={(e) => {
@@ -253,7 +253,7 @@ const PresetsSection = ({ epicPresets, onPresetsChanged, onError }) => {
                       }
                     }}
                     style={{ padding: "0.4rem 0.6rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.85rem", minWidth: "220px" }}>
-                    <option value="">Pick a saved filter…</option>
+                    <option value="">Pick a Jira filter…</option>
                     {jiraFilters.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                   </select>
                 ) : null}
@@ -261,7 +261,7 @@ const PresetsSection = ({ epicPresets, onPresetsChanged, onError }) => {
               {epicForm.jiraFilterId ? (
                 <p style={{ fontSize: "0.78rem", color: "#22c55e", marginTop: "0.25rem" }}>✓ Filter ID {epicForm.jiraFilterId} selected — JQL loaded below.</p>
               ) : (
-                <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.25rem" }}>Click "Browse saved Jira filters" to load your filters, then pick one to auto-fill the JQL.</p>
+                <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.25rem" }}>Click "Browse Jira filters" to load filters you own or that are shared with you, then pick one to auto-fill the JQL.</p>
               )}
             </div>
             <div style={{ marginBottom: "0.5rem" }}>

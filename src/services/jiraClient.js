@@ -463,11 +463,6 @@ export const importEpicPresetsPack = async ({ presets, mode = "merge" }) =>
     body: JSON.stringify({ presets, mode }),
   });
 
-export const fetchFavouriteJiraFilters = async () => {
-  const data = await requestJson("/api/jira/filters/favourite");
-  return data?.items || [];
-};
-
 export const runEpicFilters = async ({ epicPresetIds, includePastDue, maxResults = 200 }) => {
   const data = await requestJson("/api/epic-filters/run", {
     method: "POST",
@@ -621,6 +616,9 @@ export const fetchJiraFilters = async () => {
   return Array.isArray(data) ? data : [];
 };
 
+/** @deprecated Prefer fetchJiraFilters — same owned + shared list via filter/search. */
+export const fetchFavouriteJiraFilters = async () => fetchJiraFilters();
+
 export const refreshDashboardMetrics = async (payload, options = {}) => {
   const data = await requestJson("/api/dashboard/refresh", {
     method: "POST",
@@ -691,10 +689,23 @@ export const fetchJiraCreateMeta = async (projectKey) => {
   return requestJson(`/api/jira/projects/${encodeURIComponent(projectKey)}/createmeta`);
 };
 
-export const fetchJiraCreateFieldOptions = async (projectKey, issueType = "Story") => {
-  const type = encodeURIComponent(String(issueType || "Story").trim() || "Story");
+export const fetchJiraCreateFieldOptions = async (
+  projectKey,
+  issueType = "Story",
+  { parentRole = "", isSubtask = false } = {}
+) => {
+  const params = new URLSearchParams({
+    issueType: String(issueType || "Story").trim() || "Story",
+  });
+  const role = String(parentRole || "").trim();
+  if (role) {
+    params.set("parentRole", role);
+  }
+  if (isSubtask) {
+    params.set("isSubtask", "true");
+  }
   return requestJson(
-    `/api/jira/projects/${encodeURIComponent(projectKey)}/create-field-options?issueType=${type}`
+    `/api/jira/projects/${encodeURIComponent(projectKey)}/create-field-options?${params.toString()}`
   );
 };
 
