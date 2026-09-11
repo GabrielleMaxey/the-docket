@@ -221,14 +221,20 @@ export const registerJiraIssueRoutes = (
     }
 
     const issueTypeName = String(req.query.issueType || "Story").trim() || "Story";
+    const parentRole = String(req.query.parentRole || "").trim();
+    const isSubtask =
+      String(req.query.isSubtask || "").trim().toLowerCase() === "true" ||
+      String(req.query.isSubtask || "").trim() === "1";
 
     try {
       const options = await loadCreateFieldOptions({
         projectKey,
         issueTypeName,
+        parentRole,
+        isSubtask,
         jiraRequest,
       });
-      return res.json({ projectKey, issueType: issueTypeName, ...options });
+      return res.json({ projectKey, issueType: issueTypeName, parentRole, ...options });
     } catch (error) {
       return res.status(500).json({
         error: "Failed to load create field options",
@@ -547,19 +553,23 @@ export const registerJiraIssueRoutes = (
       try {
         parsed = JSON.parse(cleaned);
       } catch {
-        return res.json({
-          needsClarification: false,
-          questions: [],
-          description: cleaned,
-          subtasks: [],
-          summary: null,
-          priority: null,
+        return res.status(422).json({
+          error: "AI Draft returned text that was not valid JSON. Try AI Draft again.",
         });
       }
 
-      return res.json(
-        buildGenerateDescriptionResponse(parsed, { isStory, isBug, allowSummary: hasIntake })
-      );
+      const response = buildGenerateDescriptionResponse(parsed, {
+        isStory,
+        isBug,
+        allowSummary: hasIntake,
+      });
+      if (!String(response.description || "").trim() && !response.needsClarification) {
+        return res.status(422).json({
+          error: "AI Draft did not return a description. Try again or write the description yourself.",
+        });
+      }
+
+      return res.json(response);
     } catch (error) {
       log.error("generate-description failed", error instanceof Error ? error.message : error);
       return res.status(500).json({

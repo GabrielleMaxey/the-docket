@@ -5,6 +5,7 @@ import { createLogger } from "../lib/logger.mjs";
 const log = createLogger("jira-core");
 
 import { searchAllIssues, searchJiraUsers, fetchJiraUsersByAccountIds } from "../lib/jiraSearchHelpers.mjs";
+import { listAvailableJiraFilters } from "../lib/jiraFilterList.mjs";
 
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
 
@@ -34,21 +35,12 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
     }
 
     try {
-      // /rest/api/3/filter/my returns filters owned by the authenticated
-      // user only - not shared/public filters from other people.
-      const result = await jiraRequest({
-        pathWithQuery: "/rest/api/3/filter/my?expand=jql&orderBy=name",
-      });
+      // filter/search returns owned + shared filters the user can see (not favourites-only).
+      const result = await listAvailableJiraFilters({ jiraRequest });
       if (!result.ok) {
         return res.status(result.status).json(result.data);
       }
-      // /filter/my returns a plain array (not paginated with a values key).
-      const filters = Array.isArray(result.data)
-        ? result.data
-        : Array.isArray(result.data?.values)
-          ? result.data.values
-          : [];
-      return res.json(filters);
+      return res.json(result.data?.items || []);
     } catch (error) {
       return res.status(500).json({
         error: "Failed to fetch Jira filters",

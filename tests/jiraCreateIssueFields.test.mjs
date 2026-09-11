@@ -191,7 +191,7 @@ describe("applyOdiCreateFields", () => {
       },
     };
 
-    applyOdiCreateFields({
+    const result = applyOdiCreateFields({
       fields,
       issueTypeFields,
       issueType: "Bug",
@@ -201,9 +201,46 @@ describe("applyOdiCreateFields", () => {
       projectComponents: [{ name: "WGA-DEV" }],
     });
 
+    assert.equal(result.ok, true);
     assert.deepEqual(fields.components, [{ name: "WGA-DEV" }]);
     assert.deepEqual(fields.customfield_20001, { value: "Vertical-IP" });
     assert.deepEqual(fields.customfield_20002, { value: "BUG Tracking-Itential Platform" });
+  });
+
+  it("rejects unknown vertical component values instead of silently accepting", () => {
+    const fields = {};
+    const result = applyOdiCreateFields({
+      fields,
+      issueTypeFields: {
+        customfield_20001: {
+          name: "Vertical Components",
+          schema: { type: "option" },
+          allowedValues: [{ value: "Vertical-IP" }],
+        },
+      },
+      issueType: "Story",
+      component: "",
+      verticalComponent: "Not-A-Real-Vertical",
+      bugTracking: "",
+      projectComponents: [],
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /not a valid/i);
+    assert.equal(fields.customfield_20001, undefined);
+  });
+
+  it("errors when vertical component is set but the field is missing on the issue type", () => {
+    const result = applyOdiCreateFields({
+      fields: {},
+      issueTypeFields: {},
+      issueType: "Story",
+      component: "",
+      verticalComponent: "Vertical-IP",
+      bugTracking: "",
+      projectComponents: [],
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /Vertical Components field is not available/i);
   });
 
   it("rejects unknown component names", () => {

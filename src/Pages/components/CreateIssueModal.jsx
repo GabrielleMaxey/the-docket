@@ -211,6 +211,9 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   );
   const [bugTrackingOptions, setBugTrackingOptions] = React.useState(BUG_TRACKING_OPTIONS);
   const [bugTrackingValue, setBugTrackingValue] = React.useState("");
+  const [loadingFieldOptions, setLoadingFieldOptions] = React.useState(false);
+  const [fieldOptionsError, setFieldOptionsError] = React.useState("");
+  const [fieldOptionsLoaded, setFieldOptionsLoaded] = React.useState(false);
   const [clarificationQuestions, setClarificationQuestions] = React.useState([]);
   const [needsClarification, setNeedsClarification] = React.useState(false);
   const [useAiHelper, setUseAiHelper] = React.useState(false);
@@ -384,6 +387,12 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     setComponentValue("");
     setVerticalComponentValue("");
     setBugTrackingValue("");
+    setComponentOptions(COMPONENT_OPTIONS);
+    setVerticalComponentOptions(VERTICAL_COMPONENT_OPTIONS);
+    setBugTrackingOptions(BUG_TRACKING_OPTIONS);
+    setLoadingFieldOptions(false);
+    setFieldOptionsError("");
+    setFieldOptionsLoaded(false);
     setClarificationQuestions([]);
     setNeedsClarification(false);
     setUseAiHelper(false);
@@ -402,6 +411,10 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
         if (!cancelled) {
           setProjects(items);
           setJiraBaseUrl(String(health?.jiraBaseUrl || "").trim());
+          // Auto-select the only (or first) project so component options can load.
+          if (items.length > 0) {
+            setProjectKey((prev) => prev || String(items[0]?.key || "").trim());
+          }
         }
       } catch {
         if (!cancelled) {
@@ -434,11 +447,21 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   }, [open, projectKey, issueType]);
 
   React.useEffect(() => {
-    if (!open || !projectKey) return;
+    if (!open || !projectKey) {
+      setLoadingFieldOptions(false);
+      setFieldOptionsError("");
+      setFieldOptionsLoaded(false);
+      return;
+    }
     let cancelled = false;
     const load = async () => {
+      setLoadingFieldOptions(true);
+      setFieldOptionsError("");
+      setFieldOptionsLoaded(false);
       try {
-        const data = await fetchJiraCreateFieldOptions(projectKey, issueType);
+        const data = await fetchJiraCreateFieldOptions(projectKey, issueType, {
+          parentRole,
+        });
         if (cancelled) return;
         const components = Array.isArray(data?.components) ? data.components : [];
         const vertical = Array.isArray(data?.verticalComponents) ? data.verticalComponents : [];
@@ -456,19 +479,26 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             bugTracking.length > 0 ? bugTracking : ODI_BUG_TRACKING_OPTIONS
           )
         );
-      } catch {
+        setFieldOptionsLoaded(true);
+      } catch (loadError) {
         if (!cancelled) {
           setComponentOptions(COMPONENT_OPTIONS);
           setVerticalComponentOptions(VERTICAL_COMPONENT_OPTIONS);
           setBugTrackingOptions(BUG_TRACKING_OPTIONS);
+          setFieldOptionsError(
+            loadError instanceof Error ? loadError.message : "Failed to load field options from Jira"
+          );
+          setFieldOptionsLoaded(true);
         }
+      } finally {
+        if (!cancelled) setLoadingFieldOptions(false);
       }
     };
     void load();
     return () => {
       cancelled = true;
     };
-  }, [open, projectKey, issueType]);
+  }, [open, projectKey, issueType, parentRole]);
 
   React.useEffect(() => {
     if (issueType !== "Story") {
@@ -776,6 +806,12 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       });
       if (result?.description) {
         setDescription(result.description);
+      } else if (result?.needsClarification) {
+        setError(
+          "AI Draft needs clarification before it can write a description. Answer the questions below, then run AI Draft again."
+        );
+      } else {
+        setError("AI Draft did not return a description. Try again or write the description yourself.");
       }
       setDraftedFromIntake(useAiHelper);
       setNeedsClarification(Boolean(result?.needsClarification));
@@ -959,7 +995,47 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     (useAiHelper ? intakeCheck.valid : Boolean(summary.trim())) &&
     !generatingDesc &&
     !submitting;
-  const formLoading = loadingMeta || submitting || generatingDesc || creatingSubtasks;
+  const aiDraftDisabledReason = !canEditIssueFields
+    ? "Select a parent (epic or story) before using AI Draft."
+    : useAiHelper && !intakeCheck.valid
+      ? "Fill the required guided questions before using AI Draft."
+      : !useAiHelper && !summary.trim()
+        ? "Enter a title before using AI Draft."
+        : generatingDesc || submitting
+          ? "Wait for the current action to finish."
+          : "";
+  const formLoading = loadingMeta || submitting || generatingDesc || creatingSubtasks || loadingFieldOptions;
+
+  const componentsHint = !projectKey
+    ? "Select a project to load Components from Jira."
+    : loadingFieldOptions
+      ? "Loading Components from Jira…"
+      : fieldOptionsError
+        ? `Could not load Components: ${fieldOptionsError}`
+        : fieldOptionsLoaded && componentOptions.length === 0
+          ? "No Components found for this project. Add them in Jira, or leave blank."
+          : "Loaded from the Jira project. Names must already exist as project components.";
+
+  const verticalComponentsHint = !projectKey
+    ? "Select a project to load Vertical Components from Jira."
+    : loadingFieldOptions
+      ? "Loading Vertical Components from Jira…"
+      : fieldOptionsError
+        ? `Could not load Vertical Components: ${fieldOptionsError}`
+        : fieldOptionsLoaded && verticalComponentOptions.length === 0
+          ? "No Vertical Components options on this issue type. Leave blank if unused."
+          : "Options come from the Vertical Components field on this issue type.";
+
+  const bugTrackingHint = !projectKey
+    ? "Select a project to load BUG Tracking options from Jira."
+    : loadingFieldOptions
+      ? "Loading BUG Tracking options from Jira…"
+      : fieldOptionsError
+        ? `Could not load BUG Tracking: ${fieldOptionsError}`
+        : fieldOptionsLoaded && bugTrackingOptions.length === 0
+          ? "No BUG Tracking options on Bugs. Leave blank if unused."
+          : "Options come from the BUG Tracking field on Bugs.";
+
   const createdIssueUrl = buildJiraBrowseUrl(jiraBaseUrl, createdIssueKey);
 
   return (
@@ -1243,20 +1319,20 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             label="Components"
             value={componentValue}
             options={componentOptions}
-            disabled={!canEditIssueFields}
+            disabled={!canEditIssueFields || !projectKey || loadingFieldOptions}
             placeholder="Select or type a component"
             onChange={setComponentValue}
-            hint="Loaded from the Jira project. Names must already exist as project components."
+            hint={componentsHint}
           />
 
           <ComboDropdownField
             label="Vertical Components"
             value={verticalComponentValue}
             options={verticalComponentOptions}
-            disabled={!canEditIssueFields}
+            disabled={!canEditIssueFields || !projectKey || loadingFieldOptions}
             placeholder="Select or type a vertical component"
             onChange={setVerticalComponentValue}
-            hint="Options come from the Vertical Components field on this issue type."
+            hint={verticalComponentsHint}
           />
 
           {issueType === "Bug" ? (
@@ -1264,40 +1340,42 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
               label="BUG Tracking"
               value={bugTrackingValue}
               options={bugTrackingOptions}
-              disabled={!canEditIssueFields}
+              disabled={!canEditIssueFields || !projectKey || loadingFieldOptions}
               placeholder="Select or type a bug tracking category"
               onChange={setBugTrackingValue}
-              hint="Options come from the BUG Tracking field on Bugs."
+              hint={bugTrackingHint}
             />
           ) : null}
 
           <Form.Field>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
               <label style={{ margin: 0 }}>Description</label>
-              <Button
-                type="button"
-                size="small"
-                loading={generatingDesc}
-                disabled={!canGenerate}
-                onClick={handleGenerateDescription}
-                style={{
-                  backgroundColor: "#0c93d9",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "0.35em 0.85em",
-                  fontSize: "0.82rem",
-                  fontWeight: 600,
-                  letterSpacing: "0.01em",
-                  cursor: canGenerate ? "pointer" : "not-allowed",
-                  opacity: canGenerate ? 1 : 0.5,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.35em",
-                }}
-              >
-                ✦ AI Draft
-              </Button>
+              <span title={aiDraftDisabledReason || "Generate a description with AI"}>
+                <Button
+                  type="button"
+                  size="small"
+                  loading={generatingDesc}
+                  disabled={!canGenerate}
+                  onClick={handleGenerateDescription}
+                  style={{
+                    backgroundColor: "#0c93d9",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "6px",
+                    padding: "0.35em 0.85em",
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    letterSpacing: "0.01em",
+                    cursor: canGenerate ? "pointer" : "not-allowed",
+                    opacity: canGenerate ? 1 : 0.5,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.35em",
+                  }}
+                >
+                  ✦ AI Draft
+                </Button>
+              </span>
             </div>
             <textarea value={description} rows={8} disabled={!canEditIssueFields}
               onChange={(e) => {

@@ -15,6 +15,7 @@ import {
   OVERDUE_DATE_BASES,
   normalizeOverdueDateBasis,
 } from "../../shared/overdueDateBasis.mjs";
+import { listAvailableJiraFilters } from "../lib/jiraFilterList.mjs";
 
 const EPIC_PAST_DUE_MODES = new Set(["most_recent_done_date", "project_end_date", "either"]);
 const WATCH_TYPES = new Set(["person", "jql", "direct_reports"]);
@@ -379,29 +380,23 @@ export const registerAppConfigRoutes = (app, { db, jiraRequest, ensureEnvOrRespo
     });
   });
 
+  // Alias of /api/jira/filters — kept so older clients still work. Lists owned + shared
+  // filters via filter/search (not favourites-only).
   app.get("/api/jira/filters/favourite", async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
 
     try {
-      const result = await jiraRequest({ pathWithQuery: "/rest/api/3/filter/favourite" });
+      const result = await listAvailableJiraFilters({ jiraRequest });
       if (!result.ok) {
         return res.status(result.status).json(result.data);
       }
 
-      const filters = Array.isArray(result.data) ? result.data : [];
-      return res.json({
-        items: filters.map((filter) => ({
-          id: String(filter.id || ""),
-          name: String(filter.name || "").trim(),
-          jql: String(filter.jql || "").trim(),
-          owner: filter.owner?.displayName || filter.owner?.name || "",
-        })),
-      });
+      return res.json({ items: result.data?.items || [] });
     } catch (error) {
       return res.status(500).json({
-        error: "Failed to list favourite Jira filters",
+        error: "Failed to list Jira filters",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

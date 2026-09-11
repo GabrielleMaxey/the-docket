@@ -82,6 +82,8 @@ const uniqueSortedLabels = (labels) =>
 export const loadCreateFieldOptions = async ({
   projectKey,
   issueTypeName = "Story",
+  parentRole = "",
+  isSubtask = false,
   jiraRequest,
 }) => {
   const [projectComponents, createMeta] = await Promise.all([
@@ -93,11 +95,14 @@ export const loadCreateFieldOptions = async ({
     (projectComponents || []).map((item) => item?.name)
   );
 
+  // Pass parentRole so Task-under-Story resolves Sub-task createmeta (same as create).
   const issueTypeFields =
     resolveIssueTypeMeta({
       project: createMeta?.ok ? createMeta.project : null,
       issueTypeName,
-      needsParent: false,
+      needsParent: Boolean(parentRole) || issueTypeName === "Task",
+      parentRole: String(parentRole || "").trim(),
+      isSubtask: Boolean(isSubtask),
     })?.fields || {};
 
   const verticalMatch = findCreateMetaField(issueTypeFields, isVerticalComponentsField);
@@ -245,7 +250,7 @@ const resolveAllowedOptionValue = (meta, text) => {
   const allowed = Array.isArray(meta?.allowedValues) ? meta.allowedValues : [];
   const normalized = String(text || "").trim();
   if (!normalized) {
-    return null;
+    return { ok: false, error: "Value is required." };
   }
 
   const exact = allowed.find((item) => {
@@ -254,23 +259,32 @@ const resolveAllowedOptionValue = (meta, text) => {
   });
   if (exact) {
     if (exact.value !== undefined && exact.value !== null && exact.value !== "") {
-      return { value: exact.value };
+      return { ok: true, payload: { value: exact.value } };
     }
     if (exact.name) {
-      return { name: exact.name };
+      return { ok: true, payload: { name: exact.name } };
     }
     if (exact.id) {
-      return { id: exact.id };
+      return { ok: true, payload: { id: exact.id } };
     }
   }
 
-  return { value: normalized };
+  // When Jira publishes allowedValues, reject free-text that is not on the list.
+  if (allowed.length > 0) {
+    const fieldLabel = String(meta?.name || "field").trim() || "field";
+    return {
+      ok: false,
+      error: `'${normalized}' is not a valid ${fieldLabel} value. Choose an option from the list or leave the field blank.`,
+    };
+  }
+
+  return { ok: true, payload: { value: normalized } };
 };
 
 export const applyNamedFieldValue = ({ fields, fieldKey, meta, value, projectComponents }) => {
   const text = String(value || "").trim();
   if (!text || !fieldKey || !meta) {
-    return { ok: false };
+    return { ok: false, error: "Missing field value." };
   }
 
   const schema = meta.schema || {};
@@ -292,7 +306,11 @@ export const applyNamedFieldValue = ({ fields, fieldKey, meta, value, projectCom
   }
 
   if (schema.type === "option" || Array.isArray(meta.allowedValues)) {
-    fields[fieldKey] = resolveAllowedOptionValue(meta, text);
+    const resolved = resolveAllowedOptionValue(meta, text);
+    if (!resolved.ok) {
+      return resolved;
+    }
+    fields[fieldKey] = resolved.payload;
     return { ok: true };
   }
 
@@ -317,45 +335,64 @@ export const applyOdiCreateFields = ({
   const componentValue = String(component || "").trim();
   if (componentValue) {
     const match = findCreateMetaField(issueTypeFields, isComponentsField);
-    if (match) {
-      const result = applyNamedFieldValue({
-        fields,
-        fieldKey: match.fieldKey,
-        meta: match.meta,
-        value: componentValue,
-        projectComponents,
-      });
-      if (!result.ok) {
-        return result;
-      }
+    if (!match) {
+      return {
+        ok: false,
+        error: "Components field is not available on this issue type. Clear Components or pick another type.",
+      };
+    }
+    const result = applyNamedFieldValue({
+      fields,
+      fieldKey: match.fieldKey,
+      meta: match.meta,
+      value: componentValue,
+      projectComponents,
+    });
+    if (!result.ok) {
+      return result;
     }
   }
 
   const verticalValue = String(verticalComponent || "").trim();
   if (verticalValue) {
     const match = findCreateMetaField(issueTypeFields, isVerticalComponentsField);
-    if (match) {
-      applyNamedFieldValue({
-        fields,
-        fieldKey: match.fieldKey,
-        meta: match.meta,
-        value: verticalValue,
-        projectComponents,
-      });
+    if (!match) {
+      return {
+        ok: false,
+        error:
+          "Vertical Components field is not available on this issue type. Clear Vertical Components or pick another type.",
+      };
+    }
+    const result = applyNamedFieldValue({
+      fields,
+      fieldKey: match.fieldKey,
+      meta: match.meta,
+      value: verticalValue,
+      projectComponents,
+    });
+    if (!result.ok) {
+      return result;
     }
   }
 
   const bugTrackingValue = String(bugTracking || "").trim();
   if (issueType === "Bug" && bugTrackingValue) {
     const match = findCreateMetaField(issueTypeFields, isBugTrackingField);
-    if (match) {
-      applyNamedFieldValue({
-        fields,
-        fieldKey: match.fieldKey,
-        meta: match.meta,
-        value: bugTrackingValue,
-        projectComponents,
-      });
+    if (!match) {
+      return {
+        ok: false,
+        error: "BUG Tracking field is not available on Bugs. Clear BUG Tracking or continue without it.",
+      };
+    }
+    const result = applyNamedFieldValue({
+      fields,
+      fieldKey: match.fieldKey,
+      meta: match.meta,
+      value: bugTrackingValue,
+      projectComponents,
+    });
+    if (!result.ok) {
+      return result;
     }
   }
 

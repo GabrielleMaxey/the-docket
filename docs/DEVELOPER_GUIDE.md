@@ -543,8 +543,8 @@ All routes mounted by `server/jiraProxy.mjs`.
 | POST | `/api/epic-presets/import` | Import team pack (`merge` or `replace`) |
 | GET | `/api/epic-presets/:id/scope-jql` | Resolves a preset's real JQL (epic-key, Jira filter, or hand-authored) with any trailing `ORDER BY` stripped — `{ scopeJql }`. Caller wraps it: `(${scopeJql}) AND <clause>` |
 | POST | `/api/epic-filters/run` | Run preset JQL (Task Management) |
-| GET | `/api/jira/filters` | Jira filters list |
-| GET | `/api/jira/filters/favourite` | Favourite filters |
+| GET | `/api/jira/filters` | Available Jira filters (owned + shared; paginated `filter/search`) |
+| GET | `/api/jira/filters/favourite` | Alias of `/api/jira/filters` (same available list; legacy path) |
 | GET | `/api/jira/filters/:id` | Single filter by ID |
 | GET/PUT | `/api/jira/field-mappings` | Date field role mappings |
 | POST | `/api/jira/field-mappings/sync` | Sync mappings from Jira |
