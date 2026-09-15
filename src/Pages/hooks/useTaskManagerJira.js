@@ -272,6 +272,7 @@ export const useTaskManagerJira = () => {
     try { return localStorage.getItem("ww_show_planning") === "true"; } catch { return false; }
   });
   const [expandedPlanningKey, setExpandedPlanningKey] = React.useState(null);
+  const [expandedRowKey, setExpandedRowKey] = React.useState(null);
   const [assigneeDrafts, setAssigneeDrafts] = React.useState({});
   const [assigneeAccountIds, setAssigneeAccountIds] = React.useState({});
   const [rowUpdateState, setRowUpdateState] = React.useState({});
@@ -993,6 +994,26 @@ export const useTaskManagerJira = () => {
     setExpandedPlanningKey((prev) => (prev === issueKey ? null : issueKey));
   };
 
+  const expandedRowKeyRef = React.useRef(null);
+  React.useEffect(() => {
+    expandedRowKeyRef.current = expandedRowKey;
+  }, [expandedRowKey]);
+
+  const handleToggleRowExpand = (issueKey) => {
+    const key = String(issueKey || "").trim();
+    if (!key) return;
+    const prev = expandedRowKeyRef.current;
+    if (prev === key) {
+      setExpandedRowKey(null);
+      setExpandedPlanningKey((planKey) => (planKey === key ? null : planKey));
+      return;
+    }
+    if (prev) {
+      setExpandedPlanningKey((planKey) => (planKey === prev ? null : planKey));
+    }
+    setExpandedRowKey(key);
+  };
+
   const handleSavePlanningAll = React.useCallback(async (issueKey, options = {}) => {
     const sharedProgramId = String(options.sharedProgramId || "").trim();
     const meta = planningMetaByKey[issueKey] || {};
@@ -1328,6 +1349,7 @@ export const useTaskManagerJira = () => {
     planningMetaByKey,
     showPlanningPanel,
     expandedPlanningKey,
+    expandedRowKey,
     assigneeDrafts,
     rowUpdateState,
     noteImagesByKey,
@@ -1370,6 +1392,7 @@ export const useTaskManagerJira = () => {
     handleClearDateTracking,
     handleTogglePlanningPanel,
     handleTogglePlanningRow,
+    handleToggleRowExpand,
     handleSavePlanningAll,
     handlePlanningFieldChange,
     handlePinnedGanttChange,
