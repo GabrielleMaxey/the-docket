@@ -1623,13 +1623,15 @@
 /* ── results table ── */
 .work-week-page .ww-results-table-wrap {
   width: 100%;
-  overflow-x: auto;
+  max-height: min(70vh, 52rem);
+  overflow: auto;
 }
 
 .work-week-page .ww-results-table {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 1160px;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 720px;
   background: #ffffff;
   border: 1px solid #dbe4f0;
   box-shadow: 0 1px 2px rgba(15, 49, 51, 0.05), 0 6px 16px rgba(15, 49, 51, 0.06);
@@ -1644,78 +1646,41 @@
   color: #0f172a;
 }
 
-/* Key */
+/* Expand chevron */
 .work-week-page .ww-results-table th:nth-child(1),
 .work-week-page .ww-results-table td:nth-child(1) {
-  width: 7%;
-  min-width: 100px;
-}
-
-/* Parent */
-.work-week-page .ww-results-table th:nth-child(2),
-.work-week-page .ww-results-table td:nth-child(2) {
-  width: 6%;
-  min-width: 85px;
-  white-space: nowrap;
-}
-
-/* Jira Type */
-.work-week-page .ww-results-table th:nth-child(3),
-.work-week-page .ww-results-table td:nth-child(3) {
-  width: 5%;
-  min-width: 90px;
-  white-space: nowrap;
+  width: 2.5%;
+  min-width: 2rem;
+  padding-left: 0.35rem;
   padding-right: 0.2rem;
 }
 
-/* Summary */
-.work-week-page .ww-results-table th:nth-child(4),
-.work-week-page .ww-results-table td:nth-child(4) {
-  width: 28%;
-  min-width: 220px;
-  padding-left: 0.3rem;
+/* Key */
+.work-week-page .ww-results-table th:nth-child(2),
+.work-week-page .ww-results-table td:nth-child(2) {
+  width: 10%;
+  min-width: 90px;
 }
 
-/* Status / Assignee */
-.work-week-page .ww-results-table th:nth-child(5),
-.work-week-page .ww-results-table td:nth-child(5) {
-  width: 12%;
+/* Summary */
+.work-week-page .ww-results-table th:nth-child(3),
+.work-week-page .ww-results-table td:nth-child(3) {
+  width: 42%;
+  min-width: 220px;
+}
+
+/* Status */
+.work-week-page .ww-results-table th:nth-child(4),
+.work-week-page .ww-results-table td:nth-child(4) {
+  width: 22%;
   min-width: 150px;
 }
 
-/* Updated */
-.work-week-page .ww-results-table th:nth-child(6),
-.work-week-page .ww-results-table td:nth-child(6) {
-  width: 5%;
-  min-width: 75px;
-}
-
-/* Dates — Due / MRD / Start stacked in one cell */
-.work-week-page .ww-results-table th:nth-child(7),
-.work-week-page .ww-results-table td:nth-child(7) {
-  width: 15%;
-  min-width: 190px;
-}
-
 /* Priority */
-.work-week-page .ww-results-table th:nth-child(8),
-.work-week-page .ww-results-table td:nth-child(8) {
-  width: 6%;
-  min-width: 80px;
-}
-
-/* Notes */
-.work-week-page .ww-results-table th:nth-child(9),
-.work-week-page .ww-results-table td:nth-child(9) {
-  width: 27%;
-  min-width: 360px;
-}
-
-/* Push to Jira */
-.work-week-page .ww-results-table th:nth-child(10),
-.work-week-page .ww-results-table td:nth-child(10) {
+.work-week-page .ww-results-table th:nth-child(5),
+.work-week-page .ww-results-table td:nth-child(5) {
   width: 8%;
-  min-width: 110px;
+  min-width: 80px;
 }
 
 .work-week-page .ww-th-status-assignee {
@@ -1740,6 +1705,13 @@
   text-align: left;
   background: #f8fafc;
   font-weight: 700;
+}
+
+.work-week-page .ww-results-table > thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  box-shadow: 0 1px 0 #e2e8f0;
 }
 
 .work-week-page .ww-results-table textarea,
@@ -1956,8 +1928,11 @@
 }
 
 .work-week-page .ww-push-selected-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
   padding: 0.4rem 0 0.4rem;
-  text-align: right;
 }
 
 .work-week-page .ww-push-selected-btn {
@@ -2090,12 +2065,132 @@
   outline-offset: -2px;
 }
 
-.work-week-page .ww-row-has-tracking td:first-child::after {
+.work-week-page .ww-row-has-tracking .ww-cell-key::after {
   content: "●";
   font-size: 0.5rem;
   color: #60a5fa;
   vertical-align: super;
   margin-left: 0.15rem;
+}
+
+.work-week-page .ww-row-expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: var(--color-text-secondary, #64748b);
+  border-radius: 3px;
+}
+
+.work-week-page .ww-row-expand-btn:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.work-week-page .ww-row-expand-btn--open {
+  color: #2563eb;
+}
+
+.work-week-page .ww-summary-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.work-week-page .ww-row-detail-cell {
+  padding: 0;
+  background: transparent;
+  border-top: none;
+}
+
+.work-week-page .ww-row-detail-panel {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.work-week-page table.ww-results-table.ww-results-table--expanded-detail {
+  min-width: 1160px;
+  width: 100%;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.work-week-page .ww-results-table--expanded-detail td {
+  border-bottom: none;
+}
+
+.work-week-page .ww-results-table--expanded-detail th:nth-child(1),
+.work-week-page .ww-results-table--expanded-detail td:nth-child(1) {
+  width: 7%;
+  min-width: 100px;
+}
+
+.work-week-page .ww-results-table--expanded-detail th:nth-child(2),
+.work-week-page .ww-results-table--expanded-detail td:nth-child(2) {
+  width: 6%;
+  min-width: 85px;
+  white-space: nowrap;
+}
+
+.work-week-page .ww-results-table--expanded-detail th:nth-child(3),
+.work-week-page .ww-results-table--expanded-detail td:nth-child(3) {
+  width: 5%;
+  min-width: 90px;
+  white-space: nowrap;
+  padding-right: 0.2rem;
+}
+
+.work-week-page .ww-results-table--expanded-detail th:nth-child(4),
+.work-week-page .ww-results-table--expanded-detail td:nth-child(4) {
+  width: 28%;
+  min-width: 220px;
+  padding-left: 0.3rem;
+}
+
+.work-week-page .ww-results-table--expanded-detail th:nth-child(5),
+.work-week-page .ww-results-table--expanded-detail td:nth-child(5) {
+  width: 12%;
+  min-width: 150px;
+}
+
+.work-week-page .ww-results-table--expanded-detail th:nth-child(6),
+.work-week-page .ww-results-table--expanded-detail td:nth-child(6) {
+  width: 5%;
+  min-width: 75px;
+}
+
+.work-week-page .ww-results-table--expanded-detail th:nth-child(7),
+.work-week-page .ww-results-table--expanded-detail td:nth-child(7) {
+  width: 15%;
+  min-width: 190px;
+}
+
+.work-week-page .ww-results-table--expanded-detail th:nth-child(8),
+.work-week-page .ww-results-table--expanded-detail td:nth-child(8) {
+  width: 6%;
+  min-width: 80px;
+}
+
+.work-week-page .ww-results-table--expanded-detail th:nth-child(9),
+.work-week-page .ww-results-table--expanded-detail td:nth-child(9) {
+  width: 27%;
+  min-width: 360px;
+}
+
+.work-week-page .ww-results-table--expanded-detail th:nth-child(10),
+.work-week-page .ww-results-table--expanded-detail td:nth-child(10) {
+  width: 8%;
+  min-width: 110px;
+}
+
+.work-week-page .ww-row-detail-row > td {
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .work-week-page .ww-planning-expand-btn {

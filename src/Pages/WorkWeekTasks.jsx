@@ -107,7 +107,7 @@ const WorkWeekTasks = () => {
     jiraNotes, jiraRowPriorities, prioritySourceByKey, selectedForPush,
     lastPushedJiraNoteByKey, pushState, saveState,
     statusDrafts, iddDrafts, dueDateDrafts, mrdDrafts, startDateByKey, completeDateByKey,
-    planningMetaByKey, expandedPlanningKey,
+    planningMetaByKey, expandedPlanningKey, expandedRowKey,
     assigneeDrafts, rowUpdateState, noteImagesByKey, noteImageErrorsByKey,
     keepNoteImagesByKey, noteImageKeepPendingByKey,
     isClosedLikeStatus, clampPriority, getPriorityClass,
@@ -120,7 +120,7 @@ const WorkWeekTasks = () => {
     handleDueDateDraftChange, handleDueDateUpdate,
     handleMrdDraftChange, handleMrdUpdate, handleStartDateChange,
     handleCompleteDateChange, handleClearDateTracking,
-    handleTogglePlanningRow, handleSavePlanningAll, handlePlanningFieldChange, handlePinnedGanttChange,
+    handleTogglePlanningRow, handleToggleRowExpand, handleSavePlanningAll, handlePlanningFieldChange, handlePinnedGanttChange,
     handleAssigneeDraftChange, handleAssigneeUpdate,
     handleRowPriorityChange, handleNoteChange, handleNoteImagesAdd, handleNoteImageRemove,
     handleKeepNoteImagesToggle,
@@ -595,6 +595,7 @@ const WorkWeekTasks = () => {
           planningMetaByKey={planningMetaByKey}
 
           expandedPlanningKey={expandedPlanningKey}
+          expandedRowKey={expandedRowKey}
           assigneeDrafts={assigneeDrafts} jiraRowPriorities={jiraRowPriorities}
           prioritySourceByKey={prioritySourceByKey}
           jiraNotes={jiraNotes} statusOptions={STATUS_OPTIONS}
@@ -613,6 +614,7 @@ const WorkWeekTasks = () => {
           handleClearDateTracking={handleClearDateTracking}
 
           handleTogglePlanningRow={handleTogglePlanningRow}
+          handleToggleRowExpand={handleToggleRowExpand}
           handleSavePlanningAll={handleSavePlanningAll}
           handlePlanningFieldChange={handlePlanningFieldChange}
           handlePinnedGanttChange={handlePinnedGanttChange}

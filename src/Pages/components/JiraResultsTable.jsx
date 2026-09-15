@@ -113,6 +113,7 @@ const JiraResultsTable = ({
   completeDateByKey,
   planningMetaByKey,
   expandedPlanningKey,
+  expandedRowKey,
   assigneeDrafts,
   jiraRowPriorities,
   jiraNotes,
@@ -142,6 +143,7 @@ const JiraResultsTable = ({
   handleCompleteDateChange,
   handleClearDateTracking,
   handleTogglePlanningRow,
+  handleToggleRowExpand,
   handleSavePlanningAll,
   handlePlanningFieldChange,
   handlePinnedGanttChange,
@@ -313,6 +315,58 @@ const JiraResultsTable = ({
     }
     setPageByRunIndex((prevPages) => ({ ...prevPages, [stateKey]: 1 }));
   }, [drillDownFilters, getJqlRunsIndex, onActiveTabChange, visibleRuns]);
+
+  const pagedIssueKeysForActiveRun = React.useMemo(() => {
+    if (visibleRuns.length === 0) {
+      return [];
+    }
+
+    const tab = Math.min(activeTab, visibleRuns.length - 1);
+    const activeRun = visibleRuns[tab];
+    const stateKey = getRunStateKey(activeRun, tab);
+    const loadedIssues = activeRun.issues || [];
+    const filteredIssues = filterIssues(loadedIssues, {
+      keyQuery: keyFilterByRunIndex[stateKey] ?? "",
+      keywordQuery: keywordFilterByRunIndex[stateKey] ?? "",
+      statusFilter: statusFilterByRunIndex[stateKey] ?? "",
+      assigneeFilter: assigneeFilterByRunIndex[stateKey] ?? "",
+      subtaskBugOnly: subtaskBugOnlyByRunIndex[stateKey] ?? false,
+      includeStories: includeStoriesByRunIndex[stateKey] ?? false,
+    });
+    const sorted = sortIssues({
+      issues: filteredIssues,
+      isClosedLikeStatus,
+      jiraRowPriorities,
+      clampPriority,
+      sortField,
+      sortDirection,
+    });
+    const pages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+    const page = Math.min(pageByRunIndex[stateKey] || 1, pages);
+    const sliceStart = (page - 1) * PAGE_SIZE;
+    return sorted.slice(sliceStart, sliceStart + PAGE_SIZE).map((issue) => issue.key);
+  }, [
+    visibleRuns,
+    activeTab,
+    keyFilterByRunIndex,
+    keywordFilterByRunIndex,
+    statusFilterByRunIndex,
+    assigneeFilterByRunIndex,
+    subtaskBugOnlyByRunIndex,
+    includeStoriesByRunIndex,
+    pageByRunIndex,
+    sortField,
+    sortDirection,
+    isClosedLikeStatus,
+    jiraRowPriorities,
+    clampPriority,
+  ]);
+
+  React.useEffect(() => {
+    if (expandedRowKey && !pagedIssueKeysForActiveRun.includes(expandedRowKey)) {
+      handleToggleRowExpand(expandedRowKey);
+    }
+  }, [expandedRowKey, pagedIssueKeysForActiveRun, handleToggleRowExpand]);
 
   if (visibleRuns.length === 0) {
     return null;
@@ -696,6 +750,25 @@ const JiraResultsTable = ({
 
             <div className="ww-results-table-wrap">
               <div className="ww-push-selected-row">
+                <label className="ww-select-all-label">
+                  <input
+                    type="checkbox"
+                    checked={
+                      issuesMatchingKey.filter(
+                        (issue) => !isClosedLikeStatus(issue.fields?.status?.name)
+                      ).length > 0 &&
+                      issuesMatchingKey
+                        .filter(
+                          (issue) => !isClosedLikeStatus(issue.fields?.status?.name)
+                        )
+                        .every((issue) => selectedForPush[issue.key])
+                    }
+                    onChange={(event) =>
+                      handleSelectAll(issuesMatchingKey, event.target.checked)
+                    }
+                  />
+                  Select all
+                </label>
                 <button
                   type="button"
                   className="ww-push-selected-btn"
@@ -715,6 +788,7 @@ const JiraResultsTable = ({
               <table className="ww-results-table">
                 <thead>
                   <tr>
+                    <th className="ww-th-expand" aria-hidden="true" />
                     <th aria-sort={getHeaderAriaSort("key")}>
                       <button
                         type="button"
@@ -724,30 +798,15 @@ const JiraResultsTable = ({
                         Key{getSortIndicator("key")}
                       </button>
                     </th>
-                    <th>Parent</th>
-                    <th>Jira Type</th>
                     <th>Summary</th>
-                    <th>
-                      <div className="ww-th-status-assignee">
-                        <button
-                          type="button"
-                          className={"ww-sort-header-btn" + (sortField === "status" ? " is-active" : "")}
-                          onClick={() => handleHeaderSort("status")}
-                        >
-                          Status{getSortIndicator("status")}
-                        </button>
-                        <button
-                          type="button"
-                          className={"ww-sort-header-btn" + (sortField === "assignee" ? " is-active" : "")}
-                          onClick={() => handleHeaderSort("assignee")}
-                        >
-                          Assignee{getSortIndicator("assignee")}
-                        </button>
-                      </div>
-                    </th>
-                    <th>Updated</th>
-                    <th title="Due date, Most Recent Done Date, and start date (start date is local-only, used for Gantt charts)">
-                      Dates
+                    <th aria-sort={getHeaderAriaSort("status")}>
+                      <button
+                        type="button"
+                        className={"ww-sort-header-btn" + (sortField === "status" ? " is-active" : "")}
+                        onClick={() => handleHeaderSort("status")}
+                      >
+                        Status{getSortIndicator("status")}
+                      </button>
                     </th>
                     <th aria-sort={getHeaderAriaSort("priority")}>
                       <button
@@ -757,31 +816,6 @@ const JiraResultsTable = ({
                       >
                         Priority{getSortIndicator("priority")}
                       </button>
-                    </th>
-                    <th>Notes</th>
-                    <th>
-                      <div className="ww-th-push">
-                        Push to Jira
-                        <label className="ww-select-all-label">
-                          <input
-                            type="checkbox"
-                            checked={
-                              issuesMatchingKey.filter(
-                                (issue) => !isClosedLikeStatus(issue.fields?.status?.name)
-                              ).length > 0 &&
-                              issuesMatchingKey
-                                .filter(
-                                  (issue) => !isClosedLikeStatus(issue.fields?.status?.name)
-                                )
-                                .every((issue) => selectedForPush[issue.key])
-                            }
-                            onChange={(event) =>
-                              handleSelectAll(issuesMatchingKey, event.target.checked)
-                            }
-                          />
-                          All
-                        </label>
-                      </div>
                     </th>
                   </tr>
                 </thead>
@@ -805,27 +839,36 @@ const JiraResultsTable = ({
                     });
                     const isNoteAlreadyPushed = noteMatchesLastJiraPush(noteFingerprint, pushedNoteSnapshot);
 
+                    const isExpandedRow = expandedRowKey === issueKey;
                     const isExpandedPlanning = expandedPlanningKey === issueKey;
                     const planningMeta = planningMetaByKey[issueKey] || {};
+                    const summary = issue.fields?.summary || "No summary";
+                    const sharedProgramId = String(
+                      run.sharedProgramId || jqlSharedProgramIds?.[runSlotIndex] || ""
+                    ).trim();
                     const hasAnyTracking = startDateByKey[issueKey] || completeDateByKey[issueKey] ||
                       planningMeta.plannedStart || planningMeta.plannedFinish || planningMeta.pmOverride ||
                       planningMeta.requestor;
 
                     return (
                       <React.Fragment key={issue.id}>
+                      {!isExpandedRow ? (
                       <tr
                         className={`${isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}${planningMeta.hasOpenDecision ? " ww-row-open-decision" : ""}${hasAnyTracking ? " ww-row-has-tracking" : ""}`}
                       >
-                        <td className="ww-cell-key">
+                        <td className="ww-cell-expand">
                           <button
                             type="button"
-                            className={`ww-planning-expand-btn${isExpandedPlanning ? " ww-planning-expand-btn--open" : ""}`}
-                            onClick={() => handleTogglePlanningRow(issueKey)}
-                            title={isExpandedPlanning ? "Collapse planning" : "Expand planning"}
-                            aria-label={`${isExpandedPlanning ? "Collapse" : "Expand"} planning for ${issueKey}`}
+                            className="ww-row-expand-btn"
+                            onClick={() => handleToggleRowExpand(issueKey)}
+                            title="Expand row"
+                            aria-label={`Expand details for ${issueKey}`}
+                            aria-expanded={false}
                           >
-                            {isExpandedPlanning ? "Plan ▾" : "Plan ▸"}
+                            ▸
                           </button>
+                        </td>
+                        <td className="ww-cell-key">
                           {issueBrowseUrl ? (
                             <a href={issueBrowseUrl} target="_blank" rel="noreferrer noopener">
                               {issueKey}
@@ -835,23 +878,12 @@ const JiraResultsTable = ({
                           )}
                         </td>
                         <td>
-                          {issue.fields?.parent?.key
-                            ? (() => {
-                                const parentUrl = getIssueBrowseUrl({ key: issue.fields.parent.key, self: issue.self });
-                                return parentUrl ? (
-                                  <a href={parentUrl} target="_blank" rel="noreferrer noopener" style={{ fontSize: "0.82rem", whiteSpace: "nowrap" }}>
-                                    {issue.fields.parent.key}
-                                  </a>
-                                ) : (
-                                  <span style={{ fontSize: "0.82rem" }}>{issue.fields.parent.key}</span>
-                                );
-                              })()
-                            : <span style={{ color: "#94a3b8" }}>—</span>}
+                          <span className="ww-summary-clamp" title={summary}>
+                            {summary}
+                          </span>
                         </td>
-                        <td>{issue.fields?.issuetype?.name || "-"}</td>
-                        <td>{issue.fields?.summary || "No summary"}</td>
 
-                        <td className="ww-cell-status-assignee">
+                        <td className="ww-cell-status">
                           <div className={"ww-edit-cell" + (isClosedOrResolved ? " ww-edit-disabled" : "")}>
                             <select
                               className="ww-edit-select"
@@ -879,117 +911,6 @@ const JiraResultsTable = ({
                               Update Status
                             </button>
                           </div>
-
-                          <AssigneeCell
-                            issueKey={issueKey}
-                            assignee={assignee}
-                            isClosedOrResolved={isClosedOrResolved}
-                            draftValue={assigneeDrafts[issueKey]}
-                            knownAssignees={knownAssignees}
-                            loading={rowUpdate.loading}
-                            confirmation={rowUpdate}
-                            onDraftChange={handleAssigneeDraftChange}
-                            onUpdate={handleAssigneeUpdate}
-                          />
-                        </td>
-
-                        <td>{updated}</td>
-
-                        <td className="ww-cell-dates">
-                          {(() => {
-                            const ownIdd = formatDateOnly(getFieldValue(issue, run.iddFieldId)) || "";
-                            const inheritedIdd = getMostRecentDoneDateForIssue(
-                              issue,
-                              run.iddFieldId,
-                              run.parentIddByKey
-                            );
-                            const ownMrd = formatDateOnly(getFieldValue(issue, run.mrdFieldId)) || "";
-                            const inheritedMrd = getMostRecentDoneDateForIssue(
-                              issue,
-                              run.mrdFieldId,
-                              run.parentMostRecentDoneDateByKey
-                            );
-                            const ownDue =
-                              formatDateOnly(getFieldValue(issue, run.dueFieldId || "duedate")) || "";
-                            const issueTypeName = String(issue.fields?.issuetype?.name || "Issue").trim();
-                            const sharedProgramId = String(
-                              run.sharedProgramId || jqlSharedProgramIds?.[runSlotIndex] || ""
-                            ).trim();
-
-                            const isEpic = matchesIssueTypeFamily(issueTypeName, "epic");
-
-                            return (
-                              <div className={"ww-edit-cell" + (isClosedOrResolved ? " ww-edit-disabled" : "")}>
-                                {isEpic ? (
-                                  <>
-                                    <div className="ww-date-row">
-                                      <label className="ww-date-label" title="Initial Done Date (Epic only)">IDD</label>
-                                      <input
-                                        type="date"
-                                        className="ww-edit-input"
-                                        value={iddDrafts[issueKey] ?? (ownIdd || inheritedIdd || "")}
-                                        disabled={isClosedOrResolved}
-                                        onChange={(event) => handleIddDraftChange(issueKey, event.target.value)}
-                                      />
-                                      <button
-                                        type="button"
-                                        className="ww-inline-action-btn"
-                                        onClick={() => handleIddUpdate(issueKey, ownIdd || inheritedIdd || "", run.iddFieldId)}
-                                        disabled={rowUpdate.loading || isClosedOrResolved}
-                                      >
-                                        Update
-                                      </button>
-                                    </div>
-                                    {!ownIdd && inheritedIdd ? (
-                                      <p className="ww-date-hint">from parent: {inheritedIdd}</p>
-                                    ) : null}
-
-                                    <div className="ww-date-row">
-                                      <label className="ww-date-label" title="Most Recent Done Date (Epic only)">MRD</label>
-                                      <input
-                                        type="date"
-                                        className="ww-edit-input"
-                                        value={mrdDrafts[issueKey] ?? ownMrd}
-                                        disabled={isClosedOrResolved}
-                                        onChange={(event) => handleMrdDraftChange(issueKey, event.target.value)}
-                                      />
-                                      <button
-                                        type="button"
-                                        className="ww-inline-action-btn"
-                                        onClick={() => handleMrdUpdate(issueKey, ownMrd, run.mrdFieldId)}
-                                        disabled={rowUpdate.loading || isClosedOrResolved}
-                                      >
-                                        Update
-                                      </button>
-                                    </div>
-                                    {!ownMrd && inheritedMrd ? (
-                                      <p className="ww-date-hint">from parent: {inheritedMrd}</p>
-                                    ) : null}
-                                  </>
-                                ) : null}
-
-                                <div className="ww-date-row">
-                                  <label className="ww-date-label" title={`${issueTypeName} due date from Jira`}>{issueTypeName} Due</label>
-                                  <input
-                                    type="date"
-                                    className="ww-edit-input"
-                                    value={dueDateDrafts[issueKey] ?? ownDue}
-                                    disabled={isClosedOrResolved}
-                                    onChange={(event) => handleDueDateDraftChange(issueKey, event.target.value)}
-                                  />
-                                  <button
-                                    type="button"
-                                    className="ww-inline-action-btn"
-                                    onClick={() => handleDueDateUpdate(issueKey, ownDue)}
-                                    disabled={rowUpdate.loading || isClosedOrResolved}
-                                  >
-                                    Update
-                                  </button>
-                                </div>
-
-                              </div>
-                            );
-                          })()}
                         </td>
 
                         <PriorityCell
@@ -999,110 +920,313 @@ const JiraResultsTable = ({
                           priorityClassName={getPriorityClass(rowPriority)}
                           prioritySource={prioritySourceByKey}
                           onChange={(key, value) =>
-                            handleRowPriorityChange(key, value, {
-                              sharedProgramId: String(
-                                run.sharedProgramId ||
-                                  jqlSharedProgramIds?.[runSlotIndex] ||
-                                  ""
-                              ).trim(),
-                            })
+                            handleRowPriorityChange(key, value, { sharedProgramId })
                           }
                         />
-
-                        <td>
-                          {isClosedOrResolved ? (
-                            <span>-</span>
-                          ) : (
-                            <div className="ww-note-cell-wrap">
-                              <button
-                                type="button"
-                                className="ww-note-expand-btn"
-                                onClick={() => setExpandedNoteKey(issueKey)}
-                                title="Pop out notes to a larger editor"
-                                aria-label={`Expand notes for ${issueKey}`}
-                              >
-                                ⤢
-                              </button>
-                              <NoteImagesStrip
-                                images={noteImagesByKey[issueKey]}
-                                disabled={push.loading || isClosedOrResolved}
-                                error={noteImageErrorsByKey[issueKey]}
-                                onAddFiles={(files) => handleNoteImagesAdd(issueKey, files)}
-                                onRemove={(localId) => handleNoteImageRemove(issueKey, localId)}
-                                keepOnMachine={keepNoteImagesByKey[issueKey]}
-                                keepPending={Boolean(noteImageKeepPendingByKey[issueKey])}
-                                onKeepChange={(checked) => handleKeepNoteImagesToggle(issueKey, checked)}
-                              >
-                                <textarea
-                                  className={`ww-note-textarea${
-                                    isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
-                                  }`}
-                                  value={noteDraft}
-                                  onChange={(event) =>
-                                    handleNoteChange(issueKey, event.target.value)
-                                  }
-                                  placeholder="Add notes here"
-                                  title={
-                                    isNoteAlreadyPushed
-                                      ? "This note was pushed to Jira. Change the text or images before pushing again."
-                                      : undefined
-                                  }
-                                />
-                              </NoteImagesStrip>
-                            </div>
-                          )}
-                        </td>
-
-                        <td>
-                          {isClosedOrResolved ? (
-                            <span>-</span>
-                          ) : (
-                            <div className="ww-push-actions">
-                              <label className="ww-row-select-label">
-                                <input
-                                  type="checkbox"
-                                  checked={!!selectedForPush[issueKey]}
-                                  onChange={(event) =>
-                                    handleSelectForPush(issueKey, event.target.checked)
-                                  }
-                                />
-                              </label>
-                              <button
-                                type="button"
-                                className="ww-push-btn"
-                                onClick={() => handlePushNote(issueKey)}
-                                disabled={
-                                  !selectedForPush[issueKey] ||
-                                  push.loading ||
-                                  isNoteAlreadyPushed
-                                }
-                              >
-                                {push.loading ? "Pushing..." : "Push note"}
-                              </button>
-                              <button
-                                type="button"
-                                className="ww-save-btn"
-                                onClick={() => handleSaveMetadata(issueKey)}
-                                disabled={save.loading}
-                              >
-                                {save.loading ? "Saving..." : "Save to local DB"}
-                              </button>
-                            </div>
-                          )}
-                          {push.error && <p className="ww-inline-error">{push.error}</p>}
-                          {push.success && <p className="ww-inline-success">{push.success}</p>}
-                          {save.error && <p className="ww-inline-error">{save.error}</p>}
-                          {save.success && <p className="ww-inline-success">{save.success}</p>}
-                          {rowUpdate.error && <p className="ww-inline-error">{rowUpdate.error}</p>}
-                          {rowUpdate.success && <p className="ww-inline-success">{rowUpdate.success}</p>}
-                        </td>
                       </tr>
-                      {isExpandedPlanning ? (() => {
-                        const sharedProgramId = String(run.sharedProgramId || jqlSharedProgramIds?.[runSlotIndex] || "").trim();
-                        const reporterName = String(issue.fields?.reporter?.displayName || "");
-                        return (
+                      ) : (
+                        <tr
+                          className={`ww-row-detail-row ${isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}${planningMeta.hasOpenDecision ? " ww-row-open-decision" : ""}`}
+                        >
+                          <td colSpan={5} className="ww-row-detail-cell">
+                            <div className="ww-row-detail-panel">
+                              <table className="ww-results-table ww-results-table--expanded-detail">
+                                <tbody>
+                                  <tr
+                                    className={`${isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}${hasAnyTracking ? " ww-row-has-tracking" : ""}`}
+                                  >
+                                    <td className="ww-cell-key">
+                                      <button
+                                        type="button"
+                                        className="ww-row-expand-btn ww-row-expand-btn--open"
+                                        onClick={() => handleToggleRowExpand(issueKey)}
+                                        title="Collapse row"
+                                        aria-label={`Collapse details for ${issueKey}`}
+                                        aria-expanded={true}
+                                      >
+                                        ▾
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`ww-planning-expand-btn${isExpandedPlanning ? " ww-planning-expand-btn--open" : ""}`}
+                                        onClick={() => handleTogglePlanningRow(issueKey)}
+                                        title={isExpandedPlanning ? "Collapse planning" : "Expand planning"}
+                                        aria-label={`${isExpandedPlanning ? "Collapse" : "Expand"} planning for ${issueKey}`}
+                                      >
+                                        {isExpandedPlanning ? "Plan ▾" : "Plan ▸"}
+                                      </button>
+                                      {issueBrowseUrl ? (
+                                        <a href={issueBrowseUrl} target="_blank" rel="noreferrer noopener">
+                                          {issueKey}
+                                        </a>
+                                      ) : (
+                                        issueKey
+                                      )}
+                                    </td>
+                                    <td>
+                                      {issue.fields?.parent?.key
+                                        ? (() => {
+                                            const parentUrl = getIssueBrowseUrl({
+                                              key: issue.fields.parent.key,
+                                              self: issue.self,
+                                            });
+                                            return parentUrl ? (
+                                              <a
+                                                href={parentUrl}
+                                                target="_blank"
+                                                rel="noreferrer noopener"
+                                                style={{ fontSize: "0.82rem", whiteSpace: "nowrap" }}
+                                              >
+                                                {issue.fields.parent.key}
+                                              </a>
+                                            ) : (
+                                              <span style={{ fontSize: "0.82rem" }}>
+                                                {issue.fields.parent.key}
+                                              </span>
+                                            );
+                                          })()
+                                        : (
+                                          <span style={{ color: "#94a3b8" }}>—</span>
+                                        )}
+                                    </td>
+                                    <td>{issue.fields?.issuetype?.name || "-"}</td>
+                                    <td>{summary}</td>
+                                    <td className="ww-cell-status-assignee">
+                                      <div className={"ww-edit-cell" + (isClosedOrResolved ? " ww-edit-disabled" : "")}>
+                                        <select
+                                          className="ww-edit-select"
+                                          value={statusDrafts[issueKey] || status}
+                                          onChange={(event) =>
+                                            handleStatusDraftChange(issueKey, event.target.value)
+                                          }
+                                          disabled={isClosedOrResolved}
+                                        >
+                                          <option value={status}>{status}</option>
+                                          {statusOptions
+                                            .filter((opt) => opt !== status)
+                                            .map((opt) => (
+                                              <option key={"status-opt-" + issueKey + "-" + opt} value={opt}>
+                                                {opt}
+                                              </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                          type="button"
+                                          className="ww-inline-action-btn"
+                                          onClick={() => handleStatusUpdate(issueKey, status)}
+                                          disabled={rowUpdate.loading || isClosedOrResolved}
+                                        >
+                                          Update Status
+                                        </button>
+                                      </div>
+                                      <AssigneeCell
+                                        issueKey={issueKey}
+                                        assignee={assignee}
+                                        isClosedOrResolved={isClosedOrResolved}
+                                        draftValue={assigneeDrafts[issueKey]}
+                                        knownAssignees={knownAssignees}
+                                        loading={rowUpdate.loading}
+                                        confirmation={rowUpdate}
+                                        onDraftChange={handleAssigneeDraftChange}
+                                        onUpdate={handleAssigneeUpdate}
+                                      />
+                                    </td>
+                                    <td>{updated}</td>
+                                    <td className="ww-cell-dates">
+                                      {(() => {
+                                        const ownIdd = formatDateOnly(getFieldValue(issue, run.iddFieldId)) || "";
+                                        const inheritedIdd = getMostRecentDoneDateForIssue(
+                                          issue,
+                                          run.iddFieldId,
+                                          run.parentIddByKey
+                                        );
+                                        const ownMrd = formatDateOnly(getFieldValue(issue, run.mrdFieldId)) || "";
+                                        const inheritedMrd = getMostRecentDoneDateForIssue(
+                                          issue,
+                                          run.mrdFieldId,
+                                          run.parentMostRecentDoneDateByKey
+                                        );
+                                        const ownDue =
+                                          formatDateOnly(getFieldValue(issue, run.dueFieldId || "duedate")) || "";
+                                        const issueTypeName = String(issue.fields?.issuetype?.name || "Issue").trim();
+                                        const isEpic = matchesIssueTypeFamily(issueTypeName, "epic");
+
+                                        return (
+                                          <div className={"ww-edit-cell" + (isClosedOrResolved ? " ww-edit-disabled" : "")}>
+                                            {isEpic ? (
+                                              <>
+                                                <div className="ww-date-row">
+                                                  <label className="ww-date-label" title="Initial Done Date (Epic only)">IDD</label>
+                                                  <input
+                                                    type="date"
+                                                    className="ww-edit-input"
+                                                    value={iddDrafts[issueKey] ?? (ownIdd || inheritedIdd || "")}
+                                                    disabled={isClosedOrResolved}
+                                                    onChange={(event) => handleIddDraftChange(issueKey, event.target.value)}
+                                                  />
+                                                  <button
+                                                    type="button"
+                                                    className="ww-inline-action-btn"
+                                                    onClick={() => handleIddUpdate(issueKey, ownIdd || inheritedIdd || "", run.iddFieldId)}
+                                                    disabled={rowUpdate.loading || isClosedOrResolved}
+                                                  >
+                                                    Update
+                                                  </button>
+                                                </div>
+                                                {!ownIdd && inheritedIdd ? (
+                                                  <p className="ww-date-hint">from parent: {inheritedIdd}</p>
+                                                ) : null}
+                                                <div className="ww-date-row">
+                                                  <label className="ww-date-label" title="Most Recent Done Date (Epic only)">MRD</label>
+                                                  <input
+                                                    type="date"
+                                                    className="ww-edit-input"
+                                                    value={mrdDrafts[issueKey] ?? ownMrd}
+                                                    disabled={isClosedOrResolved}
+                                                    onChange={(event) => handleMrdDraftChange(issueKey, event.target.value)}
+                                                  />
+                                                  <button
+                                                    type="button"
+                                                    className="ww-inline-action-btn"
+                                                    onClick={() => handleMrdUpdate(issueKey, ownMrd, run.mrdFieldId)}
+                                                    disabled={rowUpdate.loading || isClosedOrResolved}
+                                                  >
+                                                    Update
+                                                  </button>
+                                                </div>
+                                                {!ownMrd && inheritedMrd ? (
+                                                  <p className="ww-date-hint">from parent: {inheritedMrd}</p>
+                                                ) : null}
+                                              </>
+                                            ) : null}
+                                            <div className="ww-date-row">
+                                              <label className="ww-date-label" title={`${issueTypeName} due date from Jira`}>{issueTypeName} Due</label>
+                                              <input
+                                                type="date"
+                                                className="ww-edit-input"
+                                                value={dueDateDrafts[issueKey] ?? ownDue}
+                                                disabled={isClosedOrResolved}
+                                                onChange={(event) => handleDueDateDraftChange(issueKey, event.target.value)}
+                                              />
+                                              <button
+                                                type="button"
+                                                className="ww-inline-action-btn"
+                                                onClick={() => handleDueDateUpdate(issueKey, ownDue)}
+                                                disabled={rowUpdate.loading || isClosedOrResolved}
+                                              >
+                                                Update
+                                              </button>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
+                                    </td>
+                                    <PriorityCell
+                                      issueKey={issueKey}
+                                      isClosedOrResolved={isClosedOrResolved}
+                                      rowPriority={rowPriority}
+                                      priorityClassName={getPriorityClass(rowPriority)}
+                                      prioritySource={prioritySourceByKey}
+                                      onChange={(key, value) =>
+                                        handleRowPriorityChange(key, value, { sharedProgramId })
+                                      }
+                                    />
+                                    <td>
+                                      {isClosedOrResolved ? (
+                                        <span>-</span>
+                                      ) : (
+                                        <div className="ww-note-cell-wrap">
+                                          <button
+                                            type="button"
+                                            className="ww-note-expand-btn"
+                                            onClick={() => setExpandedNoteKey(issueKey)}
+                                            title="Pop out notes to a larger editor"
+                                            aria-label={`Expand notes for ${issueKey}`}
+                                          >
+                                            ⤢
+                                          </button>
+                                          <NoteImagesStrip
+                                            images={noteImagesByKey[issueKey]}
+                                            disabled={push.loading || isClosedOrResolved}
+                                            error={noteImageErrorsByKey[issueKey]}
+                                            onAddFiles={(files) => handleNoteImagesAdd(issueKey, files)}
+                                            onRemove={(localId) => handleNoteImageRemove(issueKey, localId)}
+                                            keepOnMachine={keepNoteImagesByKey[issueKey]}
+                                            keepPending={Boolean(noteImageKeepPendingByKey[issueKey])}
+                                            onKeepChange={(checked) => handleKeepNoteImagesToggle(issueKey, checked)}
+                                          >
+                                            <textarea
+                                              className={`ww-note-textarea${
+                                                isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
+                                              }`}
+                                              value={noteDraft}
+                                              onChange={(event) =>
+                                                handleNoteChange(issueKey, event.target.value)
+                                              }
+                                              placeholder="Add notes here"
+                                              title={
+                                                isNoteAlreadyPushed
+                                                  ? "This note was pushed to Jira. Change the text or images before pushing again."
+                                                  : undefined
+                                              }
+                                            />
+                                          </NoteImagesStrip>
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td>
+                                      {isClosedOrResolved ? (
+                                        <span>-</span>
+                                      ) : (
+                                        <div className="ww-push-actions">
+                                          <label className="ww-row-select-label">
+                                            <input
+                                              type="checkbox"
+                                              checked={!!selectedForPush[issueKey]}
+                                              onChange={(event) =>
+                                                handleSelectForPush(issueKey, event.target.checked)
+                                              }
+                                            />
+                                          </label>
+                                          <button
+                                            type="button"
+                                            className="ww-push-btn"
+                                            onClick={() => handlePushNote(issueKey)}
+                                            disabled={
+                                              !selectedForPush[issueKey] ||
+                                              push.loading ||
+                                              isNoteAlreadyPushed
+                                            }
+                                          >
+                                            {push.loading ? "Pushing..." : "Push note"}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="ww-save-btn"
+                                            onClick={() => handleSaveMetadata(issueKey)}
+                                            disabled={save.loading}
+                                          >
+                                            {save.loading ? "Saving..." : "Save to local DB"}
+                                          </button>
+                                        </div>
+                                      )}
+                                      {push.error && <p className="ww-inline-error">{push.error}</p>}
+                                      {push.success && <p className="ww-inline-success">{push.success}</p>}
+                                      {save.error && <p className="ww-inline-error">{save.error}</p>}
+                                      {save.success && <p className="ww-inline-success">{save.success}</p>}
+                                      {rowUpdate.error && <p className="ww-inline-error">{rowUpdate.error}</p>}
+                                      {rowUpdate.success && <p className="ww-inline-success">{rowUpdate.success}</p>}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {isExpandedRow && isExpandedPlanning ? (
                           <tr className="ww-planning-panel-row">
-                            <td colSpan={10} className="ww-planning-panel-cell">
+                            <td colSpan={5} className="ww-planning-panel-cell">
                               <div className="ww-planning-panel">
                                 <div className="ww-planning-panel-fields">
                                   <label className="ww-planning-field">
@@ -1249,8 +1373,7 @@ const JiraResultsTable = ({
                               </div>
                             </td>
                           </tr>
-                        );
-                      })() : null}
+                      ) : null}
                       </React.Fragment>
                     );
                   })}

@@ -6,60 +6,73 @@ import {
   buildSharedProgramJqlWithDescendants,
 } from "../utils/workWeekStorage.js";
 
-const formatErrorDetail = (value) => {
-  if (value == null || value === "") {
+const formatErrorDetail = ( value ) => {
+  if ( value == null || value === "" )
+  {
     return "";
   }
-  if (typeof value === "string") {
+  if ( typeof value === "string" )
+  {
     return value.trim();
   }
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
+  if ( typeof value === "number" || typeof value === "boolean" )
+  {
+    return String( value );
   }
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
+  try
+  {
+    return JSON.stringify( value );
+  } catch
+  {
+    return String( value );
   }
 };
 
-const extractJiraErrorMessage = (data, status) => {
-  if (Array.isArray(data?.errorMessages) && data.errorMessages.length > 0) {
-    const messages = filterWorkfrontErrorMessages(data.errorMessages);
-    if (messages.length > 0) {
-      return messages.map((item) => formatErrorDetail(item)).filter(Boolean).join(" ");
+const extractJiraErrorMessage = ( data, status ) => {
+  if ( Array.isArray( data?.errorMessages ) && data.errorMessages.length > 0 )
+  {
+    const messages = filterWorkfrontErrorMessages( data.errorMessages );
+    if ( messages.length > 0 )
+    {
+      return messages.map( ( item ) => formatErrorDetail( item ) ).filter( Boolean ).join( " " );
     }
   }
 
-  if (Array.isArray(data?.errors) && data.errors.length > 0) {
-    return data.errors.map((item) => formatErrorDetail(item)).filter(Boolean).join(" ");
+  if ( Array.isArray( data?.errors ) && data.errors.length > 0 )
+  {
+    return data.errors.map( ( item ) => formatErrorDetail( item ) ).filter( Boolean ).join( " " );
   }
 
-  const errorDetail = formatErrorDetail(data?.error);
-  if (errorDetail) {
+  const errorDetail = formatErrorDetail( data?.error );
+  if ( errorDetail )
+  {
     return errorDetail;
   }
 
-  const messageDetail = formatErrorDetail(data?.message);
-  if (messageDetail) {
+  const messageDetail = formatErrorDetail( data?.message );
+  if ( messageDetail )
+  {
     return messageDetail;
   }
 
-  return `Jira request failed with status ${status}`;
+  return `Jira request failed with status ${ status }`;
 };
 
-const requestJson = async (path, options = {}) => {
+const requestJson = async ( path, options = {} ) => {
   let response;
-  try {
-    response = await fetch(buildApiUrl(path), {
+  try
+  {
+    response = await fetch( buildApiUrl( path ), {
       headers: {
         Accept: "application/json",
-        ...(options.headers || {}),
+        ...( options.headers || {} ),
       },
       ...options,
-    });
-  } catch (error) {
-    if (error instanceof TypeError) {
+    } );
+  } catch ( error )
+  {
+    if ( error instanceof TypeError )
+    {
       throw new Error(
         "Cannot reach the local API. Start it with npm run dev:api or npm run dev:all (proxy on port 8787)."
       );
@@ -71,241 +84,254 @@ const requestJson = async (path, options = {}) => {
   let data = {};
   let parsedJson = false;
 
-  if (text) {
-    try {
-      data = JSON.parse(text);
+  if ( text )
+  {
+    try
+    {
+      data = JSON.parse( text );
       parsedJson = true;
-    } catch {
+      extractJiraErrorMessage.empty = true;
+    } catch
+    {
       data = { message: text };
     }
   }
 
-  if (!response.ok) {
-    throw new Error(extractJiraErrorMessage(data, response.status));
+  if ( !response.ok )
+  {
+    throw new Error( extractJiraErrorMessage( data, response.status ) );
   }
 
   // SPA/static fallbacks sometimes return index.html with HTTP 200 for unknown API routes.
-  if (!parsedJson || (typeof data === "object" && data && typeof data.message === "string" && /^\s*</.test(data.message))) {
+  if ( !parsedJson || ( typeof data === "object" && data && typeof data.message === "string" && /^\s*</.test( data.message ) ) )
+  {
     throw new Error(
-      `API returned a non-JSON response for ${path}. Restart the local API (npm run dev:api or npm run dev:all) so new routes are loaded.`
+      `API returned a non-JSON response for ${ path }. Restart the local API (npm run dev:api or npm run dev:all) so new routes are loaded.`
     );
   }
 
   return data;
 };
 
-export const fetchJiraMyself = async () => requestJson("/api/jira/myself");
+export const fetchJiraMyself = async () => requestJson( "/api/jira/myself" );
 
-export const fetchJiraHealth = async () => requestJson("/api/health");
+export const fetchJiraHealth = async () => requestJson( "/api/health" );
 
 export const testJiraConnection = async () => fetchJiraMyself();
 
 // Send JQL as POST JSON body to avoid URL-encoding edge cases.
-export const fetchJiraSearch = async ({ jql, maxResults = 5 }) => {
-  return requestJson("/api/jira/search", {
+export const fetchJiraSearch = async ( { jql, maxResults = 5 } ) => {
+  return requestJson( "/api/jira/search", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ jql, maxResults }),
-  });
+    body: JSON.stringify( { jql, maxResults } ),
+  } );
 };
 
-export const fetchJiraSearchAll = async ({ jql, maxTotal = 200 }) => {
-  return requestJson("/api/jira/search/all", {
+export const fetchJiraSearchAll = async ( { jql, maxTotal = 200 } ) => {
+  return requestJson( "/api/jira/search/all", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ jql, maxTotal }),
-  });
+    body: JSON.stringify( { jql, maxTotal } ),
+  } );
 };
 
 // Resolve direct children first so generated JQL also includes their subtasks.
 // Fall back to the direct-child query if Jira cannot resolve descendants.
-export const resolveSharedProgramJql = async (epicRoots) => {
-  const baseJql = buildSharedProgramJql(epicRoots);
-  if (!baseJql) {
+export const resolveSharedProgramJql = async ( epicRoots ) => {
+  const baseJql = buildSharedProgramJql( epicRoots );
+  if ( !baseJql )
+  {
     return "";
   }
 
-  try {
-    const data = await fetchJiraSearchAll({ jql: baseJql, maxTotal: 1000 });
-    const childKeys = (data?.issues || [])
-      .map((issue) => String(issue.key || "").trim())
-      .filter(Boolean);
-    return buildSharedProgramJqlWithDescendants(epicRoots, childKeys) || baseJql;
-  } catch (error) {
-    console.error("Failed to resolve shared program descendants", error);
+  try
+  {
+    const data = await fetchJiraSearchAll( { jql: baseJql, maxTotal: 1000 } );
+    const childKeys = ( data?.issues || [] )
+      .map( ( issue ) => String( issue.key || "" ).trim() )
+      .filter( Boolean );
+    return buildSharedProgramJqlWithDescendants( epicRoots, childKeys ) || baseJql;
+  } catch ( error )
+  {
+    console.error( "Failed to resolve shared program descendants", error );
     return baseJql;
   }
 };
 
-export const pushJiraIssueNote = async ({ issueKey, note, images = [] }) => {
-  const path = `/api/jira/issues/${encodeURIComponent(issueKey)}/comment`;
+export const pushJiraIssueNote = async ( { issueKey, note, images = [] } ) => {
+  const path = `/api/jira/issues/${ encodeURIComponent( issueKey ) }/comment`;
 
-  if (images.length === 0) {
-    return requestJson(path, {
+  if ( images.length === 0 )
+  {
+    return requestJson( path, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ note }),
-    });
+      body: JSON.stringify( { note } ),
+    } );
   }
 
   const formData = new FormData();
-  formData.append("note", note || "");
-  images.forEach((image) => formData.append("images", image.file, image.filename));
+  formData.append( "note", note || "" );
+  images.forEach( ( image ) => formData.append( "images", image.file, image.filename ) );
 
   // Omit Content-Type so the browser sets the multipart boundary itself.
-  return requestJson(path, {
+  return requestJson( path, {
     method: "POST",
     body: formData,
-  });
+  } );
 };
 
-export const saveKeptNoteImages = async ({ issueKey, images = [] }) => {
+export const saveKeptNoteImages = async ( { issueKey, images = [] } ) => {
   const formData = new FormData();
-  images.forEach((image) => formData.append("images", image.file, image.filename));
+  images.forEach( ( image ) => formData.append( "images", image.file, image.filename ) );
 
-  return requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/images`, {
+  return requestJson( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }/images`, {
     method: "POST",
     body: formData,
-  });
+  } );
 };
 
-export const deleteKeptNoteImages = async (issueKey) => {
-  return requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/images`, {
+export const deleteKeptNoteImages = async ( issueKey ) => {
+  return requestJson( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }/images`, {
     method: "DELETE",
-  });
+  } );
 };
 
-export const fetchKeptNoteImageBlob = async (issueKey, imageId) => {
+export const fetchKeptNoteImageBlob = async ( issueKey, imageId ) => {
   const response = await fetch(
-    buildApiUrl(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/images/${encodeURIComponent(imageId)}`)
+    buildApiUrl( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }/images/${ encodeURIComponent( imageId ) }` )
   );
-  if (!response.ok) {
-    throw new Error(`Failed to load kept image ${imageId} for ${issueKey}`);
+  if ( !response.ok )
+  {
+    throw new Error( `Failed to load kept image ${ imageId } for ${ issueKey }` );
   }
   return response.blob();
 };
 
-export const updateJiraIssueStatus = async ({ issueKey, targetStatus }) => {
-  return requestJson(`/api/jira/issues/${encodeURIComponent(issueKey)}/status`, {
+export const updateJiraIssueStatus = async ( { issueKey, targetStatus } ) => {
+  return requestJson( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/status`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ targetStatus }),
-  });
+    body: JSON.stringify( { targetStatus } ),
+  } );
 };
 
 export const JIRA_UNASSIGNED_ASSIGNEE = "__unassigned__";
 
-export const isJiraUnassignValue = (value) => {
-  const normalized = String(value || "").trim().toLowerCase();
+export const isJiraUnassignValue = ( value ) => {
+  const normalized = String( value || "" ).trim().toLowerCase();
   return normalized === "unassigned" || normalized === JIRA_UNASSIGNED_ASSIGNEE;
 };
 
-export const updateJiraIssueAssignee = async ({ issueKey, assignee }) => {
-  return requestJson(`/api/jira/issues/${encodeURIComponent(issueKey)}/assignee`, {
+export const updateJiraIssueAssignee = async ( { issueKey, assignee } ) => {
+  return requestJson( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/assignee`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ assignee }),
-  });
+    body: JSON.stringify( { assignee } ),
+  } );
 };
 
-export const searchJiraUsers = async (query) => {
+export const searchJiraUsers = async ( query ) => {
   const data = await requestJson(
-    `/api/jira/users/search?query=${encodeURIComponent(String(query || "").trim())}`
+    `/api/jira/users/search?query=${ encodeURIComponent( String( query || "" ).trim() ) }`
   );
   return data?.items || [];
 };
 
-export const resolveJiraUsersByAccountIds = async (accountIds) => {
-  const data = await requestJson("/api/jira/users/resolve-bulk", {
+export const resolveJiraUsersByAccountIds = async ( accountIds ) => {
+  const data = await requestJson( "/api/jira/users/resolve-bulk", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ accountIds }),
-  });
+    body: JSON.stringify( { accountIds } ),
+  } );
   return data?.items || {};
 };
 
-export const fetchIssueMetadataBulk = async (issueKeys) => {
-  const data = await requestJson("/api/jira/issue-metadata/bulk", {
+export const fetchIssueMetadataBulk = async ( issueKeys ) => {
+  const data = await requestJson( "/api/jira/issue-metadata/bulk", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ issueKeys }),
-  });
+    body: JSON.stringify( { issueKeys } ),
+  } );
 
   return data?.items || {};
 };
 
-export const fetchRecentlyNotedIssueKeys = async (since) => {
-  const data = await requestJson(`/api/jira/issue-metadata/recent-notes?since=${encodeURIComponent(since)}`);
-  return Array.isArray(data?.issueKeys) ? data.issueKeys : [];
+export const fetchRecentlyNotedIssueKeys = async ( since ) => {
+  const data = await requestJson( `/api/jira/issue-metadata/recent-notes?since=${ encodeURIComponent( since ) }` );
+  return Array.isArray( data?.issueKeys ) ? data.issueKeys : [];
 };
 
-export const fetchLatestJiraCommentsBulk = async (issueKeys) => {
-  const data = await requestJson("/api/jira/issues/comments/latest/bulk", {
+export const fetchLatestJiraCommentsBulk = async ( issueKeys ) => {
+  const data = await requestJson( "/api/jira/issues/comments/latest/bulk", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ issueKeys }),
-  });
+    body: JSON.stringify( { issueKeys } ),
+  } );
 
   return data?.items || {};
 };
 
-const PLANNING_FIELDS = ["hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
+const PLANNING_FIELDS = [ "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote" ];
 
-export const saveIssueMetadata = async ({ issueKey, note, priority, startDate, completeDate, ...planningFields }) => {
+export const saveIssueMetadata = async ( { issueKey, note, priority, startDate, completeDate, ...planningFields } ) => {
   const body = {};
-  if (typeof note === "string") body.note = note;
-  if (priority !== undefined) body.priority = priority;
-  if (typeof startDate === "string") body.startDate = startDate;
-  if (typeof completeDate === "string") body.completeDate = completeDate;
-  for (const f of PLANNING_FIELDS) {
-    if (planningFields[f] !== undefined) body[f] = planningFields[f];
+  if ( typeof note === "string" ) body.note = note;
+  if ( priority !== undefined ) body.priority = priority;
+  if ( typeof startDate === "string" ) body.startDate = startDate;
+  if ( typeof completeDate === "string" ) body.completeDate = completeDate;
+  for ( const f of PLANNING_FIELDS )
+  {
+    if ( planningFields[ f ] !== undefined ) body[ f ] = planningFields[ f ];
   }
 
-  return requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}`, {
+  return requestJson( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body),
-  });
+    body: JSON.stringify( body ),
+  } );
 };
 
 // role: "due_date" | "most_recent_done_date". value: "YYYY-MM-DD" or "" to clear.
-export const updateJiraIssueDateField = async ({ issueKey, role, value }) => {
-  return requestJson(`/api/jira/issues/${encodeURIComponent(issueKey)}/date-field`, {
+export const updateJiraIssueDateField = async ( { issueKey, role, value } ) => {
+  return requestJson( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/date-field`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ role, value }),
-  });
+    body: JSON.stringify( { role, value } ),
+  } );
 };
 
-export const importIssueMetadataCsv = async (csvText) => {
-  const data = await requestJson("/api/jira/issue-metadata/import", {
+export const importIssueMetadataCsv = async ( csvText ) => {
+  const data = await requestJson( "/api/jira/issue-metadata/import", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ csvText }),
-  });
-  if (!data || data.ok !== true || typeof data.updatedPriorities !== "number") {
+    body: JSON.stringify( { csvText } ),
+  } );
+  if ( !data || data.ok !== true || typeof data.updatedPriorities !== "number" )
+  {
     throw new Error(
       "Priority import API response was incomplete. Restart npm run dev:all and try again."
     );
@@ -314,379 +340,384 @@ export const importIssueMetadataCsv = async (csvText) => {
 };
 
 export const fetchTeamPriorityHealth = async () => {
-  return requestJson("/api/team-priority/health");
+  return requestJson( "/api/team-priority/health" );
 };
 
 export const seedTeamPriorityPrograms = async () => {
-  return requestJson("/api/team-priority/seed", { method: "POST" });
+  return requestJson( "/api/team-priority/seed", { method: "POST" } );
 };
 
-export const importTeamPriorityCsv = async (csvText) => {
-  const data = await requestJson("/api/team-priority/import-csv", {
+export const importTeamPriorityCsv = async ( csvText ) => {
+  const data = await requestJson( "/api/team-priority/import-csv", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ csvText }),
-  });
-  if (!data || data.ok !== true || typeof data.updatedPriorities !== "number") {
-    throw new Error("Team priority CSV import failed or returned an incomplete response.");
+    body: JSON.stringify( { csvText } ),
+  } );
+  if ( !data || data.ok !== true || typeof data.updatedPriorities !== "number" )
+  {
+    throw new Error( "Team priority CSV import failed or returned an incomplete response." );
   }
   return data;
 };
 
 export const syncLocalPrioritiesToTeam = async () => {
-  const data = await requestJson("/api/team-priority/sync-local", { method: "POST" });
-  if (!data || data.ok !== true || typeof data.updatedPriorities !== "number") {
-    throw new Error("Local → Atlas priority sync failed or returned an incomplete response.");
+  const data = await requestJson( "/api/team-priority/sync-local", { method: "POST" } );
+  if ( !data || data.ok !== true || typeof data.updatedPriorities !== "number" )
+  {
+    throw new Error( "Local → Atlas priority sync failed or returned an incomplete response." );
   }
   return data;
 };
 
 export const pullTeamPrioritiesToLocal = async () => {
-  const data = await requestJson("/api/team-priority/pull-to-local", { method: "POST" });
-  if (!data || data.ok !== true || typeof data.updatedPriorities !== "number") {
-    throw new Error("Atlas → local priority pull failed or returned an incomplete response.");
+  const data = await requestJson( "/api/team-priority/pull-to-local", { method: "POST" } );
+  if ( !data || data.ok !== true || typeof data.updatedPriorities !== "number" )
+  {
+    throw new Error( "Atlas → local priority pull failed or returned an incomplete response." );
   }
   return data;
 };
 
 export const fetchSharedPrograms = async () => {
-  const data = await requestJson("/api/shared-programs");
+  const data = await requestJson( "/api/shared-programs" );
   return data?.items || [];
 };
 
-export const fetchTeamPriorityBulk = async (issueKeys) => {
-  const data = await requestJson("/api/team-priority/bulk", {
+export const fetchTeamPriorityBulk = async ( issueKeys ) => {
+  const data = await requestJson( "/api/team-priority/bulk", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ issueKeys }),
-  });
+    body: JSON.stringify( { issueKeys } ),
+  } );
   return data?.items || {};
 };
 
-export const saveTeamPriority = async ({ issueKey, priority }) => {
-  return requestJson(`/api/team-priority/${encodeURIComponent(issueKey)}`, {
+export const saveTeamPriority = async ( { issueKey, priority } ) => {
+  return requestJson( `/api/team-priority/${ encodeURIComponent( issueKey ) }`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ priority }),
-  });
+    body: JSON.stringify( { priority } ),
+  } );
 };
 
-export const fetchTeamDatesBulk = async (issueKeys) => {
-  const data = await requestJson("/api/team-priority/dates/bulk", {
+export const fetchTeamDatesBulk = async ( issueKeys ) => {
+  const data = await requestJson( "/api/team-priority/dates/bulk", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ issueKeys }),
-  });
+    body: JSON.stringify( { issueKeys } ),
+  } );
   return data?.items || {};
 };
 
-export const saveTeamDate = async ({ issueKey, startDate, completeDate, ...planningFields }) => {
+export const saveTeamDate = async ( { issueKey, startDate, completeDate, ...planningFields } ) => {
   const body = {};
-  if (typeof startDate === "string") body.startDate = startDate;
-  if (typeof completeDate === "string") body.completeDate = completeDate;
-  for (const f of PLANNING_FIELDS) {
-    if (planningFields[f] !== undefined) body[f] = planningFields[f];
+  if ( typeof startDate === "string" ) body.startDate = startDate;
+  if ( typeof completeDate === "string" ) body.completeDate = completeDate;
+  for ( const f of PLANNING_FIELDS )
+  {
+    if ( planningFields[ f ] !== undefined ) body[ f ] = planningFields[ f ];
   }
 
-  return requestJson(`/api/team-priority/dates/${encodeURIComponent(issueKey)}`, {
+  return requestJson( `/api/team-priority/dates/${ encodeURIComponent( issueKey ) }`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body),
-  });
+    body: JSON.stringify( body ),
+  } );
 };
 
 // Explicit, deliberate clear of the whole shared date-tracking row for an issue.
-export const deleteTeamDate = async (issueKey) => {
-  return requestJson(`/api/team-priority/dates/${encodeURIComponent(issueKey)}`, {
+export const deleteTeamDate = async ( issueKey ) => {
+  return requestJson( `/api/team-priority/dates/${ encodeURIComponent( issueKey ) }`, {
     method: "DELETE",
-  });
+  } );
 };
 
 export const fetchEpicPresets = async () => {
-  const data = await requestJson("/api/epic-presets");
+  const data = await requestJson( "/api/epic-presets" );
   return data?.items || [];
 };
 
-export const fetchEpicPresetScopeJql = async (epicPresetId) => {
-  const id = String(epicPresetId || "").trim();
-  if (!id) {
+export const fetchEpicPresetScopeJql = async ( epicPresetId ) => {
+  const id = String( epicPresetId || "" ).trim();
+  if ( !id )
+  {
     return "";
   }
-  const data = await requestJson(`/api/epic-presets/${encodeURIComponent(id)}/scope-jql`);
-  return String(data?.scopeJql || "").trim();
+  const data = await requestJson( `/api/epic-presets/${ encodeURIComponent( id ) }/scope-jql` );
+  return String( data?.scopeJql || "" ).trim();
 };
 
-export const createEpicPreset = async (payload) => {
-  return requestJson("/api/epic-presets", {
+export const createEpicPreset = async ( payload ) => {
+  return requestJson( "/api/epic-presets", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload || {}),
-  });
+    body: JSON.stringify( payload || {} ),
+  } );
 };
 
-export const updateEpicPreset = async (id, payload) => {
-  return requestJson(`/api/epic-presets/${encodeURIComponent(id)}`, {
+export const updateEpicPreset = async ( id, payload ) => {
+  return requestJson( `/api/epic-presets/${ encodeURIComponent( id ) }`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload || {}),
-  });
+    body: JSON.stringify( payload || {} ),
+  } );
 };
 
-export const deleteEpicPreset = async (id) => {
-  return requestJson(`/api/epic-presets/${encodeURIComponent(id)}`, {
+export const deleteEpicPreset = async ( id ) => {
+  return requestJson( `/api/epic-presets/${ encodeURIComponent( id ) }`, {
     method: "DELETE",
-  });
+  } );
 };
 
-export const exportEpicPresetsPack = async () => requestJson("/api/epic-presets/export");
+export const exportEpicPresetsPack = async () => requestJson( "/api/epic-presets/export" );
 
-export const importEpicPresetsPack = async ({ presets, mode = "merge" }) =>
-  requestJson("/api/epic-presets/import", {
+export const importEpicPresetsPack = async ( { presets, mode = "merge" } ) =>
+  requestJson( "/api/epic-presets/import", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ presets, mode }),
-  });
+    body: JSON.stringify( { presets, mode } ),
+  } );
 
-export const runEpicFilters = async ({ epicPresetIds, includePastDue, maxResults = 200 }) => {
-  const data = await requestJson("/api/epic-filters/run", {
+export const runEpicFilters = async ( { epicPresetIds, includePastDue, maxResults = 200 } ) => {
+  const data = await requestJson( "/api/epic-filters/run", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ epicPresetIds, includePastDue, maxResults }),
-  });
+    body: JSON.stringify( { epicPresetIds, includePastDue, maxResults } ),
+  } );
 
   return data?.runs || [];
 };
 
 export const fetchFieldMappings = async () => {
-  const data = await requestJson("/api/jira/field-mappings");
+  const data = await requestJson( "/api/jira/field-mappings" );
   return data?.items || [];
 };
 
-export const saveFieldMappings = async (mappings) => {
-  const data = await requestJson("/api/jira/field-mappings", {
+export const saveFieldMappings = async ( mappings ) => {
+  const data = await requestJson( "/api/jira/field-mappings", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ mappings }),
-  });
+    body: JSON.stringify( { mappings } ),
+  } );
 
   return data?.items || [];
 };
 
 export const syncFieldMappingsFromJira = async () => {
-  const data = await requestJson("/api/jira/field-mappings/sync", {
+  const data = await requestJson( "/api/jira/field-mappings/sync", {
     method: "POST",
-  });
+  } );
 
   return data?.items || [];
 };
 
 export const fetchJiraFields = async () => {
-  const data = await requestJson("/api/jira/fields");
+  const data = await requestJson( "/api/jira/fields" );
   return data?.items || [];
 };
 
 export const fetchAppSettings = async () => {
-  const data = await requestJson("/api/settings");
+  const data = await requestJson( "/api/settings" );
   return data?.settings || {};
 };
 
-export const saveAppSettings = async (settings) => {
-  const data = await requestJson("/api/settings", {
+export const saveAppSettings = async ( settings ) => {
+  const data = await requestJson( "/api/settings", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ settings: settings || {} }),
-  });
+    body: JSON.stringify( { settings: settings || {} } ),
+  } );
 
   return data?.settings || {};
 };
 
 export const fetchReminders = async () => {
-  const data = await requestJson("/api/reminders");
+  const data = await requestJson( "/api/reminders" );
   return data?.items || [];
 };
 
-export const saveReminders = async (reminders) => {
-  const data = await requestJson("/api/reminders", {
+export const saveReminders = async ( reminders ) => {
+  const data = await requestJson( "/api/reminders", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ reminders: reminders || [] }),
-  });
+    body: JSON.stringify( { reminders: reminders || [] } ),
+  } );
 
   return data?.items || [];
 };
 
 export const fetchTodos = async () => {
-  const data = await requestJson("/api/todos");
+  const data = await requestJson( "/api/todos" );
   return data?.items || [];
 };
 
-export const fetchCompletedTodos = async (days = 90) => {
-  const param = Number(days) >= 0 ? Number(days) : 90;
-  const data = await requestJson(`/api/todos/completed?days=${param}`);
+export const fetchCompletedTodos = async ( days = 90 ) => {
+  const param = Number( days ) >= 0 ? Number( days ) : 90;
+  const data = await requestJson( `/api/todos/completed?days=${ param }` );
   return { items: data?.items || [], days: data?.days ?? param };
 };
 
 export const clearCompletedTodos = async () =>
-  requestJson("/api/todos/completed", { method: "DELETE" });
+  requestJson( "/api/todos/completed", { method: "DELETE" } );
 
-export const createTodo = async ({ text, priority, dueDate }) => {
-  const data = await requestJson("/api/todos", {
+export const createTodo = async ( { text, priority, dueDate } ) => {
+  const data = await requestJson( "/api/todos", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, priority, dueDate }),
-  });
+    body: JSON.stringify( { text, priority, dueDate } ),
+  } );
   return data;
 };
 
-export const updateTodo = async (id, fields) => {
-  const data = await requestJson(`/api/todos/${id}`, {
+export const updateTodo = async ( id, fields ) => {
+  const data = await requestJson( `/api/todos/${ id }`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(fields),
-  });
+    body: JSON.stringify( fields ),
+  } );
   return data;
 };
 
-export const deleteTodo = async (id) => {
-  await requestJson(`/api/todos/${id}`, { method: "DELETE" });
+export const deleteTodo = async ( id ) => {
+  await requestJson( `/api/todos/${ id }`, { method: "DELETE" } );
 };
 
 export const fetchWatchedAssignees = async () => {
-  const data = await requestJson("/api/watched-assignees");
+  const data = await requestJson( "/api/watched-assignees" );
   return data?.items || [];
 };
 
-export const createWatchedAssignee = async (payload) => {
-  return requestJson("/api/watched-assignees", {
+export const createWatchedAssignee = async ( payload ) => {
+  return requestJson( "/api/watched-assignees", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload || {}),
-  });
+    body: JSON.stringify( payload || {} ),
+  } );
 };
 
-export const updateWatchedAssignee = async (id, payload) => {
-  return requestJson(`/api/watched-assignees/${encodeURIComponent(id)}`, {
+export const updateWatchedAssignee = async ( id, payload ) => {
+  return requestJson( `/api/watched-assignees/${ encodeURIComponent( id ) }`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload || {}),
-  });
+    body: JSON.stringify( payload || {} ),
+  } );
 };
 
-export const deleteWatchedAssignee = async (id) => {
-  return requestJson(`/api/watched-assignees/${encodeURIComponent(id)}`, {
+export const deleteWatchedAssignee = async ( id ) => {
+  return requestJson( `/api/watched-assignees/${ encodeURIComponent( id ) }`, {
     method: "DELETE",
-  });
+  } );
 };
 
 export const fetchDashboardMetrics = async () => {
-  const data = await requestJson("/api/dashboard/metrics");
+  const data = await requestJson( "/api/dashboard/metrics" );
   return data?.snapshot || null;
 };
 
 export const fetchJiraFilters = async () => {
-  const data = await requestJson("/api/jira/filters");
-  return Array.isArray(data) ? data : [];
+  const data = await requestJson( "/api/jira/filters" );
+  return Array.isArray( data ) ? data : [];
 };
 
 /** @deprecated Prefer fetchJiraFilters — same owned + shared list via filter/search. */
 export const fetchFavouriteJiraFilters = async () => fetchJiraFilters();
 
-export const refreshDashboardMetrics = async (payload, options = {}) => {
-  const data = await requestJson("/api/dashboard/refresh", {
+export const refreshDashboardMetrics = async ( payload, options = {} ) => {
+  const data = await requestJson( "/api/dashboard/refresh", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload || {}),
+    body: JSON.stringify( payload || {} ),
     signal: options.signal,
-  });
+  } );
 
   return data?.snapshot || null;
 };
 
-export const generateReport = async ({
+export const generateReport = async ( {
   audience,
   epicPresetIds,
   additionalContext,
   statusCounts,
   chartVariant,
-}) => {
-  return requestJson("/api/report/generate", {
+} ) => {
+  return requestJson( "/api/report/generate", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
+    body: JSON.stringify( {
       audience,
       epicPresetIds,
       additionalContext,
       statusCounts,
       chartVariant,
       ...getLocalTimestampPayload(),
-    }),
-  });
+    } ),
+  } );
 };
 
-export const fetchWeeklyDigest = async () => requestJson("/api/reports/weekly-digest");
+export const fetchWeeklyDigest = async () => requestJson( "/api/reports/weekly-digest" );
 
-export const fetchChatStatus = async () => requestJson("/api/chat/status");
+export const fetchChatStatus = async () => requestJson( "/api/chat/status" );
 
 export const startChatOAuth = async () => {
-  const data = await requestJson("/api/chat/auth/start?format=json");
-  return String(data?.authorizeUrl || "").trim();
+  const data = await requestJson( "/api/chat/auth/start?format=json" );
+  return String( data?.authorizeUrl || "" ).trim();
 };
 
 export const signOutChat = async () => {
-  return requestJson("/api/chat/auth/signout", {
+  return requestJson( "/api/chat/auth/signout", {
     method: "POST",
-  });
+  } );
 };
 
-export const sendChatMessage = async ({ message, epicContext }) => {
-  return requestJson("/api/chat", {
+export const sendChatMessage = async ( { message, epicContext } ) => {
+  return requestJson( "/api/chat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ message, epicContext }),
-  });
+    body: JSON.stringify( { message, epicContext } ),
+  } );
 };
 
 export const fetchJiraProjects = async () => {
-  const data = await requestJson("/api/jira/projects");
+  const data = await requestJson( "/api/jira/projects" );
   return data?.items || [];
 };
 
-export const fetchJiraCreateMeta = async (projectKey) => {
-  return requestJson(`/api/jira/projects/${encodeURIComponent(projectKey)}/createmeta`);
+export const fetchJiraCreateMeta = async ( projectKey ) => {
+  return requestJson( `/api/jira/projects/${ encodeURIComponent( projectKey ) }/createmeta` );
 };
 
 export const fetchJiraCreateFieldOptions = async (
@@ -694,49 +725,53 @@ export const fetchJiraCreateFieldOptions = async (
   issueType = "Story",
   { parentRole = "", isSubtask = false } = {}
 ) => {
-  const params = new URLSearchParams({
-    issueType: String(issueType || "Story").trim() || "Story",
-  });
-  const role = String(parentRole || "").trim();
-  if (role) {
-    params.set("parentRole", role);
+  const params = new URLSearchParams( {
+    issueType: String( issueType || "Story" ).trim() || "Story",
+  } );
+  const role = String( parentRole || "" ).trim();
+  if ( role )
+  {
+    params.set( "parentRole", role );
   }
-  if (isSubtask) {
-    params.set("isSubtask", "true");
+  if ( isSubtask )
+  {
+    params.set( "isSubtask", "true" );
   }
   return requestJson(
-    `/api/jira/projects/${encodeURIComponent(projectKey)}/create-field-options?${params.toString()}`
+    `/api/jira/projects/${ encodeURIComponent( projectKey ) }/create-field-options?${ params.toString() }`
   );
 };
 
-export const fetchJiraIssueSummary = async (issueKey) => {
-  return requestJson(`/api/jira/issues/${encodeURIComponent(String(issueKey || "").trim())}/summary`);
+export const fetchJiraIssueSummary = async ( issueKey ) => {
+  return requestJson( `/api/jira/issues/${ encodeURIComponent( String( issueKey || "" ).trim() ) }/summary` );
 };
 
-export const fetchEpicParentOptions = async (epicKey) => {
-  return requestJson(`/api/jira/epics/${encodeURIComponent(String(epicKey || "").trim())}/parent-options`);
+export const fetchEpicParentOptions = async ( epicKey ) => {
+  return requestJson( `/api/jira/epics/${ encodeURIComponent( String( epicKey || "" ).trim() ) }/parent-options` );
 };
 
-export const fetchEpicWorkload = async (epicKey) => {
-  return requestJson(`/api/jira/epics/${encodeURIComponent(String(epicKey || "").trim())}/workload`);
+export const fetchEpicWorkload = async ( epicKey ) => {
+  return requestJson( `/api/jira/epics/${ encodeURIComponent( String( epicKey || "" ).trim() ) }/workload` );
 };
 
 // omitted/null selectedIds = all entries; [] = none (do not fetch).
-export const fetchCapacityPlanning = async (selectedIds) => {
-  if (Array.isArray(selectedIds) && selectedIds.length === 0) {
+export const fetchCapacityPlanning = async ( selectedIds ) => {
+  if ( Array.isArray( selectedIds ) && selectedIds.length === 0 )
+  {
     return [];
   }
-  const idList = Array.isArray(selectedIds) ? selectedIds.filter((id) => id !== null && id !== undefined) : null;
-  const query = idList && idList.length > 0 ? `?ids=${idList.map((id) => encodeURIComponent(id)).join(",")}` : "";
-  const data = await requestJson(`/api/project-managers/capacity${query}`);
+  const idList = Array.isArray( selectedIds ) ? selectedIds.filter( ( id ) => id !== null && id !== undefined ) : null;
+  const query = idList && idList.length > 0 ? `?ids=${ idList.map( ( id ) => encodeURIComponent( id ) ).join( "," ) }` : "";
+  const data = await requestJson( `/api/project-managers/capacity${ query }` );
   return data?.items || [];
 };
 
-export const fetchGanttData = async (slug) => {
-  const data = await requestJson(`/api/project-managers/gantt?slug=${encodeURIComponent(slug)}`);
+export const fetchGanttData = async ( slug ) => {
+  const data = await requestJson( `/api/project-managers/gantt?slug=${ encodeURIComponent( slug ) }` );
   return data;
 };
 
+<<<<<<< Updated upstream
 // On-demand only — fetched per issue on hover, not part of the bulk Gantt load.
 export const fetchGanttStatusHistory = async (issueKey) => {
   const data = await requestJson(`/api/project-managers/gantt/status-history/${encodeURIComponent(issueKey)}`);
@@ -745,64 +780,69 @@ export const fetchGanttStatusHistory = async (issueKey) => {
 
 export const updatePinnedGantt = (issueKey, pinned) =>
   requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/pin-gantt`, {
+=======
+export const updatePinnedGantt = ( issueKey, pinned ) =>
+  requestJson( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }/pin-gantt`, {
+>>>>>>> Stashed changes
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pinned: Boolean(pinned) }),
-  });
+    body: JSON.stringify( { pinned: Boolean( pinned ) } ),
+  } );
 
-export const searchEpics = async (query) => {
-  const q = String(query || "").trim();
-  if (q.length < 2) {
+export const searchEpics = async ( query ) => {
+  const q = String( query || "" ).trim();
+  if ( q.length < 2 )
+  {
     return [];
   }
-  const data = await requestJson(`/api/jira/epics/search?q=${encodeURIComponent(q)}`);
+  const data = await requestJson( `/api/jira/epics/search?q=${ encodeURIComponent( q ) }` );
   return data?.items || [];
 };
 
-export const fetchJiraParentCandidates = async ({ jql, maxTotal = 100 }) => {
-  return requestJson("/api/jira/issues/parent-candidates", {
+export const fetchJiraParentCandidates = async ( { jql, maxTotal = 100 } ) => {
+  return requestJson( "/api/jira/issues/parent-candidates", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      jql: String(jql || "").trim(),
+    body: JSON.stringify( {
+      jql: String( jql || "" ).trim(),
       maxTotal,
-    }),
-  });
+    } ),
+  } );
 };
 
-export const createJiraIssue = async (payload) => {
-  return requestJson("/api/jira/issues", {
+export const createJiraIssue = async ( payload ) => {
+  return requestJson( "/api/jira/issues", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload || {}),
-  });
+    body: JSON.stringify( payload || {} ),
+  } );
 };
 
-export const generateIssueDescription = async ({
+export const generateIssueDescription = async ( {
   summary,
   issueType,
   epicKey,
   epicName,
   intake,
-}) => {
-  return requestJson("/api/jira/issues/generate-description", {
+} ) => {
+  return requestJson( "/api/jira/issues/generate-description", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+    body: JSON.stringify( {
       summary,
       issueType,
       epicKey: epicKey || "",
       epicName: epicName || "",
       intake: intake || null,
-    }),
-  });
+    } ),
+  } );
 };
 
-export const generateProjectReport = async ({
+export const generateProjectReport = async ( {
   label,
   jql,
   summary,
@@ -810,11 +850,11 @@ export const generateProjectReport = async ({
   pwbPeriod,
   userGoals,
   companyGoals,
-}) => {
-  return requestJson("/api/report/project", {
+} ) => {
+  return requestJson( "/api/report/project", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+    body: JSON.stringify( {
       label,
       jql,
       summary,
@@ -823,118 +863,120 @@ export const generateProjectReport = async ({
       userGoals,
       companyGoals,
       ...getLocalTimestampPayload(),
-    }),
-  });
+    } ),
+  } );
 };
 
-export const generateWeekPlan = async ({ projects, focusStyle, capacityHours, additionalContext }) => {
-  return requestJson("/api/plan/week", {
+export const generateWeekPlan = async ( { projects, focusStyle, capacityHours, additionalContext } ) => {
+  return requestJson( "/api/plan/week", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+    body: JSON.stringify( {
       projects,
       focusStyle,
       capacityHours,
       additionalContext,
       ...getLocalTimestampPayload(),
-    }),
-  });
+    } ),
+  } );
 };
 
-export const fetchArchivedReports = async ({ source, limit } = {}) => {
+export const fetchArchivedReports = async ( { source, limit } = {} ) => {
   const params = new URLSearchParams();
-  if (source) {
-    params.set("source", source);
+  if ( source )
+  {
+    params.set( "source", source );
   }
-  if (limit) {
-    params.set("limit", String(limit));
+  if ( limit )
+  {
+    params.set( "limit", String( limit ) );
   }
   const query = params.toString();
-  const path = query ? `/api/reports/archive?${query}` : "/api/reports/archive";
-  const data = await requestJson(path);
+  const path = query ? `/api/reports/archive?${ query }` : "/api/reports/archive";
+  const data = await requestJson( path );
   return data?.items || [];
 };
 
-export const fetchArchivedReportById = async (id) => {
-  const data = await requestJson(`/api/reports/archive/${encodeURIComponent(id)}`);
+export const fetchArchivedReportById = async ( id ) => {
+  const data = await requestJson( `/api/reports/archive/${ encodeURIComponent( id ) }` );
   return data?.item || null;
 };
 
-export const deleteArchivedReport = async (id) => {
-  return requestJson(`/api/reports/archive/${encodeURIComponent(id)}`, {
+export const deleteArchivedReport = async ( id ) => {
+  return requestJson( `/api/reports/archive/${ encodeURIComponent( id ) }`, {
     method: "DELETE",
-  });
+  } );
 };
 
-export const deleteArchivedReportsBySource = async (source) => {
-  return requestJson(`/api/reports/archive?source=${encodeURIComponent(source)}`, {
+export const deleteArchivedReportsBySource = async ( source ) => {
+  return requestJson( `/api/reports/archive?source=${ encodeURIComponent( source ) }`, {
     method: "DELETE",
-  });
+  } );
 };
 
-export const saveAdHocReport = async ({ content, label, userPrompt, provider, savedFrom }) => {
-  return requestJson("/api/reports/archive", {
+export const saveAdHocReport = async ( { content, label, userPrompt, provider, savedFrom } ) => {
+  return requestJson( "/api/reports/archive", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ content, label, userPrompt, provider, savedFrom, ...getLocalTimestampPayload() }),
-  });
+    body: JSON.stringify( { content, label, userPrompt, provider, savedFrom, ...getLocalTimestampPayload() } ),
+  } );
 };
 
 export const fetchCoworkWeeklyPlans = async () => {
-  const data = await requestJson("/api/reports/cowork-files");
+  const data = await requestJson( "/api/reports/cowork-files" );
   return data?.items || [];
 };
 
-export const fetchCoworkWeeklyPlanByFilename = async (filename) => {
-  const data = await requestJson(`/api/reports/cowork-files/${encodeURIComponent(filename)}`);
+export const fetchCoworkWeeklyPlanByFilename = async ( filename ) => {
+  const data = await requestJson( `/api/reports/cowork-files/${ encodeURIComponent( filename ) }` );
   return data?.item || null;
 };
 
-export const saveCoworkWeeklyPlanToArchive = async ({ content, label, filename }) => {
-  return requestJson("/api/reports/archive", {
+export const saveCoworkWeeklyPlanToArchive = async ( { content, label, filename } ) => {
+  return requestJson( "/api/reports/archive", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
+    body: JSON.stringify( {
       content,
       label,
       filename,
       fromCoworkFile: true,
       ...getLocalTimestampPayload(),
-    }),
-  });
+    } ),
+  } );
 };
 
 export const fetchPmAsks = async () => {
-  const data = await requestJson("/api/project-managers/asks");
+  const data = await requestJson( "/api/project-managers/asks" );
   return data?.items || [];
 };
 
-export const createPmAsk = async ({ title, whoAsked, note }) => {
-  return requestJson("/api/project-managers/asks", {
+export const createPmAsk = async ( { title, whoAsked, note } ) => {
+  return requestJson( "/api/project-managers/asks", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, whoAsked, note }),
-  });
+    body: JSON.stringify( { title, whoAsked, note } ),
+  } );
 };
 
-export const updatePmAsk = async ({ id, title, whoAsked, note }) => {
+export const updatePmAsk = async ( { id, title, whoAsked, note } ) => {
   const body = {};
-  if (typeof title === "string") body.title = title;
-  if (typeof whoAsked === "string") body.whoAsked = whoAsked;
-  if (typeof note === "string") body.note = note;
-  return requestJson(`/api/project-managers/asks/${encodeURIComponent(id)}`, {
+  if ( typeof title === "string" ) body.title = title;
+  if ( typeof whoAsked === "string" ) body.whoAsked = whoAsked;
+  if ( typeof note === "string" ) body.note = note;
+  return requestJson( `/api/project-managers/asks/${ encodeURIComponent( id ) }`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+    body: JSON.stringify( body ),
+  } );
 };
 
-export const deletePmAsk = async (id) => {
-  return requestJson(`/api/project-managers/asks/${encodeURIComponent(id)}`, {
+export const deletePmAsk = async ( id ) => {
+  return requestJson( `/api/project-managers/asks/${ encodeURIComponent( id ) }`, {
     method: "DELETE",
-  });
+  } );
 };
