@@ -147,21 +147,43 @@ export const registerJiraIssueRoutes = (
     }
 
     try {
-      const result = await jiraRequest({
-        pathWithQuery: "/rest/api/3/project/search?maxResults=100&orderBy=name&expand=description",
-      });
-      if (!result.ok) {
-        return res.status(result.status).json(result.data);
+      const PAGE_SIZE = 50;
+      const MAX_PROJECTS = 1000;
+      const items = [];
+      let startAt = 0;
+
+      while (items.length < MAX_PROJECTS) {
+        const params = new URLSearchParams({
+          startAt: String(startAt),
+          maxResults: String(PAGE_SIZE),
+          orderBy: "name",
+          expand: "description",
+        });
+        const result = await jiraRequest({
+          pathWithQuery: `/rest/api/3/project/search?${params.toString()}`,
+        });
+        if (!result.ok) {
+          return res.status(result.status).json(result.data);
+        }
+
+        const page = Array.isArray(result.data?.values) ? result.data.values : [];
+        for (const project of page) {
+          const key = String(project.key || "").trim();
+          if (!key) continue;
+          items.push({
+            key,
+            name: String(project.name || "").trim(),
+            id: String(project.id || "").trim(),
+          });
+          if (items.length >= MAX_PROJECTS) break;
+        }
+
+        const isLast = Boolean(result.data?.isLast) || page.length === 0;
+        if (isLast) break;
+        startAt += page.length > 0 ? page.length : PAGE_SIZE;
       }
 
-      const values = Array.isArray(result.data?.values) ? result.data.values : [];
-      return res.json({
-        items: values.map((project) => ({
-          key: String(project.key || "").trim(),
-          name: String(project.name || "").trim(),
-          id: String(project.id || "").trim(),
-        })),
-      });
+      return res.json({ items });
     } catch (error) {
       return res.status(500).json({
         error: "Failed to list Jira projects",

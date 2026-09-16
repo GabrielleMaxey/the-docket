@@ -113,7 +113,7 @@ const JiraResultsTable = ({
   completeDateByKey,
   planningMetaByKey,
   expandedPlanningKey,
-  expandedRowKey,
+  collapsedRowKeys,
   assigneeDrafts,
   jiraRowPriorities,
   jiraNotes,
@@ -144,6 +144,8 @@ const JiraResultsTable = ({
   handleClearDateTracking,
   handleTogglePlanningRow,
   handleToggleRowExpand,
+  handleExpandAllRows,
+  handleCollapseAllRows,
   handleSavePlanningAll,
   handlePlanningFieldChange,
   handlePinnedGanttChange,
@@ -315,58 +317,6 @@ const JiraResultsTable = ({
     }
     setPageByRunIndex((prevPages) => ({ ...prevPages, [stateKey]: 1 }));
   }, [drillDownFilters, getJqlRunsIndex, onActiveTabChange, visibleRuns]);
-
-  const pagedIssueKeysForActiveRun = React.useMemo(() => {
-    if (visibleRuns.length === 0) {
-      return [];
-    }
-
-    const tab = Math.min(activeTab, visibleRuns.length - 1);
-    const activeRun = visibleRuns[tab];
-    const stateKey = getRunStateKey(activeRun, tab);
-    const loadedIssues = activeRun.issues || [];
-    const filteredIssues = filterIssues(loadedIssues, {
-      keyQuery: keyFilterByRunIndex[stateKey] ?? "",
-      keywordQuery: keywordFilterByRunIndex[stateKey] ?? "",
-      statusFilter: statusFilterByRunIndex[stateKey] ?? "",
-      assigneeFilter: assigneeFilterByRunIndex[stateKey] ?? "",
-      subtaskBugOnly: subtaskBugOnlyByRunIndex[stateKey] ?? false,
-      includeStories: includeStoriesByRunIndex[stateKey] ?? false,
-    });
-    const sorted = sortIssues({
-      issues: filteredIssues,
-      isClosedLikeStatus,
-      jiraRowPriorities,
-      clampPriority,
-      sortField,
-      sortDirection,
-    });
-    const pages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-    const page = Math.min(pageByRunIndex[stateKey] || 1, pages);
-    const sliceStart = (page - 1) * PAGE_SIZE;
-    return sorted.slice(sliceStart, sliceStart + PAGE_SIZE).map((issue) => issue.key);
-  }, [
-    visibleRuns,
-    activeTab,
-    keyFilterByRunIndex,
-    keywordFilterByRunIndex,
-    statusFilterByRunIndex,
-    assigneeFilterByRunIndex,
-    subtaskBugOnlyByRunIndex,
-    includeStoriesByRunIndex,
-    pageByRunIndex,
-    sortField,
-    sortDirection,
-    isClosedLikeStatus,
-    jiraRowPriorities,
-    clampPriority,
-  ]);
-
-  React.useEffect(() => {
-    if (expandedRowKey && !pagedIssueKeysForActiveRun.includes(expandedRowKey)) {
-      handleToggleRowExpand(expandedRowKey);
-    }
-  }, [expandedRowKey, pagedIssueKeysForActiveRun, handleToggleRowExpand]);
 
   if (visibleRuns.length === 0) {
     return null;
@@ -750,6 +700,24 @@ const JiraResultsTable = ({
 
             <div className="ww-results-table-wrap">
               <div className="ww-push-selected-row">
+                <div className="ww-row-expand-all-group">
+                  <button
+                    type="button"
+                    className="ww-row-expand-all-btn"
+                    onClick={() => handleExpandAllRows(sortedIssues.map((issue) => issue.key))}
+                    disabled={sortedIssues.length === 0}
+                  >
+                    Expand all
+                  </button>
+                  <button
+                    type="button"
+                    className="ww-row-expand-all-btn"
+                    onClick={() => handleCollapseAllRows(sortedIssues.map((issue) => issue.key))}
+                    disabled={sortedIssues.length === 0}
+                  >
+                    Collapse all
+                  </button>
+                </div>
                 <label className="ww-select-all-label">
                   <input
                     type="checkbox"
@@ -839,7 +807,7 @@ const JiraResultsTable = ({
                     });
                     const isNoteAlreadyPushed = noteMatchesLastJiraPush(noteFingerprint, pushedNoteSnapshot);
 
-                    const isExpandedRow = expandedRowKey === issueKey;
+                    const isExpandedRow = !collapsedRowKeys?.has?.(issueKey);
                     const isExpandedPlanning = expandedPlanningKey === issueKey;
                     const planningMeta = planningMetaByKey[issueKey] || {};
                     const summary = issue.fields?.summary || "No summary";

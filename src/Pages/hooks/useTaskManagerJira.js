@@ -272,7 +272,7 @@ export const useTaskManagerJira = () => {
     try { return localStorage.getItem("ww_show_planning") === "true"; } catch { return false; }
   });
   const [expandedPlanningKey, setExpandedPlanningKey] = React.useState(null);
-  const [expandedRowKey, setExpandedRowKey] = React.useState(null);
+  const [collapsedRowKeys, setCollapsedRowKeys] = React.useState(() => new Set());
   const [assigneeDrafts, setAssigneeDrafts] = React.useState({});
   const [assigneeAccountIds, setAssigneeAccountIds] = React.useState({});
   const [rowUpdateState, setRowUpdateState] = React.useState({});
@@ -994,25 +994,50 @@ export const useTaskManagerJira = () => {
     setExpandedPlanningKey((prev) => (prev === issueKey ? null : issueKey));
   };
 
-  const expandedRowKeyRef = React.useRef(null);
+  const collapsedRowKeysRef = React.useRef(collapsedRowKeys);
   React.useEffect(() => {
-    expandedRowKeyRef.current = expandedRowKey;
-  }, [expandedRowKey]);
+    collapsedRowKeysRef.current = collapsedRowKeys;
+  }, [collapsedRowKeys]);
 
-  const handleToggleRowExpand = (issueKey) => {
+  const handleToggleRowExpand = React.useCallback((issueKey) => {
     const key = String(issueKey || "").trim();
     if (!key) return;
-    const prev = expandedRowKeyRef.current;
-    if (prev === key) {
-      setExpandedRowKey(null);
+    const wasCollapsed = collapsedRowKeysRef.current.has(key);
+    setCollapsedRowKeys((prev) => {
+      const next = new Set(prev);
+      if (wasCollapsed) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    if (!wasCollapsed) {
       setExpandedPlanningKey((planKey) => (planKey === key ? null : planKey));
-      return;
     }
-    if (prev) {
-      setExpandedPlanningKey((planKey) => (planKey === prev ? null : planKey));
-    }
-    setExpandedRowKey(key);
-  };
+  }, []);
+
+  const handleExpandAllRows = React.useCallback((issueKeys) => {
+    const keys = (Array.isArray(issueKeys) ? issueKeys : [])
+      .map((key) => String(key || "").trim())
+      .filter(Boolean);
+    if (keys.length === 0) return;
+    setCollapsedRowKeys((prev) => {
+      const next = new Set(prev);
+      keys.forEach((key) => next.delete(key));
+      return next;
+    });
+  }, []);
+
+  const handleCollapseAllRows = React.useCallback((issueKeys) => {
+    const keys = (Array.isArray(issueKeys) ? issueKeys : [])
+      .map((key) => String(key || "").trim())
+      .filter(Boolean);
+    if (keys.length === 0) return;
+    setCollapsedRowKeys((prev) => {
+      const next = new Set(prev);
+      keys.forEach((key) => next.add(key));
+      return next;
+    });
+    setExpandedPlanningKey((planKey) => (keys.includes(planKey) ? null : planKey));
+  }, []);
 
   const handleSavePlanningAll = React.useCallback(async (issueKey, options = {}) => {
     const sharedProgramId = String(options.sharedProgramId || "").trim();
@@ -1349,7 +1374,7 @@ export const useTaskManagerJira = () => {
     planningMetaByKey,
     showPlanningPanel,
     expandedPlanningKey,
-    expandedRowKey,
+    collapsedRowKeys,
     assigneeDrafts,
     rowUpdateState,
     noteImagesByKey,
@@ -1393,6 +1418,8 @@ export const useTaskManagerJira = () => {
     handleTogglePlanningPanel,
     handleTogglePlanningRow,
     handleToggleRowExpand,
+    handleExpandAllRows,
+    handleCollapseAllRows,
     handleSavePlanningAll,
     handlePlanningFieldChange,
     handlePinnedGanttChange,
