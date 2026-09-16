@@ -771,19 +771,8 @@ export const fetchGanttData = async ( slug ) => {
   return data;
 };
 
-<<<<<<< Updated upstream
-// On-demand only — fetched per issue on hover, not part of the bulk Gantt load.
-export const fetchGanttStatusHistory = async (issueKey) => {
-  const data = await requestJson(`/api/project-managers/gantt/status-history/${encodeURIComponent(issueKey)}`);
-  return Array.isArray(data?.segments) ? data.segments : [];
-};
-
-export const updatePinnedGantt = (issueKey, pinned) =>
-  requestJson(`/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/pin-gantt`, {
-=======
 export const updatePinnedGantt = ( issueKey, pinned ) =>
   requestJson( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }/pin-gantt`, {
->>>>>>> Stashed changes
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify( { pinned: Boolean( pinned ) } ),
