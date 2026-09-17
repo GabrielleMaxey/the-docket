@@ -433,9 +433,6 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     setSuggestedPriority("");
     setBugPriority("");
     setComponentValue("");
-    setVerticalComponentValue("");
-    setBugTrackingValue("");
-    setComponentOptions(COMPONENT_OPTIONS);
     setVerticalComponentOptions(VERTICAL_COMPONENT_OPTIONS);
     setBugTrackingOptions(BUG_TRACKING_OPTIONS);
     setLoadingFieldOptions(false);

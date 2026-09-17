@@ -12,30 +12,49 @@ const PRIORITY_ALIASES = {
 
 const isEpicLinkField = (meta) => {
   const custom = String(meta?.schema?.custom || "");
-  const name = String(meta?.name || "").trim().toLowerCase();
+  const name = String(meta?.name || "")
+    .trim()
+    .toLowerCase();
   return custom.includes("gh-epic-link") || name === "epic link";
 };
 
 const isParentLinkField = (meta) => {
   const custom = String(meta?.schema?.custom || "");
-  const name = String(meta?.name || "").trim().toLowerCase();
+  const name = String(meta?.name || "")
+    .trim()
+    .toLowerCase();
   return custom.includes("jpo-custom-field-parent") || name === "parent link";
 };
 
 const findIssueTypeMeta = (project, issueTypeName) => {
-  const issueTypes = Array.isArray(project?.issuetypes) ? project.issuetypes : [];
-  const normalized = String(issueTypeName || "").trim().toLowerCase();
+  const issueTypes = Array.isArray(project?.issuetypes)
+    ? project.issuetypes
+    : [];
+  const normalized = String(issueTypeName || "")
+    .trim()
+    .toLowerCase();
   return (
-    issueTypes.find((type) => String(type?.name || "").trim().toLowerCase() === normalized) ||
-    issueTypes.find((type) => String(type?.name || "").trim() === issueTypeName) ||
+    issueTypes.find(
+      (type) =>
+        String(type?.name || "")
+          .trim()
+          .toLowerCase() === normalized,
+    ) ||
+    issueTypes.find(
+      (type) => String(type?.name || "").trim() === issueTypeName,
+    ) ||
     null
   );
 };
 
 const findSubtaskIssueTypeMeta = (project) => {
-  const issueTypes = Array.isArray(project?.issuetypes) ? project.issuetypes : [];
+  const issueTypes = Array.isArray(project?.issuetypes)
+    ? project.issuetypes
+    : [];
   return issueTypes.find((type) => {
-    const name = String(type?.name || "").trim().toLowerCase();
+    const name = String(type?.name || "")
+      .trim()
+      .toLowerCase();
     return (
       (name === "sub-task" || name === "subtask" || name === "sub task") &&
       (type?.subtask || type?.fields?.parent)
@@ -74,8 +93,12 @@ const collectAllowedOptionLabels = (meta) => {
 };
 
 const uniqueSortedLabels = (labels) =>
-  [...new Set((labels || []).map((item) => String(item || "").trim()).filter(Boolean))].sort(
-    (left, right) => left.localeCompare(right, undefined, { sensitivity: "base" })
+  [
+    ...new Set(
+      (labels || []).map((item) => String(item || "").trim()).filter(Boolean),
+    ),
+  ].sort((left, right) =>
+    left.localeCompare(right, undefined, { sensitivity: "base" }),
   );
 
 /** Live dropdown labels for Create Issue (project components + createmeta allowedValues). */
@@ -92,7 +115,7 @@ export const loadCreateFieldOptions = async ({
   ]);
 
   const componentNames = uniqueSortedLabels(
-    (projectComponents || []).map((item) => item?.name)
+    (projectComponents || []).map((item) => item?.name),
   );
 
   // Pass parentRole so Task-under-Story resolves Sub-task createmeta (same as create).
@@ -105,23 +128,40 @@ export const loadCreateFieldOptions = async ({
       isSubtask: Boolean(isSubtask),
     })?.fields || {};
 
-  const verticalMatch = findCreateMetaField(issueTypeFields, isVerticalComponentsField);
-  const bugTrackingMatch = findCreateMetaField(issueTypeFields, isBugTrackingField);
-  const componentsMetaMatch = findCreateMetaField(issueTypeFields, isComponentsField);
+  const verticalMatch = findCreateMetaField(
+    issueTypeFields,
+    isVerticalComponentsField,
+  );
+  const bugTrackingMatch = findCreateMetaField(
+    issueTypeFields,
+    isBugTrackingField,
+  );
+  const componentsMetaMatch = findCreateMetaField(
+    issueTypeFields,
+    isComponentsField,
+  );
 
   // Prefer project component registry; fall back to createmeta allowedValues when empty.
   const componentsFromMeta = uniqueSortedLabels(
-    collectAllowedOptionLabels(componentsMetaMatch?.meta)
+    collectAllowedOptionLabels(componentsMetaMatch?.meta),
   );
 
   return {
     components: componentNames.length > 0 ? componentNames : componentsFromMeta,
-    verticalComponents: uniqueSortedLabels(collectAllowedOptionLabels(verticalMatch?.meta)),
-    bugTracking: uniqueSortedLabels(collectAllowedOptionLabels(bugTrackingMatch?.meta)),
+    verticalComponents: uniqueSortedLabels(
+      collectAllowedOptionLabels(verticalMatch?.meta),
+    ),
+    bugTracking: uniqueSortedLabels(
+      collectAllowedOptionLabels(bugTrackingMatch?.meta),
+    ),
   };
 };
 
-const resolveProjectComponentName = ({ requestedName, meta, projectComponents }) => {
+const resolveProjectComponentName = ({
+  requestedName,
+  meta,
+  projectComponents,
+}) => {
   const normalized = String(requestedName || "").trim();
   if (!normalized) {
     return null;
@@ -136,7 +176,9 @@ const resolveProjectComponentName = ({ requestedName, meta, projectComponents })
     candidates.push(String(item?.name || "").trim());
   }
 
-  const match = candidates.find((name) => name && name.toLowerCase() === normalized.toLowerCase());
+  const match = candidates.find(
+    (name) => name && name.toLowerCase() === normalized.toLowerCase(),
+  );
   return match || null;
 };
 
@@ -154,9 +196,13 @@ export const loadProjectCreateMeta = async ({ projectKey, jiraRequest }) => {
     return { ok: false, status: result.status, data: result.data };
   }
 
-  const projects = Array.isArray(result.data?.projects) ? result.data.projects : [];
+  const projects = Array.isArray(result.data?.projects)
+    ? result.data.projects
+    : [];
   const project =
-    projects.find((item) => String(item.key || "").trim() === cacheKey) || projects[0] || null;
+    projects.find((item) => String(item.key || "").trim() === cacheKey) ||
+    projects[0] ||
+    null;
 
   const payload = { ok: true, project };
   createMetaCache.set(cacheKey, payload);
@@ -197,13 +243,18 @@ export const resolveJiraPriorityName = ({ fields, odiPriority }) => {
     return null;
   }
 
-  const allowed = Array.isArray(fields?.priority?.allowedValues) ? fields.priority.allowedValues : [];
+  const allowed = Array.isArray(fields?.priority?.allowedValues)
+    ? fields.priority.allowedValues
+    : [];
   if (allowed.length === 0) {
     return normalized;
   }
 
   const exact = allowed.find(
-    (item) => String(item?.name || "").trim().toLowerCase() === normalized.toLowerCase()
+    (item) =>
+      String(item?.name || "")
+        .trim()
+        .toLowerCase() === normalized.toLowerCase(),
   );
   if (exact?.name) {
     return exact.name;
@@ -211,7 +262,10 @@ export const resolveJiraPriorityName = ({ fields, odiPriority }) => {
 
   for (const candidate of PRIORITY_ALIASES[normalized] || []) {
     const match = allowed.find(
-      (item) => String(item?.name || "").trim().toLowerCase() === candidate.toLowerCase()
+      (item) =>
+        String(item?.name || "")
+          .trim()
+          .toLowerCase() === candidate.toLowerCase(),
     );
     if (match?.name) {
       return match.name;
@@ -223,7 +277,9 @@ export const resolveJiraPriorityName = ({ fields, odiPriority }) => {
 
 export const findCreateMetaField = (issueTypeFields, predicate) => {
   for (const [fieldKey, meta] of Object.entries(issueTypeFields || {})) {
-    const name = String(meta?.name || "").trim().toLowerCase();
+    const name = String(meta?.name || "")
+      .trim()
+      .toLowerCase();
     if (predicate({ fieldKey, name, meta })) {
       return { fieldKey, meta };
     }
@@ -258,7 +314,11 @@ const resolveAllowedOptionValue = (meta, text) => {
     return candidate.toLowerCase() === normalized.toLowerCase();
   });
   if (exact) {
-    if (exact.value !== undefined && exact.value !== null && exact.value !== "") {
+    if (
+      exact.value !== undefined &&
+      exact.value !== null &&
+      exact.value !== ""
+    ) {
       return { ok: true, payload: { value: exact.value } };
     }
     if (exact.name) {
@@ -281,14 +341,22 @@ const resolveAllowedOptionValue = (meta, text) => {
   return { ok: true, payload: { value: normalized } };
 };
 
-export const applyNamedFieldValue = ({ fields, fieldKey, meta, value, projectComponents }) => {
+export const applyNamedFieldValue = ({
+  fields,
+  fieldKey,
+  meta,
+  value,
+  projectComponents,
+}) => {
   const text = String(value || "").trim();
   if (!text || !fieldKey || !meta) {
     return { ok: false, error: "Missing field value." };
   }
 
   const schema = meta.schema || {};
-  const name = String(meta?.name || "").trim().toLowerCase();
+  const name = String(meta?.name || "")
+    .trim()
+    .toLowerCase();
   if (isComponentsField({ fieldKey, name, meta })) {
     const resolvedName = resolveProjectComponentName({
       requestedName: text,
@@ -338,7 +406,8 @@ export const applyOdiCreateFields = ({
     if (!match) {
       return {
         ok: false,
-        error: "Components field is not available on this issue type. Clear Components or pick another type.",
+        error:
+          "Components field is not available on this issue type. Clear Components or pick another type.",
       };
     }
     const result = applyNamedFieldValue({
@@ -355,7 +424,10 @@ export const applyOdiCreateFields = ({
 
   const verticalValue = String(verticalComponent || "").trim();
   if (verticalValue) {
-    const match = findCreateMetaField(issueTypeFields, isVerticalComponentsField);
+    const match = findCreateMetaField(
+      issueTypeFields,
+      isVerticalComponentsField,
+    );
     if (!match) {
       return {
         ok: false,
@@ -381,7 +453,8 @@ export const applyOdiCreateFields = ({
     if (!match) {
       return {
         ok: false,
-        error: "BUG Tracking field is not available on Bugs. Clear BUG Tracking or continue without it.",
+        error:
+          "BUG Tracking field is not available on Bugs. Clear BUG Tracking or continue without it.",
       };
     }
     const result = applyNamedFieldValue({
@@ -411,8 +484,13 @@ export const applyParentLinkFields = ({
     return { ok: true };
   }
 
-  const useEpicParent = parentRole === "epic" || issueType === "Story" || issueType === "Bug";
-  const useStoryParent = wantsStoryParent({ issueTypeName: issueType, parentRole, isSubtask });
+  const useEpicParent =
+    parentRole === "epic" || issueType === "Story" || issueType === "Bug";
+  const useStoryParent = wantsStoryParent({
+    issueTypeName: issueType,
+    parentRole,
+    isSubtask,
+  });
 
   if (useStoryParent) {
     fields.parent = { key: parentKey };
@@ -461,7 +539,7 @@ export const formatJiraApiError = (data) => {
     messages.push(
       ...filterWorkfrontErrorMessages(data.errorMessages)
         .map((item) => String(item || "").trim())
-        .filter(Boolean)
+        .filter(Boolean),
     );
   }
   if (data?.errors && typeof data.errors === "object") {
@@ -475,7 +553,9 @@ export const formatJiraApiError = (data) => {
   if (messages.length === 0 && data?.message) {
     messages.push(String(data.message));
   }
-  return messages.length > 0 ? messages.join(" ") : "Jira rejected the issue create request.";
+  return messages.length > 0
+    ? messages.join(" ")
+    : "Jira rejected the issue create request.";
 };
 
 export const buildJiraCreatePayload = async ({
@@ -498,7 +578,9 @@ export const buildJiraCreatePayload = async ({
     return {
       ok: false,
       status: metaResult.status || 500,
-      error: formatJiraApiError(metaResult.data) || "Failed to load Jira create metadata.",
+      error:
+        formatJiraApiError(metaResult.data) ||
+        "Failed to load Jira create metadata.",
     };
   }
 
@@ -568,7 +650,10 @@ export const buildJiraCreatePayload = async ({
     fields.assignee = { id: assigneeAccountId };
   }
 
-  const projectComponents = await loadProjectComponents({ projectKey, jiraRequest });
+  const projectComponents = await loadProjectComponents({
+    projectKey,
+    jiraRequest,
+  });
   const odiFieldsResult = applyOdiCreateFields({
     fields,
     issueTypeFields: issueTypeMeta.fields || {},
