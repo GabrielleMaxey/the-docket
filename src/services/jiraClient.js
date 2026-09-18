@@ -838,15 +838,24 @@ export const fetchGanttData = async (slug) => {
   return data;
 };
 
-export const updatePinnedGantt = (issueKey, pinned) =>
-  requestJson(
-    `/api/jira/issue-metadata/${encodeURIComponent(issueKey)}/pin-gantt`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pinned: Boolean(pinned) }),
-    },
+export const fetchGanttStatusHistory = async ( issueKey ) => {
+  const key = String( issueKey || "" ).trim();
+  if ( !key )
+  {
+    return [];
+  }
+  const data = await requestJson(
+    `/api/project-managers/gantt/status-history/${ encodeURIComponent( key ) }`
   );
+  return Array.isArray( data?.segments ) ? data.segments : [];
+};
+
+export const updatePinnedGantt = ( issueKey, pinned ) =>
+  requestJson( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }/pin-gantt`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify( { pinned: Boolean( pinned ) } ),
+  } );
 
 export const searchEpics = async (query) => {
   const q = String(query || "").trim();

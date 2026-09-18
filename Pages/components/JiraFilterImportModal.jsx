@@ -1,0 +1,112 @@
+import React from "react";
+import { Button, Modal, Table, Message } from "semantic-ui-react";
+import { fetchJiraFilters } from "../../services/jiraClient";
+import { useJiraAccountIdResolver } from "../hooks/useJiraAccountIdResolver.js";
+
+const JiraFilterImportModal = ({ open, onClose, onImport, slotLabel }) => {
+  const [filters, setFilters] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const watchedTexts = React.useMemo(() => filters.map((filter) => filter.jql), [filters]);
+  const { humanizeJql } = useJiraAccountIdResolver(watchedTexts);
+
+  React.useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadFilters = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const items = await fetchJiraFilters();
+        if (!cancelled) {
+          setFilters(items);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : "Failed to load Jira filters");
+          setFilters([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadFilters();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const handlePick = (filter) => {
+    onImport(filter.jql || "", filter.name || slotLabel || "");
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} size="large">
+      <Modal.Header>Import Jira filter</Modal.Header>
+      <Modal.Content scrolling>
+        <p className="ww-copy">
+          Choose a Jira filter you own or that is shared with you to fill {slotLabel}. The
+          filter JQL is copied into the slot.
+        </p>
+        {error ? (
+          <Message negative size="small">
+            {error}
+          </Message>
+        ) : null}
+        <Table celled compact selectable>
+          <Table.Header>
+            <Table.Row>
+              <Table.HeaderCell>Name</Table.HeaderCell>
+              <Table.HeaderCell>Owner</Table.HeaderCell>
+              <Table.HeaderCell>JQL</Table.HeaderCell>
+              <Table.HeaderCell />
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {loading ? (
+              <Table.Row>
+                <Table.Cell colSpan="4">Loading Jira filters...</Table.Cell>
+              </Table.Row>
+            ) : filters.length === 0 ? (
+              <Table.Row>
+                <Table.Cell colSpan="4">No available filters found in Jira.</Table.Cell>
+              </Table.Row>
+            ) : (
+              filters.map((filter) => (
+                <Table.Row key={filter.id}>
+                  <Table.Cell>{filter.name || filter.id}</Table.Cell>
+                  <Table.Cell>{filter.owner || "-"}</Table.Cell>
+                  <Table.Cell className="ww-filter-jql-cell">{humanizeJql(filter.jql) || "-"}</Table.Cell>
+                  <Table.Cell collapsing>
+                    <Button
+                      size="mini"
+                      primary
+                      disabled={!filter.jql}
+                      onClick={() => handlePick(filter)}
+                    >
+                      Use
+                    </Button>
+                  </Table.Cell>
+                </Table.Row>
+              ))
+            )}
+          </Table.Body>
+        </Table>
+      </Modal.Content>
+      <Modal.Actions>
+        <Button onClick={onClose}>Cancel</Button>
+      </Modal.Actions>
+    </Modal>
+  );
+};
+
+export default JiraFilterImportModal;
