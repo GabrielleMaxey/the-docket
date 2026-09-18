@@ -771,6 +771,18 @@ export const fetchGanttData = async ( slug ) => {
   return data;
 };
 
+export const fetchGanttStatusHistory = async ( issueKey ) => {
+  const key = String( issueKey || "" ).trim();
+  if ( !key )
+  {
+    return [];
+  }
+  const data = await requestJson(
+    `/api/project-managers/gantt/status-history/${ encodeURIComponent( key ) }`
+  );
+  return Array.isArray( data?.segments ) ? data.segments : [];
+};
+
 export const updatePinnedGantt = ( issueKey, pinned ) =>
   requestJson( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }/pin-gantt`, {
     method: "PATCH",
