@@ -717,6 +717,13 @@
   color: #64748b;
 }
 
+.pm-gantt-export-note {
+  margin: 0.35rem 0 0.15rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #64748b;
+}
+
 .pm-gantt-refresh {
   font-size: 0.82rem;
   padding: 0.3rem 0.75rem;
