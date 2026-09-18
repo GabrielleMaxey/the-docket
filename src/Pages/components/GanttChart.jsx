@@ -2,79 +2,81 @@ import React from "react";
 import { fetchSharedPrograms, fetchGanttData, fetchGanttStatusHistory } from "../../services/jiraClient";
 import { getStatusColor } from "../../utils/statusScale";
 
-const parseDate = (str) => {
-  if (!str) return null;
-  const d = new Date(str + "T00:00:00");
-  return isNaN(d.getTime()) ? null : d;
+const parseDate = ( str ) => {
+  if ( !str ) return null;
+  const d = new Date( str + "T00:00:00" );
+  return isNaN( d.getTime() ) ? null : d;
 };
 
-const addDays = (date, n) => {
-  const d = new Date(date);
-  d.setDate(d.getDate() + n);
+const addDays = ( date, n ) => {
+  const d = new Date( date );
+  d.setDate( d.getDate() + n );
   return d;
 };
 
-const diffDays = (a, b) => Math.round((b.getTime() - a.getTime()) / 86400000);
+const diffDays = ( a, b ) => Math.round( ( b.getTime() - a.getTime() ) / 86400000 );
 
-const fmtMonthYear = (date) =>
-  date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+const fmtMonthYear = ( date ) =>
+  date.toLocaleDateString( "en-US", { month: "short", year: "numeric" } );
 
-const fmtShort = (str) => {
-  const d = parseDate(str);
-  return d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+const fmtShort = ( str ) => {
+  const d = parseDate( str );
+  return d ? d.toLocaleDateString( "en-US", { month: "short", day: "numeric", year: "numeric" } ) : "—";
 };
 
 const OVERDUE_COLOR = "#dc2626";
 
-const barColor = (issue, today, statusIndex) => {
-  if (issue.statusCategory !== "Done") {
-    const due = parseDate(issue.dueDate || issue.completeDate);
-    if (due && due < today) return OVERDUE_COLOR;
+const barColor = ( issue, today, statusIndex ) => {
+  if ( issue.statusCategory !== "Done" )
+  {
+    const due = parseDate( issue.dueDate || issue.completeDate );
+    if ( due && due < today ) return OVERDUE_COLOR;
   }
-  return getStatusColor(issue.status, statusIndex);
+  return getStatusColor( issue.status, statusIndex );
 };
 
 // Fixed px-per-day (not a percentage of viewport width) so wide ranges actually
 // overflow their container and scroll, instead of squeezing to fit.
 const DAY_WIDTH = 18;
 
-const generateMonths = (start, end, dayWidth) => {
+const generateMonths = ( start, end, dayWidth ) => {
   const months = [];
-  let cur = new Date(start.getFullYear(), start.getMonth(), 1);
-  while (cur <= end) {
-    const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-    const mStart = Math.max(cur.getTime(), start.getTime());
-    const mEnd = Math.min(next.getTime(), end.getTime());
-    months.push({
-      label: fmtMonthYear(cur),
-      widthPx: ((mEnd - mStart) / 86400000) * dayWidth,
-    });
+  let cur = new Date( start.getFullYear(), start.getMonth(), 1 );
+  while ( cur <= end )
+  {
+    const next = new Date( cur.getFullYear(), cur.getMonth() + 1, 1 );
+    const mStart = Math.max( cur.getTime(), start.getTime() );
+    const mEnd = Math.min( next.getTime(), end.getTime() );
+    months.push( {
+      label: fmtMonthYear( cur ),
+      widthPx: ( ( mEnd - mStart ) / 86400000 ) * dayWidth,
+    } );
     cur = next;
   }
   return months;
 };
 
-const pxPos = (date, rangeStart, dayWidth) =>
-  ((date.getTime() - rangeStart.getTime()) / 86400000) * dayWidth;
+const pxPos = ( date, rangeStart, dayWidth ) =>
+  ( ( date.getTime() - rangeStart.getTime() ) / 86400000 ) * dayWidth;
 
-const issueUrl = (key) => {
+const issueUrl = ( key ) => {
   const base = window.__JIRA_BASE_URL__ || "";
-  return base ? `${base}/browse/${key}` : null;
+  return base ? `${ base }/browse/${ key }` : null;
 };
 
-const assigneeInitials = (name) => {
-  const trimmed = String(name || "").trim();
-  if (!trimmed || trimmed.toLowerCase() === "unassigned") return "";
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  return parts.length === 1 ? parts[0].slice(0, 2).toUpperCase() : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+const assigneeInitials = ( name ) => {
+  const trimmed = String( name || "" ).trim();
+  if ( !trimmed || trimmed.toLowerCase() === "unassigned" ) return "";
+  const parts = trimmed.split( /\s+/ ).filter( Boolean );
+  return parts.length === 1 ? parts[ 0 ].slice( 0, 2 ).toUpperCase() : ( parts[ 0 ][ 0 ] + parts[ parts.length - 1 ][ 0 ] ).toUpperCase();
 };
 
-const escapeCsvField = (value) => {
-  const str = String(value === null || value === undefined ? "" : value);
-  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+const escapeCsvField = ( value ) => {
+  const str = String( value === null || value === undefined ? "" : value );
+  return /[",\n]/.test( str ) ? `"${ str.replace( /"/g, '""' ) }"` : str;
 };
 
-const csvRow = (fields) => fields.map(escapeCsvField).join(",");
+const csvRow = ( fields ) => fields.map( escapeCsvField ).join( "," );
 
 const EXPORT_CSV_HEADER = [
   "Key",
@@ -87,13 +89,29 @@ const EXPORT_CSV_HEADER = [
   "Planned Start",
   "Planned Finish",
   "Requestor",
+  "Status History",
 ];
 
-const buildPlanReportCsv = (issues) => {
-  const rows = [csvRow(EXPORT_CSV_HEADER)];
-  for (const issue of issues) {
+const formatStatusHistoryCompact = ( segments ) => {
+  if ( !Array.isArray( segments ) || segments.length === 0 ) return "";
+  return segments
+    .map( ( seg ) => {
+      const status = String( seg?.status || "" ).trim() || "Unknown";
+      const from = String( seg?.from || "" ).trim();
+      const to = String( seg?.to || "" ).trim();
+      if ( from && to ) return `${ status } from ${ from } → ${ to }`;
+      if ( from ) return `${ status } from ${ from }`;
+      return status;
+    } )
+    .join( "; " );
+};
+
+const buildPlanReportCsv = ( issues, statusHistoryByKey = {} ) => {
+  const rows = [ csvRow( EXPORT_CSV_HEADER ) ];
+  for ( const issue of issues )
+  {
     rows.push(
-      csvRow([
+      csvRow( [
         issue.key,
         issue.summary,
         issue.status,
@@ -104,52 +122,108 @@ const buildPlanReportCsv = (issues) => {
         issue.plannedStart,
         issue.plannedFinish,
         issue.requestor,
-      ])
+        formatStatusHistoryCompact( statusHistoryByKey[ issue.key ] ),
+      ] )
     );
   }
-  return rows.join("\r\n");
+  return rows.join( "\r\n" );
 };
 
-const buildPlanReportMarkdown = (displayName, issues) => {
-  const lines = [`# Gantt Plan — ${displayName}`, "", `_Generated ${new Date().toLocaleString()}_`, ""];
-  lines.push("| Key | Summary | Status | Assignee | Start | Due/Complete | Planned Start | Planned Finish | Requestor |");
-  lines.push("|---|---|---|---|---|---|---|---|---|");
-  for (const issue of issues) {
+const buildPlanReportMarkdown = ( displayName, issues, statusHistoryByKey = {} ) => {
+  const lines = [ `# Gantt Plan — ${ displayName }`, "", `_Generated ${ new Date().toLocaleString() }_`, "" ];
+  lines.push( "| Key | Summary | Status | Assignee | Start | Due/Complete | Planned Start | Planned Finish | Requestor |" );
+  lines.push( "|---|---|---|---|---|---|---|---|---|" );
+  for ( const issue of issues )
+  {
     lines.push(
-      `| ${issue.key} | ${(issue.summary || "").replace(/\|/g, "\\|")} | ${issue.status || ""} | ${issue.assignee || ""} | ${issue.startDate || ""} | ${issue.dueDate || issue.completeDate || ""} | ${issue.plannedStart || ""} | ${issue.plannedFinish || ""} | ${issue.requestor || ""} |`
+      `| ${ issue.key } | ${ ( issue.summary || "" ).replace( /\|/g, "\\|" ) } | ${ issue.status || "" } | ${ issue.assignee || "" } | ${ issue.startDate || "" } | ${ issue.dueDate || issue.completeDate || "" } | ${ issue.plannedStart || "" } | ${ issue.plannedFinish || "" } | ${ issue.requestor || "" } |`
     );
   }
-  return lines.join("\n");
+
+  lines.push( "", "## Status history", "" );
+  for ( const issue of issues )
+  {
+    const segments = statusHistoryByKey[ issue.key ];
+    lines.push( `### ${ issue.key }`, "" );
+    if ( !Array.isArray( segments ) || segments.length === 0 )
+    {
+      lines.push( "_No status history available._", "" );
+      continue;
+    }
+    for ( const seg of segments )
+    {
+      const status = String( seg?.status || "" ).trim() || "Unknown";
+      const from = String( seg?.from || "" ).trim();
+      const to = String( seg?.to || "" ).trim();
+      if ( from && to ) lines.push( `- **${ status }** started ${ from } (until ${ to })` );
+      else if ( from ) lines.push( `- **${ status }** started ${ from }` );
+      else lines.push( `- **${ status }**` );
+    }
+    lines.push( "" );
+  }
+
+  return lines.join( "\n" );
 };
 
-const downloadBlob = (content, filename, type) => {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
+const STATUS_HISTORY_CONCURRENCY = 5;
+
+const fetchMissingStatusHistories = async ( issueKeys, existingByKey = {}, { signal, onBatch } = {} ) => {
+  const next = { ...existingByKey };
+  const missing = issueKeys.filter( ( key ) => next[ key ] === undefined );
+  for ( let i = 0; i < missing.length; i += STATUS_HISTORY_CONCURRENCY )
+  {
+    if ( signal?.aborted ) break;
+    const batch = missing.slice( i, i + STATUS_HISTORY_CONCURRENCY );
+    const results = await Promise.all(
+      batch.map( async ( key ) => {
+        try
+        {
+          return [ key, await fetchGanttStatusHistory( key ) ];
+        } catch
+        {
+          return [ key, [] ];
+        }
+      } )
+    );
+    if ( signal?.aborted ) break;
+    for ( const [ key, segments ] of results )
+    {
+      next[ key ] = segments;
+    }
+    onBatch?.( results );
+  }
+  return next;
+};
+
+const downloadBlob = ( content, filename, type ) => {
+  const blob = new Blob( [ content ], { type } );
+  const url = URL.createObjectURL( blob );
+  const anchor = document.createElement( "a" );
   anchor.href = url;
   anchor.download = filename;
-  document.body.appendChild(anchor);
+  document.body.appendChild( anchor );
   anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
+  document.body.removeChild( anchor );
+  URL.revokeObjectURL( url );
 };
 
-const GanttTooltip = ({ issue, x, y, today }) => {
-  const end = parseDate(issue.dueDate || issue.completeDate);
-  const planEnd = parseDate(issue.plannedFinish);
+const GanttTooltip = ( { issue, x, y, today } ) => {
+  const end = parseDate( issue.dueDate || issue.completeDate );
+  const planEnd = parseDate( issue.plannedFinish );
   const isOverdue = issue.statusCategory !== "Done" && end && end < today;
 
   let delta = null;
-  if (planEnd && end && issue.statusCategory !== "Done") {
-    const d = diffDays(planEnd, end);
-    if (d > 0) delta = { text: `${d}d behind plan`, cls: "pm-gantt-tooltip-late" };
-    else if (d < 0) delta = { text: `${Math.abs(d)}d ahead of plan`, cls: "pm-gantt-tooltip-ahead" };
+  if ( planEnd && end && issue.statusCategory !== "Done" )
+  {
+    const d = diffDays( planEnd, end );
+    if ( d > 0 ) delta = { text: `${ d }d behind plan`, cls: "pm-gantt-tooltip-late" };
+    else if ( d < 0 ) delta = { text: `${ Math.abs( d ) }d ahead of plan`, cls: "pm-gantt-tooltip-ahead" };
     else delta = { text: "on plan", cls: "" };
   }
 
   const style = {
     position: "fixed",
-    left: Math.min(x + 14, (window.innerWidth || 800) - 270),
+    left: Math.min( x + 14, ( window.innerWidth || 800 ) - 270 ),
     top: y - 8,
     transform: "translateY(-100%)",
     zIndex: 9999,
@@ -157,109 +231,110 @@ const GanttTooltip = ({ issue, x, y, today }) => {
   };
 
   return (
-    <div className="pm-gantt-tooltip" style={style}>
+    <div className="pm-gantt-tooltip" style={ style }>
       <div className="pm-gantt-tooltip-key">
-        {issue.key}
-        {isOverdue && <span className="pm-gantt-tooltip-overdue-badge">Overdue</span>}
+        { issue.key }
+        { isOverdue && <span className="pm-gantt-tooltip-overdue-badge">Overdue</span> }
       </div>
-      <div className="pm-gantt-tooltip-summary">{issue.summary}</div>
+      <div className="pm-gantt-tooltip-summary">{ issue.summary }</div>
       <div className="pm-gantt-tooltip-grid">
-        <span>Status</span><span>{issue.status || "—"}</span>
-        <span>Assignee</span><span>{issue.assignee || "—"}</span>
-        {issue.requestor ? <><span>Requestor</span><span>{issue.requestor}</span></> : null}
-        <span>Start</span><span>{fmtShort(issue.startDate)}</span>
-        <span>Due / Complete</span><span>{fmtShort(issue.dueDate || issue.completeDate)}</span>
-        {issue.plannedStart ? <><span>Planned start</span><span>{fmtShort(issue.plannedStart)}</span></> : null}
-        {issue.plannedFinish ? <><span>Planned finish</span><span>{fmtShort(issue.plannedFinish)}</span></> : null}
-        {delta ? <><span>vs Plan</span><span className={delta.cls}>{delta.text}</span></> : null}
+        <span>Status</span><span>{ issue.status || "—" }</span>
+        <span>Assignee</span><span>{ issue.assignee || "—" }</span>
+        { issue.requestor ? <><span>Requestor</span><span>{ issue.requestor }</span></> : null }
+        <span>Start</span><span>{ fmtShort( issue.startDate ) }</span>
+        <span>Due / Complete</span><span>{ fmtShort( issue.dueDate || issue.completeDate ) }</span>
+        { issue.plannedStart ? <><span>Planned start</span><span>{ fmtShort( issue.plannedStart ) }</span></> : null }
+        { issue.plannedFinish ? <><span>Planned finish</span><span>{ fmtShort( issue.plannedFinish ) }</span></> : null }
+        { delta ? <><span>vs Plan</span><span className={ delta.cls }>{ delta.text }</span></> : null }
       </div>
     </div>
   );
 };
 
-const GanttBar = ({ issue, statusIndex, statusHistory, rangeStart, totalWidthPx, today, onMouseEnter, onMouseMove, onMouseLeave }) => {
-  const start = parseDate(issue.startDate);
-  const end = parseDate(issue.dueDate || issue.completeDate);
-  const planStart = parseDate(issue.plannedStart);
-  const planEnd = parseDate(issue.plannedFinish);
+const GanttBar = ( { issue, statusIndex, statusHistory, rangeStart, totalWidthPx, today, onMouseEnter, onMouseMove, onMouseLeave } ) => {
+  const start = parseDate( issue.startDate );
+  const end = parseDate( issue.dueDate || issue.completeDate );
+  const planStart = parseDate( issue.plannedStart );
+  const planEnd = parseDate( issue.plannedFinish );
 
   const hasActualBar = start && end && end > start;
   const hasPlanBar = planStart && planEnd && planEnd > planStart;
-  const hasHistory = Array.isArray(statusHistory) && statusHistory.length > 0;
+  const hasHistory = Array.isArray( statusHistory ) && statusHistory.length > 0;
 
-  if (!hasActualBar && !hasPlanBar && !hasHistory) {
+  if ( !hasActualBar && !hasPlanBar && !hasHistory )
+  {
     // Still hoverable — most issues have no manually-tracked start/complete date,
     // but Jira's own created date + changelog almost always exists, so hovering
     // here can still reveal a real status-history bar once it loads.
     return (
       <div
         className="pm-gantt-row-bars"
-        onMouseEnter={(e) => onMouseEnter(issue, e)}
-        onMouseMove={onMouseMove}
-        onMouseLeave={onMouseLeave}
+        onMouseEnter={ ( e ) => onMouseEnter( issue, e ) }
+        onMouseMove={ onMouseMove }
+        onMouseLeave={ onMouseLeave }
       >
         <span className="pm-gantt-no-date">no dates</span>
       </div>
     );
   }
 
-  const url = issueUrl(issue.key);
-  const color = barColor(issue, today, statusIndex);
+  const url = issueUrl( issue.key );
+  const color = barColor( issue, today, statusIndex );
 
-  const renderBar = (s, e, key, className, barStyle, { title, showLabel = true } = {}) => {
-    const leftPx = Math.max(0, pxPos(s, rangeStart, DAY_WIDTH));
-    const rightPx = Math.min(totalWidthPx, pxPos(e, rangeStart, DAY_WIDTH));
-    const widthPx = Math.max(3, rightPx - leftPx);
-    const style = { left: `${leftPx}px`, width: `${widthPx}px`, ...barStyle };
+  const renderBar = ( s, e, key, className, barStyle, { title, showLabel = true } = {} ) => {
+    const leftPx = Math.max( 0, pxPos( s, rangeStart, DAY_WIDTH ) );
+    const rightPx = Math.min( totalWidthPx, pxPos( e, rangeStart, DAY_WIDTH ) );
+    const widthPx = Math.max( 3, rightPx - leftPx );
+    const style = { left: `${ leftPx }px`, width: `${ widthPx }px`, ...barStyle };
     const handlers = {
-      onMouseEnter: (e) => onMouseEnter(issue, e),
+      onMouseEnter: ( e ) => onMouseEnter( issue, e ),
       onMouseMove,
       onMouseLeave,
     };
-    const label = showLabel ? <span className="pm-gantt-bar-label">{issue.key}</span> : null;
+    const label = showLabel ? <span className="pm-gantt-bar-label">{ issue.key }</span> : null;
     return url ? (
       <a
-        key={key}
-        className={`pm-gantt-bar ${className}`}
-        href={url}
+        key={ key }
+        className={ `pm-gantt-bar ${ className }` }
+        href={ url }
         target="_blank"
         rel="noreferrer noopener"
-        style={style}
-        title={title}
-        {...handlers}
+        style={ style }
+        title={ title }
+        { ...handlers }
       >
-        {label}
+        { label }
       </a>
     ) : (
-      <div key={key} className={`pm-gantt-bar ${className}`} style={style} title={title} {...handlers}>
-        {label}
+      <div key={ key } className={ `pm-gantt-bar ${ className }` } style={ style } title={ title } { ...handlers }>
+        { label }
       </div>
     );
   };
 
   return (
     <div className="pm-gantt-row-bars">
-      {hasPlanBar &&
-        renderBar(planStart, planEnd, "plan", "pm-gantt-bar--plan", {
+      { hasPlanBar &&
+        renderBar( planStart, planEnd, "plan", "pm-gantt-bar--plan", {
           background: "transparent",
           border: "2px dashed var(--pm-gantt-plan-bar-color, #a0a0c0)",
           opacity: 0.65,
-        })}
-      {hasHistory
-        ? statusHistory.map((seg, i) => {
-            const segStart = parseDate(seg.from);
-            const segEnd = parseDate(seg.to);
-            if (!segStart || !segEnd || segEnd < segStart) return null;
-            return renderBar(
-              segStart,
-              segEnd,
-              `seg-${i}`,
-              "pm-gantt-bar--actual pm-gantt-bar--segment",
-              { background: getStatusColor(seg.status, i) },
-              { title: `${seg.status}: ${seg.from} → ${seg.to}`, showLabel: i === 0 }
-            );
-          })
-        : hasActualBar && renderBar(start, end, "actual", "pm-gantt-bar--actual", { background: color })}
+        } ) }
+      { hasHistory
+        ? statusHistory.map( ( seg, i ) => {
+          const segStart = parseDate( seg.from );
+          const segEnd = parseDate( seg.to );
+          if ( !segStart || !segEnd || segEnd < segStart ) return null;
+          return renderBar(
+            segStart,
+            segEnd,
+            `seg-${ i }`,
+            "pm-gantt-bar--actual pm-gantt-bar--segment",
+            { background: getStatusColor( seg.status, i ) },
+            { title: `${ seg.status }: ${ seg.from } → ${ seg.to }`, showLabel: i === 0 }
+          );
+        } )
+        : hasActualBar && renderBar( start, end, "actual", "pm-gantt-bar--actual", { background: color } ) }
     </div>
   );
 };
@@ -269,7 +344,7 @@ const GanttBar = ({ issue, statusIndex, statusHistory, rangeStart, totalWidthPx,
 const GanttLegend = () => (
   <div className="pm-gantt-legend">
     <span className="pm-gantt-legend-item">
-      <span className="pm-gantt-legend-swatch" style={{ background: OVERDUE_COLOR }} />
+      <span className="pm-gantt-legend-swatch" style={ { background: OVERDUE_COLOR } } />
       Overdue
     </span>
     <span className="pm-gantt-legend-item">
@@ -281,210 +356,311 @@ const GanttLegend = () => (
 
 // Preferred left-to-right workflow order for known statuses; anything unrecognized
 // (custom workflow states) sorts alphabetically after these, terminal states last.
-const KNOWN_STATUS_ORDER = ["In Progress", "Ready for Verification", "Analyzing", "Ready for Work", "Backlog"];
+const KNOWN_STATUS_ORDER = [ "In Progress", "Ready for Verification", "Analyzing", "Ready for Work", "Backlog" ];
 const PINNED_SLUG = "__pinned__";
 const ZOOM_LABELS = { "30d": "30 day", "3mo": "3 mo", "6mo": "6 mo", "1yr": "1 yr", all: "All" };
 
-const orderStatuses = (statuses, isDoneStatus) => {
-  const known = KNOWN_STATUS_ORDER.filter((s) => statuses.includes(s));
+const orderStatuses = ( statuses, isDoneStatus ) => {
+  const known = KNOWN_STATUS_ORDER.filter( ( s ) => statuses.includes( s ) );
   const rest = statuses
-    .filter((s) => !KNOWN_STATUS_ORDER.includes(s))
-    .sort((a, b) => a.localeCompare(b));
-  const [doneRest, activeRest] = [rest.filter(isDoneStatus), rest.filter((s) => !isDoneStatus(s))];
-  return [...known, ...activeRest, ...doneRest];
+    .filter( ( s ) => !KNOWN_STATUS_ORDER.includes( s ) )
+    .sort( ( a, b ) => a.localeCompare( b ) );
+  const [ doneRest, activeRest ] = [ rest.filter( isDoneStatus ), rest.filter( ( s ) => !isDoneStatus( s ) ) ];
+  return [ ...known, ...activeRest, ...doneRest ];
 };
 
-const sortGroup = (items) => {
+const sortGroup = ( items ) => {
   const dated = items
-    .filter((i) => parseDate(i.startDate))
-    .sort((a, b) => parseDate(a.startDate).getTime() - parseDate(b.startDate).getTime());
-  return [...dated, ...items.filter((i) => !parseDate(i.startDate))];
+    .filter( ( i ) => parseDate( i.startDate ) )
+    .sort( ( a, b ) => parseDate( a.startDate ).getTime() - parseDate( b.startDate ).getTime() );
+  return [ ...dated, ...items.filter( ( i ) => !parseDate( i.startDate ) ) ];
 };
 
 const GanttChart = () => {
-  const [programs, setPrograms] = React.useState([]);
-  const [slug, setSlug] = React.useState(PINNED_SLUG);
-  const [data, setData] = React.useState(null);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
-  const [zoom, setZoom] = React.useState("all");
-  const [groupMode, setGroupMode] = React.useState("status");
-  const [hiddenStatuses, setHiddenStatuses] = React.useState(new Set());
-  const [collapsedGroups, setCollapsedGroups] = React.useState(new Set());
-  const [tooltip, setTooltip] = React.useState(null);
+  const [ programs, setPrograms ] = React.useState( [] );
+  const [ slug, setSlug ] = React.useState( PINNED_SLUG );
+  const [ data, setData ] = React.useState( null );
+  const [ loading, setLoading ] = React.useState( false );
+  const [ error, setError ] = React.useState( "" );
+  const [ zoom, setZoom ] = React.useState( "all" );
+  const [ groupMode, setGroupMode ] = React.useState( "status" );
+  const [ hiddenStatuses, setHiddenStatuses ] = React.useState( new Set() );
+  const [ collapsedGroups, setCollapsedGroups ] = React.useState( new Set() );
+  const [ tooltip, setTooltip ] = React.useState( null );
   // Keyed by issue key; undefined = not yet fetched, [] = fetched (no history / failed),
   // populated = real segments. Hover-triggered only — never part of the bulk Gantt load.
-  const [statusHistoryByKey, setStatusHistoryByKey] = React.useState({});
+  const [ statusHistoryByKey, setStatusHistoryByKey ] = React.useState( {} );
+  const [ exporting, setExporting ] = React.useState( false );
+  const mountedRef = React.useRef( true );
+  const statusHistoryRef = React.useRef( statusHistoryByKey );
+  statusHistoryRef.current = statusHistoryByKey;
+  React.useEffect( () => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [] );
 
-  React.useEffect(() => {
+  React.useEffect( () => {
     fetchSharedPrograms()
-      .then((items) => setPrograms(items.filter((p) => p.enabled !== false)))
-      .catch(() => {});
-  }, []);
+      .then( ( items ) => setPrograms( items.filter( ( p ) => p.enabled !== false ) ) )
+      .catch( () => { } );
+  }, [] );
 
-  // Debounced, cached, hover-triggered status-history fetch — fires ~250ms after
-  // the hovered bar settles on one issue, and only once per issue per session.
-  React.useEffect(() => {
+  // Reset cached histories when switching programs.
+  React.useEffect( () => {
+    setStatusHistoryByKey( {} );
+  }, [ slug ] );
+
+  // Debounced hover fetch — fills a single issue early if background prefetch hasn't yet.
+  React.useEffect( () => {
     const key = tooltip?.issue?.key;
-    if (!key || statusHistoryByKey[key] !== undefined) return;
-    const timer = setTimeout(() => {
-      fetchGanttStatusHistory(key)
-        .then((segments) => setStatusHistoryByKey((prev) => ({ ...prev, [key]: segments })))
-        .catch(() => setStatusHistoryByKey((prev) => ({ ...prev, [key]: [] })));
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [tooltip?.issue?.key, statusHistoryByKey]);
+    if ( !key || statusHistoryByKey[ key ] !== undefined ) return;
+    const timer = setTimeout( () => {
+      fetchGanttStatusHistory( key )
+        .then( ( segments ) => setStatusHistoryByKey( ( prev ) => ( { ...prev, [ key ]: segments } ) ) )
+        .catch( () => setStatusHistoryByKey( ( prev ) => ( { ...prev, [ key ]: [] } ) ) );
+    }, 250 );
+    return () => clearTimeout( timer );
+  }, [ tooltip?.issue?.key, statusHistoryByKey ] );
 
-  const load = React.useCallback(() => {
-    if (!slug) return;
-    setLoading(true);
-    setError("");
-    fetchGanttData(slug)
-      .then((d) => setData(d))
-      .catch((err) => {
+  const load = React.useCallback( () => {
+    if ( !slug ) return;
+    setLoading( true );
+    setError( "" );
+    fetchGanttData( slug )
+      .then( ( d ) => setData( d ) )
+      .catch( ( err ) => {
         const msg = err?.message || "";
-        if (msg.toLowerCase().includes("jira environment") || msg.toLowerCase().includes("missing required")) {
-          setError("Jira is not configured. Set JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN in your .env file and restart the API server.");
-        } else {
-          setError(msg || "Failed to load Gantt data");
+        if ( msg.toLowerCase().includes( "jira environment" ) || msg.toLowerCase().includes( "missing required" ) )
+        {
+          setError( "Jira is not configured. Set JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN in your .env file and restart the API server." );
+        } else
+        {
+          setError( msg || "Failed to load Gantt data" );
         }
-      })
-      .finally(() => setLoading(false));
-  }, [slug]);
+      } )
+      .finally( () => setLoading( false ) );
+  }, [ slug ] );
 
-  React.useEffect(() => { void load(); }, [load]);
+  React.useEffect( () => { void load(); }, [ load ] );
 
-  const today = React.useMemo(() => {
+  const today = React.useMemo( () => {
     const d = new Date();
-    d.setHours(0, 0, 0, 0);
+    d.setHours( 0, 0, 0, 0 );
     return d;
-  }, []);
+  }, [] );
 
   const issues = data?.issues || [];
 
   const allStarts = issues
-    .flatMap((i) => [parseDate(i.startDate)?.getTime(), parseDate(i.plannedStart)?.getTime()])
-    .filter(Boolean);
+    .flatMap( ( i ) => [ parseDate( i.startDate )?.getTime(), parseDate( i.plannedStart )?.getTime() ] )
+    .filter( Boolean );
   const allEnds = issues
-    .flatMap((i) => [
-      parseDate(i.dueDate || i.completeDate)?.getTime(),
-      parseDate(i.plannedFinish)?.getTime(),
-    ])
-    .filter(Boolean);
+    .flatMap( ( i ) => [
+      parseDate( i.dueDate || i.completeDate )?.getTime(),
+      parseDate( i.plannedFinish )?.getTime(),
+    ] )
+    .filter( Boolean );
 
   const dataRangeStart =
-    allStarts.length > 0 ? addDays(new Date(Math.min(...allStarts)), -14) : addDays(today, -30);
+    allStarts.length > 0 ? addDays( new Date( Math.min( ...allStarts ) ), -14 ) : addDays( today, -30 );
   const dataRangeEnd =
-    allEnds.length > 0 ? addDays(new Date(Math.max(...allEnds)), 14) : addDays(today, 60);
+    allEnds.length > 0 ? addDays( new Date( Math.max( ...allEnds ) ), 14 ) : addDays( today, 60 );
 
   const rangeStart =
-    zoom === "30d" ? addDays(today, -3)
-    : zoom === "3mo" ? addDays(today, -30)
-    : zoom === "6mo" ? addDays(today, -60)
-    : zoom === "1yr" ? addDays(today, -90)
-    : dataRangeStart;
+    zoom === "30d" ? addDays( today, -3 )
+      : zoom === "3mo" ? addDays( today, -30 )
+        : zoom === "6mo" ? addDays( today, -60 )
+          : zoom === "1yr" ? addDays( today, -90 )
+            : dataRangeStart;
   const rangeEnd =
-    zoom === "30d" ? addDays(today, 27)
-    : zoom === "3mo" ? addDays(today, 62)
-    : zoom === "6mo" ? addDays(today, 124)
-    : zoom === "1yr" ? addDays(today, 275)
-    : dataRangeEnd;
+    zoom === "30d" ? addDays( today, 27 )
+      : zoom === "3mo" ? addDays( today, 62 )
+        : zoom === "6mo" ? addDays( today, 124 )
+          : zoom === "1yr" ? addDays( today, 275 )
+            : dataRangeEnd;
 
-  const totalWidthPx = Math.max(1, diffDays(rangeStart, rangeEnd)) * DAY_WIDTH;
-  const months = generateMonths(rangeStart, rangeEnd, DAY_WIDTH);
-  const todayPx = Math.max(0, Math.min(totalWidthPx, pxPos(today, rangeStart, DAY_WIDTH)));
+  const totalWidthPx = Math.max( 1, diffDays( rangeStart, rangeEnd ) ) * DAY_WIDTH;
+  const months = generateMonths( rangeStart, rangeEnd, DAY_WIDTH );
+  const todayPx = Math.max( 0, Math.min( totalWidthPx, pxPos( today, rangeStart, DAY_WIDTH ) ) );
 
   const statusCategoryByStatus = {};
-  for (const i of issues) {
-    if (i.status) statusCategoryByStatus[i.status] = i.statusCategory;
+  for ( const i of issues )
+  {
+    if ( i.status ) statusCategoryByStatus[ i.status ] = i.statusCategory;
   }
-  const isDoneStatus = (status) => statusCategoryByStatus[status] === "Done";
+  const isDoneStatus = ( status ) => statusCategoryByStatus[ status ] === "Done";
   const statuses = orderStatuses(
-    [...new Set(issues.map((i) => i.status).filter(Boolean))],
+    [ ...new Set( issues.map( ( i ) => i.status ).filter( Boolean ) ) ],
     isDoneStatus
   );
-  const visibleIssues = issues.filter((i) => !hiddenStatuses.has(i.status));
+  const visibleIssues = issues.filter( ( i ) => !hiddenStatuses.has( i.status ) );
+  const visibleIssueKeysKey = visibleIssues
+    .map( ( i ) => i.key )
+    .filter( Boolean )
+    .join( "," );
+
+  // Prefetch status histories for visible issues without waiting for Export.
+  React.useEffect( () => {
+    if ( loading ) return;
+    const keys = visibleIssueKeysKey ? visibleIssueKeysKey.split( "," ) : [];
+    if ( keys.length === 0 ) return;
+
+    const ac = new AbortController();
+    void fetchMissingStatusHistories( keys, statusHistoryRef.current, {
+      signal: ac.signal,
+      onBatch: ( results ) => {
+        if ( ac.signal.aborted || !mountedRef.current ) return;
+        setStatusHistoryByKey( ( prev ) => {
+          const next = { ...prev };
+          let changed = false;
+          for ( const [ key, segments ] of results )
+          {
+            if ( next[ key ] === undefined )
+            {
+              next[ key ] = segments;
+              changed = true;
+            }
+          }
+          return changed ? next : prev;
+        } );
+      },
+    } );
+
+    return () => ac.abort();
+  }, [ visibleIssueKeysKey, loading ] );
 
   const flatRows = [];
-  if (groupMode === "story") {
+  if ( groupMode === "story" )
+  {
     // Group by parent (Story/Bug → its Sub-tasks). An issue only becomes a group
     // header if it's both present in the visible set AND has ≥1 visible child —
     // a filtered-out parent's children fall back to flat rows rather than orphaning
     // under a header that isn't there, and a childless story is just a normal row.
     // Only actual Sub-tasks nest — Story/Bug's own parent is the Epic, and that
     // relationship isn't part of this grouping (no separate Epic tier).
-    const visibleKeys = new Set(visibleIssues.map((i) => i.key));
+    const visibleKeys = new Set( visibleIssues.map( ( i ) => i.key ) );
     const childrenByParent = {};
-    for (const i of visibleIssues) {
-      if (i.isSubtask && i.parentKey) (childrenByParent[i.parentKey] ||= []).push(i);
+    for ( const i of visibleIssues )
+    {
+      if ( i.isSubtask && i.parentKey ) ( childrenByParent[ i.parentKey ] ||= [] ).push( i );
     }
     const groupParentKeys = new Set(
-      Object.keys(childrenByParent).filter((pk) => visibleKeys.has(pk))
+      Object.keys( childrenByParent ).filter( ( pk ) => visibleKeys.has( pk ) )
     );
     const topLevel = sortGroup(
-      visibleIssues.filter((i) => !(i.parentKey && groupParentKeys.has(i.parentKey)))
+      visibleIssues.filter( ( i ) => !( i.parentKey && groupParentKeys.has( i.parentKey ) ) )
     );
-    for (const issue of topLevel) {
-      if (groupParentKeys.has(issue.key)) {
-        const children = sortGroup(childrenByParent[issue.key]);
-        flatRows.push({ type: "issue", issue, isGroupHeader: true, groupKey: issue.key, childCount: children.length });
-        if (!collapsedGroups.has(issue.key)) {
-          for (const child of children) flatRows.push({ type: "issue", issue: child, indent: true });
+    for ( const issue of topLevel )
+    {
+      if ( groupParentKeys.has( issue.key ) )
+      {
+        const children = sortGroup( childrenByParent[ issue.key ] );
+        flatRows.push( { type: "issue", issue, isGroupHeader: true, groupKey: issue.key, childCount: children.length } );
+        if ( !collapsedGroups.has( issue.key ) )
+        {
+          for ( const child of children ) flatRows.push( { type: "issue", issue: child, indent: true } );
         }
-      } else {
-        flatRows.push({ type: "issue", issue });
+      } else
+      {
+        flatRows.push( { type: "issue", issue } );
       }
     }
-  } else {
+  } else
+  {
     const groups = [];
-    for (const status of statuses) {
-      const items = sortGroup(visibleIssues.filter((i) => i.status === status));
-      if (items.length > 0) groups.push({ key: status, label: status, items });
+    for ( const status of statuses )
+    {
+      const items = sortGroup( visibleIssues.filter( ( i ) => i.status === status ) );
+      if ( items.length > 0 ) groups.push( { key: status, label: status, items } );
     }
-    for (const group of groups) {
-      flatRows.push({ type: "header", group });
-      if (!collapsedGroups.has(group.key)) {
-        for (const issue of group.items) flatRows.push({ type: "issue", issue });
+    for ( const group of groups )
+    {
+      flatRows.push( { type: "header", group } );
+      if ( !collapsedGroups.has( group.key ) )
+      {
+        for ( const issue of group.items ) flatRows.push( { type: "issue", issue } );
       }
     }
   }
 
-  const toggleGroup = (key) =>
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+  const toggleGroup = ( key ) =>
+    setCollapsedGroups( ( prev ) => {
+      const next = new Set( prev );
+      next.has( key ) ? next.delete( key ) : next.add( key );
       return next;
-    });
+    } );
 
-  const toggleStatus = (cat) =>
-    setHiddenStatuses((prev) => {
-      const next = new Set(prev);
-      next.has(cat) ? next.delete(cat) : next.add(cat);
+  const toggleStatus = ( cat ) =>
+    setHiddenStatuses( ( prev ) => {
+      const next = new Set( prev );
+      next.has( cat ) ? next.delete( cat ) : next.add( cat );
       return next;
-    });
+    } );
 
-  const handleMouseEnter = (issue, e) => setTooltip({ issue, x: e.clientX, y: e.clientY });
-  const handleMouseMove = (e) =>
-    setTooltip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : null));
-  const handleMouseLeave = () => setTooltip(null);
+  const handleMouseEnter = ( issue, e ) => setTooltip( { issue, x: e.clientX, y: e.clientY } );
+  const handleMouseMove = ( e ) =>
+    setTooltip( ( prev ) => ( prev ? { ...prev, x: e.clientX, y: e.clientY } : null ) );
+  const handleMouseLeave = () => setTooltip( null );
 
   const visibleCount = visibleIssues.length;
-  const noDateCount = visibleIssues.filter((i) => !parseDate(i.startDate)).length;
+  const noDateCount = visibleIssues.filter( ( i ) => !parseDate( i.startDate ) ).length;
 
-  const exportFilenameBase = `gantt_plan_${(data?.displayName || slug).replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_${new Date().toISOString().slice(0, 10)}`;
+  const exportFilenameBase = `gantt_plan_${ ( data?.displayName || slug ).replace( /[^a-z0-9]+/gi, "_" ).toLowerCase() }_${ new Date().toISOString().slice( 0, 10 ) }`;
+
+  const runExport = React.useCallback(
+    async ( format ) => {
+      if ( visibleIssues.length === 0 || exporting ) return;
+      // Snapshot at click so leaving the page does not change what we export.
+      const issuesSnapshot = visibleIssues.slice();
+      const historySnapshot = { ...statusHistoryByKey };
+      const filenameBase = exportFilenameBase;
+      const title = data?.displayName || slug;
+
+      setExporting( true );
+      try
+      {
+        const histories = await fetchMissingStatusHistories(
+          issuesSnapshot.map( ( issue ) => issue.key ).filter( Boolean ),
+          historySnapshot
+        );
+        if ( mountedRef.current )
+        {
+          setStatusHistoryByKey( histories );
+        }
+        if ( format === "csv" )
+        {
+          downloadBlob(
+            `﻿${ buildPlanReportCsv( issuesSnapshot, histories ) }`,
+            `${ filenameBase }.csv`,
+            "text/csv;charset=utf-8"
+          );
+        } else
+        {
+          downloadBlob(
+            buildPlanReportMarkdown( title, issuesSnapshot, histories ),
+            `${ filenameBase }.md`,
+            "text/markdown;charset=utf-8"
+          );
+        }
+      } finally
+      {
+        if ( mountedRef.current )
+        {
+          setExporting( false );
+        }
+      }
+    },
+    [ visibleIssues, exporting, statusHistoryByKey, exportFilenameBase, data?.displayName, slug ]
+  );
 
   const handleExportCsv = () => {
-    if (visibleIssues.length === 0) return;
-    downloadBlob(`﻿${buildPlanReportCsv(visibleIssues)}`, `${exportFilenameBase}.csv`, "text/csv;charset=utf-8");
+    void runExport( "csv" );
   };
 
   const handleExportMarkdown = () => {
-    if (visibleIssues.length === 0) return;
-    downloadBlob(
-      buildPlanReportMarkdown(data?.displayName || slug, visibleIssues),
-      `${exportFilenameBase}.md`,
-      "text/markdown;charset=utf-8"
-    );
+    void runExport( "md" );
   };
 
   const emptyMsg =
@@ -494,201 +670,218 @@ const GanttChart = () => {
 
   return (
     <div className="pm-gantt">
-      {/* Row 1: program select + meta + refresh */}
+      {/* Row 1: program select + meta + refresh */ }
       <div className="pm-gantt-toolbar">
         <div className="pm-gantt-toolbar-left">
           <select
             className="pm-gantt-program-select"
-            value={slug}
-            onChange={(e) => setSlug(e.target.value)}
+            value={ slug }
+            onChange={ ( e ) => setSlug( e.target.value ) }
           >
-            <option value={PINNED_SLUG}>Pinned Issues</option>
-            {programs.map((p) => (
-              <option key={p.slug} value={p.slug}>
-                {p.displayName}
+            <option value={ PINNED_SLUG }>Pinned Issues</option>
+            { programs.map( ( p ) => (
+              <option key={ p.slug } value={ p.slug }>
+                { p.displayName }
               </option>
-            ))}
+            ) ) }
           </select>
         </div>
         <div className="pm-gantt-toolbar-right">
-          {!loading && data && (
+          { !loading && data && (
             <span className="pm-gantt-meta">
-              {visibleCount} issue{visibleCount !== 1 ? "s" : ""}
-              {noDateCount > 0 ? ` · ${noDateCount} without dates` : ""}
+              { visibleCount } issue{ visibleCount !== 1 ? "s" : "" }
+              { noDateCount > 0 ? ` · ${ noDateCount } without dates` : "" }
             </span>
-          )}
-          {!loading && data && visibleIssues.length > 0 ? (
+          ) }
+          { !loading && data && visibleIssues.length > 0 ? (
             <>
-              <button type="button" className="pm-gantt-refresh" onClick={handleExportMarkdown}>
-                Export (.md)
+              <button
+                type="button"
+                className="pm-gantt-refresh"
+                onClick={ handleExportMarkdown }
+                disabled={ exporting }
+              >
+                { exporting ? "Exporting…" : "Export (.md)" }
               </button>
-              <button type="button" className="pm-gantt-refresh" onClick={handleExportCsv}>
-                Export (.csv)
+              <button
+                type="button"
+                className="pm-gantt-refresh"
+                onClick={ handleExportCsv }
+                disabled={ exporting }
+              >
+                { exporting ? "Exporting…" : "Export (.csv)" }
               </button>
             </>
-          ) : null}
-          <button type="button" className="pm-gantt-refresh" onClick={load} disabled={loading}>
-            {loading ? "Loading…" : "Refresh"}
+          ) : null }
+          <button type="button" className="pm-gantt-refresh" onClick={ load } disabled={ loading || !slug }>
+            { loading ? "Loading…" : "Refresh" }
           </button>
         </div>
       </div>
+      { !loading && data && visibleIssues.length > 0 ? (
+        <p className="pm-gantt-export-note">
+          Status history loads in the background for visible issues. Export only includes
+          histories that have finished loading. You can leave this page during export — the
+          download still starts when ready.
+        </p>
+      ) : null }
 
-      {/* Row 2: zoom + status filters */}
-      {data && (
+      {/* Row 2: zoom + status filters */ }
+      { data && (
         <div className="pm-gantt-controls">
           <div className="pm-gantt-zoom">
-            {Object.entries(ZOOM_LABELS).map(([key, label]) => (
+            { Object.entries( ZOOM_LABELS ).map( ( [ key, label ] ) => (
               <button
-                key={key}
+                key={ key }
                 type="button"
-                className={`pm-gantt-zoom-btn${zoom === key ? " pm-gantt-zoom-btn--active" : ""}`}
-                onClick={() => setZoom(key)}
+                className={ `pm-gantt-zoom-btn${ zoom === key ? " pm-gantt-zoom-btn--active" : "" }` }
+                onClick={ () => setZoom( key ) }
               >
-                {label}
+                { label }
               </button>
-            ))}
+            ) ) }
           </div>
           <div className="pm-gantt-group-mode">
             <span className="pm-gantt-group-mode-label">Group by</span>
             <button
               type="button"
-              className={`pm-gantt-zoom-btn${groupMode === "status" ? " pm-gantt-zoom-btn--active" : ""}`}
-              onClick={() => setGroupMode("status")}
+              className={ `pm-gantt-zoom-btn${ groupMode === "status" ? " pm-gantt-zoom-btn--active" : "" }` }
+              onClick={ () => setGroupMode( "status" ) }
             >
               Status
             </button>
             <button
               type="button"
-              className={`pm-gantt-zoom-btn${groupMode === "story" ? " pm-gantt-zoom-btn--active" : ""}`}
-              onClick={() => setGroupMode("story")}
+              className={ `pm-gantt-zoom-btn${ groupMode === "story" ? " pm-gantt-zoom-btn--active" : "" }` }
+              onClick={ () => setGroupMode( "story" ) }
             >
               Story
             </button>
           </div>
-          {statuses.length > 1 && (
+          { statuses.length > 1 && (
             <div className="pm-gantt-filters">
-              {statuses.map((status, index) => (
+              { statuses.map( ( status, index ) => (
                 <button
-                  key={status}
+                  key={ status }
                   type="button"
-                  className={`pm-gantt-filter-chip${hiddenStatuses.has(status) ? " pm-gantt-filter-chip--off" : ""}`}
-                  onClick={() => toggleStatus(status)}
+                  className={ `pm-gantt-filter-chip${ hiddenStatuses.has( status ) ? " pm-gantt-filter-chip--off" : "" }` }
+                  onClick={ () => toggleStatus( status ) }
                 >
                   <span
                     className="pm-gantt-filter-dot"
-                    style={{ background: getStatusColor(status, index) }}
+                    style={ { background: getStatusColor( status, index ) } }
                   />
-                  {status}
+                  { status }
                 </button>
-              ))}
+              ) ) }
             </div>
-          )}
+          ) }
         </div>
-      )}
+      ) }
 
-      {data && <GanttLegend />}
+      { data && <GanttLegend /> }
 
-      {/* Chart body */}
-      {error ? (
-        <div className="pm-gantt-error">{error}</div>
+      {/* Chart body */ }
+      { error ? (
+        <div className="pm-gantt-error">{ error }</div>
       ) : loading && !data ? (
         <div className="pm-gantt-loading">Loading…</div>
       ) : !loading && flatRows.length === 0 ? (
-        <div className="pm-gantt-empty">{emptyMsg}</div>
+        <div className="pm-gantt-empty">{ emptyMsg }</div>
       ) : flatRows.length > 0 ? (
         <div className="pm-gantt-chart">
-          {/* Label column */}
+          {/* Label column */ }
           <div className="pm-gantt-labels">
             <div className="pm-gantt-label-header">Task</div>
-            {flatRows.map((row) =>
+            { flatRows.map( ( row ) =>
               row.type === "header" ? (
                 <div
-                  key={`lh-${row.group.key}`}
+                  key={ `lh-${ row.group.key }` }
                   className="pm-gantt-group-label-header"
-                  onClick={() => toggleGroup(row.group.key)}
+                  onClick={ () => toggleGroup( row.group.key ) }
                 >
                   <span className="pm-gantt-group-chevron">
-                    {collapsedGroups.has(row.group.key) ? "▶" : "▼"}
+                    { collapsedGroups.has( row.group.key ) ? "▶" : "▼" }
                   </span>
                   <span
                     className="pm-gantt-group-dot"
-                    style={{ background: getStatusColor(row.group.label, statuses.indexOf(row.group.label)) }}
+                    style={ { background: getStatusColor( row.group.label, statuses.indexOf( row.group.label ) ) } }
                   />
-                  <span className="pm-gantt-group-name">{row.group.label}</span>
-                  <span className="pm-gantt-group-count">({row.group.items.length})</span>
+                  <span className="pm-gantt-group-name">{ row.group.label }</span>
+                  <span className="pm-gantt-group-count">({ row.group.items.length })</span>
                 </div>
               ) : (
                 <div
-                  key={row.issue.key}
-                  className={`pm-gantt-label-row${row.indent ? " pm-gantt-label-row--indent" : ""}${row.isGroupHeader ? " pm-gantt-label-row--group-header" : ""}`}
-                  onClick={row.isGroupHeader ? () => toggleGroup(row.groupKey) : undefined}
+                  key={ row.issue.key }
+                  className={ `pm-gantt-label-row${ row.indent ? " pm-gantt-label-row--indent" : "" }${ row.isGroupHeader ? " pm-gantt-label-row--group-header" : "" }` }
+                  onClick={ row.isGroupHeader ? () => toggleGroup( row.groupKey ) : undefined }
                 >
                   <span className="pm-gantt-label-top">
-                    {row.isGroupHeader ? (
+                    { row.isGroupHeader ? (
                       <span className="pm-gantt-group-chevron pm-gantt-group-chevron--inline">
-                        {collapsedGroups.has(row.groupKey) ? "▶" : "▼"}
+                        { collapsedGroups.has( row.groupKey ) ? "▶" : "▼" }
                       </span>
-                    ) : null}
-                    <span className="pm-gantt-label-key">{row.issue.key}</span>
-                    {row.isGroupHeader ? (
-                      <span className="pm-gantt-group-count">({row.childCount})</span>
-                    ) : null}
-                    {assigneeInitials(row.issue.assignee) ? (
-                      <span className="pm-gantt-label-assignee" title={row.issue.assignee}>
-                        {assigneeInitials(row.issue.assignee)}
+                    ) : null }
+                    <span className="pm-gantt-label-key">{ row.issue.key }</span>
+                    { row.isGroupHeader ? (
+                      <span className="pm-gantt-group-count">({ row.childCount })</span>
+                    ) : null }
+                    { assigneeInitials( row.issue.assignee ) ? (
+                      <span className="pm-gantt-label-assignee" title={ row.issue.assignee }>
+                        { assigneeInitials( row.issue.assignee ) }
                       </span>
-                    ) : null}
+                    ) : null }
                   </span>
-                  <span className="pm-gantt-label-summary" title={row.issue.summary}>
-                    {row.issue.summary}
+                  <span className="pm-gantt-label-summary" title={ row.issue.summary }>
+                    { row.issue.summary }
                   </span>
                 </div>
               )
-            )}
+            ) }
           </div>
 
-          {/* Timeline column */}
+          {/* Timeline column */ }
           <div className="pm-gantt-timeline">
-            <div className="pm-gantt-months" style={{ width: `${totalWidthPx}px` }}>
-              {months.map((m, i) => (
-                <div key={i} className="pm-gantt-month" style={{ width: `${m.widthPx}px` }}>
-                  {m.label}
+            <div className="pm-gantt-months" style={ { width: `${ totalWidthPx }px` } }>
+              { months.map( ( m, i ) => (
+                <div key={ i } className="pm-gantt-month" style={ { width: `${ m.widthPx }px` } }>
+                  { m.label }
                 </div>
-              ))}
+              ) ) }
             </div>
-            <div className="pm-gantt-rows" style={{ width: `${totalWidthPx}px` }}>
-              <div className="pm-gantt-today" style={{ left: `${todayPx}px` }} aria-label="Today" />
-              {flatRows.map((row) =>
+            <div className="pm-gantt-rows" style={ { width: `${ totalWidthPx }px` } }>
+              <div className="pm-gantt-today" style={ { left: `${ todayPx }px` } } aria-label="Today" />
+              { flatRows.map( ( row ) =>
                 row.type === "header" ? (
                   <div
-                    key={`th-${row.group.key}`}
+                    key={ `th-${ row.group.key }` }
                     className="pm-gantt-group-timeline-header"
-                    onClick={() => toggleGroup(row.group.key)}
+                    onClick={ () => toggleGroup( row.group.key ) }
                   />
                 ) : (
-                  <div key={row.issue.key} className="pm-gantt-row">
+                  <div key={ row.issue.key } className="pm-gantt-row">
                     <GanttBar
-                      issue={row.issue}
-                      statusIndex={statuses.indexOf(row.issue.status)}
-                      statusHistory={statusHistoryByKey[row.issue.key]}
-                      rangeStart={rangeStart}
-                      totalWidthPx={totalWidthPx}
-                      today={today}
-                      onMouseEnter={handleMouseEnter}
-                      onMouseMove={handleMouseMove}
-                      onMouseLeave={handleMouseLeave}
+                      issue={ row.issue }
+                      statusIndex={ statuses.indexOf( row.issue.status ) }
+                      statusHistory={ statusHistoryByKey[ row.issue.key ] }
+                      rangeStart={ rangeStart }
+                      totalWidthPx={ totalWidthPx }
+                      today={ today }
+                      onMouseEnter={ handleMouseEnter }
+                      onMouseMove={ handleMouseMove }
+                      onMouseLeave={ handleMouseLeave }
                     />
                   </div>
                 )
-              )}
+              ) }
             </div>
           </div>
         </div>
-      ) : null}
+      ) : null }
 
-      {tooltip && (
-        <GanttTooltip issue={tooltip.issue} x={tooltip.x} y={tooltip.y} today={today} />
-      )}
+      { tooltip && (
+        <GanttTooltip issue={ tooltip.issue } x={ tooltip.x } y={ tooltip.y } today={ today } />
+      ) }
     </div>
   );
 };
