@@ -1,6 +1,9 @@
+import React from "react";
+import { Link } from "react-router-dom";
 import { Button, Message } from "semantic-ui-react";
 import ReportOutput from "../../../Components/ReportOutput";
 import { AUDIENCE_OPTIONS, useReportGeneration } from "../hooks/useReportGeneration";
+import { fetchChatStatus } from "../../../services/jiraClient";
 import ReportDiagrams from "./ReportDiagrams";
 import {
   buildPersonProgressBars,
@@ -47,6 +50,12 @@ const ReportPanel = ({
     toggleEpicSelection,
     selectAllEpics,
   } = useReportGeneration({ epics, overallStatusCounts, chartVariant, assignees });
+
+  const [chatStatus, setChatStatus] = React.useState(null);
+
+  React.useEffect(() => {
+    fetchChatStatus().then(setChatStatus).catch(() => {});
+  }, []);
 
   const isAdhocTeam = audience === "direct_reports";
   const teamPeople = assignees.filter(
@@ -183,6 +192,11 @@ const ReportPanel = ({
           >
             Generate {selectedOption?.label || "Report"}
           </Button>
+          {chatStatus?.displayLabel ? (
+            <span className="dashboard-due-by-hint">
+              Using {chatStatus.displayLabel} · <Link to="/settings">Settings</Link>
+            </span>
+          ) : null}
           {!hasSnapshot ? (
             <span className="dashboard-due-by-hint">
               Run a Dashboard refresh first so there is data to report on.

@@ -1,12 +1,31 @@
 import React from "react";
 import { Button, Form, Header, Message } from "semantic-ui-react";
 import SettingsSection from "./SettingsSection";
-import { saveAppSettings } from "../../../services/jiraClient.js";
+import { fetchChatStatus, saveAppSettings } from "../../../services/jiraClient.js";
 import { setStoredProxyUrl } from "../../../services/apiBase.js";
+import { getPreferredAiPath, setPreferredAiPath } from "../../../services/aiPathPreference.js";
 import { useFlash } from "../../hooks/useFlash.js";
 
 const ChatAssistantSection = ({ settings, setSettings, chatStatus, onError }) => {
   const [flash, setFlash] = useFlash();
+  const [localStatus, setLocalStatus] = React.useState(chatStatus);
+  const [aiPath, setAiPath] = React.useState(() => getPreferredAiPath());
+
+  React.useEffect(() => {
+    setLocalStatus(chatStatus);
+  }, [chatStatus]);
+
+  const handleAiPathChange = async (newPath) => {
+    setPreferredAiPath(newPath);
+    setAiPath(newPath);
+    try {
+      const updated = await fetchChatStatus();
+      setLocalStatus(updated);
+      setFlash("AI path updated.");
+    } catch {
+      // keep existing localStatus
+    }
+  };
 
   const handleSaveSettings = async () => {
     onError("");
@@ -59,16 +78,48 @@ const ChatAssistantSection = ({ settings, setSettings, chatStatus, onError }) =>
       </Form>
 
       <div style={{ borderTop: "1px solid #e2e8f0", margin: "1.25rem 0 1rem" }} />
+      <Header as="h4" style={{ margin: "0 0 0.5rem" }}>AI path</Header>
+      {localStatus?.switchAllowed ? (
+        <Form style={{ marginBottom: "0.75rem" }}>
+          <Form.Group inline>
+            <label>Use</label>
+            <Form.Radio
+              label="Company AI"
+              checked={(aiPath ?? "managed") === "managed"}
+              onChange={() => void handleAiPathChange("managed")}
+            />
+            <Form.Radio
+              label="Local"
+              checked={aiPath === "local"}
+              onChange={() => void handleAiPathChange("local")}
+            />
+          </Form.Group>
+        </Form>
+      ) : localStatus ? (
+        <p style={{ fontSize: "0.9rem", marginBottom: "0.75rem" }}>
+          <strong>{localStatus.displayLabel}</strong>
+          {" — "}
+          <span style={{ color: "#64748b" }}>
+            {localStatus.lockedByHost
+              ? "set by your administrator."
+              : "only one AI path is configured."}
+          </span>
+        </p>
+      ) : null}
+
+      <div style={{ borderTop: "1px solid #e2e8f0", margin: "1.25rem 0 1rem" }} />
       <Header as="h4" style={{ margin: "0 0 0.5rem" }}>Connection status</Header>
       <p style={{ fontSize: "0.85rem", color: "#475569", marginBottom: "0.75rem" }}>
-        Set <code>CHAT_PROVIDER</code> and the matching API key in <code>.env</code> on the proxy host
+        For Company AI: set <code>MANAGED_AI_BASE_URL</code>, <code>MANAGED_AI_API_KEY</code>, and{" "}
+        <code>MANAGED_AI_MODEL</code> in <code>.env</code> on the proxy host.
+        For a local provider: set <code>CHAT_PROVIDER</code> and the matching API key in <code>.env</code>{" "}
         (see JIRA_SETUP.md). Use <code>CHAT_PROVIDER=rovo</code> only if your org has Rovo MCP access.
       </p>
-      {chatStatus ? (
+      {localStatus ? (
         <Message info size="small">
-          Provider: <strong>{chatStatus.provider}</strong>
-          {chatStatus.provider === "rovo" && chatStatus.oauthConnected ? " · Signed in with Atlassian" : ""}
-          {chatStatus.ready ? " · Ready" : " · Not ready — check API keys in .env"}
+          Provider: <strong>{localStatus.provider}</strong>
+          {localStatus.provider === "rovo" && localStatus.oauthConnected ? " · Signed in with Atlassian" : ""}
+          {localStatus.ready ? " · Ready" : " · Not ready — check API keys in .env"}
         </Message>
       ) : (
         <Message warning size="small">Could not load chat status.</Message>

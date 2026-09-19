@@ -3,8 +3,10 @@
 import {
   completeLlmText,
   formatUnableToGenerateReportError,
+  isLocalReportReady,
   resolveFirstReadyReportProvider,
 } from "../lib/llmClient.mjs";
+import { AI_PATH_LOCAL, AI_PATH_MANAGED, getHostAiMode, isManagedAiReady, resolveAiPath } from "../lib/aiPath.mjs";
 import { loadWeeklyDigestFromDb } from "../lib/weeklyDigest.mjs";
 import { fetchLatestCommentTextBulk } from "../lib/jiraCommentText.mjs";
 import {
@@ -204,17 +206,25 @@ const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics, windowCont
   return lines.join("\n");
 };
 
-const callLLMForReport = async ({ systemPrompt, context, label = "report" }) => {
+const callLLMForReport = async ({ systemPrompt, context, label = "report", aiPath = null }) => {
+  const normalizedAiPath = aiPath ? String(aiPath).trim().toLowerCase() : null;
+  const resolved = resolveAiPath({
+    preferredPath: normalizedAiPath === AI_PATH_MANAGED || normalizedAiPath === AI_PATH_LOCAL ? normalizedAiPath : null,
+    managedReady: isManagedAiReady(),
+    localReady: isLocalReportReady(),
+    hostMode: getHostAiMode(),
+  });
+  if (resolved.path === "disabled") {
+    throw new Error("No AI provider configured. Set MANAGED_AI_* or CHAT_PROVIDER / REPORT_PROVIDER in .env.");
+  }
+  if (resolved.path === AI_PATH_MANAGED) {
+    log.info(`generating ${label} via managed`);
+    return completeLlmText({ systemPrompt, userMessage: context, maxTokens: REPORT_MAX_TOKENS, aiPath: AI_PATH_MANAGED });
+  }
   const provider = resolveFirstReadyReportProvider();
   log.info(`generating ${label} via ${provider}`);
   try {
-    return await completeLlmText({
-      systemPrompt,
-      userMessage: context,
-      maxTokens: REPORT_MAX_TOKENS,
-      provider,
-      forReports: true,
-    });
+    return await completeLlmText({ systemPrompt, userMessage: context, maxTokens: REPORT_MAX_TOKENS, provider, forReports: true });
   } catch (error) {
     throw new Error(formatUnableToGenerateReportError(provider, error));
   }
@@ -421,7 +431,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     const systemPrompt = systemParts.join("\n\n");
 
     try {
-      const generated = await callLLMForReport({ systemPrompt, context, label: config.label });
+      const generated = await callLLMForReport({ systemPrompt, context, label: config.label, aiPath: req.body?.aiPath });
       const report = dueWindows.appendedSection
         ? `${generated.trim()}\n\n${dueWindows.appendedSection}`
         : generated.trim();
@@ -559,7 +569,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     ];
     if (customInstructions) systemParts.push(`\nAdditional instructions:\n${customInstructions}`);
     try {
-      const report = await callLLMForReport({ systemPrompt: systemParts.join("\n\n"), context: contextLines.join("\n"), label });
+      const report = await callLLMForReport({ systemPrompt: systemParts.join("\n\n"), context: contextLines.join("\n"), label, aiPath: req.body?.aiPath });
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.WORK_WEEK,
         reportType: archiveReportType,
@@ -609,7 +619,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     const systemPrompt = buildWeekPlanSystemPrompt({ focusStyle, capacityHours, customInstructions });
 
     try {
-      const plan = await callLLMForReport({ systemPrompt, context: contextLines.join("\n"), label: "week plan" });
+      const plan = await callLLMForReport({ systemPrompt, context: contextLines.join("\n"), label: "week plan", aiPath: req.body?.aiPath });
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.WORK_WEEK,
         reportType: "week_plan",

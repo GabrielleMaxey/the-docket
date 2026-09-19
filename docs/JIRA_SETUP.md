@@ -59,8 +59,14 @@ Open `.env` in any text editor and fill in:
 | `REPORT_ANTHROPIC_API_KEY` | | Optional report-only Anthropic key (falls back to `ANTHROPIC_API_KEY`) |
 | `REPORT_ANTHROPIC_BASE_URL` | | Optional report-only Anthropic-compatible URL |
 | `REPORT_ANTHROPIC_MODEL` | | Optional report-only Anthropic model |
+| `MANAGED_AI_BASE_URL` | `https://<company-gateway>/v1` | Company OpenAI-compatible gateway (Managed / Company AI) |
+| `MANAGED_AI_API_KEY` | | Token for the company gateway |
+| `MANAGED_AI_MODEL` | | Pinned company model id |
+| `AI_MODE` | `managed` or `local` | Optional host lock; overrides the Settings AI path choice |
 
 Chat and reports use the same provider (`CHAT_PROVIDER`) unless you set `REPORT_PROVIDER`. All three built-in providers (`anthropic`, `openai`, `ollama`) can generate reports and week plans.
+
+When **Managed / Company AI** is configured (`MANAGED_AI_BASE_URL`, `MANAGED_AI_API_KEY`, and `MANAGED_AI_MODEL` all set), it is the default for chat and reports. Users switch to Local only in **Settings → Chat assistant** when both paths are ready. The app does not silently fall back from Managed to Local on errors — a failed Managed call surfaces the error. `REPORT_PROVIDER` and `REPORT_*` credentials apply only while **Local** is the active path.
 
 > **Never commit `.env`** — it is in `.gitignore`.
 
@@ -166,6 +172,16 @@ Open **tasks/stories** in overdue metrics also count when standard **Due date**,
 ## 8. Chat, reports, and optional providers
 
 **Setup:** set `CHAT_PROVIDER` and the matching credentials in `.env`. Chat is disabled until you do. Reports and week plans use the same provider unless you set `REPORT_PROVIDER`.
+
+### Managed vs Local (Company AI)
+
+| Path | Config | Notes |
+|------|--------|-------|
+| **Managed (default when ready)** | `MANAGED_AI_BASE_URL` + `MANAGED_AI_API_KEY` + `MANAGED_AI_MODEL` | OpenAI-compatible company gateway; used for chat and reports |
+| **Local** | `CHAT_PROVIDER` + matching provider vars | Full BYO stack: `anthropic`, `openai`, `ollama`, or `rovo` |
+| **Host lock** | `AI_MODE=managed` or `AI_MODE=local` | Ops override; wins over the Settings preference |
+
+When both Managed and Local are ready, the app defaults to **Company AI**. Switch to Local in **Settings → Chat assistant** only — Chat and report pages show status (e.g. “Using Company AI”) and link to Settings; they do not duplicate the switch. If a Managed call fails, the error is shown; the app does **not** silently retry on Local. `REPORT_PROVIDER` and `REPORT_*` vars are **Local-only** — ignored while Managed is the active path.
 
 | Goal | `.env` setup |
 |------|----------------|
