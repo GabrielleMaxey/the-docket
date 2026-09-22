@@ -182,7 +182,8 @@ The modal pre-selects a preset when you open it from an active Task Management J
   Only the basic ask is required — leave any optional prompt blank and the AI omits that section rather than guessing. Blank prompts are listed back to you as a reminder to finish them on the Jira issue after it is created. With the helper on, **Title** becomes optional: click **✦ AI Draft** and the AI writes the title (Job Story format for Stories) and description from your answers. Everything it produces stays editable before you create.
 - **Title** — required unless the AI helper is on. Stories should use Job Story format; AI Draft can rewrite and ask 2–3 clarification questions if the ask/goal is unclear.
 - **Components**, **Vertical Components** — choose from the dropdown. **Components** must already exist on your Jira project (free-text names are rejected).
-- **BUG Tracking** (Bug only) — pick a default or type a custom value.
+- **BUG Tracking** (Bug only) — optional. Options load from your project's `BUG Tracking-…` components and are added to the issue alongside any regular Component. Click **×** on any Components, Vertical Components, or BUG Tracking dropdown to clear it.
+- **AI Draft errors** — if AI Draft reports it ran out of room, shorten the guided answers and try again. If it times out (about 2 minutes), the spinner clears and **Create** becomes available again so you can write the description yourself.
 - **Description** — use **✦ AI Draft** or write your own. Description and goal validation errors (including “story not fully defined”) appear **below the Description field**, not at the top of the modal.
 - **Priority** (Bug only) — required on create.
 - **Assignee** — optional for Task/Bug. Stories stay unassigned; when AI Draft suggests sub-tasks, a **Subtask assignee** field appears and applies to all checked sub-tasks.

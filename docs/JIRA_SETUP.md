@@ -59,6 +59,9 @@ Open `.env` in any text editor and fill in:
 | `REPORT_ANTHROPIC_API_KEY` | | Optional report-only Anthropic key (falls back to `ANTHROPIC_API_KEY`) |
 | `REPORT_ANTHROPIC_BASE_URL` | | Optional report-only Anthropic-compatible URL |
 | `REPORT_ANTHROPIC_MODEL` | | Optional report-only Anthropic model |
+| `LLM_TIMEOUT_MS` | `180000` | Optional request timeout for Anthropic / OpenAI / Managed AI calls |
+| `OLLAMA_TIMEOUT_MS` | `600000` | Optional request timeout for Ollama calls |
+| `AI_DRAFT_TIMEOUT_MS` | `120000` | Optional timeout for Create Issue **AI Draft** (any provider) |
 | `MANAGED_AI_BASE_URL` | `https://<company-gateway>/v1` | Company OpenAI-compatible gateway (Managed / Company AI) |
 | `MANAGED_AI_API_KEY` | | Token for the company gateway |
 | `MANAGED_AI_MODEL` | | Pinned company model id |

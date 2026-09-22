@@ -114,10 +114,20 @@ export const loadCreateFieldOptions = async ({
     collectAllowedOptionLabels(componentsMetaMatch?.meta)
   );
 
+  const allComponents = componentNames.length > 0 ? componentNames : componentsFromMeta;
+  const bugTrackingFromField = uniqueSortedLabels(collectAllowedOptionLabels(bugTrackingMatch?.meta));
+  // No dedicated BUG Tracking field (ODI): offer the "BUG Tracking-*" components instead and keep
+  // them out of the regular Components list so the two dropdowns don't duplicate each other.
+  const useComponentBugTracking = issueTypeName === "Bug" && !bugTrackingMatch;
+
   return {
-    components: componentNames.length > 0 ? componentNames : componentsFromMeta,
+    components: useComponentBugTracking
+      ? allComponents.filter((name) => !isBugTrackingComponentName(name))
+      : allComponents,
     verticalComponents: uniqueSortedLabels(collectAllowedOptionLabels(verticalMatch?.meta)),
-    bugTracking: uniqueSortedLabels(collectAllowedOptionLabels(bugTrackingMatch?.meta)),
+    bugTracking: useComponentBugTracking
+      ? allComponents.filter((name) => isBugTrackingComponentName(name))
+      : bugTrackingFromField,
   };
 };
 
@@ -323,6 +333,12 @@ export const applyNamedFieldValue = ({ fields, fieldKey, meta, value, projectCom
   return { ok: true };
 };
 
+// ODI models "BUG Tracking-*" values as Components, not a separate field. Projects that
+// do publish a dedicated "BUG Tracking" field keep using it; otherwise the value is merged
+// into the Components array alongside the regular component selection.
+export const isBugTrackingComponentName = (name) =>
+  /^bug tracking[-\s]/i.test(String(name || "").trim());
+
 export const applyOdiCreateFields = ({
   fields,
   issueTypeFields,
@@ -333,24 +349,44 @@ export const applyOdiCreateFields = ({
   projectComponents,
 }) => {
   const componentValue = String(component || "").trim();
-  if (componentValue) {
+  const bugTrackingValue = issueType === "Bug" ? String(bugTracking || "").trim() : "";
+  const bugTrackingFieldMatch = bugTrackingValue
+    ? findCreateMetaField(issueTypeFields, isBugTrackingField)
+    : null;
+  const bugTrackingAsComponent = Boolean(bugTrackingValue && !bugTrackingFieldMatch);
+
+  const requestedComponents = [componentValue, bugTrackingAsComponent ? bugTrackingValue : ""].filter(
+    Boolean
+  );
+  if (requestedComponents.length > 0) {
     const match = findCreateMetaField(issueTypeFields, isComponentsField);
     if (!match) {
       return {
         ok: false,
-        error: "Components field is not available on this issue type. Clear Components or pick another type.",
+        error: bugTrackingAsComponent && !componentValue
+          ? "BUG Tracking is set, but the Components field is not available on Bugs. Clear BUG Tracking or continue without it."
+          : "Components field is not available on this issue type. Clear Components or pick another type.",
       };
     }
-    const result = applyNamedFieldValue({
-      fields,
-      fieldKey: match.fieldKey,
-      meta: match.meta,
-      value: componentValue,
-      projectComponents,
-    });
-    if (!result.ok) {
-      return result;
+    const resolvedNames = [];
+    for (const requested of requestedComponents) {
+      const resolvedName = resolveProjectComponentName({
+        requestedName: requested,
+        meta: match.meta,
+        projectComponents,
+      });
+      if (!resolvedName) {
+        const label = requested === bugTrackingValue && bugTrackingAsComponent ? "BUG Tracking" : "Component";
+        return {
+          ok: false,
+          error: `${label} '${requested}' is not a valid component for this Jira project. Choose an existing option or clear the field.`,
+        };
+      }
+      if (!resolvedNames.some((name) => name.toLowerCase() === resolvedName.toLowerCase())) {
+        resolvedNames.push(resolvedName);
+      }
     }
+    fields.components = resolvedNames.map((name) => ({ name }));
   }
 
   const verticalValue = String(verticalComponent || "").trim();
@@ -375,19 +411,11 @@ export const applyOdiCreateFields = ({
     }
   }
 
-  const bugTrackingValue = String(bugTracking || "").trim();
-  if (issueType === "Bug" && bugTrackingValue) {
-    const match = findCreateMetaField(issueTypeFields, isBugTrackingField);
-    if (!match) {
-      return {
-        ok: false,
-        error: "BUG Tracking field is not available on Bugs. Clear BUG Tracking or continue without it.",
-      };
-    }
+  if (bugTrackingFieldMatch) {
     const result = applyNamedFieldValue({
       fields,
-      fieldKey: match.fieldKey,
-      meta: match.meta,
+      fieldKey: bugTrackingFieldMatch.fieldKey,
+      meta: bugTrackingFieldMatch.meta,
       value: bugTrackingValue,
       projectComponents,
     });
