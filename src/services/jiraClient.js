@@ -55,18 +55,28 @@ const extractJiraErrorMessage = (data, status) => {
   return `Jira request failed with status ${status}`;
 };
 
-const requestJson = async (path, options = {}) => {
+const requestJson = async ( path, options = {} ) => {
+  const { timeoutMs, ...fetchOptions } = options;
   let response;
   try {
     response = await fetch(buildApiUrl(path), {
       headers: {
         Accept: "application/json",
-        ...(options.headers || {}),
+        ...( fetchOptions.headers || {} ),
       },
-      ...options,
-    });
-  } catch (error) {
-    if (error instanceof TypeError) {
+      ...fetchOptions,
+      ...( timeoutMs ? { signal: AbortSignal.timeout( timeoutMs ) } : {} ),
+    } );
+  } catch ( error )
+  {
+    if ( error?.name === "TimeoutError" || error?.name === "AbortError" )
+    {
+      throw new Error(
+        `The request did not finish within ${ Math.round( timeoutMs / 1000 ) }s. Try again.`
+      );
+    }
+    if ( error instanceof TypeError )
+    {
       throw new Error(
         "Cannot reach the local API. Start it with npm run dev:api or npm run dev:all (proxy on port 8787).",
       );
@@ -916,6 +926,8 @@ export const generateIssueDescription = async ({
 } ) => {
   const aiPath = getPreferredAiPath();
   return requestJson( "/api/jira/issues/generate-description", {
+    // Slightly longer than the server's AI_DRAFT_TIMEOUT_MS so the server's clearer error wins.
+    timeoutMs: 150_000,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1091,5 +1103,59 @@ export const updatePmAsk = async ({ id, title, whoAsked, note }) => {
 export const deletePmAsk = async (id) => {
   return requestJson(`/api/project-managers/asks/${encodeURIComponent(id)}`, {
     method: "DELETE",
-  });
+  } );
 };
+
+// ─── Issue attachments ──────────────────────────────────────────────────────
+
+export const fetchAttachmentLimits = async () => requestJson( "/api/jira/attachment-limits" );
+
+export const fetchIssueAttachments = async ( issueKey ) =>
+  requestJson( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/attachments` );
+
+/**
+ * Uploads files to a Jira issue. Uses XMLHttpRequest (not fetch) so large screen
+ * recordings can report upload progress.
+ * @param {string} issueKey
+ * @param {File[]} files
+ * @param {{ onProgress?: (fraction: number) => void }} [options]
+ * @returns {Promise<{ issueKey: string, uploaded: object[], failed: {filename: string, error: string}[] }>}
+ */
+export const uploadIssueAttachments = ( issueKey, files, { onProgress } = {} ) =>
+  new Promise( ( resolve, reject ) => {
+    const formData = new FormData();
+    ( files || [] ).forEach( ( file ) => formData.append( "files", file, file.name ) );
+
+    const xhr = new XMLHttpRequest();
+    xhr.open( "POST", buildApiUrl( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/attachments` ) );
+    xhr.setRequestHeader( "Accept", "application/json" );
+    if ( onProgress )
+    {
+      xhr.upload.onprogress = ( event ) =>
+      {
+        if ( event.lengthComputable ) onProgress( event.loaded / event.total );
+      };
+    }
+    xhr.onerror = () =>
+      reject( new Error( "Cannot reach the local API. Start it with npm run dev:api or npm run dev:all." ) );
+    xhr.onload = () =>
+    {
+      let data = {};
+      try
+      {
+        data = xhr.responseText ? JSON.parse( xhr.responseText ) : {};
+      } catch
+      {
+        data = {};
+      }
+      if ( xhr.status >= 200 && xhr.status < 300 )
+      {
+        resolve( data );
+        return;
+      }
+      const error = new Error( data?.error || `Attachment upload failed (HTTP ${ xhr.status })` );
+      error.failed = Array.isArray( data?.failed ) ? data.failed : [];
+      reject( error );
+    };
+    xhr.send( formData );
+  } );

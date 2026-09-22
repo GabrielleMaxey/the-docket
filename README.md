@@ -46,7 +46,7 @@ The Docket connects to your Jira project through a local Express proxy. Credenti
 | Chat | Natural-language Jira questions with app session context | Jira-backed answers, optional save to Past Reports |
 | Settings | Jira setup, presets, field mappings, report/chat preferences | Shared preset packs and connection checks |
 
-**Task Management** is the daily driver. Run up to five saved JQL queries, update status or assignee, set P1–P20 priority, write notes, push notes to Jira, create issues, and generate AI reports or week plans from the loaded work.
+**Task Management** is the daily driver. Run up to five saved JQL queries, update status or assignee, set P1–P20 priority, write notes, push notes to Jira, attach screenshots and recordings, create issues, and generate AI reports or week plans from the loaded work.
 
 **Metrics** is the project view. Pick saved Epic/JQL presets, refresh a Jira snapshot, review overall/project/contributor metrics, inspect due-date lists, and generate leadership or team-facing reports.
 

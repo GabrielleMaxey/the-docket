@@ -6,6 +6,7 @@ import {
   applyParentLinkFields,
   buildEpicStoriesJql,
   formatJiraApiError,
+  isBugTrackingComponentName,
   resolveIssueTypeMeta,
   resolveJiraPriorityName,
 } from "../server/lib/jiraCreateIssueFields.mjs";
@@ -268,5 +269,83 @@ describe("applyOdiCreateFields", () => {
     });
     assert.equal(result.ok, true);
     assert.deepEqual(fields.components, [{ name: "WGA-DEV" }]);
+  });
+});
+
+describe("BUG Tracking as a component (ODI)", () => {
+  const componentsOnly = {
+    components: { name: "Component(s)", schema: { type: "array", items: "component" } },
+  };
+  const projectComponents = [
+    { name: "WGA-DEV" },
+    { name: "BUG Tracking-Itential Platform" },
+    { name: "BUG Tracking-Workflow" },
+  ];
+
+  it("recognizes BUG Tracking component names", () => {
+    assert.equal(isBugTrackingComponentName("BUG Tracking-Workflow"), true);
+    assert.equal(isBugTrackingComponentName("Infrastructure Bugs"), false);
+  });
+
+  it("merges BUG Tracking into components when no dedicated field exists", () => {
+    const fields = {};
+    const result = applyOdiCreateFields({
+      fields,
+      issueTypeFields: componentsOnly,
+      issueType: "Bug",
+      component: "WGA-DEV",
+      verticalComponent: "",
+      bugTracking: "BUG Tracking-Itential Platform",
+      projectComponents,
+    });
+    assert.equal(result.ok, true);
+    assert.deepEqual(fields.components, [
+      { name: "WGA-DEV" },
+      { name: "BUG Tracking-Itential Platform" },
+    ]);
+  });
+
+  it("sends BUG Tracking alone as the only component", () => {
+    const fields = {};
+    const result = applyOdiCreateFields({
+      fields,
+      issueTypeFields: componentsOnly,
+      issueType: "Bug",
+      component: "",
+      verticalComponent: "",
+      bugTracking: "BUG Tracking-Workflow",
+      projectComponents,
+    });
+    assert.equal(result.ok, true);
+    assert.deepEqual(fields.components, [{ name: "BUG Tracking-Workflow" }]);
+  });
+
+  it("ignores BUG Tracking on non-Bug issue types", () => {
+    const fields = {};
+    const result = applyOdiCreateFields({
+      fields,
+      issueTypeFields: componentsOnly,
+      issueType: "Story",
+      component: "",
+      verticalComponent: "",
+      bugTracking: "BUG Tracking-Workflow",
+      projectComponents,
+    });
+    assert.equal(result.ok, true);
+    assert.equal(fields.components, undefined);
+  });
+
+  it("rejects an unknown BUG Tracking value with a BUG Tracking-specific message", () => {
+    const result = applyOdiCreateFields({
+      fields: {},
+      issueTypeFields: componentsOnly,
+      issueType: "Bug",
+      component: "",
+      verticalComponent: "",
+      bugTracking: "BUG Tracking-Nope",
+      projectComponents,
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /^BUG Tracking 'BUG Tracking-Nope'/);
   });
 });

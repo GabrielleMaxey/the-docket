@@ -3,6 +3,7 @@ import { Button, Modal } from "semantic-ui-react";
 import PriorityCell from "./cells/PriorityCell";
 import AssigneeCell from "./cells/AssigneeCell.jsx";
 import NoteImagesStrip from "./NoteImagesStrip.jsx";
+import AttachFilesModal from "./AttachFilesModal.jsx";
 import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
 import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js";
 import {
@@ -183,6 +184,7 @@ const JiraResultsTable = ({
     return idx >= 0 ? idx : 0;
   });
   const [pageByRunIndex, setPageByRunIndex] = React.useState({});
+  const [attachTarget, setAttachTarget] = React.useState(null);
   const [keyFilterByRunIndex, setKeyFilterByRunIndex] = React.useState({});
   const [keywordFilterByRunIndex, setKeywordFilterByRunIndex] = React.useState({});
   const [statusFilterByRunIndex, setStatusFilterByRunIndex] = React.useState({});
@@ -1176,6 +1178,20 @@ const JiraResultsTable = ({
                                           >
                                             {save.loading ? "Saving..." : "Save to local DB"}
                                           </button>
+                                          <button
+                                            type="button"
+                                            className="ww-save-btn"
+                                            title="Attach screenshots, recordings, or files to this issue in Jira"
+                                            onClick={() =>
+                                              setAttachTarget({
+                                                key: issueKey,
+                                                summary,
+                                                browseUrl: issueBrowseUrl || "",
+                                              })
+                                            }
+                                          >
+                                            Attach files
+                                          </button>
                                         </div>
                                       )}
                                       {push.error && <p className="ww-inline-error">{push.error}</p>}
@@ -1412,6 +1428,13 @@ const JiraResultsTable = ({
           </div>
         )}
       </div>
+      <AttachFilesModal
+        open={Boolean(attachTarget)}
+        issueKey={attachTarget?.key || ""}
+        issueSummary={attachTarget?.summary || ""}
+        browseUrl={attachTarget?.browseUrl || ""}
+        onClose={() => setAttachTarget(null)}
+      />
     </div>
   );
 };
