@@ -128,6 +128,7 @@ const ComboDropdownField = ({
         search
         selection
         allowAdditions
+        clearable
         additionLabel="Use custom: "
         placeholder={placeholder}
         options={mergedOptions}
@@ -522,11 +523,8 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             vertical.length > 0 ? vertical : ODI_VERTICAL_COMPONENT_OPTIONS
           )
         );
-        setBugTrackingOptions(
-          toCreateIssueDropdownOptions(
-            bugTracking.length > 0 ? bugTracking : ODI_BUG_TRACKING_OPTIONS
-          )
-        );
+        // Trust Jira's answer here: the static list is only a fallback when the lookup fails.
+        setBugTrackingOptions(toCreateIssueDropdownOptions(bugTracking));
         setFieldOptionsLoaded(true);
       } catch (loadError) {
         if (!cancelled) {
@@ -1085,7 +1083,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
         ? `Could not load BUG Tracking: ${fieldOptionsError}`
         : fieldOptionsLoaded && bugTrackingOptions.length === 0
           ? "No BUG Tracking options on Bugs. Leave blank if unused."
-          : "Options come from the BUG Tracking field on Bugs.";
+          : "Sent to Jira as a BUG Tracking component. Use the × to clear.";
 
   const createdIssueUrl = buildJiraBrowseUrl(jiraBaseUrl, createdIssueKey);
 

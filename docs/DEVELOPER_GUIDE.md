@@ -459,6 +459,10 @@ Preset preload from the active Task Management tab uses `resolveCreateIssueDefau
 
 **Create payload:** `buildJiraCreatePayload` in `server/lib/jiraCreateIssueFields.mjs` reads Jira **createmeta** to choose `parent` vs Epic Link, issue type id, priority mapping (`Critical` → `Highest`), and project custom fields (Components, Vertical Components, BUG Tracking). Descriptions are sent as ADF via `shared/jiraDescriptionAdf.mjs`.
 
+**BUG Tracking:** in ODI there is no dedicated BUG Tracking field — the values are Components named `BUG Tracking-*`. When Bug createmeta has no field named "bug tracking", `loadCreateFieldOptions` offers those components as BUG Tracking options (and removes them from the regular Components list), and `applyOdiCreateFields` merges the selection into the `components` array with the regular Component. Projects that do publish a dedicated field keep using it.
+
+**AI Draft limits:** `/api/jira/issues/generate-description` uses per-type output budgets (`AI_DRAFT_MAX_TOKENS`: Story 4000, Bug 3000, Task 2000) and calls `completeLlmText` with `failOnTruncation: true`, so a response cut off at the token limit returns a clear 502 instead of an unparseable-JSON 422. All LLM fetches in `server/lib/llmClient.mjs` now carry an `AbortSignal.timeout` (see `LLM_TIMEOUT_MS`, `OLLAMA_TIMEOUT_MS`, `AI_DRAFT_TIMEOUT_MS`); the client aborts AI Draft after 150s so `generatingDesc` never blocks **Create** indefinitely.
+
 **Parent / issue-type rules:**
 
 | Create | Issue type sent | Jira issuetype used | Parent link |

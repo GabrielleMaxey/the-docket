@@ -60,18 +60,26 @@ const extractJiraErrorMessage = ( data, status ) => {
 };
 
 const requestJson = async ( path, options = {} ) => {
+  const { timeoutMs, ...fetchOptions } = options;
   let response;
   try
   {
     response = await fetch( buildApiUrl( path ), {
       headers: {
         Accept: "application/json",
-        ...( options.headers || {} ),
+        ...( fetchOptions.headers || {} ),
       },
-      ...options,
+      ...fetchOptions,
+      ...( timeoutMs ? { signal: AbortSignal.timeout( timeoutMs ) } : {} ),
     } );
   } catch ( error )
   {
+    if ( error?.name === "TimeoutError" || error?.name === "AbortError" )
+    {
+      throw new Error(
+        `The request did not finish within ${ Math.round( timeoutMs / 1000 ) }s. Try again.`
+      );
+    }
     if ( error instanceof TypeError )
     {
       throw new Error(
@@ -848,6 +856,8 @@ export const generateIssueDescription = async ( {
 } ) => {
   const aiPath = getPreferredAiPath();
   return requestJson( "/api/jira/issues/generate-description", {
+    // Slightly longer than the server's AI_DRAFT_TIMEOUT_MS so the server's clearer error wins.
+    timeoutMs: 150_000,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify( {

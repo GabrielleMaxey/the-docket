@@ -273,10 +273,37 @@ export const formatUnableToGenerateReportError = (provider, error) => {
   return `Unable to generate report. ${raw}`;
 };
 
-const fetchOrThrow = async (url, options, label) => {
+const readTimeoutMs = (name, fallback) => {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+};
+
+// Without a timeout a stalled provider leaves the caller (and its UI spinner) waiting forever.
+const defaultTimeoutMsFor = (label) =>
+  label === "Ollama"
+    ? readTimeoutMs("OLLAMA_TIMEOUT_MS", 600_000)
+    : readTimeoutMs("LLM_TIMEOUT_MS", 180_000);
+
+export class LlmTruncatedError extends Error {
+  constructor(label, maxTokens) {
+    super(`${label} response was cut off at the ${maxTokens}-token limit before it finished.`);
+    this.name = "LlmTruncatedError";
+    this.code = "LLM_TRUNCATED";
+  }
+}
+
+const fetchOrThrow = async (url, options, label, timeoutMs) => {
+  const effectiveTimeoutMs = timeoutMs || defaultTimeoutMsFor(label);
   try {
-    return await fetch(url, options);
+    return await fetch(url, { ...options, signal: AbortSignal.timeout(effectiveTimeoutMs) });
   } catch (error) {
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+      const timeoutError = new Error(
+        `${label || "LLM"} did not respond within ${Math.round(effectiveTimeoutMs / 1000)}s.`
+      );
+      timeoutError.code = "LLM_TIMEOUT";
+      throw timeoutError;
+    }
     const cause = error?.cause;
     const code = cause?.code || "";
     const detail = String(cause?.message || error?.message || "fetch failed");
@@ -284,7 +311,7 @@ const fetchOrThrow = async (url, options, label) => {
   }
 };
 
-const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens, tools }) => {
+const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens, tools, timeoutMs }) => {
   const response = await fetchOrThrow(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -297,7 +324,7 @@ const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens,
       ...(maxTokens ? { max_tokens: maxTokens } : {}),
       ...(tools ? { tools, tool_choice: "auto" } : {}),
     }),
-  }, "OpenAI");
+  }, "OpenAI", timeoutMs);
 
   const data = await response.json();
   if (!response.ok) {
@@ -307,7 +334,7 @@ const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens,
   return data;
 };
 
-const callAnthropicMessages = async ({ apiKey, baseUrl, model, systemPrompt, messages, maxTokens, tools }) => {
+const callAnthropicMessages = async ({ apiKey, baseUrl, model, systemPrompt, messages, maxTokens, tools, timeoutMs }) => {
   const response = await fetchOrThrow(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
@@ -322,7 +349,7 @@ const callAnthropicMessages = async ({ apiKey, baseUrl, model, systemPrompt, mes
       messages,
       ...(tools ? { tools } : {}),
     }),
-  }, "Anthropic");
+  }, "Anthropic", timeoutMs);
 
   const data = await response.json();
   if (!response.ok) {
@@ -332,7 +359,7 @@ const callAnthropicMessages = async ({ apiKey, baseUrl, model, systemPrompt, mes
   return data;
 };
 
-const callOllamaChat = async ({ systemPrompt, userMessage, maxTokens, forReports = false }) => {
+const callOllamaChat = async ({ systemPrompt, userMessage, maxTokens, forReports = false, timeoutMs, failOnTruncation = false }) => {
   const { baseUrl, model } = getOllamaConfig({ forReports });
   const response = await fetchOrThrow(`${baseUrl}/api/chat`, {
     method: "POST",
@@ -346,11 +373,14 @@ const callOllamaChat = async ({ systemPrompt, userMessage, maxTokens, forReports
       ],
       ...(maxTokens ? { options: { num_predict: maxTokens } } : {}),
     }),
-  }, "Ollama");
+  }, "Ollama", timeoutMs);
 
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data?.error || "Ollama request failed");
+  }
+  if (failOnTruncation && data?.done_reason === "length") {
+    throw new LlmTruncatedError("Ollama", maxTokens);
   }
 
   const text = extractAssistantText(data);
@@ -361,18 +391,31 @@ const callOllamaChat = async ({ systemPrompt, userMessage, maxTokens, forReports
   return text;
 };
 
-const completeOpenAiText = async ({ systemPrompt, userMessage, maxTokens, forReports = false, credentials }) => {
+const completeOpenAiText = async ({
+  systemPrompt,
+  userMessage,
+  maxTokens,
+  forReports = false,
+  credentials,
+  timeoutMs,
+  failOnTruncation = false,
+}) => {
   const { apiKey, baseUrl, model } = credentials ?? getOpenAiCredentials({ forReports });
   const data = await callOpenAiMessages({
     apiKey,
     baseUrl,
     model,
     maxTokens,
+    timeoutMs,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
     ],
   });
+
+  if (failOnTruncation && data?.choices?.[0]?.finish_reason === "length") {
+    throw new LlmTruncatedError("OpenAI", maxTokens);
+  }
 
   const text = extractAssistantText(data);
   if (!text) {
@@ -382,7 +425,14 @@ const completeOpenAiText = async ({ systemPrompt, userMessage, maxTokens, forRep
   return text;
 };
 
-const completeAnthropicText = async ({ systemPrompt, userMessage, maxTokens, forReports = false }) => {
+const completeAnthropicText = async ({
+  systemPrompt,
+  userMessage,
+  maxTokens,
+  forReports = false,
+  timeoutMs,
+  failOnTruncation = false,
+}) => {
   const { apiKey, baseUrl, model } = getAnthropicCredentials({ forReports });
   const data = await callAnthropicMessages({
     apiKey,
@@ -390,8 +440,13 @@ const completeAnthropicText = async ({ systemPrompt, userMessage, maxTokens, for
     model,
     systemPrompt,
     maxTokens,
+    timeoutMs,
     messages: [{ role: "user", content: userMessage }],
   });
+
+  if (failOnTruncation && data?.stop_reason === "max_tokens") {
+    throw new LlmTruncatedError("Anthropic", maxTokens);
+  }
 
   const text = extractAssistantText(data);
   if (!text) {
@@ -514,31 +569,30 @@ export const completeLlmText = async ({
   defaultProvider = "disabled",
   forReports = false,
   aiPath,
+  timeoutMs,
+  failOnTruncation = false,
 }) => {
   const userContent = String(userMessage || "").trim();
   if (!userContent) {
     throw new Error("Message is required");
   }
 
+  const common = { systemPrompt, userMessage: userContent, maxTokens, timeoutMs, failOnTruncation };
+
   if (aiPath === AI_PATH_MANAGED) {
     const credentials = getManagedAiCredentials();
-    return completeOpenAiText({ systemPrompt, userMessage: userContent, maxTokens, forReports: false, credentials });
+    return completeOpenAiText({ ...common, forReports: false, credentials });
   }
 
   const provider = providerOverride || resolveLlmProvider(defaultProvider);
 
   switch (provider) {
     case "anthropic":
-      return completeAnthropicText({ systemPrompt, userMessage: userContent, maxTokens, forReports });
+      return completeAnthropicText({ ...common, forReports });
     case "openai":
-      return completeOpenAiText({ systemPrompt, userMessage: userContent, maxTokens, forReports });
+      return completeOpenAiText({ ...common, forReports });
     case "ollama":
-      return callOllamaChat({
-        systemPrompt,
-        userMessage: userContent,
-        maxTokens,
-        forReports,
-      });
+      return callOllamaChat({ ...common, forReports });
     default:
       throw new Error(buildProviderError(provider, { forReports }));
   }

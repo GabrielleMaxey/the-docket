@@ -1,5 +1,10 @@
 import { createLogger } from "../lib/logger.mjs";
-import { completeLlmText, isLocalReportReady, resolveFirstReadyReportProvider } from "../lib/llmClient.mjs";
+import {
+  completeLlmText,
+  isLocalReportReady,
+  LlmTruncatedError,
+  resolveFirstReadyReportProvider,
+} from "../lib/llmClient.mjs";
 import { AI_PATH_MANAGED, getHostAiMode, isManagedAiReady, resolveAiPath } from "../lib/aiPath.mjs";
 import { buildAiDraftSystemPrompt, buildAiDraftUserPrompt } from "../lib/aiInstructions.mjs";
 import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
@@ -514,6 +519,33 @@ export const registerJiraIssueRoutes = (
   });
 
   // Generates a description (and optional subtasks for Stories) from a title + context.
+  // AI Draft token budgets. A full Bug draft with guided intake measured ~1,100 output tokens,
+  // so the old 900 cap truncated the JSON mid-string and surfaced as "not valid JSON".
+  const AI_DRAFT_MAX_TOKENS = { Story: 4000, Bug: 3000, Task: 2000 };
+  const AI_DRAFT_TIMEOUT_MS = (() => {
+    const value = Number(process.env.AI_DRAFT_TIMEOUT_MS);
+    return Number.isFinite(value) && value > 0 ? value : 120_000;
+  })();
+
+  // Models sometimes wrap the object in fences or add a sentence before/after it.
+  const parseAiDraftJson = (raw) => {
+    const cleaned = String(raw || "").replace(/```json|```/g, "").trim();
+    try {
+      return JSON.parse(cleaned);
+    } catch {
+      const start = cleaned.indexOf("{");
+      const end = cleaned.lastIndexOf("}");
+      if (start === -1 || end <= start) {
+        return null;
+      }
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+  };
+
   app.post("/api/jira/issues/generate-description", async (req, res) => {
     const summary = String(req.body?.summary || "").trim();
     const issueType = String(req.body?.issueType || "Story").trim();
@@ -575,20 +607,20 @@ export const registerJiraIssueRoutes = (
       log.info(
         `generating description for ${issueType}: "${summary || "(from AI helper intake)"}"${hasIntake ? " with guided intake" : ""}`
       );
-      const maxTokens = isStory ? 1400 : isBug ? 900 : 600;
+      const maxTokens = AI_DRAFT_MAX_TOKENS[issueType] || AI_DRAFT_MAX_TOKENS.Task;
       const raw = await completeLlmText({
         systemPrompt,
         userMessage: userPrompt,
         maxTokens,
+        timeoutMs: AI_DRAFT_TIMEOUT_MS,
+        failOnTruncation: true,
         ...(resolved.path === AI_PATH_MANAGED
           ? { aiPath: AI_PATH_MANAGED }
           : { provider: resolveFirstReadyReportProvider(), forReports: true }),
       });
-      const cleaned = String(raw || "").replace(/```json|```/g, "").trim();
-      let parsed;
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch {
+      const parsed = parseAiDraftJson(raw);
+      if (!parsed || typeof parsed !== "object") {
+        log.warn(`AI Draft JSON parse failed (${String(raw || "").length} chars)`);
         return res.status(422).json({
           error: "AI Draft returned text that was not valid JSON. Try AI Draft again.",
         });
@@ -608,6 +640,17 @@ export const registerJiraIssueRoutes = (
       return res.json(response);
     } catch (error) {
       log.error("generate-description failed", error instanceof Error ? error.message : error);
+      if (error instanceof LlmTruncatedError) {
+        return res.status(502).json({
+          error:
+            "AI Draft ran out of room before finishing. Shorten the guided answers or title and try again, or write the description yourself.",
+        });
+      }
+      if (error?.code === "LLM_TIMEOUT") {
+        return res.status(504).json({
+          error: `AI Draft timed out. ${error.message} Try again, or write the description yourself.`,
+        });
+      }
       return res.status(500).json({
         error: "AI generation failed",
         message: error instanceof Error ? error.message : "Unknown error",
