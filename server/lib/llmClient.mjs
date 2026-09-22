@@ -4,6 +4,7 @@ import {
   JIRA_SEARCH_TOOL_PARAMETERS,
   executeJiraSearch,
 } from "./jiraSearchTool.mjs";
+import { AI_PATH_MANAGED, getManagedAiCredentials } from "./aiPath.mjs";
 
 const MAX_TOOL_ROUNDS = 3;
 const SUPPORTED_PROVIDERS = new Set(["openai", "anthropic", "ollama"]);
@@ -135,6 +136,11 @@ const hasAnyLlmFallback = () =>
 
 /** @deprecated Use isChatProviderReady */
 export const isLlmProviderReady = (provider) => isLlmCredentialReady(provider);
+
+export const isLocalChatReady = ({ oauthConnected = false } = {}) =>
+  isChatProviderReady(getConfiguredChatProvider(), { oauthConnected });
+
+export const isLocalReportReady = () => resolveFirstReadyReportProvider() !== "disabled";
 
 export const extractAssistantText = (data) => {
   if (typeof data === "string") {
@@ -355,8 +361,8 @@ const callOllamaChat = async ({ systemPrompt, userMessage, maxTokens, forReports
   return text;
 };
 
-const completeOpenAiText = async ({ systemPrompt, userMessage, maxTokens, forReports = false }) => {
-  const { apiKey, baseUrl, model } = getOpenAiCredentials({ forReports });
+const completeOpenAiText = async ({ systemPrompt, userMessage, maxTokens, forReports = false, credentials }) => {
+  const { apiKey, baseUrl, model } = credentials ?? getOpenAiCredentials({ forReports });
   const data = await callOpenAiMessages({
     apiKey,
     baseUrl,
@@ -395,8 +401,8 @@ const completeAnthropicText = async ({ systemPrompt, userMessage, maxTokens, for
   return text;
 };
 
-const completeOpenAiWithJiraTools = async ({ systemPrompt, userMessage, maxTokens, jiraRequest }) => {
-  const { apiKey, baseUrl, model } = getOpenAiCredentials();
+const completeOpenAiWithJiraTools = async ({ systemPrompt, userMessage, maxTokens, jiraRequest, credentials }) => {
+  const { apiKey, baseUrl, model } = credentials ?? getOpenAiCredentials();
   const messages = [
     { role: "system", content: systemPrompt },
     { role: "user", content: userMessage },
@@ -507,12 +513,19 @@ export const completeLlmText = async ({
   provider: providerOverride,
   defaultProvider = "disabled",
   forReports = false,
+  aiPath,
 }) => {
-  const provider = providerOverride || resolveLlmProvider(defaultProvider);
   const userContent = String(userMessage || "").trim();
   if (!userContent) {
     throw new Error("Message is required");
   }
+
+  if (aiPath === AI_PATH_MANAGED) {
+    const credentials = getManagedAiCredentials();
+    return completeOpenAiText({ systemPrompt, userMessage: userContent, maxTokens, forReports: false, credentials });
+  }
+
+  const provider = providerOverride || resolveLlmProvider(defaultProvider);
 
   switch (provider) {
     case "anthropic":
@@ -537,12 +550,19 @@ export const completeLlmWithJiraTools = async ({
   maxTokens = 1024,
   provider: providerOverride,
   jiraRequest,
+  aiPath,
 }) => {
-  const provider = providerOverride || resolveLlmProvider("disabled");
   const userContent = String(userMessage || "").trim();
   if (!userContent) {
     throw new Error("Message is required");
   }
+
+  if (aiPath === AI_PATH_MANAGED) {
+    const credentials = getManagedAiCredentials();
+    return completeOpenAiWithJiraTools({ systemPrompt, userMessage: userContent, maxTokens, jiraRequest, credentials });
+  }
+
+  const provider = providerOverride || resolveLlmProvider("disabled");
 
   switch (provider) {
     case "openai":

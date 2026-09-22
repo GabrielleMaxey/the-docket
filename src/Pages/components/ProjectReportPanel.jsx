@@ -1,10 +1,12 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { Button, Checkbox, Form } from "semantic-ui-react";
 import CollapsibleSection from "../../Components/CollapsibleSection";
 import ReportOutput from "../../Components/ReportOutput";
 import { useReportClipboard } from "../../hooks/useReportClipboard";
 import {
   fetchAppSettings,
+  fetchChatStatus,
   fetchJiraSearchAll,
   fetchLatestJiraCommentsBulk,
   fetchRecentlyNotedIssueKeys,
@@ -112,6 +114,11 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
   const loading = reportPending || bgReportRunning;
   const [report, setReport] = React.useState(persisted?.report ?? null);
   const [error, setError] = React.useState("");
+  const [chatStatus, setChatStatus] = React.useState(null);
+
+  React.useEffect(() => {
+    fetchChatStatus().then(setChatStatus).catch(() => {});
+  }, []);
   const { copied, handleCopy, handleDownload } = useReportClipboard(report);
 
   const [reportType, setReportType] = React.useState("status");
@@ -479,6 +486,11 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
         <Button size="small" primary onClick={handleGenerate} loading={loading} disabled={loading}>
           Generate Report
         </Button>
+        {chatStatus?.displayLabel ? (
+          <span style={{ fontSize: "0.82rem", color: "#64748b", marginLeft: "0.75rem" }}>
+            Using {chatStatus.displayLabel} · <Link to="/settings">Settings</Link>
+          </span>
+        ) : null}
       </div>
       {error ? <p className="ww-jira-status ww-jira-error">{error}</p> : null}
       <ReportOutput

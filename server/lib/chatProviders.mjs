@@ -5,6 +5,7 @@ import {
 } from "./llmClient.mjs";
 import { sendRovoChatMessage } from "./rovoChat.mjs";
 import { buildEpicContextPrompt } from "./aiInstructions.mjs";
+import { AI_PATH_MANAGED } from "./aiPath.mjs";
 
 export const sendChatWithProvider = async ({
   provider,
@@ -13,6 +14,7 @@ export const sendChatWithProvider = async ({
   jiraRequest,
   customInstructions,
   oauthTokens,
+  aiPath,
 }) => {
   const systemPrompt = buildEpicContextPrompt(epicContext, customInstructions);
   const userMessage = String(message || "").trim();
@@ -20,7 +22,7 @@ export const sendChatWithProvider = async ({
     throw new Error("Message is required");
   }
 
-  if (provider === ROVO_PROVIDER) {
+  if (provider === ROVO_PROVIDER && aiPath !== AI_PATH_MANAGED) {
     return sendRovoChatMessage({
       systemPrompt,
       message: userMessage,
@@ -34,15 +36,17 @@ export const sendChatWithProvider = async ({
     systemPrompt,
     userMessage,
     jiraRequest,
+    aiPath,
   });
 
-  return { reply: text, provider };
+  return { reply: text, provider: aiPath === AI_PATH_MANAGED ? AI_PATH_MANAGED : provider };
 };
 
 export const sendChatMessage = async ({
   message,
   epicContext,
   providerOverride,
+  aiPath,
   jiraRequest,
   customInstructions,
   oauthTokens,
@@ -55,5 +59,6 @@ export const sendChatMessage = async ({
     jiraRequest,
     customInstructions,
     oauthTokens,
+    aiPath,
   });
 };

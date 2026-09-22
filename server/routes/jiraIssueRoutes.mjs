@@ -1,5 +1,6 @@
 import { createLogger } from "../lib/logger.mjs";
-import { completeLlmText, resolveFirstReadyReportProvider } from "../lib/llmClient.mjs";
+import { completeLlmText, isLocalReportReady, resolveFirstReadyReportProvider } from "../lib/llmClient.mjs";
+import { AI_PATH_MANAGED, getHostAiMode, isManagedAiReady, resolveAiPath } from "../lib/aiPath.mjs";
 import { buildAiDraftSystemPrompt, buildAiDraftUserPrompt } from "../lib/aiInstructions.mjs";
 import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
 import { loadParentCandidatesFromJql } from "../lib/jiraParentCandidates.mjs";
@@ -537,9 +538,15 @@ export const registerJiraIssueRoutes = (
       }
     }
 
-    const provider = resolveFirstReadyReportProvider();
-    if (!provider) {
-      return res.status(503).json({ error: "No AI provider configured. Set CHAT_PROVIDER or REPORT_PROVIDER in .env." });
+    const reqAiPath = String(req.body?.aiPath || "").trim().toLowerCase() || null;
+    const resolved = resolveAiPath({
+      preferredPath: reqAiPath === AI_PATH_MANAGED || reqAiPath === "local" ? reqAiPath : null,
+      managedReady: isManagedAiReady(),
+      localReady: isLocalReportReady(),
+      hostMode: getHostAiMode(),
+    });
+    if (resolved.path === "disabled") {
+      return res.status(503).json({ error: "No AI provider configured. Set MANAGED_AI_* or CHAT_PROVIDER / REPORT_PROVIDER in .env." });
     }
 
     const isStory = issueType === "Story";
@@ -569,7 +576,14 @@ export const registerJiraIssueRoutes = (
         `generating description for ${issueType}: "${summary || "(from AI helper intake)"}"${hasIntake ? " with guided intake" : ""}`
       );
       const maxTokens = isStory ? 1400 : isBug ? 900 : 600;
-      const raw = await completeLlmText({ provider, systemPrompt, userMessage: userPrompt, maxTokens });
+      const raw = await completeLlmText({
+        systemPrompt,
+        userMessage: userPrompt,
+        maxTokens,
+        ...(resolved.path === AI_PATH_MANAGED
+          ? { aiPath: AI_PATH_MANAGED }
+          : { provider: resolveFirstReadyReportProvider(), forReports: true }),
+      });
       const cleaned = String(raw || "").replace(/```json|```/g, "").trim();
       let parsed;
       try {

@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import {
   Button,
   Container,
@@ -234,10 +235,11 @@ const Chat = () => {
       <Segment>
         <div className="chat-status-row">
           <span>
-            Provider: <strong>{chatStatus?.provider || "not configured"}</strong>
+            Using <strong>{chatStatus?.displayLabel || chatStatus?.provider || "not configured"}</strong>
             {chatStatus?.provider === "rovo" && chatStatus?.oauthConnected
               ? " · Signed in with Atlassian"
               : ""}
+            {" · "}<Link to="/settings">Settings</Link>
           </span>
           {chatStatus?.provider === "rovo" && chatStatus?.oauthConfigured ? (
             <div className="chat-status-actions">
