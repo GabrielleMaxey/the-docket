@@ -184,6 +184,7 @@ The modal pre-selects a preset when you open it from an active Task Management J
 - **Components**, **Vertical Components** — choose from the dropdown. **Components** must already exist on your Jira project (free-text names are rejected).
 - **BUG Tracking** (Bug only) — optional. Options load from your project's `BUG Tracking-…` components and are added to the issue alongside any regular Component. Click **×** on any Components, Vertical Components, or BUG Tracking dropdown to clear it.
 - **AI Draft errors** — if AI Draft reports it ran out of room, shorten the guided answers and try again. If it times out (about 2 minutes), the spinner clears and **Create** becomes available again so you can write the description yourself.
+- **Attachments** — optional. Click **Add files** or drop screenshots, screen recordings (.mov, .mp4), or documents onto the box. They upload to the new issue right after it is created; if one fails, the issue is still created and you can retry from **Attach files** on its row.
 - **Description** — use **✦ AI Draft** or write your own. Description and goal validation errors (including “story not fully defined”) appear **below the Description field**, not at the top of the modal.
 - **Priority** (Bug only) — required on create.
 - **Assignee** — optional for Task/Bug. Stories stay unassigned; when AI Draft suggests sub-tasks, a **Subtask assignee** field appears and applies to all checked sub-tasks.
@@ -245,6 +246,7 @@ Each row is one Jira issue. What you can do per row:
 | Add **files** to a note | **Add file** button, paste while the notes area is focused (images only), or drag-and-drop onto the notes cell. Up to **5** files per note; **5 MB** each — images (PNG, JPEG, GIF, WebP) plus TXT, PDF, DOC/DOCX, XLSX, and CSV |
 | **Keep on this machine** (attachments) | Optional checkbox below the notes box. Off by default — attachments stay until you **Push note** or close/refresh the tab. Turn on to keep draft files on this machine across reloads |
 | Push note to Jira as a **comment** | Check the row checkbox → **Push note** (or **Push Selected** for multiple). Sends note text and attachments inline in the Jira comment (same as images for documents); local copies are cleared after a successful push |
+| **Attach files** to the Jira issue | Click **Attach files** on an open issue's row (next to **Save to local DB**). Drop or pick screenshots, screen recordings (.mov, .mp4), or documents — up to 10 per upload, 250 MB each by default. The dialog lists what is already on the issue and shows upload progress. Unlike note attachments, these go straight onto the issue's **Attachments**, not into a comment. |
 | Filter visible rows | **Filter by key**, **Status**, or **Assignee** above the table; **Clear filters** resets all three |
 | Page through results | **First / Prev / Next / Last** below the table (30 rows per page) |
 | Load more issues | When the status line shows **Loaded X of Y** and Y is larger than X, click **Load remaining** |
