@@ -1,5 +1,6 @@
 import { buildApiUrl } from "./apiBase.js";
 import { getLocalTimestampPayload } from "../utils/localTimestamp.js";
+import { getPreferredAiPath } from "./aiPathPreference.js";
 import { filterWorkfrontErrorMessages } from "../../shared/jiraErrorUtils.mjs";
 import {
   buildSharedProgramJql,
@@ -670,6 +671,7 @@ export const generateReport = async ( {
   statusCounts,
   chartVariant,
 } ) => {
+  const aiPath = getPreferredAiPath();
   return requestJson( "/api/report/generate", {
     method: "POST",
     headers: {
@@ -681,6 +683,7 @@ export const generateReport = async ( {
       additionalContext,
       statusCounts,
       chartVariant,
+      ...( aiPath ? { aiPath } : {} ),
       ...getLocalTimestampPayload(),
     } ),
   } );
@@ -688,7 +691,11 @@ export const generateReport = async ( {
 
 export const fetchWeeklyDigest = async () => requestJson( "/api/reports/weekly-digest" );
 
-export const fetchChatStatus = async () => requestJson( "/api/chat/status" );
+export const fetchChatStatus = async () => {
+  const aiPath = getPreferredAiPath();
+  const path = aiPath ? `/api/chat/status?aiPath=${ encodeURIComponent( aiPath ) }` : "/api/chat/status";
+  return requestJson( path );
+};
 
 export const generateGanttSharepointSummary = async ( payload ) => {
   return requestJson( "/api/report/gantt-summary", {
@@ -710,12 +717,13 @@ export const signOutChat = async () => {
 };
 
 export const sendChatMessage = async ( { message, epicContext } ) => {
+  const aiPath = getPreferredAiPath();
   return requestJson( "/api/chat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify( { message, epicContext } ),
+    body: JSON.stringify( { message, epicContext, ...( aiPath ? { aiPath } : {} ) } ),
   } );
 };
 
@@ -838,6 +846,7 @@ export const generateIssueDescription = async ( {
   epicName,
   intake,
 } ) => {
+  const aiPath = getPreferredAiPath();
   return requestJson( "/api/jira/issues/generate-description", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -847,6 +856,7 @@ export const generateIssueDescription = async ( {
       epicKey: epicKey || "",
       epicName: epicName || "",
       intake: intake || null,
+      ...( aiPath ? { aiPath } : {} ),
     } ),
   } );
 };
@@ -860,6 +870,7 @@ export const generateProjectReport = async ( {
   userGoals,
   companyGoals,
 } ) => {
+  const aiPath = getPreferredAiPath();
   return requestJson( "/api/report/project", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -871,12 +882,14 @@ export const generateProjectReport = async ( {
       pwbPeriod,
       userGoals,
       companyGoals,
+      ...( aiPath ? { aiPath } : {} ),
       ...getLocalTimestampPayload(),
     } ),
   } );
 };
 
 export const generateWeekPlan = async ( { projects, focusStyle, capacityHours, additionalContext } ) => {
+  const aiPath = getPreferredAiPath();
   return requestJson( "/api/plan/week", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -885,6 +898,7 @@ export const generateWeekPlan = async ( { projects, focusStyle, capacityHours, a
       focusStyle,
       capacityHours,
       additionalContext,
+      ...( aiPath ? { aiPath } : {} ),
       ...getLocalTimestampPayload(),
     } ),
   } );

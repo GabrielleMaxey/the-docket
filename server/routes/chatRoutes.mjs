@@ -5,9 +5,10 @@ const log = createLogger("chat");
 import { sendChatMessage } from "../lib/chatProviders.mjs";
 import {
   getConfiguredChatProvider,
-  isChatProviderReady,
+  isLocalChatReady,
   ROVO_PROVIDER,
 } from "../lib/llmClient.mjs";
+import { resolveAiPath, isManagedAiReady, getHostAiMode } from "../lib/aiPath.mjs";
 
 const DEFAULT_SESSION_ID = "default";
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
@@ -64,18 +65,37 @@ export const registerChatRoutes = (app, { db, jiraRequest }) => {
     };
   };
 
-  app.get("/api/chat/status", (_req, res) => {
+  app.get("/api/chat/status", (req, res) => {
     const provider = getConfiguredChatProvider();
     const oauth = getOAuthConfig();
     const session = readSession();
     const oauthConnected = Boolean(session?.oauthTokens?.access_token || session?.oauthTokens?.accessToken);
-    const ready = isChatProviderReady(provider, { oauthConnected });
+
+    const managedReady = isManagedAiReady();
+    const localReady = isLocalChatReady({ oauthConnected });
+
+    const preferred = String(req.query.aiPath || "").trim().toLowerCase() || null;
+    const resolved = resolveAiPath({
+      preferredPath: preferred === "managed" || preferred === "local" ? preferred : null,
+      managedReady,
+      localReady,
+      hostMode: getHostAiMode(),
+    });
+
+    const ready = resolved.path !== "disabled";
+    const activeProvider = resolved.path === "managed" ? "managed" : provider;
 
     return res.json({
-      provider,
+      provider: activeProvider,
       ready,
       oauthConfigured: provider === ROVO_PROVIDER ? oauth.configured : false,
       oauthConnected: provider === ROVO_PROVIDER ? oauthConnected : false,
+      managedReady,
+      localReady,
+      activePath: resolved.path,
+      switchAllowed: resolved.switchAllowed,
+      displayLabel: resolved.displayLabel,
+      lockedByHost: resolved.lockedByHost,
     });
   });
 
@@ -175,25 +195,35 @@ export const registerChatRoutes = (app, { db, jiraRequest }) => {
   app.post("/api/chat", async (req, res) => {
     const message = String(req.body?.message || "").trim();
     const epicContext = req.body?.epicContext || {};
+    const preferredPath = String(req.body?.aiPath || "").trim().toLowerCase() || null;
 
     if (!message) {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    const provider = getConfiguredChatProvider();
-    if (provider === "disabled") {
+    const session = readSession();
+    const oauthConnected = Boolean(session?.oauthTokens?.access_token || session?.oauthTokens?.accessToken);
+
+    const { path: resolvedPath } = resolveAiPath({
+      preferredPath: preferredPath === "managed" || preferredPath === "local" ? preferredPath : null,
+      managedReady: isManagedAiReady(),
+      localReady: isLocalChatReady({ oauthConnected }),
+      hostMode: getHostAiMode(),
+    });
+
+    if (resolvedPath === "disabled") {
       return res.status(503).json({
-        error: "Chat is disabled",
-        hint: "Set CHAT_PROVIDER to anthropic, openai, ollama, or rovo with matching credentials in .env.",
+        error: "Chat is not available on the selected path",
+        hint: "Configure MANAGED_AI_BASE_URL/MANAGED_AI_API_KEY/MANAGED_AI_MODEL or a local CHAT_PROVIDER.",
       });
     }
 
     try {
-      const session = readSession();
       const customInstructions = getCustomInstructionsStmt.get()?.value || "";
       const result = await sendChatMessage({
         message,
         epicContext,
+        aiPath: resolvedPath,
         oauthTokens: session?.oauthTokens,
         jiraRequest,
         customInstructions,
