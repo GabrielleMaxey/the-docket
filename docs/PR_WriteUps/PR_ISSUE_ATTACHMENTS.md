@@ -1,6 +1,6 @@
 # PR: File attachments for Task Management rows and Create Issue
 
-> **Stacked on #25** (Create Issue fixes). Review/merge that first; GitHub retargets this PR to `pilot` automatically once it merges.
+> **Stacked on #25** (Create Issue fixes). Merge that first and delete its branch; GitHub then retargets this PR to `pilot` automatically.
 
 ## Summary
 
