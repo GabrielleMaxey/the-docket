@@ -404,6 +404,17 @@ Pin any issue to the Gantt by opening its planning panel and checking **Pin to G
 
 **Export** — download the current view (respecting active status filters) as **.md** or **.csv**.
 
+**Wider chart** — the Gantt tab uses the full page width so timelines are easier to read. Long date ranges still scroll horizontally; bars are not squeezed to fit one screen.
+
+**Search** — use the search box above the chart to filter rows by **issue key** or **summary** (case-insensitive). A count shows how many issues match; click **Clear** or delete the query to restore the full list (status filters still apply).
+
+**SharePoint report** — click **SharePoint report…** in the toolbar to build a self-contained HTML status page for SharePoint or email:
+- **Scope:** **Current view** (default — respects status filters and search) or **Entire plan** (all loaded issues).
+- **Metrics** — auto-generated bullets (counts, overdue, timeline span).
+- **Summary** — optional text you can type, or use **Generate AI Summary** / **Refine** when Chat is configured; works without AI using metrics + manual summary only.
+- **Preview** — live preview matches the exported HTML (no scripts — safe for SharePoint).
+- **Actions:** **Download HTML**, **Copy HTML**, or optional **Download chart PNG** for slides.
+
 **Legend** — a small color legend at the top of the chart explains the Overdue color and the dashed Planned-bar style; the status filter chips double as the color legend for every status.
 
 ### Asks panel

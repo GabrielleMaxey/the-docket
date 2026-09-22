@@ -3,8 +3,10 @@
 import {
   completeLlmText,
   formatUnableToGenerateReportError,
+  isLocalReportReady,
   resolveFirstReadyReportProvider,
 } from "../lib/llmClient.mjs";
+import { AI_PATH_LOCAL, AI_PATH_MANAGED, getHostAiMode, isManagedAiReady, resolveAiPath } from "../lib/aiPath.mjs";
 import { loadWeeklyDigestFromDb } from "../lib/weeklyDigest.mjs";
 import { fetchLatestCommentTextBulk } from "../lib/jiraCommentText.mjs";
 import {
@@ -204,17 +206,25 @@ const buildReportContext = ({ snapshot, epicMetrics, assigneeMetrics, windowCont
   return lines.join("\n");
 };
 
-const callLLMForReport = async ({ systemPrompt, context, label = "report" }) => {
+const callLLMForReport = async ({ systemPrompt, context, label = "report", aiPath = null }) => {
+  const normalizedAiPath = aiPath ? String(aiPath).trim().toLowerCase() : null;
+  const resolved = resolveAiPath({
+    preferredPath: normalizedAiPath === AI_PATH_MANAGED || normalizedAiPath === AI_PATH_LOCAL ? normalizedAiPath : null,
+    managedReady: isManagedAiReady(),
+    localReady: isLocalReportReady(),
+    hostMode: getHostAiMode(),
+  });
+  if (resolved.path === "disabled") {
+    throw new Error("No AI provider configured. Set MANAGED_AI_* or CHAT_PROVIDER / REPORT_PROVIDER in .env.");
+  }
+  if (resolved.path === AI_PATH_MANAGED) {
+    log.info(`generating ${label} via managed`);
+    return completeLlmText({ systemPrompt, userMessage: context, maxTokens: REPORT_MAX_TOKENS, aiPath: AI_PATH_MANAGED });
+  }
   const provider = resolveFirstReadyReportProvider();
   log.info(`generating ${label} via ${provider}`);
   try {
-    return await completeLlmText({
-      systemPrompt,
-      userMessage: context,
-      maxTokens: REPORT_MAX_TOKENS,
-      provider,
-      forReports: true,
-    });
+    return await completeLlmText({ systemPrompt, userMessage: context, maxTokens: REPORT_MAX_TOKENS, provider, forReports: true });
   } catch (error) {
     throw new Error(formatUnableToGenerateReportError(provider, error));
   }
@@ -421,7 +431,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     const systemPrompt = systemParts.join("\n\n");
 
     try {
-      const generated = await callLLMForReport({ systemPrompt, context, label: config.label });
+      const generated = await callLLMForReport({ systemPrompt, context, label: config.label, aiPath: req.body?.aiPath });
       const report = dueWindows.appendedSection
         ? `${generated.trim()}\n\n${dueWindows.appendedSection}`
         : generated.trim();
@@ -559,7 +569,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     ];
     if (customInstructions) systemParts.push(`\nAdditional instructions:\n${customInstructions}`);
     try {
-      const report = await callLLMForReport({ systemPrompt: systemParts.join("\n\n"), context: contextLines.join("\n"), label });
+      const report = await callLLMForReport({ systemPrompt: systemParts.join("\n\n"), context: contextLines.join("\n"), label, aiPath: req.body?.aiPath });
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.WORK_WEEK,
         reportType: archiveReportType,
@@ -574,6 +584,68 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
       return res.status(500).json({
         error: error instanceof Error ? error.message : "Unable to generate report.",
       });
+    }
+  });
+
+  // ─── Gantt SharePoint AI summary ─────────────────────────────────────────────
+  app.post("/api/report/gantt-summary", async (req, res) => {
+    const mode = String(req.body?.mode || "generate").trim();
+    if (mode !== "generate" && mode !== "refine") {
+      return res.status(400).json({ error: "mode must be 'generate' or 'refine'" });
+    }
+    const displayName = String(req.body?.displayName || "Gantt Plan").trim();
+    const metrics = req.body?.metrics || {};
+    const rawIssues = Array.isArray(req.body?.issues) ? req.body.issues : [];
+    const currentSummary = String(req.body?.currentSummary || "").trim();
+    const instruction = String(req.body?.instruction || "").trim();
+
+    if (mode === "refine" && !instruction) {
+      return res.status(400).json({ error: "instruction is required for refine mode" });
+    }
+
+    const ISSUE_CAP = 80;
+    const issues = rawIssues.slice(0, ISSUE_CAP);
+    const truncated = rawIssues.length > ISSUE_CAP;
+
+    const contextLines = [
+      `## Gantt Plan: ${displayName}`,
+      `- Total: ${metrics.total || 0} | Done: ${metrics.done || 0} | In Progress: ${metrics.inProgress || 0} | To Do: ${metrics.todo || 0} | Overdue: ${metrics.overdue || 0}`,
+    ];
+
+    if (Array.isArray(metrics.bullets) && metrics.bullets.length > 0) {
+      contextLines.push("", "### Key Metrics");
+      for (const b of metrics.bullets) contextLines.push(`- ${b}`);
+    }
+
+    if (issues.length > 0) {
+      contextLines.push("", "### Issues");
+      if (truncated) contextLines.push(`(showing first ${ISSUE_CAP} of ${rawIssues.length} issues)`);
+      for (const issue of issues) {
+        const overdueFlag = issue.overdue ? " [OVERDUE]" : "";
+        const dates = [
+          issue.startDate ? `start: ${issue.startDate}` : null,
+          issue.dueDate ? `due: ${issue.dueDate}` : null,
+          issue.completeDate ? `completed: ${issue.completeDate}` : null,
+        ].filter(Boolean).join(", ");
+        contextLines.push(`- ${issue.key}: ${issue.summary} (${issue.statusCategory || issue.status})${dates ? ` [${dates}]` : ""}${overdueFlag}`);
+      }
+    }
+
+    if (mode === "refine") {
+      contextLines.push("", "### Current Summary", currentSummary, "", "### Refinement Instruction", instruction);
+    }
+
+    const systemPrompt =
+      mode === "generate"
+        ? "Write a concise management status paragraph for this Gantt plan's SharePoint report. Be factual, specific, and avoid fluff. Ground all statements only in the provided data. Output only the paragraph text, no headings."
+        : "Revise the provided summary following the refinement instruction. Be factual and concise. Output only the revised paragraph text, no headings.";
+
+    try {
+      const generated = await callLLMForReport({ systemPrompt, context: contextLines.join("\n"), label: "gantt-summary" });
+      return res.json({ summary: generated.trim() });
+    } catch (error) {
+      log.error("gantt summary generation failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({ error: error instanceof Error ? error.message : "Unable to generate summary." });
     }
   });
 
@@ -609,7 +681,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     const systemPrompt = buildWeekPlanSystemPrompt({ focusStyle, capacityHours, customInstructions });
 
     try {
-      const plan = await callLLMForReport({ systemPrompt, context: contextLines.join("\n"), label: "week plan" });
+      const plan = await callLLMForReport({ systemPrompt, context: contextLines.join("\n"), label: "week plan", aiPath: req.body?.aiPath });
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.WORK_WEEK,
         reportType: "week_plan",
