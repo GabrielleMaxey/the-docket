@@ -1013,3 +1013,57 @@ export const deletePmAsk = async ( id ) => {
     method: "DELETE",
   } );
 };
+
+// ─── Issue attachments ──────────────────────────────────────────────────────
+
+export const fetchAttachmentLimits = async () => requestJson( "/api/jira/attachment-limits" );
+
+export const fetchIssueAttachments = async ( issueKey ) =>
+  requestJson( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/attachments` );
+
+/**
+ * Uploads files to a Jira issue. Uses XMLHttpRequest (not fetch) so large screen
+ * recordings can report upload progress.
+ * @param {string} issueKey
+ * @param {File[]} files
+ * @param {{ onProgress?: (fraction: number) => void }} [options]
+ * @returns {Promise<{ issueKey: string, uploaded: object[], failed: {filename: string, error: string}[] }>}
+ */
+export const uploadIssueAttachments = ( issueKey, files, { onProgress } = {} ) =>
+  new Promise( ( resolve, reject ) => {
+    const formData = new FormData();
+    ( files || [] ).forEach( ( file ) => formData.append( "files", file, file.name ) );
+
+    const xhr = new XMLHttpRequest();
+    xhr.open( "POST", buildApiUrl( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/attachments` ) );
+    xhr.setRequestHeader( "Accept", "application/json" );
+    if ( onProgress )
+    {
+      xhr.upload.onprogress = ( event ) =>
+      {
+        if ( event.lengthComputable ) onProgress( event.loaded / event.total );
+      };
+    }
+    xhr.onerror = () =>
+      reject( new Error( "Cannot reach the local API. Start it with npm run dev:api or npm run dev:all." ) );
+    xhr.onload = () =>
+    {
+      let data = {};
+      try
+      {
+        data = xhr.responseText ? JSON.parse( xhr.responseText ) : {};
+      } catch
+      {
+        data = {};
+      }
+      if ( xhr.status >= 200 && xhr.status < 300 )
+      {
+        resolve( data );
+        return;
+      }
+      const error = new Error( data?.error || `Attachment upload failed (HTTP ${ xhr.status })` );
+      error.failed = Array.isArray( data?.failed ) ? data.failed : [];
+      reject( error );
+    };
+    xhr.send( formData );
+  } );

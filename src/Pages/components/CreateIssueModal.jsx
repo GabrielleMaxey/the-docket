@@ -9,6 +9,7 @@ import {
   fetchJiraParentCandidates,
   fetchJiraProjects,
   generateIssueDescription,
+  uploadIssueAttachments,
   fetchTeamDatesBulk,
   fetchIssueMetadataBulk,
   saveTeamDate,
@@ -90,6 +91,8 @@ import {
   validateAiHelperIntake,
 } from "../../../shared/aiHelperIntake.mjs";
 import AiHelperIntakePanel from "./AiHelperIntakePanel";
+import AttachmentPicker from "./AttachmentPicker";
+import { useAttachmentLimits } from "./AttachFilesModal";
 import useCreateIssueManualKey from "../hooks/useCreateIssueManualKey";
 
 const COMPONENT_OPTIONS = toCreateIssueDropdownOptions(ODI_COMPONENT_OPTIONS);
@@ -235,6 +238,10 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   const [overrideReason, setOverrideReason] = React.useState(""); // "clarification" | "standards"
   const [success, setSuccess] = React.useState("");
   const [createdIssueKey, setCreatedIssueKey] = React.useState("");
+  const [attachments, setAttachments] = React.useState([]);
+  const [attachmentProgress, setAttachmentProgress] = React.useState(null);
+  const [attachmentResult, setAttachmentResult] = React.useState(null);
+  const attachmentLimits = useAttachmentLimits(open);
   const [jiraBaseUrl, setJiraBaseUrl] = React.useState("");
   const [epicSelectValue, setEpicSelectValue] = React.useState(defaultEpicSelectValue || "");
   const [manualEpicInput, setManualEpicInput] = React.useState("");
@@ -429,6 +436,9 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     setOverrideReason("");
     setSuccess("");
     setCreatedIssueKey("");
+    setAttachments([]);
+    setAttachmentProgress(null);
+    setAttachmentResult(null);
     setSuggestedSubtasks([]);
     setSubtaskResults([]);
     setSuggestedPriority("");
@@ -977,6 +987,30 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       return;
     }
 
+    // Attachments go on only after the issue exists. A failed upload never undoes the
+    // created issue; failures are reported and can be retried from the task row.
+    if (createdParentKey && attachments.length > 0) {
+      setAttachmentProgress(0);
+      try {
+        const uploadResult = await uploadIssueAttachments(createdParentKey, attachments, {
+          onProgress: setAttachmentProgress,
+        });
+        setAttachmentResult({
+          uploaded: uploadResult?.uploaded || [],
+          failed: uploadResult?.failed || [],
+        });
+      } catch (uploadError) {
+        setAttachmentResult({
+          uploaded: [],
+          failed: uploadError?.failed?.length
+            ? uploadError.failed
+            : [{ filename: "", error: uploadError instanceof Error ? uploadError.message : "Attachment upload failed" }],
+        });
+      } finally {
+        setAttachmentProgress(null);
+      }
+    }
+
     const checkedSubtasks = suggestedSubtasks.filter((s) => s.checked);
     if (createdParentKey && checkedSubtasks.length > 0) {
       setSubmitting(false);
@@ -1094,6 +1128,11 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
         {error ? (
           <Message negative size="small" style={{ whiteSpace: "pre-wrap" }}>{error}</Message>
         ) : null}
+        {attachmentProgress !== null ? (
+          <Message info size="small">
+            Uploading attachments… {Math.round(attachmentProgress * 100)}%
+          </Message>
+        ) : null}
         {success ? (
           <Message positive size="small">
             <p style={{ marginBottom: subtaskResults.length > 0 || createdIssueUrl ? "0.4rem" : 0 }}>{success}</p>
@@ -1109,6 +1148,28 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
                 Finish these on the issue in Jira:{" "}
                 {blankOptionalIntakeFields.map((field) => field.label).join(", ")}.
               </p>
+            ) : null}
+            {attachmentResult ? (
+              <div style={{ margin: "0.4rem 0", fontSize: "0.85rem" }}>
+                {attachmentResult.uploaded.length > 0 ? (
+                  <p style={{ margin: 0 }}>
+                    Attached {attachmentResult.uploaded.length} file
+                    {attachmentResult.uploaded.length === 1 ? "" : "s"}.
+                  </p>
+                ) : null}
+                {attachmentResult.failed.length > 0 ? (
+                  <>
+                    <ul style={{ margin: "0.2rem 0 0", paddingLeft: "1.2rem", color: "#991b1b", fontSize: "0.82rem" }}>
+                      {attachmentResult.failed.map((item, i) => (
+                        <li key={i}>{item.error}</li>
+                      ))}
+                    </ul>
+                    <p style={{ margin: "0.2rem 0 0", fontSize: "0.8rem", color: "#475569" }}>
+                      The issue was created. Retry with Attach files on its row in Task Management.
+                    </p>
+                  </>
+                ) : null}
+              </div>
             ) : null}
             {subtaskResults.length > 0 ? (
               <ul style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.82rem" }}>
@@ -1561,6 +1622,20 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
               Stories stay unassigned per ODI standards. Run AI Draft to add subtasks, then assign them here.
             </p>
           )}
+
+          <Form.Field>
+            <label>Attachments</label>
+            <AttachmentPicker
+              files={attachments}
+              onChange={setAttachments}
+              disabled={!canEditIssueFields || submitting || creatingSubtasks || Boolean(createdIssueKey)}
+              maxMb={attachmentLimits.maxMb}
+              maxCount={attachmentLimits.maxCount}
+            />
+            <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+              Uploaded to the new issue right after it is created.
+            </p>
+          </Form.Field>
         </Form>
       </Modal.Content>
       <Modal.Actions>

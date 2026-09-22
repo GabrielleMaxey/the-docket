@@ -17,6 +17,7 @@ import { registerCapacityPlanningRoutes } from "./routes/capacityPlanningRoutes.
 import { registerTeamPriorityRoutes } from "./routes/teamPriorityRoutes.mjs";
 import { registerPmAsksRoutes } from "./routes/pmAsksRoutes.mjs";
 import { registerTodoRoutes } from "./routes/todoRoutes.mjs";
+import { registerAttachmentRoutes } from "./routes/attachmentRoutes.mjs";
 import { resolveJiraUser, fetchJiraMyself } from "./lib/jiraSearchHelpers.mjs";
 import { getJiraSearchFields } from "./lib/jiraSearchFields.mjs";
 import { createLogger } from "./lib/logger.mjs";
@@ -325,6 +326,7 @@ registerCapacityPlanningRoutes(app, routeCtx);
 registerTeamPriorityRoutes(app, routeCtx);
 registerPmAsksRoutes(app, routeCtx);
 registerTodoRoutes(app, routeCtx);
+registerAttachmentRoutes(app, routeCtx);
 registerAppConfigRoutes(app, routeCtx);
 registerDashboardRoutes(app, routeCtx);
 registerReportRoutes(app, routeCtx);
