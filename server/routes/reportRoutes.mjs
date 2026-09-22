@@ -577,6 +577,68 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     }
   });
 
+  // ─── Gantt SharePoint AI summary ─────────────────────────────────────────────
+  app.post("/api/report/gantt-summary", async (req, res) => {
+    const mode = String(req.body?.mode || "generate").trim();
+    if (mode !== "generate" && mode !== "refine") {
+      return res.status(400).json({ error: "mode must be 'generate' or 'refine'" });
+    }
+    const displayName = String(req.body?.displayName || "Gantt Plan").trim();
+    const metrics = req.body?.metrics || {};
+    const rawIssues = Array.isArray(req.body?.issues) ? req.body.issues : [];
+    const currentSummary = String(req.body?.currentSummary || "").trim();
+    const instruction = String(req.body?.instruction || "").trim();
+
+    if (mode === "refine" && !instruction) {
+      return res.status(400).json({ error: "instruction is required for refine mode" });
+    }
+
+    const ISSUE_CAP = 80;
+    const issues = rawIssues.slice(0, ISSUE_CAP);
+    const truncated = rawIssues.length > ISSUE_CAP;
+
+    const contextLines = [
+      `## Gantt Plan: ${displayName}`,
+      `- Total: ${metrics.total || 0} | Done: ${metrics.done || 0} | In Progress: ${metrics.inProgress || 0} | To Do: ${metrics.todo || 0} | Overdue: ${metrics.overdue || 0}`,
+    ];
+
+    if (Array.isArray(metrics.bullets) && metrics.bullets.length > 0) {
+      contextLines.push("", "### Key Metrics");
+      for (const b of metrics.bullets) contextLines.push(`- ${b}`);
+    }
+
+    if (issues.length > 0) {
+      contextLines.push("", "### Issues");
+      if (truncated) contextLines.push(`(showing first ${ISSUE_CAP} of ${rawIssues.length} issues)`);
+      for (const issue of issues) {
+        const overdueFlag = issue.overdue ? " [OVERDUE]" : "";
+        const dates = [
+          issue.startDate ? `start: ${issue.startDate}` : null,
+          issue.dueDate ? `due: ${issue.dueDate}` : null,
+          issue.completeDate ? `completed: ${issue.completeDate}` : null,
+        ].filter(Boolean).join(", ");
+        contextLines.push(`- ${issue.key}: ${issue.summary} (${issue.statusCategory || issue.status})${dates ? ` [${dates}]` : ""}${overdueFlag}`);
+      }
+    }
+
+    if (mode === "refine") {
+      contextLines.push("", "### Current Summary", currentSummary, "", "### Refinement Instruction", instruction);
+    }
+
+    const systemPrompt =
+      mode === "generate"
+        ? "Write a concise management status paragraph for this Gantt plan's SharePoint report. Be factual, specific, and avoid fluff. Ground all statements only in the provided data. Output only the paragraph text, no headings."
+        : "Revise the provided summary following the refinement instruction. Be factual and concise. Output only the revised paragraph text, no headings.";
+
+    try {
+      const generated = await callLLMForReport({ systemPrompt, context: contextLines.join("\n"), label: "gantt-summary" });
+      return res.json({ summary: generated.trim() });
+    } catch (error) {
+      log.error("gantt summary generation failed", error instanceof Error ? error.message : error);
+      return res.status(500).json({ error: error instanceof Error ? error.message : "Unable to generate summary." });
+    }
+  });
+
   // ─── Weekly plan (WorkWeek task manager) ──────────────────────────────────
   app.post("/api/plan/week", async (req, res) => {
     const projects = Array.isArray(req.body?.projects) ? req.body.projects : [];
