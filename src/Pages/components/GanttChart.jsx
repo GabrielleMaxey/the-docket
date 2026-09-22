@@ -1,6 +1,8 @@
 import React from "react";
 import { fetchSharedPrograms, fetchGanttData, fetchGanttStatusHistory } from "../../services/jiraClient";
 import { getStatusColor } from "../../utils/statusScale";
+import { filterIssuesBySearch } from "./ganttIssueSearch";
+import GanttSharepointReportPanel from "./GanttSharepointReportPanel";
 
 const parseDate = ( str ) => {
   if ( !str ) return null;
@@ -390,7 +392,9 @@ const GanttChart = () => {
   // Keyed by issue key; undefined = not yet fetched, [] = fetched (no history / failed),
   // populated = real segments. Hover-triggered only — never part of the bulk Gantt load.
   const [ statusHistoryByKey, setStatusHistoryByKey ] = React.useState( {} );
+  const [ searchQuery, setSearchQuery ] = React.useState( "" );
   const [ exporting, setExporting ] = React.useState( false );
+  const [ spPanelOpen, setSpPanelOpen ] = React.useState( false );
   const mountedRef = React.useRef( true );
   const statusHistoryRef = React.useRef( statusHistoryByKey );
   statusHistoryRef.current = statusHistoryByKey;
@@ -407,9 +411,10 @@ const GanttChart = () => {
       .catch( () => { } );
   }, [] );
 
-  // Reset cached histories when switching programs.
+  // Reset cached histories and search when switching programs.
   React.useEffect( () => {
     setStatusHistoryByKey( {} );
+    setSearchQuery( "" );
   }, [ slug ] );
 
   // Debounced hover fetch — fills a single issue early if background prefetch hasn't yet.
@@ -496,6 +501,7 @@ const GanttChart = () => {
     isDoneStatus
   );
   const visibleIssues = issues.filter( ( i ) => !hiddenStatuses.has( i.status ) );
+  const searchedIssues = filterIssuesBySearch( visibleIssues, searchQuery );
   const visibleIssueKeysKey = visibleIssues
     .map( ( i ) => i.key )
     .filter( Boolean )
@@ -540,9 +546,9 @@ const GanttChart = () => {
     // under a header that isn't there, and a childless story is just a normal row.
     // Only actual Sub-tasks nest — Story/Bug's own parent is the Epic, and that
     // relationship isn't part of this grouping (no separate Epic tier).
-    const visibleKeys = new Set( visibleIssues.map( ( i ) => i.key ) );
+    const visibleKeys = new Set( searchedIssues.map( ( i ) => i.key ) );
     const childrenByParent = {};
-    for ( const i of visibleIssues )
+    for ( const i of searchedIssues )
     {
       if ( i.isSubtask && i.parentKey ) ( childrenByParent[ i.parentKey ] ||= [] ).push( i );
     }
@@ -550,7 +556,7 @@ const GanttChart = () => {
       Object.keys( childrenByParent ).filter( ( pk ) => visibleKeys.has( pk ) )
     );
     const topLevel = sortGroup(
-      visibleIssues.filter( ( i ) => !( i.parentKey && groupParentKeys.has( i.parentKey ) ) )
+      searchedIssues.filter( ( i ) => !( i.parentKey && groupParentKeys.has( i.parentKey ) ) )
     );
     for ( const issue of topLevel )
     {
@@ -572,7 +578,7 @@ const GanttChart = () => {
     const groups = [];
     for ( const status of statuses )
     {
-      const items = sortGroup( visibleIssues.filter( ( i ) => i.status === status ) );
+      const items = sortGroup( searchedIssues.filter( ( i ) => i.status === status ) );
       if ( items.length > 0 ) groups.push( { key: status, label: status, items } );
     }
     for ( const group of groups )
@@ -604,16 +610,16 @@ const GanttChart = () => {
     setTooltip( ( prev ) => ( prev ? { ...prev, x: e.clientX, y: e.clientY } : null ) );
   const handleMouseLeave = () => setTooltip( null );
 
-  const visibleCount = visibleIssues.length;
-  const noDateCount = visibleIssues.filter( ( i ) => !parseDate( i.startDate ) ).length;
+  const visibleCount = searchedIssues.length;
+  const noDateCount = searchedIssues.filter( ( i ) => !parseDate( i.startDate ) ).length;
 
   const exportFilenameBase = `gantt_plan_${ ( data?.displayName || slug ).replace( /[^a-z0-9]+/gi, "_" ).toLowerCase() }_${ new Date().toISOString().slice( 0, 10 ) }`;
 
   const runExport = React.useCallback(
     async ( format ) => {
-      if ( visibleIssues.length === 0 || exporting ) return;
+      if ( searchedIssues.length === 0 || exporting ) return;
       // Snapshot at click so leaving the page does not change what we export.
-      const issuesSnapshot = visibleIssues.slice();
+      const issuesSnapshot = searchedIssues.slice();
       const historySnapshot = { ...statusHistoryByKey };
       const filenameBase = exportFilenameBase;
       const title = data?.displayName || slug;
@@ -652,7 +658,7 @@ const GanttChart = () => {
         }
       }
     },
-    [ visibleIssues, exporting, statusHistoryByKey, exportFilenameBase, data?.displayName, slug ]
+    [ searchedIssues, exporting, statusHistoryByKey, exportFilenameBase, data?.displayName, slug ]
   );
 
   const handleExportCsv = () => {
@@ -693,7 +699,16 @@ const GanttChart = () => {
               { noDateCount > 0 ? ` · ${ noDateCount } without dates` : "" }
             </span>
           ) }
-          { !loading && data && visibleIssues.length > 0 ? (
+          { !loading && data ? (
+            <button
+              type="button"
+              className="pm-gantt-refresh"
+              onClick={ () => setSpPanelOpen( true ) }
+            >
+              SharePoint report…
+            </button>
+          ) : null }
+          { !loading && data && searchedIssues.length > 0 ? (
             <>
               <button
                 type="button"
@@ -718,7 +733,7 @@ const GanttChart = () => {
           </button>
         </div>
       </div>
-      { !loading && data && visibleIssues.length > 0 ? (
+      { !loading && data && searchedIssues.length > 0 ? (
         <p className="pm-gantt-export-note">
           Status history loads in the background for visible issues. Export only includes
           histories that have finished loading. You can leave this page during export — the
@@ -726,7 +741,35 @@ const GanttChart = () => {
         </p>
       ) : null }
 
-      {/* Row 2: zoom + status filters */ }
+      {/* Row 2: search */ }
+      { data && (
+        <div className="pm-gantt-search-row">
+          <input
+            type="search"
+            className="pm-gantt-search-input"
+            placeholder="Search key or summary…"
+            value={ searchQuery }
+            onChange={ ( e ) => setSearchQuery( e.target.value ) }
+          />
+          { searchQuery && (
+            <button
+              type="button"
+              className="pm-gantt-search-clear"
+              onClick={ () => setSearchQuery( "" ) }
+              aria-label="Clear search"
+            >
+              ✕
+            </button>
+          ) }
+          { searchQuery.trim() && (
+            <span className="pm-gantt-search-count">
+              Showing { searchedIssues.length } of { visibleIssues.length } issues
+            </span>
+          ) }
+        </div>
+      ) }
+
+      {/* Row 3: zoom + status filters */ }
       { data && (
         <div className="pm-gantt-controls">
           <div className="pm-gantt-zoom">
@@ -882,6 +925,15 @@ const GanttChart = () => {
       { tooltip && (
         <GanttTooltip issue={ tooltip.issue } x={ tooltip.x } y={ tooltip.y } today={ today } />
       ) }
+
+      <GanttSharepointReportPanel
+        open={ spPanelOpen }
+        onClose={ () => setSpPanelOpen( false ) }
+        displayName={ data?.displayName || slug }
+        viewIssues={ searchedIssues }
+        allIssues={ issues }
+        jiraBaseUrl={ window.__JIRA_BASE_URL__ || "" }
+      />
     </div>
   );
 };

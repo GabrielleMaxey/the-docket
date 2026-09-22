@@ -690,6 +690,14 @@ export const fetchWeeklyDigest = async () => requestJson( "/api/reports/weekly-d
 
 export const fetchChatStatus = async () => requestJson( "/api/chat/status" );
 
+export const generateGanttSharepointSummary = async ( payload ) => {
+  return requestJson( "/api/report/gantt-summary", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify( payload ),
+  } );
+};
+
 export const startChatOAuth = async () => {
   const data = await requestJson( "/api/chat/auth/start?format=json" );
   return String( data?.authorizeUrl || "" ).trim();

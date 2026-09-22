@@ -676,9 +676,17 @@
 
 /* ── Gantt wide layout ───────────────────────────────────────────────────── */
 
-.project-managers-page--gantt {
+.ui.container.project-managers-page--gantt {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.project-managers-page--gantt .pm-gantt-chart {
   max-width: none;
-  padding: 0 1rem;
 }
 
 /* ── Gantt chrome ────────────────────────────────────────────────────────── */
@@ -713,6 +721,48 @@
 }
 
 .pm-gantt-meta {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.pm-gantt-search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.pm-gantt-search-input {
+  font-size: 0.88rem;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #1e293b;
+  width: 220px;
+}
+
+.pm-gantt-search-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.pm-gantt-search-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  padding: 0.1rem 0.3rem;
+  line-height: 1;
+}
+
+.pm-gantt-search-clear:hover {
+  color: #475569;
+}
+
+.pm-gantt-search-count {
   font-size: 0.82rem;
   color: #64748b;
 }
@@ -1205,6 +1255,220 @@
 .pm-gantt-tooltip-ahead {
   color: #16a34a;
   font-weight: 600;
+}
+
+/* ── SharePoint report panel ── */
+.pm-sp-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.pm-sp-panel {
+  width: min(680px, 100vw);
+  height: 100vh;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 24px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+
+.pm-sp-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.pm-sp-panel-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #111827;
+}
+
+.pm-sp-panel-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #6b7280;
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.pm-sp-panel-close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.pm-sp-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pm-sp-scope {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pm-sp-scope-option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  color: #374151;
+}
+
+.pm-sp-scope-option--active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.pm-sp-metrics {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.83rem;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.pm-sp-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.pm-sp-label-hint {
+  font-weight: 400;
+  color: #9ca3af;
+}
+
+.pm-sp-summary {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.pm-sp-summary:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.pm-sp-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pm-sp-copy-msg {
+  font-size: 0.82rem;
+  color: #16a34a;
+}
+
+.pm-sp-empty {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  font-style: italic;
+  margin: 0;
+}
+
+.pm-sp-preview-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 0;
+}
+
+.pm-sp-preview-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+
+.pm-sp-preview {
+  flex: 1;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  width: 100%;
+  min-height: 300px;
+  background: #fff;
+}
+
+.pm-sp-ai-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pm-sp-ai-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pm-sp-refine-input {
+  flex: 1;
+  min-width: 10rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  line-height: 1.45;
+}
+
+.pm-sp-refine-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.pm-sp-refine-input:disabled {
+  background: #f9fafb;
+  color: #9ca3af;
+}
+
+.pm-sp-ai-hint {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  font-style: italic;
+  margin: 0;
+}
+
+.pm-sp-ai-error {
+  font-size: 0.82rem;
+  color: #dc2626;
+  margin: 0;
 }
 
 /* ── Asks panel ── */
