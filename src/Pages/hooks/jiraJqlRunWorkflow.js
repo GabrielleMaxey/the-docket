@@ -32,6 +32,39 @@ const readCommentEntry = (entry) => {
   return { text: "", author: "" };
 };
 
+const lookupCommentEntry = (latestComments, issueKey) => {
+  if (!latestComments || !issueKey) {
+    return undefined;
+  }
+  return latestComments[issueKey] ?? latestComments[String(issueKey).toUpperCase()];
+};
+
+const applyLatestCommentNotes = async ({ issueKeys, setJiraNotes }) => {
+  const keys = dedupeIssueKeys(issueKeys);
+  if (keys.length === 0 || typeof setJiraNotes !== "function") {
+    return;
+  }
+  try {
+    const latestComments = await fetchLatestJiraCommentsBulk(keys);
+    const commentNotes = {};
+    keys.forEach((issueKey) => {
+      const { text } = readCommentEntry(lookupCommentEntry(latestComments, issueKey));
+      if (text) {
+        commentNotes[issueKey] = text;
+        const upper = String(issueKey).toUpperCase();
+        if (upper !== issueKey) {
+          commentNotes[upper] = text;
+        }
+      }
+    });
+    if (Object.keys(commentNotes).length > 0) {
+      setJiraNotes((prev) => ({ ...prev, ...commentNotes }));
+    }
+  } catch (error) {
+    console.error("Failed to fetch latest Jira comments", error);
+  }
+};
+
 const dedupeIssueKeys = (issueKeys) => [
   ...new Set(
     (Array.isArray(issueKeys) ? issueKeys : [])
@@ -144,7 +177,7 @@ const applyDrillDownMetadata = async ({
       const latestComments = await fetchLatestJiraCommentsBulk(issueKeys);
       const commentNotes = {};
       issueKeys.forEach((key) => {
-        const { text } = readCommentEntry(latestComments?.[key]);
+        const { text } = readCommentEntry(lookupCommentEntry(latestComments, key));
         if (text) {
           commentNotes[key] = text;
         }
@@ -294,25 +327,16 @@ export async function runJqlWorkflow({
     });
 
     const localKeys = [...localIssueKeys];
-    if (localKeys.length > 0) {
-      if (pullLatestComment) {
-        try {
-          const latestComments = await fetchLatestJiraCommentsBulk(localKeys);
-          const commentNotes = {};
-          localKeys.forEach((issueKey) => {
-            const { text } = readCommentEntry(latestComments?.[issueKey]);
-            if (text) {
-              commentNotes[issueKey] = text;
-            }
-          });
-          if (Object.keys(commentNotes).length > 0) {
-            setJiraNotes((prev) => ({ ...prev, ...commentNotes }));
-          }
-        } catch (error) {
-          console.error("Failed to fetch latest Jira comments", error);
-        }
-      }
+    const teamKeys = [...teamIssueKeys];
 
+    if (pullLatestComment) {
+      await applyLatestCommentNotes({
+        issueKeys: [...localKeys, ...teamKeys],
+        setJiraNotes,
+      });
+    }
+
+    if (localKeys.length > 0) {
       try {
         const persisted = await fetchIssueMetadataBulk(localKeys);
         const nextNotes = {};
@@ -498,6 +522,9 @@ export async function loadRemainingJqlIssues({
     }
 
     if (sharedProgramId) {
+      if (pullLatestComment) {
+        await applyLatestCommentNotes({ issueKeys, setJiraNotes });
+      }
       await Promise.all([
         applyTeamPriorityState({
           issueKeys,
@@ -511,17 +538,7 @@ export async function loadRemainingJqlIssues({
     }
 
     if (pullLatestComment) {
-      try {
-        const latestComments = await fetchLatestJiraCommentsBulk(issueKeys);
-        issueKeys.forEach((issueKey) => {
-          const { text } = readCommentEntry(latestComments?.[issueKey]);
-          if (text) {
-            setJiraNotes((prev) => ({ ...prev, [issueKey]: text }));
-          }
-        });
-      } catch (error) {
-        console.error("Failed to fetch latest Jira comments", error);
-      }
+      await applyLatestCommentNotes({ issueKeys, setJiraNotes });
     }
 
     try {

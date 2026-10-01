@@ -801,7 +801,10 @@ const JiraResultsTable = ({
                     const save = saveState[issueKey] || { loading: false, error: "", success: "" };
                     const rowUpdate = rowUpdateState[issueKey] || { loading: false, error: "", success: "" };
                     const isClosedOrResolved = isClosedLikeStatus(status);
-                    const noteDraft = jiraNotes[issueKey] || "";
+                    const noteDraft =
+                      jiraNotes[issueKey] ||
+                      jiraNotes[String(issueKey || "").toUpperCase()] ||
+                      "";
                     const pushedNoteSnapshot = lastPushedJiraNoteByKey[issueKey];
                     const noteFingerprint = buildNotePushFingerprint({
                       note: noteDraft,
@@ -1371,7 +1374,10 @@ const JiraResultsTable = ({
                   if (!noteIssue) {
                     return null;
                   }
-                  const modalNoteDraft = jiraNotes[expandedNoteKey] || "";
+                  const modalNoteDraft =
+                    jiraNotes[expandedNoteKey] ||
+                    jiraNotes[String(expandedNoteKey || "").toUpperCase()] ||
+                    "";
                   const modalClosedOrResolved = isClosedLikeStatus(
                     noteIssue.fields?.status?.name || "-"
                   );
