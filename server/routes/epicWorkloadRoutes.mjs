@@ -19,14 +19,14 @@ import { escapeJqlString } from "../../shared/directReportsJql.mjs";
 
 const log = createLogger("epic-workload");
 
-export const registerEpicWorkloadRoutes = (app, { db, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
-  const loadMappingsByRole = () => {
-    const rows = db
-      .prepare("SELECT role, field_id, field_name FROM jira_field_mappings ORDER BY role ASC")
-      .all();
-    return buildFieldMappingsMap(rows);
-  };
+const loadMappingsByRole = (db) => {
+  const rows = db
+    .prepare("SELECT role, field_id, field_name FROM jira_field_mappings ORDER BY role ASC")
+    .all();
+  return buildFieldMappingsMap(rows);
+};
 
+export const registerEpicWorkloadRoutes = (app, { getDb, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
   app.get("/api/jira/epics/search", async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
@@ -66,7 +66,7 @@ export const registerEpicWorkloadRoutes = (app, { db, jiraRequest, runJiraSearch
     }
 
     try {
-      const mappingsByRole = loadMappingsByRole();
+      const mappingsByRole = loadMappingsByRole(getDb());
 
       const validated = await fetchAndValidateEpic({ epicKey, mappingsByRole, jiraRequest });
       if (!validated.ok) {

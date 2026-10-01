@@ -145,7 +145,7 @@ const buildGenerateDescriptionResponse = (parsed, { isStory, isBug, allowSummary
 
 export const registerJiraIssueRoutes = (
   app,
-  { db, jiraRequest, ensureEnvOrRespond, resolveJiraUser, runJiraSearchRequest }
+  { getDb, jiraRequest, ensureEnvOrRespond, resolveJiraUser, runJiraSearchRequest }
 ) => {
   app.get("/api/jira/projects", async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
@@ -363,7 +363,7 @@ export const registerJiraIssueRoutes = (
         maxTotal,
         jiraRequest,
         runJiraSearchRequest,
-        searchFields: getJiraSearchFields(db),
+        searchFields: getJiraSearchFields(getDb()),
       });
       return res.json(candidates);
     } catch (error) {

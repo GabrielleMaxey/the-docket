@@ -9,7 +9,7 @@ import { listAvailableJiraFilters } from "../lib/jiraFilterList.mjs";
 
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
 
-export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, runJiraSearchRequest, db }) => {
+export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, runJiraSearchRequest, getDb }) => {
   app.get("/api/jira/myself", async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
@@ -114,7 +114,7 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
       const result = await runJiraSearchRequest({
         jql,
         maxResults,
-        fields: getJiraSearchFields(db),
+        fields: getJiraSearchFields(getDb()),
       });
       if (!result.ok) {
         return res.status(result.status).json({

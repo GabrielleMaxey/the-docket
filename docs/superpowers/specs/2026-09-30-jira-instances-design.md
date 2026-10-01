@@ -1,7 +1,7 @@
 # Multi Jira instance toggle (design)
 
 **Date:** 2026-09-30  
-**Status:** Approved for planning (pending user review of this file)  
+**Status:** Approved — plan at `docs/superpowers/plans/2026-09-30-jira-instances.md`  
 **Branch:** `gmaxey_jira_instances`  
 **Scope:** Toggle among up to 5 Jira Cloud instances with Settings CRUD, header switcher, and per-instance local SQLite data  
 **Related:** `server/jiraProxy.mjs` (`JIRA_BASE_URL` / email / token, `workweek.sqlite`), Settings, app nav/header
@@ -53,10 +53,10 @@ Hard cap: **5** enabled or total configured rows (v1: max **5 rows** total).
 
 ## Legacy & env seed
 
-1. **Registry empty + legacy `JIRA_*` set** → runtime uses legacy vars (behavior unchanged). Optionally also materialize them as Instance 1 on first Settings open / first seed pass.  
-2. **Optional multi-seed:** `JIRA_INSTANCE_2_BASE_URL` / `_EMAIL` / `_API_TOKEN` / `_NAME` … through `_5_*` (and `_1_*` aliases if useful).  
+1. **Registry empty + legacy `JIRA_*` set** → runtime uses legacy vars and **`workweek.sqlite`** (behavior unchanged). Proxy boot does **not** auto-materialize bare legacy into the registry (avoids abandoning existing local data).  
+2. **Optional multi-seed at startup:** only when at least one explicit `JIRA_INSTANCE_N_BASE_URL` (N=1..5) is set; then seed complete `_BASE_URL` / `_EMAIL` / `_API_TOKEN` / `_NAME` rows (and fall back inside the seed helper when needed).  
 3. Once the registry has rows, **active instance credentials win** for Jira calls; legacy vars remain fallback only when registry is empty (decision **C**).  
-4. Document both paths in `.env.example` and `JIRA_SETUP.md`.
+4. Users add further sites in Settings (or via env seed); document both paths in `.env.example` and `JIRA_SETUP.md`.
 
 ## Data isolation
 

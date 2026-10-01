@@ -10,6 +10,7 @@ import { registerDashboardRoutes } from "./routes/dashboardRoutes.mjs";
 import { registerReportRoutes } from "./routes/reportRoutes.mjs";
 import { registerChatRoutes } from "./routes/chatRoutes.mjs";
 import { registerJiraCoreRoutes } from "./routes/jiraCoreRoutes.mjs";
+import { registerJiraInstanceRoutes } from "./routes/jiraInstanceRoutes.mjs";
 import { registerJiraIssueRoutes } from "./routes/jiraIssueRoutes.mjs";
 import { registerIssueMetadataRoutes } from "./routes/issueMetadataRoutes.mjs";
 import { registerEpicWorkloadRoutes } from "./routes/epicWorkloadRoutes.mjs";
@@ -27,6 +28,17 @@ import {
 } from "../shared/jiraErrorUtils.mjs";
 import { extractMediaIdFromUrl } from "./lib/jiraNoteComment.mjs";
 import { parseJiraResponse } from "./lib/jiraResponse.mjs";
+import {
+  openInstancesMetaDb,
+  initInstancesSchema,
+  seedInstancesFromEnv,
+  resolveJiraCredentials,
+  legacyAppDbPath,
+  appDbPathForInstance,
+  noteImagesDirFor,
+  setActiveInstanceId,
+  MAX_JIRA_INSTANCES,
+} from "./lib/jiraInstances.mjs";
 
 const log = createLogger("server");
 
@@ -117,7 +129,6 @@ app.use((req, res, next) => {
 
 const PROXY_VERSION = "2026-06-23-modular";
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
-const requiredEnv = ["JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_API_TOKEN"];
 
 // ─── Database ─────────────────────────────────────────────────────────────────
 
@@ -126,29 +137,75 @@ const dbDir = userDataRoot
   ? path.join(userDataRoot, "data")
   : path.resolve(projectRoot, "data");
 fs.mkdirSync(dbDir, { recursive: true });
-const dbPath = path.resolve(dbDir, "workweek.sqlite");
-const noteImagesDir = path.resolve(dbDir, "note-images");
 
-let db;
-try {
-  db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
-  initDatabase(db);
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  log.error("Failed to open SQLite database at " + dbPath);
-  log.error(message);
-  if (message.includes("NODE_MODULE_VERSION")) {
-    log.error("better-sqlite3 must match your Node version. Run: npm rebuild better-sqlite3");
-    log.error("Or start the API via: npm run dev:api (rebuilds automatically)");
-  }
-  process.exit(1);
+const metaDb = openInstancesMetaDb(path.join(dbDir, "instances-meta.sqlite"));
+initInstancesSchema(metaDb);
+
+// Only auto-seed when an explicit multi-instance env var is present. Bare legacy
+// JIRA_BASE_URL/EMAIL/API_TOKEN alone must keep the registry empty so existing
+// installs keep resolving to "legacy" mode and the pre-existing workweek.sqlite.
+const hasExplicitInstanceEnv = Array.from({ length: MAX_JIRA_INSTANCES }, (_, i) => i + 1).some(
+  (n) => String(process.env[`JIRA_INSTANCE_${n}_BASE_URL`] || "").trim()
+);
+if (hasExplicitInstanceEnv) {
+  seedInstancesFromEnv(metaDb, process.env);
 }
+
+const runtime = {
+  db: null,
+  noteImagesDir: null,
+  dbPath: null,
+};
+
+const openAppDbForCurrent = () => {
+  const creds = resolveJiraCredentials(metaDb, process.env);
+  const nextPath =
+    creds.mode === "instance" && creds.instanceId
+      ? appDbPathForInstance(dbDir, creds.instanceId)
+      : legacyAppDbPath(dbDir);
+
+  try {
+    if (runtime.db) {
+      try {
+        runtime.db.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    runtime.dbPath = nextPath;
+    runtime.db = new Database(nextPath);
+    runtime.db.pragma("journal_mode = WAL");
+    initDatabase(runtime.db);
+    runtime.noteImagesDir = noteImagesDirFor(dbDir, creds.mode === "instance" ? creds.instanceId : null);
+    fs.mkdirSync(runtime.noteImagesDir, { recursive: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.error("Failed to open SQLite database at " + nextPath);
+    log.error(message);
+    if (message.includes("NODE_MODULE_VERSION")) {
+      log.error("better-sqlite3 must match your Node version. Run: npm rebuild better-sqlite3");
+      log.error("Or start the API via: npm run dev:api (rebuilds automatically)");
+    }
+    process.exit(1);
+  }
+};
+
+openAppDbForCurrent();
+
+const getDb = () => runtime.db;
 
 // ─── Shared helpers (passed into route modules) ───────────────────────────────
 
-const getMissingEnv = () =>
-  requiredEnv.filter((n) => !process.env[n] || !String(process.env[n]).trim());
+const getCredentials = () => resolveJiraCredentials(metaDb, process.env);
+
+const getMissingEnv = () => {
+  const c = getCredentials();
+  const missing = [];
+  if (!c.baseUrl) missing.push(c.mode === "legacy" ? "JIRA_BASE_URL" : "instance.baseUrl");
+  if (!c.email) missing.push(c.mode === "legacy" ? "JIRA_EMAIL" : "instance.email");
+  if (!c.apiToken) missing.push(c.mode === "legacy" ? "JIRA_API_TOKEN" : "instance.apiToken");
+  return missing;
+};
 
 const ensureEnvOrRespond = (res) => {
   const missing = getMissingEnv();
@@ -160,12 +217,19 @@ const ensureEnvOrRespond = (res) => {
 };
 
 const getAuthHeader = () => {
-  const basic = Buffer.from(`${process.env.JIRA_EMAIL}:${process.env.JIRA_API_TOKEN}`).toString("base64");
-  return `Basic ${basic}`;
+  const c = getCredentials();
+  return `Basic ${Buffer.from(`${c.email}:${c.apiToken}`).toString("base64")}`;
+};
+
+const activateInstance = (id) => {
+  setActiveInstanceId(metaDb, id);
+  openAppDbForCurrent();
+  const { mode, instanceId, displayName, baseUrl } = getCredentials();
+  return { mode, instanceId, displayName, baseUrl };
 };
 
 const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
-  const target = `${process.env.JIRA_BASE_URL}${pathWithQuery}`;
+  const target = `${getCredentials().baseUrl}${pathWithQuery}`;
   const response = await fetch(target, {
     method,
     headers: {
@@ -196,7 +260,7 @@ const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
 
 // Jira uploads need X-Atlassian-Token: no-check; omit Content-Type so fetch sets the multipart boundary.
 const jiraMultipartRequest = async ({ method = "POST", pathWithQuery, formData }) => {
-  const target = `${process.env.JIRA_BASE_URL}${pathWithQuery}`;
+  const target = `${getCredentials().baseUrl}${pathWithQuery}`;
   const response = await fetch(target, {
     method,
     headers: {
@@ -224,7 +288,7 @@ const resolveJiraAttachmentMediaId = async (attachmentId) => {
     return "";
   }
 
-  const target = `${process.env.JIRA_BASE_URL}/rest/api/3/attachment/content/${encodeURIComponent(id)}`;
+  const target = `${getCredentials().baseUrl}/rest/api/3/attachment/content/${encodeURIComponent(id)}`;
   const response = await fetch(target, {
     method: "GET",
     headers: {
@@ -264,7 +328,7 @@ const runJiraSearchRequest = async (input, legacyOptions = {}) => {
   const requestBody = {
     jql,
     maxResults,
-    fields: fields || getJiraSearchFields(db),
+    fields: fields || getJiraSearchFields(getDb()),
     ...(nextPageToken ? { nextPageToken } : {}),
   };
 
@@ -291,11 +355,15 @@ const runJiraSearchRequest = async (input, legacyOptions = {}) => {
 
 app.get("/api/health", (_req, res) => {
   const missing = getMissingEnv();
+  const c = getCredentials();
   res.json({
     ok: missing.length === 0,
     service: "jira-proxy",
     version: PROXY_VERSION,
-    jiraBaseUrl: process.env.JIRA_BASE_URL || "",
+    jiraBaseUrl: c.baseUrl || "",
+    jiraInstanceId: c.instanceId,
+    jiraInstanceName: c.displayName || "",
+    legacyMode: c.mode === "legacy",
     searchEndpoint: JIRA_SEARCH_JQL_PATH,
     missingEnv: missing,
   });
@@ -304,7 +372,7 @@ app.get("/api/health", (_req, res) => {
 // ─── Mount all route modules ──────────────────────────────────────────────────
 
 const routeCtx = {
-  db,
+  getDb,
   dataDir: dbDir,
   jiraRequest,
   jiraMultipartRequest,
@@ -315,9 +383,13 @@ const routeCtx = {
   // Distinct from resolveJiraUser (a by-query search) — this resolves the
   // currently authenticated Jira account, for attributing writes like team priority.
   resolveCurrentJiraUser: () => fetchJiraMyself({ jiraRequest }),
-  noteImagesDir,
+  getNoteImagesDir: () => runtime.noteImagesDir,
+  metaDb,
+  activateInstance,
+  getCredentials,
 };
 
+registerJiraInstanceRoutes(app, routeCtx);
 registerJiraCoreRoutes(app, routeCtx);
 registerJiraIssueRoutes(app, routeCtx);
 registerIssueMetadataRoutes(app, routeCtx);
@@ -354,12 +426,12 @@ if (fs.existsSync(distDir)) {
 
 const server = app.listen(port, () => {
   log.info(`Jira proxy listening on http://localhost:${port}`);
-  log.info(`Database: ${dbPath}`);
+  log.info(`Database: ${runtime.dbPath}`);
   const missing = getMissingEnv();
   if (missing.length > 0) {
     log.warn(`Missing env vars: ${missing.join(", ")} — Jira calls will fail`);
   } else {
-    log.info(`Jira base URL: ${process.env.JIRA_BASE_URL}`);
+    log.info(`Jira base URL: ${getCredentials().baseUrl}`);
   }
 });
 
