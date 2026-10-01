@@ -4,6 +4,9 @@ import { noteMarkdownToHtml } from "../utils/noteMarkdown.js";
 /**
  * Notes field: formatted preview when idle; textarea while editing so markdown
  * from pulled Jira comments (bold, lists, headings, newlines) is readable.
+ *
+ * Preview uses a div (not a button) so heading/list styles are not reset by
+ * user-agent / Semantic UI button rules.
  */
 const NoteFormattedField = ({
   className = "",
@@ -27,22 +30,33 @@ const NoteFormattedField = ({
     }
   }, [editing]);
 
+  const startEditing = () => {
+    if (!disabled) setEditing(true);
+  };
+
   if (showPreview) {
     return (
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
         className={`ww-note-formatted-preview${modal ? " ww-note-formatted-preview--modal" : ""}${
           className ? ` ${className}` : ""
         }`}
-        onClick={() => !disabled && setEditing(true)}
+        onClick={startEditing}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            startEditing();
+          }
+        }}
         title={title || "Click to edit notes"}
-        disabled={disabled}
+        aria-label={title || "Formatted notes preview. Activate to edit."}
       >
         <div
           className="ww-note-formatted-body"
           dangerouslySetInnerHTML={{ __html: html }}
         />
-      </button>
+      </div>
     );
   }
 

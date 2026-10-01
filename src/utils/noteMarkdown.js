@@ -80,6 +80,16 @@ export const noteMarkdownToHtml = (markdown) => {
       continue;
     }
 
+    // Lone bold line (common Jira “subhead” style) — keep visual weight without a real heading level.
+    if (
+      lines.length === 1 &&
+      (/^\*\*[^*].*[^*]\*\*$/.test(lines[0].trim()) || /^__[^\s_].*[^\s_]__$/.test(lines[0].trim()))
+    ) {
+      const bare = lines[0].trim().replace(/^\*\*|\*\*$/g, "").replace(/^__|__$/g, "");
+      html.push(`<p class="ww-note-subhead"><strong>${formatInline(bare)}</strong></p>`);
+      continue;
+    }
+
     if (lines.length === 1 && /^(-{3,}|\*{3,}|_{3,})$/.test(lines[0].trim())) {
       html.push("<hr/>");
       continue;

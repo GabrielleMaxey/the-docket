@@ -99,6 +99,45 @@ describe("noteMarkdownToHtml", () => {
     assert.match(html, /<ul><li>First<\/li><li>Second<\/li><\/ul>/);
   });
 
+  it("treats a lone bold line as a visual subhead", () => {
+    const html = noteMarkdownToHtml("**SUMMARY NOTES**\n\n- Keep all responses");
+    assert.match(html, /class="ww-note-subhead"/);
+    assert.match(html, /SUMMARY NOTES/);
+  });
+
+  it("preserves ODI-26318-style section breaks", () => {
+    const md = [
+      "Updates / Modifications Needed based on today’s call:",
+      "",
+      "## ODI-26318 Modification Request 9/30/2026",
+      "",
+      "### New Requirement",
+      "",
+      "**Feedback Response De-Duplication by Interaction**",
+      "",
+      "When multiple feedback responses are received.",
+      "",
+      "### Business Reason",
+      "",
+      "During review of customer feedback results.",
+      "",
+      "### Notes for ODI-26318",
+      "",
+      "- Request originated during review.",
+      "- Rabih identified apparent duplicates.",
+      "",
+      "**SUMMARY NOTES**",
+      "",
+      "- Add interaction-level feedback de-duplication logic.",
+    ].join("\n");
+    const html = noteMarkdownToHtml(md);
+    assert.match(html, /<h2>ODI-26318 Modification Request 9\/30\/2026<\/h2>/);
+    assert.match(html, /<h3>New Requirement<\/h3>/);
+    assert.match(html, /<h3>Business Reason<\/h3>/);
+    assert.match(html, /ww-note-subhead/);
+    assert.match(html, /<ul><li>Request originated/);
+  });
+
   it("escapes raw HTML in notes", () => {
     const html = noteMarkdownToHtml("<script>alert(1)</script>");
     assert.equal(html.includes("<script>"), false);
