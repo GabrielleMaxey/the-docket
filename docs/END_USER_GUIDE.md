@@ -77,6 +77,17 @@ Then in the app:
 3. If it shows ✓ Connected — you're good. Skip to Task Management below.
 4. If it fails, check that your `.env` file has the right values (see [JIRA_SETUP.md](./JIRA_SETUP.md)).
 
+### Switching Jira sites
+
+Use this when you work across more than one Jira Cloud site (different company URLs).
+
+- **One site from `.env` only:** keep using **Test Jira Connection** as above. Your notes and presets stay in the app’s usual database; the top bar shows **Jira** until you add more sites.
+- **Several sites:** go to **Settings → Jira sites**. Add up to **five** sites (name, URL, email, API token). Use **Set active** or the **Site** menu in the top bar to change which Jira the app talks to.
+- **After you switch:** the app reloads. Presets, notes, past reports, and other saved data belong to **that site only** — nothing is merged across clouds.
+- **Test before save:** in the add/edit dialog, use **Test connection** to confirm credentials.
+
+Developers can also pre-register sites in `.env` with `JIRA_INSTANCE_1_*` … `JIRA_INSTANCE_5_*` (see [JIRA_SETUP.md](./JIRA_SETUP.md)); the app does not turn a single legacy `.env` site into a registry entry by itself at startup.
+
 ### Epic & JQL presets
 
 These are the named saved searches that power everything else. Add them once in Settings; they'll appear in Task Management, Metrics, and Chat.

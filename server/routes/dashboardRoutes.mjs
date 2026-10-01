@@ -5,32 +5,23 @@ const log = createLogger("dashboard");
 import { loadLatestDashboardSnapshot } from "../lib/dashboardRefresh/loadSnapshot.mjs";
 import { runDashboardRefresh } from "../lib/dashboardRefresh/runDashboardRefresh.mjs";
 
-export const registerDashboardRoutes = (
-  app,
-  { db, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest }
-) => {
-  const listFieldMappingsStmt = db.prepare(
-    "SELECT role, field_id, field_name FROM jira_field_mappings ORDER BY role ASC"
-  );
-  const listSettingsStmt = db.prepare("SELECT key, value FROM app_settings");
-  const getEpicPresetStmt = db.prepare("SELECT * FROM epic_presets WHERE id = ?");
-  const getWatchedAssigneeStmt = db.prepare("SELECT * FROM watched_assignees WHERE id = ?");
-
-  const getLatestSnapshotStmt = db.prepare(
+const createSnapshotStmts = (db) => ({
+  getLatestSnapshotStmt: db.prepare(
     "SELECT * FROM dashboard_snapshots ORDER BY refreshed_at DESC, id DESC LIMIT 1"
-  );
-  const listEpicMetricsForSnapshotStmt = db.prepare(
+  ),
+  listEpicMetricsForSnapshotStmt: db.prepare(
     "SELECT * FROM dashboard_epic_metrics WHERE snapshot_id = ? ORDER BY id ASC"
-  );
-  const listAssigneeMetricsForSnapshotStmt = db.prepare(
+  ),
+  listAssigneeMetricsForSnapshotStmt: db.prepare(
     "SELECT * FROM dashboard_assignee_metrics WHERE snapshot_id = ? ORDER BY id ASC"
-  );
+  ),
+});
 
-  const deleteAllAssigneeMetricsStmt = db.prepare("DELETE FROM dashboard_assignee_metrics");
-  const deleteAllEpicMetricsStmt = db.prepare("DELETE FROM dashboard_epic_metrics");
-  const deleteAllSnapshotsStmt = db.prepare("DELETE FROM dashboard_snapshots");
-
-  const insertSnapshotStmt = db.prepare(`
+const createPersistStmts = (db) => ({
+  deleteAllAssigneeMetricsStmt: db.prepare("DELETE FROM dashboard_assignee_metrics"),
+  deleteAllEpicMetricsStmt: db.prepare("DELETE FROM dashboard_epic_metrics"),
+  deleteAllSnapshotsStmt: db.prepare("DELETE FROM dashboard_snapshots"),
+  insertSnapshotStmt: db.prepare(`
     INSERT INTO dashboard_snapshots (
       refreshed_at,
       epic_preset_ids_json,
@@ -62,9 +53,8 @@ export const registerDashboardRoutes = (
       @overallOverduePercent,
       @statusCountsJson
     )
-  `);
-
-  const insertEpicMetricStmt = db.prepare(`
+  `),
+  insertEpicMetricStmt: db.prepare(`
     INSERT INTO dashboard_epic_metrics (
       snapshot_id,
       epic_preset_id,
@@ -110,9 +100,8 @@ export const registerDashboardRoutes = (
       @contributorMetricsJson,
       @epicBreakdownJson
     )
-  `);
-
-  const insertAssigneeMetricStmt = db.prepare(`
+  `),
+  insertAssigneeMetricStmt: db.prepare(`
     INSERT INTO dashboard_assignee_metrics (
       snapshot_id,
       query_name,
@@ -148,33 +137,24 @@ export const registerDashboardRoutes = (
       @workloadCountsJson,
       @errorMessage
     )
-  `);
+  `),
+});
 
-  const snapshotStmts = {
-    getLatestSnapshotStmt,
-    listEpicMetricsForSnapshotStmt,
-    listAssigneeMetricsForSnapshotStmt,
-  };
+const readSettings = (db) => {
+  const rows = db.prepare("SELECT key, value FROM app_settings").all();
+  return rows.reduce((acc, row) => {
+    acc[row.key] = String(row.value ?? "");
+    return acc;
+  }, {});
+};
 
-  const persistStmts = {
-    deleteAllAssigneeMetricsStmt,
-    deleteAllEpicMetricsStmt,
-    deleteAllSnapshotsStmt,
-    insertSnapshotStmt,
-    insertEpicMetricStmt,
-    insertAssigneeMetricStmt,
-  };
-
-  const readSettings = () => {
-    const rows = listSettingsStmt.all();
-    return rows.reduce((acc, row) => {
-      acc[row.key] = String(row.value ?? "");
-      return acc;
-    }, {});
-  };
-
+export const registerDashboardRoutes = (
+  app,
+  { getDb, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest }
+) => {
   app.get("/api/dashboard/metrics", (_req, res) => {
-    const snapshot = loadLatestDashboardSnapshot(db, snapshotStmts);
+    const db = getDb();
+    const snapshot = loadLatestDashboardSnapshot(db, createSnapshotStmts(db));
     return res.json({ snapshot });
   });
 
@@ -184,15 +164,18 @@ export const registerDashboardRoutes = (
     }
 
     try {
+      const db = getDb();
+      const snapshotStmts = createSnapshotStmts(db);
       const result = await runDashboardRefresh({
         body: req.body,
-        readSettings,
-        listFieldMappings: () => listFieldMappingsStmt.all(),
-        getEpicPreset: (id) => getEpicPresetStmt.get(id),
-        getWatchedAssignee: (id) => getWatchedAssigneeStmt.get(id),
+        readSettings: () => readSettings(db),
+        listFieldMappings: () =>
+          db.prepare("SELECT role, field_id, field_name FROM jira_field_mappings ORDER BY role ASC").all(),
+        getEpicPreset: (id) => db.prepare("SELECT * FROM epic_presets WHERE id = ?").get(id),
+        getWatchedAssignee: (id) => db.prepare("SELECT * FROM watched_assignees WHERE id = ?").get(id),
         mapWatchedAssigneeRow,
         db,
-        persistStmts,
+        persistStmts: createPersistStmts(db),
         snapshotStmts,
         jiraRequest,
         runJiraSearchRequest,

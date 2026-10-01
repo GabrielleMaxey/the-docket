@@ -52,7 +52,7 @@ const withTeamMongo = (label, handler) => async (req, res) => {
   }
 };
 
-export const registerTeamPriorityRoutes = (app, { db, resolveCurrentJiraUser }) => {
+export const registerTeamPriorityRoutes = (app, { getDb, resolveCurrentJiraUser }) => {
   app.get("/api/team-priority/health", async (_req, res) => {
     const status = await pingTeamPriorityMongo();
     return res.json({
@@ -104,6 +104,7 @@ export const registerTeamPriorityRoutes = (app, { db, resolveCurrentJiraUser }) 
   app.post(
     "/api/team-priority/sync-local",
     withTeamMongo("sync local priorities to Atlas", async (_req, res) => {
+      const db = getDb();
       if (!db) {
         return res.status(500).json({ error: "Local database unavailable" });
       }
@@ -130,6 +131,7 @@ export const registerTeamPriorityRoutes = (app, { db, resolveCurrentJiraUser }) 
   app.post(
     "/api/team-priority/pull-to-local",
     withTeamMongo("pull Atlas priorities to local", async (_req, res) => {
+      const db = getDb();
       if (!db) {
         return res.status(500).json({ error: "Local database unavailable" });
       }

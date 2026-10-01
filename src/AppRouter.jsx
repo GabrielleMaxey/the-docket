@@ -5,6 +5,7 @@ import Errors from "./Pages/Errors.jsx";
 import "semantic-ui-css/semantic.min.css";
 import "./AppRouter.css";
 import BackgroundJobIndicator from "./Components/BackgroundJobIndicator.jsx";
+import JiraInstanceSwitcher from "./Components/JiraInstanceSwitcher.jsx";
 import { EpicFiltersProvider } from "./context/EpicFiltersContext.jsx";
 
 const WorkWeekTasks = React.lazy(() => import("./Pages/WorkWeekTasks.jsx"));
@@ -37,6 +38,7 @@ const AppLayout = () => (
         The Docket
       </NavLink>
       <BackgroundJobIndicator />
+      <JiraInstanceSwitcher />
       <ul className="app-nav-links">
         {NAV_LINKS.map(({ to, label, icon }) => (
           <li key={to}>

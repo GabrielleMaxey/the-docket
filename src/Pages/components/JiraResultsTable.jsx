@@ -3,6 +3,7 @@ import { Button, Modal } from "semantic-ui-react";
 import PriorityCell from "./cells/PriorityCell";
 import AssigneeCell from "./cells/AssigneeCell.jsx";
 import NoteImagesStrip from "./NoteImagesStrip.jsx";
+import NoteFormattedField from "../../Components/NoteFormattedField.jsx";
 import AttachFilesModal from "./AttachFilesModal.jsx";
 import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
 import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js";
@@ -19,8 +20,22 @@ import {
   getKnownAssignees,
   getKnownStatuses,
   noteMatchesLastJiraPush,
+  parseIssueLinks,
   sortIssues,
 } from "./jiraResultsTableUtils.js";
+
+const IssueLinkLine = ({ linkType, linkedKey, browseUrl }) => (
+  <span className="ww-issue-link-line">
+    {linkType ? `${linkType} ` : ""}
+    {browseUrl ? (
+      <a href={browseUrl} target="_blank" rel="noreferrer noopener">
+        {linkedKey}
+      </a>
+    ) : (
+      linkedKey
+    )}
+  </span>
+);
 
 const PAGE_SIZE = 30;
 const SORT_FIELDS = [
@@ -801,7 +816,10 @@ const JiraResultsTable = ({
                     const save = saveState[issueKey] || { loading: false, error: "", success: "" };
                     const rowUpdate = rowUpdateState[issueKey] || { loading: false, error: "", success: "" };
                     const isClosedOrResolved = isClosedLikeStatus(status);
-                    const noteDraft = jiraNotes[issueKey] || "";
+                    const noteDraft =
+                      jiraNotes[issueKey] ||
+                      jiraNotes[String(issueKey || "").toUpperCase()] ||
+                      "";
                     const pushedNoteSnapshot = lastPushedJiraNoteByKey[issueKey];
                     const noteFingerprint = buildNotePushFingerprint({
                       note: noteDraft,
@@ -819,6 +837,7 @@ const JiraResultsTable = ({
                     const hasAnyTracking = startDateByKey[issueKey] || completeDateByKey[issueKey] ||
                       planningMeta.plannedStart || planningMeta.plannedFinish || planningMeta.pmOverride ||
                       planningMeta.requestor;
+                    const issueLinks = parseIssueLinks(issue);
 
                     return (
                       <React.Fragment key={issue.id}>
@@ -851,6 +870,23 @@ const JiraResultsTable = ({
                           <span className="ww-summary-clamp" title={summary}>
                             {summary}
                           </span>
+                          {issueLinks.length > 0 ? (
+                            <div className="ww-issue-links ww-issue-links--compact">
+                              <IssueLinkLine
+                                linkType={issueLinks[0].linkType}
+                                linkedKey={issueLinks[0].linkedKey}
+                                browseUrl={getIssueBrowseUrl({
+                                  key: issueLinks[0].linkedKey,
+                                  self: issue.self,
+                                })}
+                              />
+                              {issueLinks.length > 1 ? (
+                                <span className="ww-issue-links-more">
+                                  {` +${issueLinks.length - 1} more`}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </td>
 
                         <td className="ww-cell-status">
@@ -1125,14 +1161,12 @@ const JiraResultsTable = ({
                                             keepPending={Boolean(noteImageKeepPendingByKey[issueKey])}
                                             onKeepChange={(checked) => handleKeepNoteImagesToggle(issueKey, checked)}
                                           >
-                                            <textarea
+                                            <NoteFormattedField
                                               className={`ww-note-textarea${
                                                 isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
                                               }`}
                                               value={noteDraft}
-                                              onChange={(event) =>
-                                                handleNoteChange(issueKey, event.target.value)
-                                              }
+                                              onChange={(next) => handleNoteChange(issueKey, next)}
                                               placeholder="Add notes here"
                                               title={
                                                 isNoteAlreadyPushed
@@ -1204,6 +1238,25 @@ const JiraResultsTable = ({
                                   </tr>
                                 </tbody>
                               </table>
+                              {issueLinks.length > 0 ? (
+                                <div className="ww-issue-links ww-issue-links--expanded">
+                                  {issueLinks.map((link) => (
+                                    <div
+                                      key={`${link.linkType}-${link.linkedKey}`}
+                                      className="ww-issue-links-item"
+                                    >
+                                      <IssueLinkLine
+                                        linkType={link.linkType}
+                                        linkedKey={link.linkedKey}
+                                        browseUrl={getIssueBrowseUrl({
+                                          key: link.linkedKey,
+                                          self: issue.self,
+                                        })}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -1371,7 +1424,10 @@ const JiraResultsTable = ({
                   if (!noteIssue) {
                     return null;
                   }
-                  const modalNoteDraft = jiraNotes[expandedNoteKey] || "";
+                  const modalNoteDraft =
+                    jiraNotes[expandedNoteKey] ||
+                    jiraNotes[String(expandedNoteKey || "").toUpperCase()] ||
+                    "";
                   const modalClosedOrResolved = isClosedLikeStatus(
                     noteIssue.fields?.status?.name || "-"
                   );
@@ -1391,18 +1447,17 @@ const JiraResultsTable = ({
                       </Modal.Header>
                       <Modal.Content>
                         <p className="ww-note-modal-hint">
-                          Markdown renders when pushed to Jira: **bold**, *italic*, `code`,
-                          [links](url), - lists, 1. numbered lists, # headings
+                          Pulled Jira comments keep structure (headings, lists, bold, italics).
+                          Markdown also renders when pushed to Jira: **bold**, *italic*, `code`,
+                          [links](url), - lists, 1. numbered lists, # headings. Click the preview to edit.
                         </p>
-                        <textarea
+                        <NoteFormattedField
                           className="ww-note-modal-textarea"
+                          modal
                           value={modalNoteDraft}
-                          onChange={(event) =>
-                            handleNoteChange(expandedNoteKey, event.target.value)
-                          }
+                          onChange={(next) => handleNoteChange(expandedNoteKey, next)}
                           placeholder="Add notes here"
                           disabled={modalClosedOrResolved}
-                          autoFocus
                         />
                       </Modal.Content>
                       <Modal.Actions>
