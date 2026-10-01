@@ -17,9 +17,12 @@ import {
   deleteInstance,
   setActiveInstanceId,
   seedInstancesFromEnv,
+  seedInstanceAppDbFromLegacyIfNeeded,
   getActiveInstanceId,
   getInstanceCredentials,
 } from "../server/lib/jiraInstances.mjs";
+
+import Database from "better-sqlite3";
 
 const tmpDirs = [];
 
@@ -40,6 +43,59 @@ afterEach(() => {
 describe("normalizeBaseUrl", () => {
   it("trims and strips trailing slash", () => {
     assert.equal(normalizeBaseUrl(" https://x.atlassian.net/ "), "https://x.atlassian.net");
+  });
+
+  it("strips /browse/... from pasted Jira links", () => {
+    assert.equal(
+      normalizeBaseUrl("https://lumen.atlassian.net/browse/ODI"),
+      "https://lumen.atlassian.net"
+    );
+  });
+});
+
+describe("seedInstanceAppDbFromLegacyIfNeeded", () => {
+  it("copies legacy DB into an empty instance file once", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "jira-seed-"));
+    tmpDirs.push(dir);
+    const meta = openInstancesMetaDb(path.join(dir, "instances-meta.sqlite"));
+    initInstancesSchema(meta);
+
+    const legacyPath = legacyAppDbPath(dir);
+    const legacy = new Database(legacyPath);
+    legacy.exec(`
+      CREATE TABLE epic_presets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        epic_key TEXT NOT NULL,
+        epic_name TEXT NOT NULL,
+        jira_filter_id TEXT,
+        jql TEXT,
+        preset_type TEXT NOT NULL DEFAULT 'epic',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    legacy.prepare(
+      "INSERT INTO epic_presets (epic_key, epic_name, jql, preset_type) VALUES (?, ?, ?, ?)"
+    ).run("EPIC", "My Open Work", "assignee = currentUser()", "jql");
+    legacy.close();
+
+    const row = createInstance(meta, {
+      displayName: "Site A",
+      baseUrl: "https://a.atlassian.net",
+      email: "a@b.com",
+      apiToken: "tok",
+    });
+
+    const first = seedInstanceAppDbFromLegacyIfNeeded(meta, dir, row.id);
+    assert.equal(first.seeded, true);
+    const dest = new Database(appDbPathForInstance(dir, row.id), { readonly: true });
+    assert.equal(dest.prepare("SELECT COUNT(*) AS c FROM epic_presets").get().c, 1);
+    dest.close();
+
+    const second = seedInstanceAppDbFromLegacyIfNeeded(meta, dir, row.id);
+    assert.equal(second.seeded, false);
+    assert.equal(second.reason, "already-seeded");
   });
 });
 

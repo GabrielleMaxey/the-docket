@@ -32,6 +32,7 @@ import {
   openInstancesMetaDb,
   initInstancesSchema,
   seedInstancesFromEnv,
+  seedInstanceAppDbFromLegacyIfNeeded,
   resolveJiraCredentials,
   legacyAppDbPath,
   appDbPathForInstance,
@@ -159,6 +160,12 @@ const runtime = {
 
 const openAppDbForCurrent = () => {
   const creds = resolveJiraCredentials(metaDb, process.env);
+  if (creds.mode === "instance" && creds.instanceId) {
+    const seed = seedInstanceAppDbFromLegacyIfNeeded(metaDb, dbDir, creds.instanceId);
+    if (seed.seeded) {
+      log.info(`Seeded instance DB from legacy workweek.sqlite for ${creds.instanceId}`);
+    }
+  }
   const nextPath =
     creds.mode === "instance" && creds.instanceId
       ? appDbPathForInstance(dbDir, creds.instanceId)
@@ -166,6 +173,11 @@ const openAppDbForCurrent = () => {
 
   try {
     if (runtime.db) {
+      try {
+        runtime.db.pragma("wal_checkpoint(TRUNCATE)");
+      } catch {
+        /* ignore */
+      }
       try {
         runtime.db.close();
       } catch {

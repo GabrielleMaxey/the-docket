@@ -104,11 +104,20 @@ const JiraInstancesSection = () => {
         if (form.apiToken.trim()) patch.apiToken = form.apiToken;
         await updateJiraInstance(editingId, patch);
         setFlash("Jira site updated.");
-      } else {
-        await createJiraInstance(form);
-        setFlash("Jira site added.");
+        setModalOpen(false);
+        await loadInstances();
+        return;
       }
+
+      const wasEmpty = instances.length === 0;
+      await createJiraInstance(form);
+      setFlash("Jira site added.");
       setModalOpen(false);
+      if (wasEmpty) {
+        // First site auto-activates server-side and seeds local data from legacy DB.
+        window.location.reload();
+        return;
+      }
       await loadInstances();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save Jira site");
@@ -152,7 +161,7 @@ const JiraInstancesSection = () => {
   return (
     <SettingsSection
       title="Jira sites"
-      description="Manage multiple Jira sites and switch which one the app talks to. Notes, dates, and presets are stored per site — switching reloads the app."
+      description="Manage multiple Jira sites and switch which one the app talks to. Notes, dates, and presets are stored per site — switching reloads the app. The first time you activate a site, existing single-site local data is copied into that site's database."
     >
       {error ? <Message negative size="small" content={error} /> : null}
       {legacyMode ? (

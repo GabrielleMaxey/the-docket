@@ -1,10 +1,12 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 
 export const MAX_JIRA_INSTANCES = 5;
 
 const ACTIVE_INSTANCE_KEY = "active_instance_id";
+const legacySeedMetaKey = (instanceId) => `legacy_db_seeded:${instanceId}`;
 
 const INSTANCES_SCHEMA = `
 CREATE TABLE IF NOT EXISTS jira_instances (
@@ -28,7 +30,18 @@ function trimOrEmpty(value) {
 }
 
 export function normalizeBaseUrl(url) {
-  return trimOrEmpty(url).replace(/\/$/, "");
+  const trimmed = trimOrEmpty(url).replace(/\/$/, "");
+  if (!trimmed) return "";
+  try {
+    const parsed = new URL(trimmed);
+    // Pasted browse links (…/browse/KEY) must become the site origin for API calls.
+    if (/^\/browse(\/|$)/i.test(parsed.pathname || "")) {
+      return parsed.origin;
+    }
+    return `${parsed.origin}${parsed.pathname || ""}`.replace(/\/$/, "") || parsed.origin;
+  } catch {
+    return trimmed;
+  }
 }
 
 export function legacyAppDbPath(dataDir) {
@@ -50,6 +63,96 @@ export function openInstancesMetaDb(metaPath) {
 
 export function initInstancesSchema(metaDb) {
   metaDb.exec(INSTANCES_SCHEMA);
+}
+
+function getMetaValue(metaDb, key) {
+  const row = metaDb.prepare("SELECT value FROM jira_instance_meta WHERE key = ?").get(key);
+  return row?.value ?? null;
+}
+
+function setMetaValue(metaDb, key, value) {
+  metaDb
+    .prepare(
+      `INSERT INTO jira_instance_meta (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    )
+    .run(key, value);
+}
+
+function countTableRows(dbPath, tableName) {
+  if (!fs.existsSync(dbPath)) return 0;
+  const db = new Database(dbPath, { readonly: true });
+  try {
+    const hasTable = db
+      .prepare("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(tableName);
+    if (!hasTable) return 0;
+    return Number(db.prepare(`SELECT COUNT(*) AS c FROM ${tableName}`).get()?.c || 0);
+  } finally {
+    db.close();
+  }
+}
+
+function copySqliteDatabase(srcPath, destPath) {
+  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  fs.copyFileSync(srcPath, destPath);
+  for (const suffix of ["-wal", "-shm"]) {
+    const srcSide = `${srcPath}${suffix}`;
+    const destSide = `${destPath}${suffix}`;
+    if (fs.existsSync(srcSide)) {
+      fs.copyFileSync(srcSide, destSide);
+    } else if (fs.existsSync(destSide)) {
+      fs.unlinkSync(destSide);
+    }
+  }
+}
+
+/**
+ * One-time: when an instance app DB is missing or empty of presets/notes, copy
+ * legacy workweek.sqlite (and note-images) so existing single-site data survives
+ * the first activate. Flagged in meta so we never overwrite intentional empties.
+ */
+export function seedInstanceAppDbFromLegacyIfNeeded(metaDb, dataDir, instanceId) {
+  const id = trimOrEmpty(instanceId);
+  if (!id) return { seeded: false, reason: "no-instance" };
+
+  const flagKey = legacySeedMetaKey(id);
+  if (getMetaValue(metaDb, flagKey) === "1") {
+    return { seeded: false, reason: "already-seeded" };
+  }
+
+  const legacyPath = legacyAppDbPath(dataDir);
+  const destPath = appDbPathForInstance(dataDir, id);
+  if (!fs.existsSync(legacyPath)) {
+    setMetaValue(metaDb, flagKey, "1");
+    return { seeded: false, reason: "no-legacy" };
+  }
+
+  const legacyPresets = countTableRows(legacyPath, "epic_presets");
+  const legacyNotes = countTableRows(legacyPath, "issue_metadata");
+  if (legacyPresets === 0 && legacyNotes === 0) {
+    setMetaValue(metaDb, flagKey, "1");
+    return { seeded: false, reason: "legacy-empty" };
+  }
+
+  const destExists = fs.existsSync(destPath);
+  const destPresets = destExists ? countTableRows(destPath, "epic_presets") : 0;
+  const destNotes = destExists ? countTableRows(destPath, "issue_metadata") : 0;
+  if (destExists && (destPresets > 0 || destNotes > 0)) {
+    setMetaValue(metaDb, flagKey, "1");
+    return { seeded: false, reason: "dest-has-data" };
+  }
+
+  copySqliteDatabase(legacyPath, destPath);
+
+  const legacyImages = noteImagesDirFor(dataDir, null);
+  const destImages = noteImagesDirFor(dataDir, id);
+  if (fs.existsSync(legacyImages) && !fs.existsSync(destImages)) {
+    fs.cpSync(legacyImages, destImages, { recursive: true });
+  }
+
+  setMetaValue(metaDb, flagKey, "1");
+  return { seeded: true, reason: "copied-legacy" };
 }
 
 export function toPublicInstance(row) {
@@ -88,10 +191,7 @@ export function listInstances(metaDb) {
 }
 
 export function getActiveInstanceId(metaDb) {
-  const row = metaDb
-    .prepare("SELECT value FROM jira_instance_meta WHERE key = ?")
-    .get(ACTIVE_INSTANCE_KEY);
-  return row?.value ?? null;
+  return getMetaValue(metaDb, ACTIVE_INSTANCE_KEY);
 }
 
 export function setActiveInstanceId(metaDb, id) {
@@ -99,12 +199,7 @@ export function setActiveInstanceId(metaDb, id) {
     metaDb.prepare("DELETE FROM jira_instance_meta WHERE key = ?").run(ACTIVE_INSTANCE_KEY);
     return;
   }
-  metaDb
-    .prepare(
-      `INSERT INTO jira_instance_meta (key, value) VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-    )
-    .run(ACTIVE_INSTANCE_KEY, id);
+  setMetaValue(metaDb, ACTIVE_INSTANCE_KEY, id);
 }
 
 export function resolveJiraCredentials(metaDb, env = {}) {
