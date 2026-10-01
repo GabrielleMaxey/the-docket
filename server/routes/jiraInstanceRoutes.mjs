@@ -44,6 +44,10 @@ export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getC
 
     try {
       const instance = createInstance(metaDb, { displayName, baseUrl, email, apiToken });
+      // First site: activate immediately so local data seeds from legacy and the UI isn't stuck in limbo.
+      if (listInstances(metaDb).length === 1 && !getActiveInstanceId(metaDb)) {
+        activateInstance(instance.id);
+      }
       log.info(`created Jira instance ${instance.id} "${instance.displayName}"`);
       return res.status(201).json(instance);
     } catch (error) {
