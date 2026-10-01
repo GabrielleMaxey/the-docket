@@ -20,8 +20,22 @@ import {
   getKnownAssignees,
   getKnownStatuses,
   noteMatchesLastJiraPush,
+  parseIssueLinks,
   sortIssues,
 } from "./jiraResultsTableUtils.js";
+
+const IssueLinkLine = ({ linkType, linkedKey, browseUrl }) => (
+  <span className="ww-issue-link-line">
+    {linkType ? `${linkType} ` : ""}
+    {browseUrl ? (
+      <a href={browseUrl} target="_blank" rel="noreferrer noopener">
+        {linkedKey}
+      </a>
+    ) : (
+      linkedKey
+    )}
+  </span>
+);
 
 const PAGE_SIZE = 30;
 const SORT_FIELDS = [
@@ -823,6 +837,7 @@ const JiraResultsTable = ({
                     const hasAnyTracking = startDateByKey[issueKey] || completeDateByKey[issueKey] ||
                       planningMeta.plannedStart || planningMeta.plannedFinish || planningMeta.pmOverride ||
                       planningMeta.requestor;
+                    const issueLinks = parseIssueLinks(issue);
 
                     return (
                       <React.Fragment key={issue.id}>
@@ -855,6 +870,23 @@ const JiraResultsTable = ({
                           <span className="ww-summary-clamp" title={summary}>
                             {summary}
                           </span>
+                          {issueLinks.length > 0 ? (
+                            <div className="ww-issue-links ww-issue-links--compact">
+                              <IssueLinkLine
+                                linkType={issueLinks[0].linkType}
+                                linkedKey={issueLinks[0].linkedKey}
+                                browseUrl={getIssueBrowseUrl({
+                                  key: issueLinks[0].linkedKey,
+                                  self: issue.self,
+                                })}
+                              />
+                              {issueLinks.length > 1 ? (
+                                <span className="ww-issue-links-more">
+                                  {` +${issueLinks.length - 1} more`}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </td>
 
                         <td className="ww-cell-status">
@@ -1206,6 +1238,25 @@ const JiraResultsTable = ({
                                   </tr>
                                 </tbody>
                               </table>
+                              {issueLinks.length > 0 ? (
+                                <div className="ww-issue-links ww-issue-links--expanded">
+                                  {issueLinks.map((link) => (
+                                    <div
+                                      key={`${link.linkType}-${link.linkedKey}`}
+                                      className="ww-issue-links-item"
+                                    >
+                                      <IssueLinkLine
+                                        linkType={link.linkType}
+                                        linkedKey={link.linkedKey}
+                                        browseUrl={getIssueBrowseUrl({
+                                          key: link.linkedKey,
+                                          self: issue.self,
+                                        })}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
                             </div>
                           </td>
                         </tr>
