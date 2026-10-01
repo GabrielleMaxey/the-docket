@@ -3,6 +3,7 @@ import { Button, Modal } from "semantic-ui-react";
 import PriorityCell from "./cells/PriorityCell";
 import AssigneeCell from "./cells/AssigneeCell.jsx";
 import NoteImagesStrip from "./NoteImagesStrip.jsx";
+import NoteFormattedField from "../../Components/NoteFormattedField.jsx";
 import AttachFilesModal from "./AttachFilesModal.jsx";
 import { findRunIndexForDrillDown, getRunStateKey } from "../../utils/workWeekNavigation.js";
 import { getMostRecentDoneDateForIssue } from "../../utils/jiraIssueDoneDates.js";
@@ -1128,14 +1129,12 @@ const JiraResultsTable = ({
                                             keepPending={Boolean(noteImageKeepPendingByKey[issueKey])}
                                             onKeepChange={(checked) => handleKeepNoteImagesToggle(issueKey, checked)}
                                           >
-                                            <textarea
+                                            <NoteFormattedField
                                               className={`ww-note-textarea${
                                                 isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
                                               }`}
                                               value={noteDraft}
-                                              onChange={(event) =>
-                                                handleNoteChange(issueKey, event.target.value)
-                                              }
+                                              onChange={(next) => handleNoteChange(issueKey, next)}
                                               placeholder="Add notes here"
                                               title={
                                                 isNoteAlreadyPushed
@@ -1397,18 +1396,17 @@ const JiraResultsTable = ({
                       </Modal.Header>
                       <Modal.Content>
                         <p className="ww-note-modal-hint">
-                          Markdown renders when pushed to Jira: **bold**, *italic*, `code`,
-                          [links](url), - lists, 1. numbered lists, # headings
+                          Pulled Jira comments keep structure (headings, lists, bold, italics).
+                          Markdown also renders when pushed to Jira: **bold**, *italic*, `code`,
+                          [links](url), - lists, 1. numbered lists, # headings. Click the preview to edit.
                         </p>
-                        <textarea
+                        <NoteFormattedField
                           className="ww-note-modal-textarea"
+                          modal
                           value={modalNoteDraft}
-                          onChange={(event) =>
-                            handleNoteChange(expandedNoteKey, event.target.value)
-                          }
+                          onChange={(next) => handleNoteChange(expandedNoteKey, next)}
                           placeholder="Add notes here"
                           disabled={modalClosedOrResolved}
-                          autoFocus
                         />
                       </Modal.Content>
                       <Modal.Actions>
