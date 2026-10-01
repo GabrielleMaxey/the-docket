@@ -58,14 +58,12 @@ const handleNoteImageUploadError = (err, _req, res, next) => {
   return res.status(400).json({ error: err.message || NOTE_IMAGE_BAD_MIME_MESSAGE });
 };
 
-export const registerIssueMetadataRoutes = (
-  app,
-  { db, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, noteImagesDir }
-) => {
-  const selectIssueMetadataStmt = db.prepare(
-    "SELECT issue_key, note, priority, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note FROM issue_metadata WHERE issue_key = ?"
-  );
-  const upsertIssueMetadataStmt = db.prepare(`
+const ISSUE_METADATA_SELECT_COLUMNS =
+  "issue_key, note, priority, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note";
+
+const upsertIssueMetadata = (db, payload) =>
+  db
+    .prepare(`
     INSERT INTO issue_metadata (issue_key, note, priority, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note, updated_at)
     VALUES (@issueKey, @note, @priority, @startDate, @completeDate, @hasOpenDecision, @plannedStart, @plannedFinish, @pmOverride, @requestor, @openDecisionNote, CURRENT_TIMESTAMP)
     ON CONFLICT(issue_key) DO UPDATE SET
@@ -80,18 +78,24 @@ export const registerIssueMetadataRoutes = (
       requestor = excluded.requestor,
       open_decision_note = excluded.open_decision_note,
       updated_at = CURRENT_TIMESTAMP
-  `);
-  const listFieldMappingsStmt = db.prepare(
-    "SELECT role, field_id, field_name FROM jira_field_mappings"
-  );
-  const setKeepNoteImagesStmt = db.prepare(`
+  `)
+    .run(payload);
+
+const setKeepNoteImages = (db, payload) =>
+  db
+    .prepare(`
     INSERT INTO issue_metadata (issue_key, keep_note_images, updated_at)
     VALUES (@issueKey, @keepNoteImages, CURRENT_TIMESTAMP)
     ON CONFLICT(issue_key) DO UPDATE SET
       keep_note_images = excluded.keep_note_images,
       updated_at = CURRENT_TIMESTAMP
-  `);
+  `)
+    .run(payload);
 
+export const registerIssueMetadataRoutes = (
+  app,
+  { getDb, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, getNoteImagesDir }
+) => {
   const isUnassignAssigneeRequest = (value) => {
     const normalized = String(value || "").trim().toLowerCase();
     return normalized === "unassigned" || normalized === "__unassigned__";
@@ -137,8 +141,9 @@ export const registerIssueMetadataRoutes = (
         }
 
         if (images.length > 0) {
-          deleteAllNoteImages(db, noteImagesDir, issueKey);
-          setKeepNoteImagesStmt.run({ issueKey, keepNoteImages: 0 });
+          const db = getDb();
+          deleteAllNoteImages(db, getNoteImagesDir(), issueKey);
+          setKeepNoteImages(db, { issueKey, keepNoteImages: 0 });
         }
 
         log.info(`comment pushed to ${issueKey}${images.length ? ` with ${images.length} image(s)` : ""}`);
@@ -343,6 +348,7 @@ export const registerIssueMetadataRoutes = (
       return res.json({ items: {} });
     }
 
+    const db = getDb();
     const placeholders = issueKeys.map(() => "?").join(",");
     const rows = db
       .prepare(
@@ -379,7 +385,7 @@ export const registerIssueMetadataRoutes = (
       return res.status(400).json({ error: "Query param 'since' must be a YYYY-MM-DD date." });
     }
 
-    const rows = db
+    const rows = getDb()
       .prepare(
         `SELECT issue_key FROM issue_metadata
          WHERE trim(note) != '' AND updated_at >= ?
@@ -394,7 +400,7 @@ export const registerIssueMetadataRoutes = (
     const issueKey = String(req.params.issueKey || "").trim().toUpperCase();
     if (!issueKey) return res.status(400).json({ error: "Missing issue key" });
     const pinned = Boolean(req.body?.pinned);
-    db.prepare(`
+    getDb().prepare(`
       INSERT INTO issue_metadata (issue_key, pinned_gantt, updated_at)
       VALUES (?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(issue_key) DO UPDATE SET
@@ -416,6 +422,7 @@ export const registerIssueMetadataRoutes = (
     }
 
     try {
+      const db = getDb();
       const issueKeys = [
         ...new Set(
           parsed.rows
@@ -445,7 +452,7 @@ export const registerIssueMetadataRoutes = (
       const plan = planIssueMetadataImport(parsed.rows, existingByKey);
       const apply = db.transaction((upserts) => {
         for (const item of upserts) {
-          upsertIssueMetadataStmt.run({
+          upsertIssueMetadata(db, {
             issueKey: item.issueKey,
             note: item.note,
             priority: item.priority,
@@ -486,7 +493,7 @@ export const registerIssueMetadataRoutes = (
       return res.status(400).json({ error: "Missing issue key or image id" });
     }
 
-    const image = getNoteImageFile(db, issueKey, id);
+    const image = getNoteImageFile(getDb(), issueKey, id);
     if (!image) {
       return res.status(404).json({ error: "Image not found" });
     }
@@ -518,9 +525,10 @@ export const registerIssueMetadataRoutes = (
       }
 
       const files = req.files || [];
+      const db = getDb();
       const images = replaceNoteImages(
         db,
-        noteImagesDir,
+        getNoteImagesDir(),
         issueKey,
         files.map((file) => ({
           buffer: file.buffer,
@@ -528,7 +536,7 @@ export const registerIssueMetadataRoutes = (
           filename: file.originalname,
         }))
       );
-      setKeepNoteImagesStmt.run({ issueKey, keepNoteImages: images.length > 0 ? 1 : 0 });
+      setKeepNoteImages(db, { issueKey, keepNoteImages: images.length > 0 ? 1 : 0 });
 
       log.info(`kept ${images.length} note image(s) on this machine for ${issueKey}`);
       return res.json({ ok: true, issueKey, images });
@@ -541,8 +549,9 @@ export const registerIssueMetadataRoutes = (
       return res.status(400).json({ error: "Missing issue key" });
     }
 
-    deleteAllNoteImages(db, noteImagesDir, issueKey);
-    setKeepNoteImagesStmt.run({ issueKey, keepNoteImages: 0 });
+    const db = getDb();
+    deleteAllNoteImages(db, getNoteImagesDir(), issueKey);
+    setKeepNoteImages(db, { issueKey, keepNoteImages: 0 });
 
     log.info(`deleted kept note images for ${issueKey}`);
     return res.json({ ok: true, issueKey });
@@ -554,7 +563,9 @@ export const registerIssueMetadataRoutes = (
       return res.status(400).json({ error: "Missing issue key" });
     }
 
-    const current = selectIssueMetadataStmt.get(issueKey) || {};
+    const db = getDb();
+    const current =
+      db.prepare(`SELECT ${ISSUE_METADATA_SELECT_COLUMNS} FROM issue_metadata WHERE issue_key = ?`).get(issueKey) || {};
     const hasNote = typeof req.body?.note === "string";
     const hasPriority = req.body?.priority !== undefined;
     const hasStartDate = typeof req.body?.startDate === "string";
@@ -600,7 +611,7 @@ export const registerIssueMetadataRoutes = (
       ? String(req.body.openDecisionNote)
       : String(current.open_decision_note || "");
 
-    upsertIssueMetadataStmt.run({
+    upsertIssueMetadata(db, {
       issueKey,
       note: nextNote,
       priority: nextPriority,
@@ -652,7 +663,9 @@ export const registerIssueMetadataRoutes = (
       return res.status(400).json({ error: "value must be YYYY-MM-DD or empty" });
     }
 
-    const mappingsByRole = buildFieldMappingsMap(listFieldMappingsStmt.all());
+    const mappingsByRole = buildFieldMappingsMap(
+      getDb().prepare("SELECT role, field_id, field_name FROM jira_field_mappings").all()
+    );
     const fieldId = resolveMappedFieldId(mappingsByRole, role);
 
     if (!fieldId) {

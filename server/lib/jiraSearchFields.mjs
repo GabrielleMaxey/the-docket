@@ -8,6 +8,7 @@ const BASE_SEARCH_FIELDS = [
   "created",
   "parent",
   "duedate",
+  "issuelinks",
 ];
 
 const ODI_FALLBACK_FIELD_IDS = ["customfield_10008", "customfield_10009"];

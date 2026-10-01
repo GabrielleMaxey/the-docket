@@ -17,6 +17,7 @@ import MetricTargetsSection from "./components/MetricTargetsSection";
 import DirectReportsSection from "./components/DirectReportsSection";
 import WorkWeekHeaderSection from "./components/WorkWeekHeaderSection";
 import ChatAssistantSection from "./components/ChatAssistantSection";
+import JiraInstancesSection from "./components/JiraInstancesSection";
 import TeamPriorityImportSection from "./components/TeamPriorityImportSection";
 import TeamPriorityDemoSection from "./components/TeamPriorityDemoSection";
 
@@ -105,6 +106,8 @@ const Settings = () => {
           </Message>
         ) : null}
       </Segment>
+
+      <JiraInstancesSection />
 
       <PresetsSection epicPresets={epicPresets} onPresetsChanged={reloadPresets} onError={setError} />
 

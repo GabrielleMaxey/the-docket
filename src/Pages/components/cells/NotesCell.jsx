@@ -1,14 +1,15 @@
 import React from "react";
+import NoteFormattedField from "../../../Components/NoteFormattedField.jsx";
 
 const NotesCell = ({ issueKey, isClosedOrResolved, noteDraft, isNoteAlreadyPushed, onChange }) => (
   <td>
     {isClosedOrResolved ? (
       <span>-</span>
     ) : (
-      <textarea
+      <NoteFormattedField
         className={`ww-note-textarea${isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""}`}
         value={noteDraft}
-        onChange={(event) => onChange(issueKey, event.target.value)}
+        onChange={(next) => onChange(issueKey, next)}
         placeholder="Add notes here"
         title={
           isNoteAlreadyPushed

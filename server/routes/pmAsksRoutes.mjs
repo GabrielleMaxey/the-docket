@@ -11,9 +11,9 @@ const trimAsk = (row) => ({
   updatedAt: String(row.updated_at || ""),
 });
 
-export const registerPmAsksRoutes = (app, { db }) => {
+export const registerPmAsksRoutes = (app, { getDb }) => {
   app.get("/api/project-managers/asks", (req, res) => {
-    const rows = db
+    const rows = getDb()
       .prepare("SELECT id, title, who_asked, note, created_at, updated_at FROM pm_asks ORDER BY id ASC")
       .all();
     return res.json({ items: rows.map(trimAsk) });
@@ -24,7 +24,7 @@ export const registerPmAsksRoutes = (app, { db }) => {
     const whoAsked = String(req.body?.whoAsked || "").trim();
     const note = String(req.body?.note || "").trim();
 
-    const result = db
+    const result = getDb()
       .prepare(
         "INSERT INTO pm_asks (title, who_asked, note) VALUES (?, ?, ?) RETURNING id, title, who_asked, note, created_at, updated_at"
       )
@@ -39,6 +39,7 @@ export const registerPmAsksRoutes = (app, { db }) => {
       return res.status(400).json({ error: "Invalid ask id" });
     }
 
+    const db = getDb();
     const current = db.prepare("SELECT id, title, who_asked, note FROM pm_asks WHERE id = ?").get(id);
     if (!current) {
       return res.status(404).json({ error: "Ask not found" });
@@ -70,7 +71,7 @@ export const registerPmAsksRoutes = (app, { db }) => {
       return res.status(400).json({ error: "Invalid ask id" });
     }
 
-    const result = db.prepare("DELETE FROM pm_asks WHERE id = ?").run(id);
+    const result = getDb().prepare("DELETE FROM pm_asks WHERE id = ?").run(id);
     if (result.changes === 0) {
       return res.status(404).json({ error: "Ask not found" });
     }

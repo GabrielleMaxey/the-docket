@@ -125,5 +125,34 @@ export const getIssueBrowseUrl = (issue) => {
   }
 };
 
+/** All issuelinks on an issue (same-project included). */
+export const parseIssueLinks = (issue) => {
+  const links = Array.isArray(issue?.fields?.issuelinks) ? issue.fields.issuelinks : [];
+  const found = [];
+
+  for (const link of links) {
+    const direction = link?.outwardIssue ? "outward" : link?.inwardIssue ? "inward" : null;
+    const linkedIssue = link?.outwardIssue || link?.inwardIssue;
+    if (!direction || !linkedIssue) {
+      continue;
+    }
+
+    const linkedKey = String(linkedIssue.key || "").trim();
+    if (!linkedKey) {
+      continue;
+    }
+
+    found.push({
+      linkType:
+        direction === "outward"
+          ? String(link?.type?.outward || "").trim()
+          : String(link?.type?.inward || "").trim(),
+      linkedKey,
+    });
+  }
+
+  return found;
+};
+
 export const noteMatchesLastJiraPush = (fingerprint, lastPushed) =>
   typeof lastPushed === "string" && lastPushed.length > 0 && fingerprint === lastPushed;
