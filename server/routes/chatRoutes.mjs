@@ -36,39 +36,25 @@ const getOAuthConfig = () => {
   return { clientId, clientSecret, redirectUri, configured: Boolean(clientId && clientSecret) };
 };
 
-export const registerChatRoutes = (app, { db, jiraRequest }) => {
-  const getSessionStmt = db.prepare("SELECT * FROM chat_sessions WHERE id = ?");
-  const getCustomInstructionsStmt = db.prepare(
-    "SELECT value FROM app_settings WHERE key = 'chat_custom_instructions'"
-  );
-  const upsertSessionStmt = db.prepare(`
-    INSERT INTO chat_sessions (id, provider, oauth_tokens, updated_at)
-    VALUES (@id, @provider, @oauthTokens, CURRENT_TIMESTAMP)
-    ON CONFLICT(id) DO UPDATE SET
-      provider = excluded.provider,
-      oauth_tokens = excluded.oauth_tokens,
-      updated_at = CURRENT_TIMESTAMP
-  `);
-  const deleteSessionStmt = db.prepare("DELETE FROM chat_sessions WHERE id = ?");
+const readSession = (db) => {
+  const row = db.prepare("SELECT * FROM chat_sessions WHERE id = ?").get(DEFAULT_SESSION_ID);
+  if (!row) {
+    return null;
+  }
 
-  const readSession = () => {
-    const row = getSessionStmt.get(DEFAULT_SESSION_ID);
-    if (!row) {
-      return null;
-    }
-
-    return {
-      id: row.id,
-      provider: String(row.provider || "").trim(),
-      oauthTokens: parseOAuthTokens(row.oauth_tokens),
-      updatedAt: row.updated_at,
-    };
+  return {
+    id: row.id,
+    provider: String(row.provider || "").trim(),
+    oauthTokens: parseOAuthTokens(row.oauth_tokens),
+    updatedAt: row.updated_at,
   };
+};
 
+export const registerChatRoutes = (app, { getDb, jiraRequest }) => {
   app.get("/api/chat/status", (req, res) => {
     const provider = getConfiguredChatProvider();
     const oauth = getOAuthConfig();
-    const session = readSession();
+    const session = readSession(getDb());
     const oauthConnected = Boolean(session?.oauthTokens?.access_token || session?.oauthTokens?.accessToken);
 
     const managedReady = isManagedAiReady();
@@ -171,7 +157,14 @@ export const registerChatRoutes = (app, { db, jiraRequest }) => {
           .send(tokens?.error_description || tokens?.message || "Token exchange failed");
       }
 
-      upsertSessionStmt.run({
+      getDb().prepare(`
+        INSERT INTO chat_sessions (id, provider, oauth_tokens, updated_at)
+        VALUES (@id, @provider, @oauthTokens, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          provider = excluded.provider,
+          oauth_tokens = excluded.oauth_tokens,
+          updated_at = CURRENT_TIMESTAMP
+      `).run({
         id: DEFAULT_SESSION_ID,
         provider: ROVO_PROVIDER,
         oauthTokens: JSON.stringify(tokens),
@@ -188,7 +181,7 @@ export const registerChatRoutes = (app, { db, jiraRequest }) => {
   });
 
   app.post("/api/chat/auth/signout", (_req, res) => {
-    deleteSessionStmt.run(DEFAULT_SESSION_ID);
+    getDb().prepare("DELETE FROM chat_sessions WHERE id = ?").run(DEFAULT_SESSION_ID);
     return res.json({ ok: true });
   });
 
@@ -201,7 +194,8 @@ export const registerChatRoutes = (app, { db, jiraRequest }) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    const session = readSession();
+    const db = getDb();
+    const session = readSession(db);
     const oauthConnected = Boolean(session?.oauthTokens?.access_token || session?.oauthTokens?.accessToken);
 
     const { path: resolvedPath } = resolveAiPath({
@@ -219,7 +213,8 @@ export const registerChatRoutes = (app, { db, jiraRequest }) => {
     }
 
     try {
-      const customInstructions = getCustomInstructionsStmt.get()?.value || "";
+      const customInstructions =
+        db.prepare("SELECT value FROM app_settings WHERE key = 'chat_custom_instructions'").get()?.value || "";
       const result = await sendChatMessage({
         message,
         epicContext,

@@ -230,31 +230,44 @@ const callLLMForReport = async ({ systemPrompt, context, label = "report", aiPat
   }
 };
 
-export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
-  const getLatestSnapshotStmt = db.prepare(
+const createStatements = (db) => ({
+  getLatestSnapshotStmt: db.prepare(
     "SELECT * FROM dashboard_snapshots ORDER BY refreshed_at DESC LIMIT 1"
-  );
-  const getEpicMetricsStmt = db.prepare(
+  ),
+  getEpicMetricsStmt: db.prepare(
     "SELECT * FROM dashboard_epic_metrics WHERE snapshot_id = ? ORDER BY rowid ASC"
-  );
-  const getAssigneeMetricsStmt = db.prepare(
+  ),
+  getAssigneeMetricsStmt: db.prepare(
     "SELECT * FROM dashboard_assignee_metrics WHERE snapshot_id = ? ORDER BY rowid ASC"
-  );
-  const getCustomInstructionsStmt = db.prepare(
+  ),
+  getCustomInstructionsStmt: db.prepare(
     "SELECT value FROM app_settings WHERE key = 'chat_custom_instructions'"
-  );
-  const getEpicPastDueModeStmt = db.prepare(
+  ),
+  getEpicPastDueModeStmt: db.prepare(
     "SELECT value FROM app_settings WHERE key = 'epic_past_due_mode'"
-  );
-  const listFieldMappingsStmt = db.prepare(
+  ),
+  listFieldMappingsStmt: db.prepare(
     "SELECT role, field_id, field_name FROM jira_field_mappings ORDER BY role ASC"
-  );
-  const getEpicPresetStmt = db.prepare("SELECT * FROM epic_presets WHERE id = ?");
-  const listDirectReportWatchesStmt = db.prepare(
+  ),
+  getEpicPresetStmt: db.prepare("SELECT * FROM epic_presets WHERE id = ?"),
+  listDirectReportWatchesStmt: db.prepare(
     "SELECT * FROM watched_assignees WHERE watch_type = 'direct_reports' ORDER BY sort_order ASC, id ASC"
-  );
+  ),
+});
 
+export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
   app.post("/api/report/generate", async (req, res) => {
+    const db = getDb();
+    const {
+      getLatestSnapshotStmt,
+      getEpicMetricsStmt,
+      getAssigneeMetricsStmt,
+      getCustomInstructionsStmt,
+      getEpicPastDueModeStmt,
+      listFieldMappingsStmt,
+      getEpicPresetStmt,
+      listDirectReportWatchesStmt,
+    } = createStatements(db);
     const audienceKey = String(req.body?.audience || "executive").trim();
     const config = AUDIENCE_CONFIGS[audienceKey] || AUDIENCE_CONFIGS.executive;
     const requestedEpicIds = Array.isArray(req.body?.epicPresetIds)
@@ -467,10 +480,13 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
 
   // ─── Per-project report (WorkWeek task manager) ───────────────────────────
   app.post("/api/report/project", async (req, res) => {
+    const db = getDb();
     const label = String(req.body?.label || "Project").trim();
     const jql = String(req.body?.jql || "").trim();
     const summary = req.body?.summary || {};
-    const customInstructions = String(getCustomInstructionsStmt.get()?.value || "").trim();
+    const customInstructions = String(
+      createStatements(db).getCustomInstructionsStmt.get()?.value || ""
+    ).trim();
     const rawReportType = String(req.body?.reportType || "").trim();
     const careerReportType = isValidCareerReportType(rawReportType) ? rawReportType : null;
     const userGoals = String(req.body?.userGoals || "").trim();
@@ -651,11 +667,14 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
 
   // ─── Weekly plan (WorkWeek task manager) ──────────────────────────────────
   app.post("/api/plan/week", async (req, res) => {
+    const db = getDb();
     const projects = Array.isArray(req.body?.projects) ? req.body.projects : [];
     const focusStyle = String(req.body?.focusStyle || "balance").trim();
     const capacityHours = Number(req.body?.capacityHours) || 40;
     const additionalContext = String(req.body?.additionalContext || "").trim();
-    const customInstructions = String(getCustomInstructionsStmt.get()?.value || "").trim();
+    const customInstructions = String(
+      createStatements(db).getCustomInstructionsStmt.get()?.value || ""
+    ).trim();
 
     if (projects.length === 0) return res.status(400).json({ error: "No project data provided." });
 
@@ -707,7 +726,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
 
   app.get("/api/reports/weekly-digest", (_req, res) => {
     try {
-      const digest = loadWeeklyDigestFromDb(db);
+      const digest = loadWeeklyDigestFromDb(getDb());
       if (!digest) {
         return res.status(404).json({
           error: "No dashboard snapshot found. Run a Dashboard refresh first.",
@@ -757,7 +776,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     const limit = Math.min(200, Math.max(1, Number(req.query?.limit) || 100));
 
     try {
-      const items = listGeneratedReports(db, { source, limit });
+      const items = listGeneratedReports(getDb(), { source, limit });
       return res.json({ items });
     } catch (error) {
       log.error("archive list failed", error instanceof Error ? error.message : error);
@@ -782,7 +801,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
       const label = labelRaw || filename || "Week plan";
 
       try {
-        const archiveId = insertGeneratedReport(db, {
+        const archiveId = insertGeneratedReport(getDb(), {
           source: REPORT_SOURCES.WORK_WEEK,
           reportType: "week_plan",
           label,
@@ -815,7 +834,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     const savedFrom = String(req.body?.savedFrom || "").trim() || "chat";
 
     try {
-      const archiveId = insertGeneratedReport(db, {
+      const archiveId = insertGeneratedReport(getDb(), {
         source: REPORT_SOURCES.ADHOC,
         reportType: "chat_response",
         label,
@@ -845,7 +864,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     }
 
     try {
-      const item = getGeneratedReportById(db, id);
+      const item = getGeneratedReportById(getDb(), id);
       if (!item) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -866,7 +885,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     }
 
     try {
-      const deleted = deleteGeneratedReportById(db, id);
+      const deleted = deleteGeneratedReportById(getDb(), id);
       if (!deleted) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -890,7 +909,7 @@ export const registerReportRoutes = (app, { db, dataDir, jiraRequest }) => {
     }
 
     try {
-      const deletedCount = deleteGeneratedReportsBySource(db, { source });
+      const deletedCount = deleteGeneratedReportsBySource(getDb(), { source });
       return res.json({ ok: true, deletedCount });
     } catch (error) {
       log.error("archive bulk delete failed", error instanceof Error ? error.message : error);

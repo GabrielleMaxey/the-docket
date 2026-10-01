@@ -128,6 +128,47 @@ export const fetchJiraHealth = async () => requestJson( "/api/health" );
 
 export const testJiraConnection = async () => fetchJiraMyself();
 
+export const fetchJiraInstances = async () => requestJson( "/api/jira/instances" );
+
+export const createJiraInstance = async ( body ) =>
+  requestJson( "/api/jira/instances", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify( body ),
+  } );
+
+export const updateJiraInstance = async ( id, body ) =>
+  requestJson( `/api/jira/instances/${ encodeURIComponent( id ) }`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify( body ),
+  } );
+
+export const deleteJiraInstance = async ( id ) =>
+  requestJson( `/api/jira/instances/${ encodeURIComponent( id ) }`, { method: "DELETE" } );
+
+export const activateJiraInstance = async ( id ) =>
+  requestJson( `/api/jira/instances/${ encodeURIComponent( id ) }/activate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: "{}",
+  } );
+
+export const testJiraInstance = async ( id, body = {} ) =>
+  requestJson( `/api/jira/instances/${ encodeURIComponent( id ) }/test`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify( body ),
+  } );
+
 // Send JQL as POST JSON body to avoid URL-encoding edge cases.
 export const fetchJiraSearch = async ( { jql, maxResults = 5 } ) => {
   return requestJson( "/api/jira/search", {

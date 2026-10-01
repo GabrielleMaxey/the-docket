@@ -24,52 +24,7 @@ const JQL_PRESET_KEY = "JQL";
 const REMINDER_SLOT_COUNT = 4;
 const REMINDER_TEXT_MAX_LENGTH = 500;
 
-export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest } ) => {
-  const listEpicPresetsStmt = db.prepare(
-    "SELECT * FROM epic_presets ORDER BY sort_order ASC, id ASC"
-  );
-  const getEpicPresetStmt = db.prepare( "SELECT * FROM epic_presets WHERE id = ?" );
-  const insertEpicPresetStmt = db.prepare( `
-    INSERT INTO epic_presets (epic_key, epic_name, jira_filter_id, jql, preset_type, sort_order, updated_at)
-    VALUES (@epicKey, @epicName, @jiraFilterId, @jql, @presetType, @sortOrder, CURRENT_TIMESTAMP)
-  `);
-  const updateEpicPresetStmt = db.prepare( `
-    UPDATE epic_presets SET
-      epic_key = @epicKey,
-      epic_name = @epicName,
-      jira_filter_id = @jiraFilterId,
-      jql = @jql,
-      preset_type = @presetType,
-      sort_order = @sortOrder,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = @id
-  `);
-  const deleteEpicPresetStmt = db.prepare( "DELETE FROM epic_presets WHERE id = ?" );
-
-  const listFieldMappingsStmt = db.prepare(
-    "SELECT role, field_id, field_name, updated_at FROM jira_field_mappings ORDER BY role ASC"
-  );
-  const upsertFieldMappingStmt = db.prepare( `
-    INSERT INTO jira_field_mappings (role, field_id, field_name, updated_at)
-    VALUES (@role, @fieldId, @fieldName, CURRENT_TIMESTAMP)
-    ON CONFLICT(role) DO UPDATE SET
-      field_id = excluded.field_id,
-      field_name = excluded.field_name,
-      updated_at = CURRENT_TIMESTAMP
-  `);
-
-  const listSettingsStmt = db.prepare( "SELECT key, value FROM app_settings" );
-  const upsertSettingStmt = db.prepare( `
-    INSERT INTO app_settings (key, value, updated_at)
-    VALUES (@key, @value, CURRENT_TIMESTAMP)
-    ON CONFLICT(key) DO UPDATE SET
-      value = excluded.value,
-      updated_at = CURRENT_TIMESTAMP
-  `);
-
-  const listRemindersStmt = db.prepare(
-    "SELECT slot_index, text, done FROM reminders ORDER BY slot_index ASC"
-  );
+const createStatements = ( db ) => {
   const upsertReminderStmt = db.prepare( `
     INSERT INTO reminders (slot_index, text, done, updated_at)
     VALUES (@slotIndex, @text, @done, CURRENT_TIMESTAMP)
@@ -85,45 +40,94 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
     }
   } );
 
-  const readReminders = () => {
-    const bySlot = new Map( listRemindersStmt.all().map( ( row ) => [ row.slot_index, row ] ) );
-    return Array.from( { length: REMINDER_SLOT_COUNT }, ( _, index ) => ( {
-      text: String( bySlot.get( index )?.text || "" ),
-      done: Boolean( bySlot.get( index )?.done ),
-    } ) );
+  return {
+    listEpicPresetsStmt: db.prepare( "SELECT * FROM epic_presets ORDER BY sort_order ASC, id ASC" ),
+    getEpicPresetStmt: db.prepare( "SELECT * FROM epic_presets WHERE id = ?" ),
+    insertEpicPresetStmt: db.prepare( `
+      INSERT INTO epic_presets (epic_key, epic_name, jira_filter_id, jql, preset_type, sort_order, updated_at)
+      VALUES (@epicKey, @epicName, @jiraFilterId, @jql, @presetType, @sortOrder, CURRENT_TIMESTAMP)
+    `),
+    updateEpicPresetStmt: db.prepare( `
+      UPDATE epic_presets SET
+        epic_key = @epicKey,
+        epic_name = @epicName,
+        jira_filter_id = @jiraFilterId,
+        jql = @jql,
+        preset_type = @presetType,
+        sort_order = @sortOrder,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = @id
+    `),
+    deleteEpicPresetStmt: db.prepare( "DELETE FROM epic_presets WHERE id = ?" ),
+
+    listFieldMappingsStmt: db.prepare(
+      "SELECT role, field_id, field_name, updated_at FROM jira_field_mappings ORDER BY role ASC"
+    ),
+    upsertFieldMappingStmt: db.prepare( `
+      INSERT INTO jira_field_mappings (role, field_id, field_name, updated_at)
+      VALUES (@role, @fieldId, @fieldName, CURRENT_TIMESTAMP)
+      ON CONFLICT(role) DO UPDATE SET
+        field_id = excluded.field_id,
+        field_name = excluded.field_name,
+        updated_at = CURRENT_TIMESTAMP
+    `),
+
+    listSettingsStmt: db.prepare( "SELECT key, value FROM app_settings" ),
+    upsertSettingStmt: db.prepare( `
+      INSERT INTO app_settings (key, value, updated_at)
+      VALUES (@key, @value, CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updated_at = CURRENT_TIMESTAMP
+    `),
+
+    listRemindersStmt: db.prepare(
+      "SELECT slot_index, text, done FROM reminders ORDER BY slot_index ASC"
+    ),
+    upsertReminderStmt,
+    saveRemindersTxn,
+
+    listWatchedAssigneesStmt: db.prepare(
+      "SELECT * FROM watched_assignees ORDER BY sort_order ASC, id ASC"
+    ),
+    getWatchedAssigneeStmt: db.prepare( "SELECT * FROM watched_assignees WHERE id = ?" ),
+    insertWatchedAssigneeStmt: db.prepare( `
+      INSERT INTO watched_assignees (display_name, resolved_account_id, watch_type, jql, member_names_json, sort_order, capacity, overdue_date_basis)
+      VALUES (@displayName, @resolvedAccountId, @watchType, @jql, @memberNamesJson, @sortOrder, @capacity, @overdueDateBasis)
+    `),
+    updateWatchedAssigneeStmt: db.prepare( `
+      UPDATE watched_assignees SET
+        display_name = @displayName,
+        resolved_account_id = @resolvedAccountId,
+        watch_type = @watchType,
+        jql = @jql,
+        member_names_json = @memberNamesJson,
+        sort_order = @sortOrder,
+        capacity = @capacity,
+        overdue_date_basis = @overdueDateBasis
+      WHERE id = @id
+    `),
+    deleteWatchedAssigneeStmt: db.prepare( "DELETE FROM watched_assignees WHERE id = ?" ),
   };
+};
 
-  const listWatchedAssigneesStmt = db.prepare(
-    "SELECT * FROM watched_assignees ORDER BY sort_order ASC, id ASC"
-  );
-  const getWatchedAssigneeStmt = db.prepare( "SELECT * FROM watched_assignees WHERE id = ?" );
-  const insertWatchedAssigneeStmt = db.prepare( `
-    INSERT INTO watched_assignees (display_name, resolved_account_id, watch_type, jql, member_names_json, sort_order, capacity, overdue_date_basis)
-    VALUES (@displayName, @resolvedAccountId, @watchType, @jql, @memberNamesJson, @sortOrder, @capacity, @overdueDateBasis)
-  `);
-  const updateWatchedAssigneeStmt = db.prepare( `
-    UPDATE watched_assignees SET
-      display_name = @displayName,
-      resolved_account_id = @resolvedAccountId,
-      watch_type = @watchType,
-      jql = @jql,
-      member_names_json = @memberNamesJson,
-      sort_order = @sortOrder,
-      capacity = @capacity,
-      overdue_date_basis = @overdueDateBasis
-    WHERE id = @id
-  `);
-  const deleteWatchedAssigneeStmt = db.prepare( "DELETE FROM watched_assignees WHERE id = ?" );
+const readSettingsMap = ( stmts ) => {
+  const rows = stmts.listSettingsStmt.all();
+  return rows.reduce( ( acc, row ) => {
+    acc[ row.key ] = String( row.value ?? "" );
+    return acc;
+  }, {} );
+};
 
-  const readSettingsMap = () => {
-    const rows = listSettingsStmt.all();
-    return rows.reduce( ( acc, row ) => {
-      acc[ row.key ] = String( row.value ?? "" );
-      return acc;
-    }, {} );
-  };
+const readReminders = ( stmts ) => {
+  const bySlot = new Map( stmts.listRemindersStmt.all().map( ( row ) => [ row.slot_index, row ] ) );
+  return Array.from( { length: REMINDER_SLOT_COUNT }, ( _, index ) => ( {
+    text: String( bySlot.get( index )?.text || "" ),
+    done: Boolean( bySlot.get( index )?.done ),
+  } ) );
+};
 
-  const normalizeEpicPresetPayload = ( body, existing = null ) => {
+const normalizeEpicPresetPayload = ( body, existing = null ) => {
     const presetType = String( body?.presetType ?? existing?.preset_type ?? "epic" ).trim();
     const epicName = String( body?.epicName ?? existing?.epic_name ?? "" ).trim();
     const jql = String( body?.jql ?? existing?.jql ?? "" ).trim();
@@ -243,8 +247,9 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
     };
   };
 
+export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest } ) => {
   app.get( "/api/epic-presets", ( _req, res ) => {
-    const items = listEpicPresetsStmt.all().map( mapEpicPresetRow );
+    const items = createStatements( getDb() ).listEpicPresetsStmt.all().map( mapEpicPresetRow );
     return res.json( { items } );
   } );
 
@@ -255,15 +260,17 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
       return res.status( 400 ).json( payload );
     }
 
-    const result = insertEpicPresetStmt.run( payload );
-    const row = getEpicPresetStmt.get( result.lastInsertRowid );
+    const stmts = createStatements( getDb() );
+    const result = stmts.insertEpicPresetStmt.run( payload );
+    const row = stmts.getEpicPresetStmt.get( result.lastInsertRowid );
     log.info( `created epic preset ${ row.id } "${ payload.epicName }" (${ payload.presetType })` );
     return res.status( 201 ).json( mapEpicPresetRow( row ) );
   } );
 
   app.put( "/api/epic-presets/:id", ( req, res ) => {
     const id = Number( req.params.id );
-    const existing = getEpicPresetStmt.get( id );
+    const stmts = createStatements( getDb() );
+    const existing = stmts.getEpicPresetStmt.get( id );
     if ( !existing )
     {
       return res.status( 404 ).json( { error: "Epic preset not found" } );
@@ -275,14 +282,14 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
       return res.status( 400 ).json( payload );
     }
 
-    updateEpicPresetStmt.run( { id, ...payload } );
+    stmts.updateEpicPresetStmt.run( { id, ...payload } );
     log.info( `updated epic preset ${ id } "${ payload.epicName }"` );
-    return res.json( mapEpicPresetRow( getEpicPresetStmt.get( id ) ) );
+    return res.json( mapEpicPresetRow( stmts.getEpicPresetStmt.get( id ) ) );
   } );
 
   app.get( "/api/epic-presets/:id/scope-jql", async ( req, res ) => {
     const id = Number( req.params.id );
-    const row = getEpicPresetStmt.get( id );
+    const row = createStatements( getDb() ).getEpicPresetStmt.get( id );
     if ( !row )
     {
       return res.status( 404 ).json( { error: "Epic preset not found" } );
@@ -310,19 +317,20 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
 
   app.delete( "/api/epic-presets/:id", ( req, res ) => {
     const id = Number( req.params.id );
-    const existing = getEpicPresetStmt.get( id );
+    const stmts = createStatements( getDb() );
+    const existing = stmts.getEpicPresetStmt.get( id );
     if ( !existing )
     {
       return res.status( 404 ).json( { error: "Epic preset not found" } );
     }
 
-    deleteEpicPresetStmt.run( id );
+    stmts.deleteEpicPresetStmt.run( id );
     log.info( `deleted epic preset ${ id }` );
     return res.json( { ok: true, id } );
   } );
 
   app.get( "/api/epic-presets/export", ( _req, res ) => {
-    const items = listEpicPresetsStmt.all().map( mapEpicPresetRow );
+    const items = createStatements( getDb() ).listEpicPresetsStmt.all().map( mapEpicPresetRow );
     return res.json( {
       version: 1,
       exportedAt: new Date().toISOString(),
@@ -347,6 +355,8 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
       return res.status( 400 ).json( { error: "No presets provided" } );
     }
 
+    const db = getDb();
+    const stmts = createStatements( db );
     if ( mode === "replace" )
     {
       db.prepare( "DELETE FROM epic_presets" ).run();
@@ -362,7 +372,7 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
 
     const existingFingerprints = new Set(
       mode === "merge"
-        ? listEpicPresetsStmt.all().map( ( row ) => presetFingerprint( mapEpicPresetRow( row ) ) )
+        ? stmts.listEpicPresetsStmt.all().map( ( row ) => presetFingerprint( mapEpicPresetRow( row ) ) )
         : []
     );
 
@@ -393,7 +403,7 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
         continue;
       }
 
-      insertEpicPresetStmt.run( payload );
+      stmts.insertEpicPresetStmt.run( payload );
       existingFingerprints.add( fp );
       imported += 1;
     }
@@ -403,7 +413,7 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
       ok: true,
       imported,
       skipped,
-      items: listEpicPresetsStmt.all().map( mapEpicPresetRow ),
+      items: stmts.listEpicPresetsStmt.all().map( mapEpicPresetRow ),
     } );
   } );
 
@@ -488,14 +498,15 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
       } );
     }
 
-    const settings = readSettingsMap();
+    const stmts = createStatements( getDb() );
+    const settings = readSettingsMap( stmts );
     const epicPastDueMode = EPIC_PAST_DUE_MODES.has( settings.epic_past_due_mode )
       ? settings.epic_past_due_mode
       : "either";
-    const mappingsByRole = buildFieldMappingsMap( listFieldMappingsStmt.all() );
+    const mappingsByRole = buildFieldMappingsMap( stmts.listFieldMappingsStmt.all() );
 
     const selectedPresets = epicPresetIds
-      .map( ( id ) => getEpicPresetStmt.get( id ) )
+      .map( ( id ) => stmts.getEpicPresetStmt.get( id ) )
       .filter( Boolean )
       .map( mapEpicPresetRow );
 
@@ -641,7 +652,7 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
   } );
 
   app.get( "/api/jira/field-mappings", ( _req, res ) => {
-    const items = listFieldMappingsStmt.all().map( ( row ) => ( {
+    const items = createStatements( getDb() ).listFieldMappingsStmt.all().map( ( row ) => ( {
       role: row.role,
       fieldId: String( row.field_id || "" ).trim(),
       fieldName: String( row.field_name || "" ).trim(),
@@ -657,6 +668,7 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
       return res.status( 400 ).json( { error: "Provide mappings array" } );
     }
 
+    const stmts = createStatements( getDb() );
     for ( const item of mappings )
     {
       const role = String( item?.role || "" ).trim();
@@ -666,14 +678,14 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
         return res.status( 400 ).json( { error: "Each mapping needs role and fieldName" } );
       }
 
-      upsertFieldMappingStmt.run( {
+      stmts.upsertFieldMappingStmt.run( {
         role,
         fieldId: String( item?.fieldId || "" ).trim(),
         fieldName,
       } );
     }
 
-    const items = listFieldMappingsStmt.all().map( ( row ) => ( {
+    const items = stmts.listFieldMappingsStmt.all().map( ( row ) => ( {
       role: row.role,
       fieldId: String( row.field_id || "" ).trim(),
       fieldName: String( row.field_name || "" ).trim(),
@@ -701,13 +713,14 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
         fields.map( ( field ) => [ String( field.name || "" ).trim().toLowerCase(), field ] )
       );
 
-      const current = listFieldMappingsStmt.all();
+      const stmts = createStatements( getDb() );
+      const current = stmts.listFieldMappingsStmt.all();
       for ( const row of current )
       {
         const match = byName.get( String( row.field_name || "" ).trim().toLowerCase() );
         if ( match?.id )
         {
-          upsertFieldMappingStmt.run( {
+          stmts.upsertFieldMappingStmt.run( {
             role: row.role,
             fieldId: String( match.id ),
             fieldName: String( match.name || row.field_name ),
@@ -715,7 +728,7 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
         }
       }
 
-      const items = listFieldMappingsStmt.all().map( ( mapping ) => ( {
+      const items = stmts.listFieldMappingsStmt.all().map( ( mapping ) => ( {
         role: mapping.role,
         fieldId: String( mapping.field_id || "" ).trim(),
         fieldName: String( mapping.field_name || "" ).trim(),
@@ -764,7 +777,7 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
   } );
 
   app.get( "/api/settings", ( _req, res ) => {
-    return res.json( { settings: readSettingsMap() } );
+    return res.json( { settings: readSettingsMap( createStatements( getDb() ) ) } );
   } );
 
   app.put( "/api/settings", ( req, res ) => {
@@ -774,6 +787,7 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
       return res.status( 400 ).json( { error: "Provide settings object" } );
     }
 
+    const stmts = createStatements( getDb() );
     for ( const [ key, value ] of Object.entries( settings ) )
     {
       const normalizedKey = String( key ).trim();
@@ -794,17 +808,17 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
         }
       }
 
-      upsertSettingStmt.run( {
+      stmts.upsertSettingStmt.run( {
         key: normalizedKey,
         value: String( value ?? "" ),
       } );
     }
 
-    return res.json( { settings: readSettingsMap() } );
+    return res.json( { settings: readSettingsMap( stmts ) } );
   } );
 
   app.get( "/api/reminders", ( _req, res ) => {
-    return res.json( { items: readReminders() } );
+    return res.json( { items: readReminders( createStatements( getDb() ) ) } );
   } );
 
   app.put( "/api/reminders", ( req, res ) => {
@@ -815,12 +829,13 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
       done: incoming[ index ]?.done ? 1 : 0,
     } ) );
 
-    saveRemindersTxn( rows );
-    return res.json( { items: readReminders() } );
+    const stmts = createStatements( getDb() );
+    stmts.saveRemindersTxn( rows );
+    return res.json( { items: readReminders( stmts ) } );
   } );
 
   app.get( "/api/watched-assignees", ( _req, res ) => {
-    const items = listWatchedAssigneesStmt.all().map( mapWatchedAssigneeRow );
+    const items = createStatements( getDb() ).listWatchedAssigneesStmt.all().map( mapWatchedAssigneeRow );
     return res.json( { items } );
   } );
 
@@ -831,14 +846,16 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
       return res.status( 400 ).json( payload );
     }
 
-    const result = insertWatchedAssigneeStmt.run( payload );
-    const row = getWatchedAssigneeStmt.get( result.lastInsertRowid );
+    const stmts = createStatements( getDb() );
+    const result = stmts.insertWatchedAssigneeStmt.run( payload );
+    const row = stmts.getWatchedAssigneeStmt.get( result.lastInsertRowid );
     return res.status( 201 ).json( mapWatchedAssigneeRow( row ) );
   } );
 
   app.put( "/api/watched-assignees/:id", ( req, res ) => {
     const id = Number( req.params.id );
-    const existing = getWatchedAssigneeStmt.get( id );
+    const stmts = createStatements( getDb() );
+    const existing = stmts.getWatchedAssigneeStmt.get( id );
     if ( !existing )
     {
       return res.status( 404 ).json( { error: "Watched assignee not found" } );
@@ -850,19 +867,20 @@ export const registerAppConfigRoutes = ( app, { db, jiraRequest, ensureEnvOrResp
       return res.status( 400 ).json( payload );
     }
 
-    updateWatchedAssigneeStmt.run( { id, ...payload } );
-    return res.json( mapWatchedAssigneeRow( getWatchedAssigneeStmt.get( id ) ) );
+    stmts.updateWatchedAssigneeStmt.run( { id, ...payload } );
+    return res.json( mapWatchedAssigneeRow( stmts.getWatchedAssigneeStmt.get( id ) ) );
   } );
 
   app.delete( "/api/watched-assignees/:id", ( req, res ) => {
     const id = Number( req.params.id );
-    const existing = getWatchedAssigneeStmt.get( id );
+    const stmts = createStatements( getDb() );
+    const existing = stmts.getWatchedAssigneeStmt.get( id );
     if ( !existing )
     {
       return res.status( 404 ).json( { error: "Watched assignee not found" } );
     }
 
-    deleteWatchedAssigneeStmt.run( id );
+    stmts.deleteWatchedAssigneeStmt.run( id );
     return res.json( { ok: true, id } );
   } );
 };

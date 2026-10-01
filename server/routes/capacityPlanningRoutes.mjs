@@ -8,7 +8,7 @@ import { chunkValues } from "../../shared/jiraBatch.mjs";
 
 const log = createLogger("capacity-planning");
 
-export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
+export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
   // On-demand only (hover-triggered on the frontend) — a single-issue changelog
   // fetch, not part of the bulk Gantt load. Bulk-fetching changelogs for every
   // issue would bloat every Gantt load; this stays cheap by only firing per bar.
@@ -81,6 +81,7 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
     }
 
     try {
+      const db = getDb();
       let watchedRows = db
         .prepare("SELECT * FROM watched_assignees ORDER BY sort_order ASC, id ASC")
         .all()
@@ -124,6 +125,7 @@ export const registerCapacityPlanningRoutes = (app, { db, jiraRequest, runJiraSe
     if (!slug) return res.status(400).json({ error: "slug is required" });
 
     try {
+      const db = getDb();
       let loaded = [];
       let displayName = "";
 

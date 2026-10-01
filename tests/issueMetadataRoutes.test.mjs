@@ -17,8 +17,8 @@ describe("issue metadata image routes", () => {
     initDatabase(db);
     const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "metadata-images-test-"));
     registerIssueMetadataRoutes(app, {
-      db,
-      noteImagesDir: baseDir,
+      getDb: () => db,
+      getNoteImagesDir: () => baseDir,
       jiraRequest: async () => ({ ok: true, status: 201, data: {} }),
       jiraMultipartRequest: async () => ({ ok: true, status: 201, data: {} }),
       resolveJiraAttachmentMediaId: async () => "6e7c7f2c-dd7a-499c-bceb-6f32bfbf32b5",
@@ -112,8 +112,8 @@ describe("issue metadata date fields", () => {
     const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "metadata-dates-test-"));
     const jiraRequestCalls = [];
     registerIssueMetadataRoutes(app, {
-      db,
-      noteImagesDir: baseDir,
+      getDb: () => db,
+      getNoteImagesDir: () => baseDir,
       jiraRequest:
         jiraRequest ||
         (async (options) => {
