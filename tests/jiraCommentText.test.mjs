@@ -5,6 +5,7 @@ import {
   fetchLatestCommentTextForIssue,
   fetchLatestCommentTextBulk,
 } from "../server/lib/jiraCommentText.mjs";
+import { noteMarkdownToHtml } from "../src/utils/noteMarkdown.js";
 
 describe("adfToPlainText", () => {
   it("extracts plain text paragraphs", () => {
@@ -34,6 +35,74 @@ describe("adfToPlainText", () => {
       ],
     };
     assert.equal(adfToPlainText(body), "@Alice please review");
+  });
+
+  it("preserves headings, lists, bold, italic, and newlines as markdown", () => {
+    const body = {
+      type: "doc",
+      content: [
+        {
+          type: "heading",
+          attrs: { level: 2 },
+          content: [{ type: "text", text: "Status" }],
+        },
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Please ", marks: [] },
+            { type: "text", text: "review", marks: [{ type: "strong" }] },
+            { type: "text", text: " this ", marks: [] },
+            { type: "text", text: "soon", marks: [{ type: "em" }] },
+            { type: "hardBreak" },
+            { type: "text", text: "Thanks" },
+          ],
+        },
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "First" }],
+                },
+              ],
+            },
+            {
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Second" }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    assert.equal(
+      adfToPlainText(body),
+      ["## Status", "Please **review** this *soon*\nThanks", "- First\n- Second"].join("\n\n")
+    );
+  });
+});
+
+describe("noteMarkdownToHtml", () => {
+  it("renders bold, italic, lists, and headings", () => {
+    const html = noteMarkdownToHtml("## Status\n\nPlease **review** this *soon*\n\n- First\n- Second");
+    assert.match(html, /<h2>Status<\/h2>/);
+    assert.match(html, /<strong>review<\/strong>/);
+    assert.match(html, /<em>soon<\/em>/);
+    assert.match(html, /<ul><li>First<\/li><li>Second<\/li><\/ul>/);
+  });
+
+  it("escapes raw HTML in notes", () => {
+    const html = noteMarkdownToHtml("<script>alert(1)</script>");
+    assert.equal(html.includes("<script>"), false);
+    assert.match(html, /&lt;script&gt;/);
   });
 });
 

@@ -6,52 +6,163 @@ const chunkArray = (items, size) => {
   return chunks;
 };
 
+const markTypes = (marks) =>
+  new Set((Array.isArray(marks) ? marks : []).map((mark) => mark?.type).filter(Boolean));
+
+const wrapInlineMarkdown = (text, marks) => {
+  let out = String(text || "");
+  if (!out) return "";
+  const types = markTypes(marks);
+  if (types.has("code")) {
+    return `\`${out.replace(/`/g, "'")}\``;
+  }
+  if (types.has("link")) {
+    const href = marks.find((mark) => mark?.type === "link")?.attrs?.href;
+    if (href) {
+      out = `[${out}](${href})`;
+    }
+  }
+  if (types.has("strong")) {
+    out = `**${out}**`;
+  }
+  if (types.has("em")) {
+    out = `*${out}*`;
+  }
+  if (types.has("strike")) {
+    out = `~~${out}~~`;
+  }
+  return out;
+};
+
+const inlineFromNode = (node) => {
+  if (!node || typeof node !== "object") {
+    return "";
+  }
+
+  if (node.type === "text" && typeof node.text === "string") {
+    return wrapInlineMarkdown(node.text, node.marks);
+  }
+
+  if (node.type === "hardBreak") {
+    return "\n";
+  }
+
+  if (node.type === "mention") {
+    return String(node.attrs?.text || node.attrs?.displayName || "").trim();
+  }
+
+  if (node.type === "emoji") {
+    return String(node.attrs?.shortName || node.attrs?.text || "").trim();
+  }
+
+  if (node.type === "inlineCard" || node.type === "blockCard" || node.type === "embedCard") {
+    return String(node.attrs?.url || "").trim();
+  }
+
+  if (!Array.isArray(node.content)) {
+    return "";
+  }
+
+  return node.content.map(inlineFromNode).join("");
+};
+
+const blockFromNode = (node) => {
+  if (!node || typeof node !== "object") {
+    return "";
+  }
+
+  switch (node.type) {
+    case "paragraph":
+      return inlineFromNode(node);
+    case "heading": {
+      const level = Math.min(6, Math.max(1, Number(node.attrs?.level) || 1));
+      const text = inlineFromNode(node).trim();
+      return text ? `${"#".repeat(level)} ${text}` : "";
+    }
+    case "bulletList":
+      return (node.content || [])
+        .map((item) => {
+          const text = (item.content || []).map(blockFromNode).join("\n").trim();
+          return text
+            .split("\n")
+            .map((line, index) => (index === 0 ? `- ${line}` : `  ${line}`))
+            .join("\n");
+        })
+        .filter(Boolean)
+        .join("\n");
+    case "orderedList": {
+      let n = Number(node.attrs?.order) || 1;
+      return (node.content || [])
+        .map((item) => {
+          const text = (item.content || []).map(blockFromNode).join("\n").trim();
+          const prefix = `${n++}. `;
+          return text
+            .split("\n")
+            .map((line, index) => (index === 0 ? `${prefix}${line}` : `   ${line}`))
+            .join("\n");
+        })
+        .filter(Boolean)
+        .join("\n");
+    }
+    case "blockquote": {
+      const inner = (node.content || []).map(blockFromNode).filter(Boolean).join("\n\n");
+      return inner
+        .split("\n")
+        .map((line) => `> ${line}`)
+        .join("\n");
+    }
+    case "codeBlock": {
+      const lang = String(node.attrs?.language || "").trim();
+      const code = (node.content || [])
+        .map((child) => (child.type === "text" ? child.text : inlineFromNode(child)))
+        .join("");
+      return `\`\`\`${lang}\n${code}\n\`\`\``;
+    }
+    case "rule":
+      return "---";
+    case "listItem":
+      return (node.content || []).map(blockFromNode).filter(Boolean).join("\n");
+    case "doc":
+      return (node.content || []).map(blockFromNode).filter((part) => part.length > 0).join("\n\n");
+    case "mediaSingle":
+    case "mediaGroup":
+    case "media":
+      return "[image]";
+    case "panel": {
+      const inner = (node.content || []).map(blockFromNode).filter(Boolean).join("\n\n");
+      return inner;
+    }
+    case "table":
+      return (node.content || [])
+        .map((row) =>
+          (row.content || [])
+            .map((cell) => (cell.content || []).map(blockFromNode).join(" ").trim())
+            .join(" | ")
+        )
+        .filter(Boolean)
+        .join("\n");
+    default:
+      if (Array.isArray(node.content)) {
+        return node.content.map(blockFromNode).filter(Boolean).join("\n\n");
+      }
+      return inlineFromNode(node);
+  }
+};
+
+/** ADF → note text with markdown-style structure (newlines, bold, lists, headings). */
 export const adfToPlainText = (body) => {
   if (typeof body === "string") {
-    return body.trim();
+    return body.replace(/\r\n/g, "\n").trim();
   }
 
   if (!body || typeof body !== "object") {
     return "";
   }
 
-  const walk = (node) => {
-    if (!node || typeof node !== "object") {
-      return [];
-    }
-
-    if (node.type === "text" && typeof node.text === "string") {
-      return [node.text];
-    }
-
-    // Mentions / emoji often have no text children — use attrs so notes still populate.
-    if (node.type === "mention") {
-      const label = String(node.attrs?.text || node.attrs?.displayName || "").trim();
-      return label ? [label] : [];
-    }
-
-    if (node.type === "emoji") {
-      const short = String(node.attrs?.shortName || node.attrs?.text || "").trim();
-      return short ? [short] : [];
-    }
-
-    if (node.type === "inlineCard" || node.type === "blockCard" || node.type === "embedCard") {
-      const url = String(node.attrs?.url || "").trim();
-      return url ? [url] : [];
-    }
-
-    if (node.type === "hardBreak") {
-      return [" "];
-    }
-
-    if (!Array.isArray(node.content)) {
-      return [];
-    }
-
-    return node.content.flatMap(walk);
-  };
-
-  return walk(body).join("").replace(/\s+/g, " ").trim();
+  return blockFromNode(body)
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 };
 
 const commentFieldsFrom = (comment) => {
