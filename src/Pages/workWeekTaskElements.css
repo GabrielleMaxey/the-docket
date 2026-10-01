@@ -2271,6 +2271,39 @@
   word-break: break-word;
 }
 
+.work-week-page .ww-issue-links {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #64748b;
+  word-break: break-word;
+}
+
+.work-week-page .ww-issue-links a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.work-week-page .ww-issue-links a:hover {
+  text-decoration: underline;
+}
+
+.work-week-page .ww-issue-links--compact {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.work-week-page .ww-issue-links--expanded {
+  padding: 0.5rem 0.75rem 0.65rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.work-week-page .ww-issue-links-item + .ww-issue-links-item {
+  margin-top: 0.2rem;
+}
+
 .work-week-page .ww-row-detail-cell {
   padding: 0;
   background: transparent;
