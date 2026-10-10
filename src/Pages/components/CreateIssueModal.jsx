@@ -110,6 +110,17 @@ const mergeDropdownOptions = (options, value) => {
   return list;
 };
 
+const isMarkdownAttachment = (file) => {
+  if (!file) return false;
+  if (file.type === "text/markdown") return true;
+  return /\.md$/i.test(String(file.name || ""));
+};
+
+const findFirstMarkdownAttachment = (files) => {
+  if (!Array.isArray(files)) return null;
+  return files.find(isMarkdownAttachment) ?? null;
+};
+
 const ComboDropdownField = ({
   label,
   value,
@@ -291,6 +302,12 @@ const CreateIssueModal = ({
   const [attachmentPreference, setAttachmentPreference] = React.useState("attachmentsOnly");
   const [creatingSubtasks, setCreatingSubtasks] = React.useState(false);
   const [subtaskResults, setSubtaskResults] = React.useState([]);
+  const [loadingMarkdownDescription, setLoadingMarkdownDescription] = React.useState(false);
+
+  const markdownAttachment = React.useMemo(
+    () => findFirstMarkdownAttachment(attachments),
+    [attachments]
+  );
 
   const isManualEpic = epicSelectValue === "__other__";
   const activePreset = React.useMemo(
@@ -917,6 +934,30 @@ const CreateIssueModal = ({
       setGeneratingDesc(false);
     }
   };
+
+  const handleUseMarkdownAsDescription = React.useCallback(async () => {
+    const file = findFirstMarkdownAttachment(attachments);
+    if (!file) return;
+    if (description.trim() && !window.confirm("Replace description with file contents?")) {
+      return;
+    }
+    setLoadingMarkdownDescription(true);
+    try {
+      const text = await file.text();
+      setDescription(text);
+      if (descriptionError) setDescriptionError("");
+      if (error) setError("");
+      if (standardsOverrideAvailable) {
+        setStandardsOverrideAvailable(false);
+        setOverrideDescriptionStandards(false);
+        setOverrideReason("");
+      }
+    } catch (readError) {
+      setError(readError instanceof Error ? readError.message : "Failed to read markdown file");
+    } finally {
+      setLoadingMarkdownDescription(false);
+    }
+  }, [attachments, description, descriptionError, error, standardsOverrideAvailable]);
 
   const applyValidationErrors = (errors) => {
     const list = Array.isArray(errors) ? errors : [];
@@ -1672,7 +1713,41 @@ const CreateIssueModal = ({
           ) : null}
 
           <Form.Field>
-            <label>Attachments</label>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.3rem",
+              }}
+            >
+              <label style={{ margin: 0 }}>Attachments</label>
+              {markdownAttachment ? (
+                <Button
+                  type="button"
+                  size="small"
+                  loading={loadingMarkdownDescription}
+                  disabled={
+                    !canEditIssueFields
+                    || submitting
+                    || creatingSubtasks
+                    || Boolean(createdIssueKey)
+                  }
+                  onClick={handleUseMarkdownAsDescription}
+                  style={{
+                    backgroundColor: "#fff",
+                    color: "#0c93d9",
+                    border: "1px solid #0c93d9",
+                    borderRadius: "6px",
+                    padding: "0.35em 0.85em",
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  Use .md as description
+                </Button>
+              ) : null}
+            </div>
             <AttachmentPicker
               files={attachments}
               onChange={setAttachments}
