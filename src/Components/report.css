@@ -227,6 +227,30 @@
   font-weight: 600;
 }
 
+.create-issue-writeup-preview {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.create-issue-writeup-preview-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 0.4rem;
+}
+
+.create-issue-writeup-preview .app-report-markdown .report-p {
+  margin: 0.35rem 0;
+  font-size: 0.88rem;
+}
+
 .app-report-contributor-legend-row {
   display: flex;
   flex-wrap: wrap;

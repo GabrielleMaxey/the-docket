@@ -92,6 +92,8 @@ import {
 } from "../../../shared/aiHelperIntake.mjs";
 import AiHelperIntakePanel from "./AiHelperIntakePanel";
 import AttachmentPicker from "./AttachmentPicker";
+import SimpleMarkdown from "../../Components/SimpleMarkdown.jsx";
+import "../../Components/report.css";
 import { useAttachmentLimits } from "./AttachFilesModal";
 import useCreateIssueManualKey from "../hooks/useCreateIssueManualKey";
 
@@ -1518,6 +1520,12 @@ const CreateIssueModal = ({
                 ? "Short overview, then bulleted steps to reproduce, troubleshooting, and fix approach."
                 : `Short overview, then bulleted work items for this ${issueType.toLowerCase()}…`}
               style={{ width: "100%", padding: "0.5em 0.8em", border: "1px solid #e2e8f0", borderRadius: "6px", resize: "vertical", fontFamily: "inherit", fontSize: "0.9rem", lineHeight: 1.45, whiteSpace: "pre-wrap" }} />
+            {description.trim() ? (
+              <div className="create-issue-writeup-preview" aria-live="polite">
+                <div className="create-issue-writeup-preview-label">Write-up preview</div>
+                <SimpleMarkdown text={description} />
+              </div>
+            ) : null}
             {descriptionError ? (
               <Message negative size="small" style={{ marginTop: "0.35rem", whiteSpace: "pre-wrap" }}>
                 {descriptionError}
