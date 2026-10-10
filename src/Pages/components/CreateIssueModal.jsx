@@ -222,7 +222,17 @@ const buildParentDropdownOptions = ({ parentOptions, issueType }) => {
   return [epicOption, ...storyOptions];
 };
 
-const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, onCreated }) => {
+const CreateIssueModal = ({
+  open,
+  onClose,
+  epicPresets,
+  defaultEpicSelectValue,
+  initialSummary = "",
+  initialDescription = "",
+  sourceAskId = null,
+  onAskLinked,
+  onCreated,
+}) => {
   const [projectKey, setProjectKey] = React.useState("");
   const [issueType, setIssueType] = React.useState("Story");
   const [summary, setSummary] = React.useState("");
@@ -426,8 +436,8 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     setEpicSelectValue(defaultEpicSelectValue || "");
     setManualEpicInput("");
     resetParentState();
-    setSummary("");
-    setDescription("");
+    setSummary(String(initialSummary || ""));
+    setDescription(String(initialDescription || ""));
     setAssignee("");
     setError("");
     setDescriptionError("");
@@ -458,7 +468,7 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     setIntakeValues(createEmptyAiHelperIntake("Story"));
     setIntakeMissingFieldIds([]);
     setDraftedFromIntake(false);
-  }, [open, defaultEpicSelectValue, resetParentState]);
+  }, [open, defaultEpicSelectValue, initialDescription, initialSummary, resetParentState]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -1062,7 +1072,12 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       setSubmitting(false);
       setSuccess(createdParentKey ? `Created ${createdParentKey}` : "Issue created.");
     }
-    if (onCreated && createdParentKey) onCreated(createdParentKey);
+    if (createdParentKey) {
+      if (sourceAskId && onAskLinked) {
+        void onAskLinked(sourceAskId, createdParentKey);
+      }
+      if (onCreated) onCreated(createdParentKey);
+    }
   };
 
   const intakeCheck = React.useMemo(

@@ -1,10 +1,11 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Container, Header, Message, Segment, Button } from "semantic-ui-react";
 import { fetchCapacityPlanning, fetchWatchedAssignees, saveAdHocReport, fetchPmAsks, fetchJiraHealth, createPmAsk, updatePmAsk, deletePmAsk } from "../services/jiraClient";
 import GanttChart from "./components/GanttChart";
 import { getStatusColor } from "../utils/statusScale";
 import { buildWorkWeekHref } from "../utils/workWeekNavigation";
+import { writePmAskCreateIssueHandoff } from "../utils/pmAskCreateIssueHandoff";
 import { usePersistedState } from "./hooks/usePersistedState";
 import { useFlash } from "./hooks/useFlash";
 import { reconcileSelectedEntryIds, sameIdList, watchTypeLabel } from "./pmEntrySelection";
@@ -631,6 +632,7 @@ const getPmAskStatusLabel = (status) => {
 };
 
 const AsksPanel = () => {
+  const navigate = useNavigate();
   const [asks, setAsks] = React.useState([]);
   const [error, setError] = React.useState("");
   const [jiraBaseUrl, setJiraBaseUrl] = React.useState("");
@@ -825,6 +827,20 @@ const AsksPanel = () => {
                       <>
                         <button type="button" className="ww-page-btn" onClick={() => handleEdit(ask)}>Edit</button>
                         <button type="button" className="ww-page-btn" onClick={() => handleDelete(ask.id)}>Delete</button>
+                        <button
+                          type="button"
+                          className="ww-page-btn"
+                          onClick={() => {
+                            writePmAskCreateIssueHandoff({
+                              askId: ask.id,
+                              title: ask.title,
+                              note: ask.note,
+                            });
+                            navigate("/work-week");
+                          }}
+                        >
+                          Create a task
+                        </button>
                         <button type="button" className="ww-page-btn" onClick={() => handleSetStatus(ask.id, "done")}>Done</button>
                         <button type="button" className="ww-page-btn" onClick={() => handleSetStatus(ask.id, "canceled")}>Cancel</button>
                       </>
