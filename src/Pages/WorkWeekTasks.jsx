@@ -673,7 +673,6 @@ const WorkWeekTasks = () => {
         defaultEpicSelectValue={createIssueDefaults.epicSelectValue}
         initialSummary={createIssuePrefill?.title || ""}
         initialDescription={createIssuePrefill?.note || ""}
-        sourceAskId={createIssuePrefill?.askId ?? null}
         onCreated={async (createdKey) => {
           void handleRunJql();
           const key = String(createdKey || "");

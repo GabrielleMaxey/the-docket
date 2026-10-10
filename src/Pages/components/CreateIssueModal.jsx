@@ -242,8 +242,6 @@ const CreateIssueModal = ({
   defaultEpicSelectValue,
   initialSummary = "",
   initialDescription = "",
-  sourceAskId = null,
-  onAskLinked,
   onCreated,
 }) => {
   const [projectKey, setProjectKey] = React.useState("");
@@ -1120,9 +1118,6 @@ const CreateIssueModal = ({
       setSuccess(createdParentKey ? `Created ${createdParentKey}` : "Issue created.");
     }
     if (createdParentKey) {
-      if (sourceAskId && onAskLinked) {
-        void onAskLinked(sourceAskId, createdParentKey);
-      }
       if (onCreated) onCreated(createdParentKey);
     }
   };
@@ -1729,6 +1724,7 @@ const CreateIssueModal = ({
                   loading={loadingMarkdownDescription}
                   disabled={
                     !canEditIssueFields
+                    || loadingMarkdownDescription
                     || submitting
                     || creatingSubtasks
                     || Boolean(createdIssueKey)
