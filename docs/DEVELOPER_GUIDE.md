@@ -99,7 +99,7 @@ taskManager/
 │   ├── createIssuePresetUtils.mjs # Preset dropdown values, JQL epic key extraction
 │   ├── createIssueParentUtils.mjs # Manual key validation + query-issue parent resolution
 │   ├── jiraParentCandidates.mjs   # Parent chain walk + dropdown builders (shared UI/server)
-│   ├── jiraDescriptionAdf.mjs     # Plain-text description → Jira ADF
+│   ├── jiraDescriptionAdf.mjs     # Markdown description → Jira ADF (via markdownToAdf)
 │   ├── markdownToAdf.mjs          # Note-comment markdown (bold/italic/code/links/lists/headings) → Jira ADF
 │   ├── issuePriority.mjs          # MAX_ISSUE_PRIORITY + clampIssuePriority (P0–P20)
 │   └── chatSessionPrompt.mjs  # Formats Chat session context for LLM prompts
