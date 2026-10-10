@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Container, Header, Message, Segment, Button } from "semantic-ui-react";
-import { fetchCapacityPlanning, fetchWatchedAssignees, saveAdHocReport, fetchPmAsks, createPmAsk, updatePmAsk, deletePmAsk } from "../services/jiraClient";
+import { fetchCapacityPlanning, fetchWatchedAssignees, saveAdHocReport, fetchPmAsks, fetchJiraHealth, createPmAsk, updatePmAsk, deletePmAsk } from "../services/jiraClient";
 import GanttChart from "./components/GanttChart";
 import { getStatusColor } from "../utils/statusScale";
 import { buildWorkWeekHref } from "../utils/workWeekNavigation";
@@ -9,6 +9,7 @@ import { usePersistedState } from "./hooks/usePersistedState";
 import { useFlash } from "./hooks/useFlash";
 import { reconcileSelectedEntryIds, sameIdList, watchTypeLabel } from "./pmEntrySelection";
 import { escapeJqlString } from "../../shared/directReportsJql.mjs";
+import { isClosedPmAskStatus, normalizePmAskStatus } from "../../shared/pmAskStatus.mjs";
 import { formatDate, formatTimestamp } from "../utils/format.js";
 import "./projectManagers.css";
 
@@ -616,16 +617,63 @@ const AutoTextarea = ({ className, placeholder, value, onChange }) => {
   );
 };
 
+const buildJiraBrowseUrl = (jiraBaseUrl, issueKey) => {
+  const base = String(jiraBaseUrl || "").trim().replace(/\/$/, "");
+  const key = String(issueKey || "").trim();
+  return base && key ? `${base}/browse/${encodeURIComponent(key)}` : "";
+};
+
+const getPmAskStatusLabel = (status) => {
+  const normalized = normalizePmAskStatus(status);
+  if (normalized === "done") return "Done";
+  if (normalized === "canceled") return "Canceled";
+  return "Open";
+};
+
 const AsksPanel = () => {
   const [asks, setAsks] = React.useState([]);
   const [error, setError] = React.useState("");
+  const [jiraBaseUrl, setJiraBaseUrl] = React.useState("");
   const [draft, setDraft] = React.useState({ title: "", whoAsked: "", note: "" });
   const [editingId, setEditingId] = React.useState(null);
   const [editDraft, setEditDraft] = React.useState({});
 
   React.useEffect(() => {
-    fetchPmAsks().then(setAsks).catch((e) => setError(String(e?.message || "Failed to load asks")));
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [items, health] = await Promise.all([fetchPmAsks(), fetchJiraHealth().catch(() => null)]);
+        if (cancelled) return;
+        setAsks(Array.isArray(items) ? items : []);
+        setJiraBaseUrl(String(health?.jiraBaseUrl || "").trim());
+      } catch (e) {
+        if (!cancelled) setError(String(e?.message || "Failed to load asks"));
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const sortedAsks = React.useMemo(() => {
+    return [...asks].sort((a, b) => {
+      const ac = normalizePmAskStatus(a.status) === "open" ? 0 : 1;
+      const bc = normalizePmAskStatus(b.status) === "open" ? 0 : 1;
+      if (ac !== bc) return ac - bc;
+      return a.id - b.id;
+    });
+  }, [asks]);
+
+  const updateAsk = async (id, payload, fallbackError) => {
+    try {
+      const updated = await updatePmAsk({ id, ...payload });
+      setAsks((prev) => prev.map((ask) => (ask.id === id ? updated : ask)));
+      setEditingId(null);
+    } catch (e) {
+      setError(String(e?.message || fallbackError));
+    }
+  };
 
   const handleCreate = async () => {
     try {
@@ -643,13 +691,11 @@ const AsksPanel = () => {
   };
 
   const handleSaveEdit = async (id) => {
-    try {
-      const updated = await updatePmAsk({ id, ...editDraft });
-      setAsks((prev) => prev.map((a) => (a.id === id ? updated : a)));
-      setEditingId(null);
-    } catch (e) {
-      setError(String(e?.message || "Failed to update ask"));
-    }
+    await updateAsk(id, editDraft, "Failed to update ask");
+  };
+
+  const handleSetStatus = async (id, status) => {
+    await updateAsk(id, { status }, "Failed to update ask status");
   };
 
   const handleDelete = async (id) => {
@@ -657,6 +703,7 @@ const AsksPanel = () => {
     try {
       await deletePmAsk(id);
       setAsks((prev) => prev.filter((a) => a.id !== id));
+      setEditingId(null);
     } catch (e) {
       setError(String(e?.message || "Failed to delete ask"));
     }
@@ -664,9 +711,13 @@ const AsksPanel = () => {
 
   const handleDownloadCsv = () => {
     const today = new Date().toISOString().slice(0, 10);
-    const rows = [["Title", "Who asked", "Note"]];
-    for (const a of asks) {
-      rows.push([a.title, a.whoAsked, a.note].map((v) => `"${String(v || "").replace(/"/g, '""')}"`));
+    const rows = [["Title", "Who asked", "Status", "Jira key", "Note"]];
+    for (const a of sortedAsks) {
+      rows.push(
+        [a.title, a.whoAsked, getPmAskStatusLabel(a.status), a.jiraIssueKey, a.note].map(
+          (v) => `"${String(v || "").replace(/"/g, '""')}"`
+        )
+      );
     }
     const csv = "﻿" + rows.map((r) => r.join(",")).join("\r\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -707,26 +758,28 @@ const AsksPanel = () => {
         <button type="button" className="ww-page-btn" onClick={handleCreate}>
           Add
         </button>
-        {asks.length > 0 ? (
+        {sortedAsks.length > 0 ? (
           <button type="button" className="ww-page-btn" onClick={handleDownloadCsv}>
             Download CSV
           </button>
         ) : null}
       </div>
 
-      {asks.length === 0 ? (
+      {sortedAsks.length === 0 ? (
         <p className="pm-asks-empty">No asks yet — add one above.</p>
       ) : (
         <table className="pm-asks-table">
           <thead>
-            <tr><th>Title</th><th>Who asked</th><th>Note</th><th></th></tr>
+            <tr><th>Title</th><th>Who asked</th><th>Status</th><th>Jira key</th><th>Note</th><th></th></tr>
           </thead>
           <tbody>
-            {asks.map((ask) =>
-              editingId === ask.id ? (
-                <tr key={ask.id}>
+            {sortedAsks.map((ask) =>
+              editingId === ask.id && !isClosedPmAskStatus(ask.status) ? (
+                <tr key={ask.id} className="pm-asks-row">
                   <td><AutoTextarea className="pm-asks-input" value={editDraft.title || ""} onChange={(e) => setEditDraft((d) => ({ ...d, title: e.target.value }))} /></td>
                   <td><AutoTextarea className="pm-asks-input" value={editDraft.whoAsked || ""} onChange={(e) => setEditDraft((d) => ({ ...d, whoAsked: e.target.value }))} /></td>
+                  <td>Open</td>
+                  <td>{ask.jiraIssueKey || "—"}</td>
                   <td><AutoTextarea className="pm-asks-input pm-asks-input--note" value={editDraft.note || ""} onChange={(e) => setEditDraft((d) => ({ ...d, note: e.target.value }))} /></td>
                   <td>
                     <button type="button" className="ww-page-btn" onClick={() => handleSaveEdit(ask.id)}>Save</button>
@@ -734,13 +787,48 @@ const AsksPanel = () => {
                   </td>
                 </tr>
               ) : (
-                <tr key={ask.id}>
+                <tr key={ask.id} className={`pm-asks-row${isClosedPmAskStatus(ask.status) ? " pm-asks-row--closed" : ""}`}>
                   <td>{ask.title || "—"}</td>
                   <td>{ask.whoAsked || "—"}</td>
+                  <td>
+                    {isClosedPmAskStatus(ask.status) ? (
+                      <span className="pm-asks-status-badge">{getPmAskStatusLabel(ask.status)}</span>
+                    ) : (
+                      "Open"
+                    )}
+                  </td>
+                  <td>
+                    {ask.jiraIssueKey ? (
+                      buildJiraBrowseUrl(jiraBaseUrl, ask.jiraIssueKey) ? (
+                        <a
+                          href={buildJiraBrowseUrl(jiraBaseUrl, ask.jiraIssueKey)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {ask.jiraIssueKey}
+                        </a>
+                      ) : (
+                        ask.jiraIssueKey
+                      )
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td>{ask.note || "—"}</td>
                   <td>
-                    <button type="button" className="ww-page-btn" onClick={() => handleEdit(ask)}>Edit</button>
-                    <button type="button" className="ww-page-btn" onClick={() => handleDelete(ask.id)}>Delete</button>
+                    {isClosedPmAskStatus(ask.status) ? (
+                      <>
+                        <button type="button" className="ww-page-btn" onClick={() => handleSetStatus(ask.id, "open")}>Reopen</button>
+                        <button type="button" className="ww-page-btn" onClick={() => handleDelete(ask.id)}>Delete</button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" className="ww-page-btn" onClick={() => handleEdit(ask)}>Edit</button>
+                        <button type="button" className="ww-page-btn" onClick={() => handleDelete(ask.id)}>Delete</button>
+                        <button type="button" className="ww-page-btn" onClick={() => handleSetStatus(ask.id, "done")}>Done</button>
+                        <button type="button" className="ww-page-btn" onClick={() => handleSetStatus(ask.id, "canceled")}>Cancel</button>
+                      </>
+                    )}
                   </td>
                 </tr>
               )
