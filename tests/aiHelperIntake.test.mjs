@@ -201,4 +201,18 @@ describe("AI draft prompts with guided intake", () => {
     assert.ok(!prompt.includes('"label": "User story"'));
     assert.ok(!prompt.includes('Also return "summary"'));
   });
+
+  it("includes attachment names and preference guidance", () => {
+    const prompt = buildAiDraftUserPrompt({
+      summary: "Ship the fix",
+      context: "",
+      isStory: false,
+      isBug: false,
+      attachmentPreference: "referenceInDescription",
+      attachmentNames: ["file1.png", "notes.md"],
+    });
+    assert.ok(prompt.includes("Attachments (will upload after create): file1.png, notes.md"));
+    assert.ok(prompt.includes("reference in description - mention these files by name"));
+    assert.ok(!prompt.includes("file bytes"));
+  });
 });

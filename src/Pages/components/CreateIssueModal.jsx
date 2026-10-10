@@ -288,6 +288,7 @@ const CreateIssueModal = ({
   const [intakeValues, setIntakeValues] = React.useState(() => createEmptyAiHelperIntake("Story"));
   const [intakeMissingFieldIds, setIntakeMissingFieldIds] = React.useState([]);
   const [draftedFromIntake, setDraftedFromIntake] = React.useState(false);
+  const [attachmentPreference, setAttachmentPreference] = React.useState("attachmentsOnly");
   const [creatingSubtasks, setCreatingSubtasks] = React.useState(false);
   const [subtaskResults, setSubtaskResults] = React.useState([]);
 
@@ -467,6 +468,7 @@ const CreateIssueModal = ({
     setClarificationQuestions([]);
     setNeedsClarification(false);
     setUseAiHelper(false);
+    setAttachmentPreference("attachmentsOnly");
     setIntakeValues(createEmptyAiHelperIntake("Story"));
     setIntakeMissingFieldIds([]);
     setDraftedFromIntake(false);
@@ -871,6 +873,8 @@ const CreateIssueModal = ({
         epicKey: sourceEpicKey || parentKey,
         epicName,
         intake: useAiHelper ? normalizeAiHelperIntake(issueType, intakeValues) : null,
+        attachmentPreference,
+        attachmentNames: attachments.map((file) => file.name),
       });
       if (result?.description) {
         setDescription(result.description);
@@ -1645,6 +1649,27 @@ const CreateIssueModal = ({
               Stories stay unassigned per ODI standards. Run AI Draft to add subtasks, then assign them here.
             </p>
           )}
+
+          {useAiHelper && attachments.length > 0 ? (
+            <Form.Field>
+              <label>Attachment preference</label>
+              <Form.Group inline>
+                <Form.Radio
+                  label="Reference in description"
+                  checked={attachmentPreference === "referenceInDescription"}
+                  onChange={() => setAttachmentPreference("referenceInDescription")}
+                />
+                <Form.Radio
+                  label="Attachments only"
+                  checked={attachmentPreference === "attachmentsOnly"}
+                  onChange={() => setAttachmentPreference("attachmentsOnly")}
+                />
+              </Form.Group>
+              <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+                The draft uses file names only, never attachment bytes.
+              </p>
+            </Form.Field>
+          ) : null}
 
           <Form.Field>
             <label>Attachments</label>

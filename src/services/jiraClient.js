@@ -894,6 +894,8 @@ export const generateIssueDescription = async ( {
   epicKey,
   epicName,
   intake,
+  attachmentPreference = "attachmentsOnly",
+  attachmentNames = [],
 } ) => {
   const aiPath = getPreferredAiPath();
   return requestJson( "/api/jira/issues/generate-description", {
@@ -907,6 +909,8 @@ export const generateIssueDescription = async ( {
       epicKey: epicKey || "",
       epicName: epicName || "",
       intake: intake || null,
+      attachmentPreference,
+      attachmentNames,
       ...( aiPath ? { aiPath } : {} ),
     } ),
   } );
