@@ -441,9 +441,31 @@ const TITLE_FROM_INTAKE_INSTRUCTION = `
 
 Also return "summary": a short, specific title (under 15 words) drawn from the intake answers. If a title was already provided, return it unchanged.`;
 
-export const buildAiDraftUserPrompt = ({ summary, context, isStory, isBug, intakeBlock = "" }) => {
+export const buildAiDraftUserPrompt = ({
+  summary,
+  context,
+  isStory,
+  isBug,
+  intakeBlock = "",
+  attachmentPreference = "attachmentsOnly",
+  attachmentNames = [],
+}) => {
   const intakeText = String(intakeBlock || "").trim();
+  const attachments = Array.isArray(attachmentNames)
+    ? attachmentNames.map((name) => String(name || "").trim()).filter(Boolean)
+    : [];
+  const normalizedAttachmentPreference =
+    String(attachmentPreference || "").trim() === "referenceInDescription"
+      ? "referenceInDescription"
+      : "attachmentsOnly";
   const intakeSection = intakeText ? `\n\n${intakeText}` : "";
+  const attachmentSection = attachments.length
+    ? `\n\nAttachments (will upload after create): ${attachments.join(", ")}\nUser choice: ${
+        normalizedAttachmentPreference === "referenceInDescription"
+          ? "reference in description - mention these files by name and describe how they support the write-up; do not invent unseen pixel content."
+          : "attachments only - do not rely on these files in the description body."
+      }`
+    : "";
   const titleLine = String(summary || "").trim()
     ? `Title provided: ${summary}`
     : "Title provided: (none — derive the title from the intake answers below)";
@@ -452,7 +474,7 @@ export const buildAiDraftUserPrompt = ({ summary, context, isStory, isBug, intak
       ? `Write an ODI-standard Jira Story draft.
 
 Issue type: Story
-${titleLine}${context ? `\nContext: ${context}` : ""}${intakeSection}
+${titleLine}${context ? `\nContext: ${context}` : ""}${intakeSection}${attachmentSection}
 
 Respond with valid JSON only — no prose, no markdown fences:
 {
@@ -480,7 +502,7 @@ The "summary" must still use the ODI job story format ("When <situation>, I want
       ? `Write an ODI-standard Jira Bug draft.
 
 Issue type: Bug
-${titleLine}${context ? `\nContext: ${context}` : ""}${intakeSection}
+${titleLine}${context ? `\nContext: ${context}` : ""}${intakeSection}${attachmentSection}
 
 Respond with valid JSON only — no prose, no markdown fences:
 {
@@ -500,7 +522,7 @@ Respond with valid JSON only — no prose, no markdown fences:
       : `Write an ODI Task description.
 
 Issue type: Task
-${titleLine}${context ? `\nContext: ${context}` : ""}${intakeSection}
+${titleLine}${context ? `\nContext: ${context}` : ""}${intakeSection}${attachmentSection}
 
 Respond with valid JSON only — no prose, no markdown fences:
 {

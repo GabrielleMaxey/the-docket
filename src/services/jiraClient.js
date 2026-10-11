@@ -894,6 +894,8 @@ export const generateIssueDescription = async ( {
   epicKey,
   epicName,
   intake,
+  attachmentPreference = "attachmentsOnly",
+  attachmentNames = [],
 } ) => {
   const aiPath = getPreferredAiPath();
   return requestJson( "/api/jira/issues/generate-description", {
@@ -907,6 +909,8 @@ export const generateIssueDescription = async ( {
       epicKey: epicKey || "",
       epicName: epicName || "",
       intake: intake || null,
+      attachmentPreference,
+      attachmentNames,
       ...( aiPath ? { aiPath } : {} ),
     } ),
   } );
@@ -1037,11 +1041,13 @@ export const createPmAsk = async ( { title, whoAsked, note } ) => {
   } );
 };
 
-export const updatePmAsk = async ( { id, title, whoAsked, note } ) => {
+export const updatePmAsk = async ( { id, title, whoAsked, note, status, jiraIssueKey } ) => {
   const body = {};
   if ( typeof title === "string" ) body.title = title;
   if ( typeof whoAsked === "string" ) body.whoAsked = whoAsked;
   if ( typeof note === "string" ) body.note = note;
+  if ( typeof status === "string" ) body.status = status;
+  if ( typeof jiraIssueKey === "string" ) body.jiraIssueKey = jiraIssueKey;
   return requestJson( `/api/project-managers/asks/${ encodeURIComponent( id ) }`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

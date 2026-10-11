@@ -552,6 +552,10 @@ export const registerJiraIssueRoutes = (
     const epicName = String(req.body?.epicName || "").trim();
     const epicKey = String(req.body?.epicKey || "").trim();
     const intake = normalizeAiHelperIntake(issueType, req.body?.intake);
+    const attachmentPreference = String(req.body?.attachmentPreference || "attachmentsOnly").trim();
+    const attachmentNames = Array.isArray(req.body?.attachmentNames)
+      ? req.body.attachmentNames.map((name) => String(name || "").trim()).filter(Boolean)
+      : [];
     const hasIntake = Object.keys(intake).length > 0;
 
     // With guided intake the AI derives the title, so a summary is only required without it.
@@ -601,6 +605,8 @@ export const registerJiraIssueRoutes = (
       isStory,
       isBug,
       intakeBlock: hasIntake ? buildAiHelperIntakePrompt(issueType, intake) : "",
+      attachmentPreference,
+      attachmentNames,
     });
 
     try {

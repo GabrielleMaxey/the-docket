@@ -92,6 +92,8 @@ import {
 } from "../../../shared/aiHelperIntake.mjs";
 import AiHelperIntakePanel from "./AiHelperIntakePanel";
 import AttachmentPicker from "./AttachmentPicker";
+import SimpleMarkdown from "../../Components/SimpleMarkdown.jsx";
+import "../../Components/report.css";
 import { useAttachmentLimits } from "./AttachFilesModal";
 import useCreateIssueManualKey from "../hooks/useCreateIssueManualKey";
 
@@ -106,6 +108,17 @@ const mergeDropdownOptions = (options, value) => {
     list.push({ key: current, text: current, value: current });
   }
   return list;
+};
+
+const isMarkdownAttachment = (file) => {
+  if (!file) return false;
+  if (file.type === "text/markdown") return true;
+  return /\.md$/i.test(String(file.name || ""));
+};
+
+const findFirstMarkdownAttachment = (files) => {
+  if (!Array.isArray(files)) return null;
+  return files.find(isMarkdownAttachment) ?? null;
 };
 
 const ComboDropdownField = ({
@@ -222,7 +235,15 @@ const buildParentDropdownOptions = ({ parentOptions, issueType }) => {
   return [epicOption, ...storyOptions];
 };
 
-const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, onCreated }) => {
+const CreateIssueModal = ({
+  open,
+  onClose,
+  epicPresets,
+  defaultEpicSelectValue,
+  initialSummary = "",
+  initialDescription = "",
+  onCreated,
+}) => {
   const [projectKey, setProjectKey] = React.useState("");
   const [issueType, setIssueType] = React.useState("Story");
   const [summary, setSummary] = React.useState("");
@@ -276,8 +297,15 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
   const [intakeValues, setIntakeValues] = React.useState(() => createEmptyAiHelperIntake("Story"));
   const [intakeMissingFieldIds, setIntakeMissingFieldIds] = React.useState([]);
   const [draftedFromIntake, setDraftedFromIntake] = React.useState(false);
+  const [attachmentPreference, setAttachmentPreference] = React.useState("attachmentsOnly");
   const [creatingSubtasks, setCreatingSubtasks] = React.useState(false);
   const [subtaskResults, setSubtaskResults] = React.useState([]);
+  const [loadingMarkdownDescription, setLoadingMarkdownDescription] = React.useState(false);
+
+  const markdownAttachment = React.useMemo(
+    () => findFirstMarkdownAttachment(attachments),
+    [attachments]
+  );
 
   const isManualEpic = epicSelectValue === "__other__";
   const activePreset = React.useMemo(
@@ -426,8 +454,8 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     setEpicSelectValue(defaultEpicSelectValue || "");
     setManualEpicInput("");
     resetParentState();
-    setSummary("");
-    setDescription("");
+    setSummary(String(initialSummary || ""));
+    setDescription(String(initialDescription || ""));
     setAssignee("");
     setError("");
     setDescriptionError("");
@@ -455,10 +483,11 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
     setClarificationQuestions([]);
     setNeedsClarification(false);
     setUseAiHelper(false);
+    setAttachmentPreference("attachmentsOnly");
     setIntakeValues(createEmptyAiHelperIntake("Story"));
     setIntakeMissingFieldIds([]);
     setDraftedFromIntake(false);
-  }, [open, defaultEpicSelectValue, resetParentState]);
+  }, [open, defaultEpicSelectValue, initialDescription, initialSummary, resetParentState]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -859,6 +888,8 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
         epicKey: sourceEpicKey || parentKey,
         epicName,
         intake: useAiHelper ? normalizeAiHelperIntake(issueType, intakeValues) : null,
+        attachmentPreference,
+        attachmentNames: attachments.map((file) => file.name),
       });
       if (result?.description) {
         setDescription(result.description);
@@ -901,6 +932,30 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       setGeneratingDesc(false);
     }
   };
+
+  const handleUseMarkdownAsDescription = React.useCallback(async () => {
+    const file = findFirstMarkdownAttachment(attachments);
+    if (!file) return;
+    if (description.trim() && !window.confirm("Replace description with file contents?")) {
+      return;
+    }
+    setLoadingMarkdownDescription(true);
+    try {
+      const text = await file.text();
+      setDescription(text);
+      if (descriptionError) setDescriptionError("");
+      if (error) setError("");
+      if (standardsOverrideAvailable) {
+        setStandardsOverrideAvailable(false);
+        setOverrideDescriptionStandards(false);
+        setOverrideReason("");
+      }
+    } catch (readError) {
+      setError(readError instanceof Error ? readError.message : "Failed to read markdown file");
+    } finally {
+      setLoadingMarkdownDescription(false);
+    }
+  }, [attachments, description, descriptionError, error, standardsOverrideAvailable]);
 
   const applyValidationErrors = (errors) => {
     const list = Array.isArray(errors) ? errors : [];
@@ -1062,7 +1117,9 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
       setSubmitting(false);
       setSuccess(createdParentKey ? `Created ${createdParentKey}` : "Issue created.");
     }
-    if (onCreated && createdParentKey) onCreated(createdParentKey);
+    if (createdParentKey) {
+      if (onCreated) onCreated(createdParentKey);
+    }
   };
 
   const intakeCheck = React.useMemo(
@@ -1503,6 +1560,12 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
                 ? "Short overview, then bulleted steps to reproduce, troubleshooting, and fix approach."
                 : `Short overview, then bulleted work items for this ${issueType.toLowerCase()}…`}
               style={{ width: "100%", padding: "0.5em 0.8em", border: "1px solid #e2e8f0", borderRadius: "6px", resize: "vertical", fontFamily: "inherit", fontSize: "0.9rem", lineHeight: 1.45, whiteSpace: "pre-wrap" }} />
+            {description.trim() ? (
+              <div className="create-issue-writeup-preview" aria-live="polite">
+                <div className="create-issue-writeup-preview-label">Write-up preview</div>
+                <SimpleMarkdown text={description} />
+              </div>
+            ) : null}
             {descriptionError ? (
               <Message negative size="small" style={{ marginTop: "0.35rem", whiteSpace: "pre-wrap" }}>
                 {descriptionError}
@@ -1623,8 +1686,64 @@ const CreateIssueModal = ({ open, onClose, epicPresets, defaultEpicSelectValue, 
             </p>
           )}
 
+          {useAiHelper && attachments.length > 0 ? (
+            <Form.Field>
+              <label>Attachment preference</label>
+              <Form.Group inline>
+                <Form.Radio
+                  label="Reference in description"
+                  checked={attachmentPreference === "referenceInDescription"}
+                  onChange={() => setAttachmentPreference("referenceInDescription")}
+                />
+                <Form.Radio
+                  label="Attachments only"
+                  checked={attachmentPreference === "attachmentsOnly"}
+                  onChange={() => setAttachmentPreference("attachmentsOnly")}
+                />
+              </Form.Group>
+              <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+                The draft uses file names only, never attachment bytes.
+              </p>
+            </Form.Field>
+          ) : null}
+
           <Form.Field>
-            <label>Attachments</label>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.3rem",
+              }}
+            >
+              <label style={{ margin: 0 }}>Attachments</label>
+              {markdownAttachment ? (
+                <Button
+                  type="button"
+                  size="small"
+                  loading={loadingMarkdownDescription}
+                  disabled={
+                    !canEditIssueFields
+                    || loadingMarkdownDescription
+                    || submitting
+                    || creatingSubtasks
+                    || Boolean(createdIssueKey)
+                  }
+                  onClick={handleUseMarkdownAsDescription}
+                  style={{
+                    backgroundColor: "#fff",
+                    color: "#0c93d9",
+                    border: "1px solid #0c93d9",
+                    borderRadius: "6px",
+                    padding: "0.35em 0.85em",
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  Use .md as description
+                </Button>
+              ) : null}
+            </div>
             <AttachmentPicker
               files={attachments}
               onChange={setAttachments}

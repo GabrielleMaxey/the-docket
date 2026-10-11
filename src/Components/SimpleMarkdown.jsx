@@ -22,63 +22,64 @@ const routerPathFromHref = (href) => {
   return null;
 };
 
+const INLINE_PATTERN =
+  /`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|_([^_\n]+)_|\[([^\]]+)\]\(([^)]+)\)/g;
+
 const renderInline = (text, keyPrefix) => {
   const nodes = [];
   const source = String(text || "");
-  const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
-  let lastIndex = 0;
-  let match;
   let part = 0;
+  let remaining = source;
 
-  const pushFormatted = (chunk) => {
-    String(chunk)
-      .split(/\*\*(.+?)\*\*/g)
-      .forEach((piece, i) => {
-        if (i % 2 === 1) {
-          nodes.push(<strong key={`${keyPrefix}-b-${part}-${i}`}>{piece}</strong>);
-        } else if (piece) {
-          nodes.push(piece);
+  while (remaining.length > 0) {
+    INLINE_PATTERN.lastIndex = 0;
+    const match = INLINE_PATTERN.exec(remaining);
+    if (!match) {
+      nodes.push(remaining);
+      break;
+    }
+
+    if (match.index > 0) {
+      nodes.push(remaining.slice(0, match.index));
+    }
+
+    if (match[1] !== undefined) {
+      nodes.push(<code key={`${keyPrefix}-code-${part}`}>{match[1]}</code>);
+    } else if (match[2] !== undefined || match[3] !== undefined) {
+      nodes.push(<strong key={`${keyPrefix}-b-${part}`}>{match[2] ?? match[3]}</strong>);
+    } else if (match[4] !== undefined || match[5] !== undefined) {
+      nodes.push(<em key={`${keyPrefix}-i-${part}`}>{match[4] ?? match[5]}</em>);
+    } else if (match[6] !== undefined) {
+      const label = match[6];
+      const href = String(match[7] || "").trim();
+      if (isSafeHref(href)) {
+        const to = routerPathFromHref(href);
+        if (to) {
+          nodes.push(
+            <Link key={`${keyPrefix}-a-${part}`} to={to} className="report-link">
+              {label}
+            </Link>
+          );
+        } else {
+          nodes.push(
+            <a
+              key={`${keyPrefix}-a-${part}`}
+              href={href}
+              className="report-link"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {label}
+            </a>
+          );
         }
-      });
-    part += 1;
-  };
-
-  while ((match = linkRe.exec(source))) {
-    if (match.index > lastIndex) {
-      pushFormatted(source.slice(lastIndex, match.index));
-    }
-    const label = match[1];
-    const href = String(match[2] || "").trim();
-    if (isSafeHref(href)) {
-      const to = routerPathFromHref(href);
-      if (to) {
-        nodes.push(
-          <Link key={`${keyPrefix}-a-${part}`} to={to} className="report-link">
-            {label}
-          </Link>
-        );
       } else {
-        nodes.push(
-          <a
-            key={`${keyPrefix}-a-${part}`}
-            href={href}
-            className="report-link"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {label}
-          </a>
-        );
+        nodes.push(match[0]);
       }
-      part += 1;
-    } else {
-      pushFormatted(match[0]);
     }
-    lastIndex = match.index + match[0].length;
-  }
 
-  if (lastIndex < source.length) {
-    pushFormatted(source.slice(lastIndex));
+    remaining = remaining.slice(match.index + match[0].length);
+    part += 1;
   }
 
   return nodes;
