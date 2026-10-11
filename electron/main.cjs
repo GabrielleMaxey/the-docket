@@ -148,9 +148,9 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      additionalArguments: app.isPackaged
-        ? [`--api-port=${apiPort}`]
-        : [`--api-port=${apiPort}`, "--api-base=http://localhost:5173"],
+      // Always point the renderer at the API Electron spawned (CORS allows localhost:5173 → :8787).
+      // Do not use the Vite origin as apiBase — that races the proxy and can hide the site switcher.
+      additionalArguments: [`--api-port=${apiPort}`],
     },
   });
 
@@ -236,13 +236,12 @@ app.whenReady().then(async () => {
 
   startApiProcess();
 
-  if (app.isPackaged) {
-    const ready = await waitForApi();
-    if (!ready) {
-      console.error(
-        `[electron] API did not become ready on port ${apiPort}. Check ${path.join(getPackagedUserDataRoot(), ".env")}.`
-      );
-    }
+  const ready = await waitForApi();
+  if (!ready) {
+    const envHint = app.isPackaged
+      ? path.join(getPackagedUserDataRoot(), ".env")
+      : path.join(process.cwd(), ".env");
+    console.error(`[electron] API did not become ready on port ${apiPort}. Check ${envHint}.`);
   }
 
   createWindow();
