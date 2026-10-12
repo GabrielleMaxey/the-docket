@@ -1523,6 +1523,11 @@
   border-bottom: 1px solid #e5e7eb;
 }
 
+.pm-asks-row--closed td {
+  opacity: 0.55;
+  color: #64748b;
+}
+
 .pm-asks-table th {
   font-weight: 600;
   font-size: 0.72rem;
@@ -1540,4 +1545,15 @@
   white-space: nowrap;
   display: flex;
   gap: 0.35rem;
+}
+
+.pm-asks-status-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+  background: #eef2f7;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
 }

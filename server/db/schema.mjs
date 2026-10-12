@@ -226,6 +226,9 @@ const migrateDatabase = (db) => {
     )
   `);
 
+  ensureColumn(db, "pm_asks", "status", "TEXT NOT NULL DEFAULT 'open'");
+  ensureColumn(db, "pm_asks", "jira_issue_key", "TEXT NOT NULL DEFAULT ''");
+
   db.prepare(
     "UPDATE jira_field_mappings SET field_id = 'customfield_10008' WHERE role = 'initial_done_date' AND TRIM(field_id) = ''"
   ).run();

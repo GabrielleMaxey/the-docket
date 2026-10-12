@@ -22,8 +22,10 @@ import { STATUS_OPTIONS, useTaskManagerJira } from "./hooks/useTaskManagerJira.j
 import {
   fetchSharedPrograms,
   resolveSharedProgramJql,
+  updatePmAsk,
 } from "../services/jiraClient.js";
 import { isDrillDownDismissed } from "../utils/jqlRunPersistence.js";
+import { consumePmAskCreateIssueHandoff } from "../utils/pmAskCreateIssueHandoff.js";
 import { resolveCreateIssueDefaults } from "../../shared/createIssuePresetUtils.mjs";
 import {
   isConfiguredJqlRun,
@@ -81,6 +83,8 @@ const WorkWeekTasks = () => {
   } = useTodos();
   const [importSlotIndex, setImportSlotIndex] = React.useState(null);
   const [createIssueOpen, setCreateIssueOpen] = React.useState(false);
+  const [createIssuePrefill, setCreateIssuePrefill] = React.useState(null);
+  const createIssueSourceAskIdRef = React.useRef(null);
   const [quickPickValueBySlot, setQuickPickValueBySlot] = React.useState({});
   const drillDownBannerRef = React.useRef(null);
   const [generatedSharedProgramJqlBySlot, setGeneratedSharedProgramJqlBySlot] = usePersistedState(
@@ -148,6 +152,16 @@ const WorkWeekTasks = () => {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  React.useEffect(() => {
+    const handoff = consumePmAskCreateIssueHandoff();
+    if (!handoff) {
+      return;
+    }
+    setCreateIssuePrefill(handoff);
+    createIssueSourceAskIdRef.current = handoff.askId ?? null;
+    setCreateIssueOpen(true);
   }, []);
 
   const [activeRunIndex, setActiveRunIndex] = usePersistedState(
@@ -650,10 +664,30 @@ const WorkWeekTasks = () => {
 
       <CreateIssueModal
         open={createIssueOpen}
-        onClose={() => setCreateIssueOpen(false)}
+        onClose={() => {
+          setCreateIssueOpen(false);
+          setCreateIssuePrefill(null);
+          createIssueSourceAskIdRef.current = null;
+        }}
         epicPresets={epicPresets}
         defaultEpicSelectValue={createIssueDefaults.epicSelectValue}
-        onCreated={() => void handleRunJql()}
+        initialSummary={createIssuePrefill?.title || ""}
+        initialDescription={createIssuePrefill?.note || ""}
+        onCreated={async (createdKey) => {
+          void handleRunJql();
+          const key = String(createdKey || "");
+          if (createIssueSourceAskIdRef.current && key) {
+            try {
+              await updatePmAsk({
+                id: createIssueSourceAskIdRef.current,
+                status: "done",
+                jiraIssueKey: key,
+              });
+            } catch {
+              // Leave the ask open if Jira linking fails.
+            }
+          }
+        }}
       />
     </>
   );

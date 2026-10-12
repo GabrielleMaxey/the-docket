@@ -1,12 +1,18 @@
 import { createLogger } from "../lib/logger.mjs";
+import { normalizePmAskStatus } from "../../shared/pmAskStatus.mjs";
 
 const log = createLogger("pm-asks");
+
+const ASK_COLUMNS =
+  "id, title, who_asked, note, status, jira_issue_key, created_at, updated_at";
 
 const trimAsk = (row) => ({
   id: row.id,
   title: String(row.title || ""),
   whoAsked: String(row.who_asked || ""),
   note: String(row.note || ""),
+  status: normalizePmAskStatus(row.status),
+  jiraIssueKey: String(row.jira_issue_key || ""),
   createdAt: String(row.created_at || ""),
   updatedAt: String(row.updated_at || ""),
 });
@@ -14,7 +20,7 @@ const trimAsk = (row) => ({
 export const registerPmAsksRoutes = (app, { getDb }) => {
   app.get("/api/project-managers/asks", (req, res) => {
     const rows = getDb()
-      .prepare("SELECT id, title, who_asked, note, created_at, updated_at FROM pm_asks ORDER BY id ASC")
+      .prepare(`SELECT ${ASK_COLUMNS} FROM pm_asks ORDER BY id ASC`)
       .all();
     return res.json({ items: rows.map(trimAsk) });
   });
@@ -26,7 +32,7 @@ export const registerPmAsksRoutes = (app, { getDb }) => {
 
     const result = getDb()
       .prepare(
-        "INSERT INTO pm_asks (title, who_asked, note) VALUES (?, ?, ?) RETURNING id, title, who_asked, note, created_at, updated_at"
+        `INSERT INTO pm_asks (title, who_asked, note) VALUES (?, ?, ?) RETURNING ${ASK_COLUMNS}`
       )
       .get(title, whoAsked, note);
 
@@ -40,7 +46,9 @@ export const registerPmAsksRoutes = (app, { getDb }) => {
     }
 
     const db = getDb();
-    const current = db.prepare("SELECT id, title, who_asked, note FROM pm_asks WHERE id = ?").get(id);
+    const current = db
+      .prepare(`SELECT ${ASK_COLUMNS} FROM pm_asks WHERE id = ?`)
+      .get(id);
     if (!current) {
       return res.status(404).json({ error: "Ask not found" });
     }
@@ -48,19 +56,27 @@ export const registerPmAsksRoutes = (app, { getDb }) => {
     const hasTitle = typeof req.body?.title === "string";
     const hasWhoAsked = typeof req.body?.whoAsked === "string";
     const hasNote = typeof req.body?.note === "string";
-    if (!hasTitle && !hasWhoAsked && !hasNote) {
-      return res.status(400).json({ error: "Provide title, whoAsked, or note" });
+    const hasStatus = typeof req.body?.status === "string";
+    const hasJiraIssueKey = typeof req.body?.jiraIssueKey === "string";
+    if (!hasTitle && !hasWhoAsked && !hasNote && !hasStatus && !hasJiraIssueKey) {
+      return res.status(400).json({ error: "Provide title, whoAsked, note, status, or jiraIssueKey" });
     }
 
     const nextTitle = hasTitle ? String(req.body.title).trim() : String(current.title || "");
     const nextWhoAsked = hasWhoAsked ? String(req.body.whoAsked).trim() : String(current.who_asked || "");
     const nextNote = hasNote ? String(req.body.note).trim() : String(current.note || "");
+    const nextStatus = hasStatus
+      ? normalizePmAskStatus(req.body.status)
+      : normalizePmAskStatus(current.status);
+    const nextJiraIssueKey = hasJiraIssueKey
+      ? String(req.body.jiraIssueKey).trim()
+      : String(current.jira_issue_key || "");
 
     const updated = db
       .prepare(
-        "UPDATE pm_asks SET title = ?, who_asked = ?, note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING id, title, who_asked, note, created_at, updated_at"
+        `UPDATE pm_asks SET title = ?, who_asked = ?, note = ?, status = ?, jira_issue_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING ${ASK_COLUMNS}`
       )
-      .get(nextTitle, nextWhoAsked, nextNote, id);
+      .get(nextTitle, nextWhoAsked, nextNote, nextStatus, nextJiraIssueKey, id);
 
     return res.json(trimAsk(updated));
   });
