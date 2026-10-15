@@ -121,7 +121,7 @@ test("task table renders exclusive Now/Next checkboxes with source-specific clea
   const { build } = await import("esbuild");
   const React = await import("react");
   const { renderToStaticMarkup } = await import("react-dom/server");
-  const temporary = await fs.mkdtemp(path.join(process.cwd(), ".superpowers/sdd/2026-10-14-team-data-imports/evidence/d2-render-"));
+  const temporary = await fs.mkdtemp(new URL("./d2-render-", import.meta.url));
   try {
     const outfile = path.join(temporary, "table.cjs");
     await build({ entryPoints: ["src/Pages/components/JiraResultsTable.jsx"], bundle: true, outfile, packages: "external", format: "cjs", platform: "node", define: { "import.meta.env.VITE_API_BASE": "undefined" } });
