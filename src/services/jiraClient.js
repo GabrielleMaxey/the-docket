@@ -157,7 +157,9 @@ const requestJsonNow = async ( path, options = {} ) => {
 
   if ( !response.ok )
   {
-    throw new Error( extractJiraErrorMessage( data, response.status ) );
+    const error = new Error( extractJiraErrorMessage( data, response.status ) );
+    error.status = response.status;
+    throw error;
   }
 
   // SPA/static fallbacks sometimes return index.html with HTTP 200 for unknown API routes.
@@ -684,7 +686,7 @@ export const saveReminders = async ( reminders, { siteContext } = {} ) => {
 
 export const fetchTodos = async () => {
   const data = await requestJson( "/api/todos" );
-  return data?.items || [];
+  return { items: data?.items || [], migration: data?.migration };
 };
 
 export const fetchCompletedTodos = async ( days = 90 ) => {
@@ -696,11 +698,11 @@ export const fetchCompletedTodos = async ( days = 90 ) => {
 export const clearCompletedTodos = async () =>
   requestJson( "/api/todos/completed", { method: "DELETE" } );
 
-export const createTodo = async ( { text, priority, dueDate } ) => {
+export const createTodo = async ( { clientId, text, priority, dueDate } ) => {
   const data = await requestJson( "/api/todos", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify( { text, priority, dueDate } ),
+    body: JSON.stringify( { clientId, text, priority, dueDate } ),
   } );
   return data;
 };
@@ -715,7 +717,11 @@ export const updateTodo = async ( id, fields ) => {
 };
 
 export const deleteTodo = async ( id ) => {
-  await requestJson( `/api/todos/${ id }`, { method: "DELETE" } );
+  try {
+    await requestJson( `/api/todos/${ id }`, { method: "DELETE" } );
+  } catch ( error ) {
+    if ( error.status !== 404 ) throw error;
+  }
 };
 
 export const fetchWatchedAssignees = async () => {

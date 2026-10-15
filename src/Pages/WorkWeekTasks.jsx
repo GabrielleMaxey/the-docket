@@ -72,6 +72,10 @@ const WorkWeekTasks = () => {
   const {
     sorted: todosSorted,
     error: todosError,
+    recoveryNotice: todosRecoveryNotice,
+    loading: todosLoading,
+    handleRetry: handleTodoRetry,
+    loadTodos,
     canAdd: canAddTodo,
     handleTextChange: handleTodoTextChange,
     handlePriorityChange: handleTodoPriorityChange,
@@ -505,6 +509,10 @@ const WorkWeekTasks = () => {
           calendarCells={calendarCells} todayDay={todayDay}
           todos={todosSorted}
           todosError={todosError}
+          todosRecoveryNotice={todosRecoveryNotice}
+          todosLoading={todosLoading}
+          onTodoRetry={handleTodoRetry}
+          onTodoReload={loadTodos}
           canAddTodo={canAddTodo}
           onTodoTextChange={handleTodoTextChange}
           onTodoPriorityChange={handleTodoPriorityChange}

@@ -64,6 +64,14 @@ export const registerTodoRoutes = (app, { getDb, getMigrationStatus = () => ({ u
   app.post("/api/todos", (req, res) => {
     try {
       const db = getDb();
+      const clientId = req.body?.clientId ?? null;
+      if (clientId !== null && (typeof clientId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientId))) {
+        return res.status(400).json({ error: "clientId must be a UUID" });
+      }
+      if (clientId) {
+        const existing = db.prepare(`SELECT * FROM todos WHERE client_id = ?`).get(clientId);
+        if (existing) return res.json(mapRow(existing));
+      }
       if (db.prepare(`SELECT COUNT(*) as n FROM todos WHERE done = 0`).get().n >= MAX_TODOS) {
         return res.status(400).json({ error: `Maximum of ${MAX_TODOS} active to dos reached.` });
       }
@@ -75,10 +83,10 @@ export const registerTodoRoutes = (app, { getDb, getMigrationStatus = () => ({ u
       }
       const result = db
         .prepare(
-          `INSERT INTO todos (text, priority, due_date, done, created_at, completed_at)
-           VALUES (@text, @priority, @dueDate, 0, CURRENT_TIMESTAMP, '')`
+          `INSERT INTO todos (text, priority, due_date, done, created_at, completed_at, client_id)
+           VALUES (@text, @priority, @dueDate, 0, CURRENT_TIMESTAMP, '', @clientId)`
         )
-        .run({ text, priority, dueDate });
+        .run({ text, priority, dueDate, clientId });
       const row = db.prepare(`SELECT * FROM todos WHERE id = ?`).get(result.lastInsertRowid);
       return res.status(201).json(mapRow(row));
     } catch (err) {

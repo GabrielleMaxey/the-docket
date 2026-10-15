@@ -8,12 +8,14 @@ import path from "node:path";
 import net from "node:net";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { openTodoDatabase } from "../server/db/todoDatabase.mjs";
 import { initDatabase } from "../server/db/schema.mjs";
 import { registerTodoRoutes } from "../server/routes/todoRoutes.mjs";
 import { initInstancesSchema, createInstance, setActiveInstanceId } from "../server/lib/jiraInstances.mjs";
 
 const withServer = async (run) => {
-  const db = new Database(":memory:");
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "todo-route-"));
+  const db = openTodoDatabase(fixtureDir);
   initDatabase(db);
   const app = express();
   app.use(express.json());
@@ -25,7 +27,7 @@ const withServer = async (run) => {
   const server = await new Promise((resolve) => { const listener = app.listen(0, "127.0.0.1", () => resolve(listener)); });
   const request = (url, options) => fetch(`http://127.0.0.1:${server.address().port}${url}`, options);
   try { await run({ db, request }); }
-  finally { await new Promise((resolve) => server.close(resolve)); db.close(); }
+  finally { await new Promise((resolve) => server.close(resolve)); db.close(); fs.rmSync(fixtureDir, { recursive: true, force: true }); }
 };
 const json = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
@@ -202,7 +204,7 @@ test("browser personal requests bypass site initialization and save admission", 
     if (options.method === "POST") return new Response(JSON.stringify({ id: 1, text: "saved" }), { status: 201 });
     return new Response(JSON.stringify({ items: [{ id: 1, text: "saved" }], days: 0, migration: { unresolved: [{ count: 2 }] } }));
   };
-  assert.equal((await client.fetchTodos()).length, 1);
+  assert.equal((await client.fetchTodos()).items.length, 1);
   client.setSiteContext({ instanceId: "synthetic", generation: "old" });
   client.setSiteSwitching(true);
   assert.equal((await client.createTodo({ text: "saved" })).id, 1);
@@ -210,4 +212,33 @@ test("browser personal requests bypass site initialization and save admission", 
   assert.equal(completed.days, 0);
   assert.equal(completed.migration.unresolved[0].count, 2);
   assert.deepEqual(urls, ["/api/todos", "/api/todos", "/api/todos/completed?days=0"]);
+});
+
+
+test("POST retries preserve UUID identity before capacity and never overwrite the original", async () => {
+  await withServer(async ({ db, request }) => {
+    const clientId = "4b67d94c-6356-4fe4-8e22-d3274e424575";
+    const first = await request("/api/todos", json("POST", { clientId, text: "original", priority: 2 })).then((res) => res.json());
+    for (let i = 0; i < 14; i++) db.prepare("INSERT INTO todos (text) VALUES (?)").run(`filler ${i}`);
+    const retried = await request("/api/todos", json("POST", { clientId, text: "different", priority: 5 }));
+    assert.equal(retried.status, 200); assert.deepEqual(await retried.json(), first);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM todos").get().n, 15);
+    assert.equal((await request(`/api/todos/${first.id}`, json("PUT", { text: "latest" }))).status, 200);
+  });
+});
+test("POST rejects malformed client identities", async () => {
+  await withServer(async ({ request }) => { assert.equal((await request("/api/todos", json("POST", { clientId: "not-a-uuid", text: "bad" }))).status, 400); });
+});
+
+
+test("personal client treats confirmed missing deletion as success but retains other failures", async (t) => {
+  const { build } = await import("esbuild");
+  const result = await build({ entryPoints: ["src/services/jiraClient.js"], bundle: true, platform: "node", format: "esm", write: false, define: { "import.meta.env.VITE_API_BASE": "undefined" } });
+  const client = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString("base64")}`);
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: "To do not found" }), { status: 404 });
+  await client.deleteTodo(1);
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: "Synthetic offline" }), { status: 503 });
+  await assert.rejects(client.deleteTodo(1), /Synthetic offline/);
 });

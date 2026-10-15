@@ -8,6 +8,7 @@ import "semantic-ui-css/semantic.min.css";
 import "./AppRouter.css";
 import BackgroundJobIndicator from "./Components/BackgroundJobIndicator.jsx";
 import JiraInstanceSwitcher from "./Components/JiraInstanceSwitcher.jsx";
+import { TodosProvider } from "./context/TodosContext.jsx";
 import { EpicFiltersProvider } from "./context/EpicFiltersContext.jsx";
 
 const WorkWeekTasks = React.lazy(() => import("./Pages/WorkWeekTasks.jsx"));
@@ -64,7 +65,6 @@ const AppLayout = () => {
       </ul>
     </nav>
     {recoveryNotice && <p role="status">{recoveryNotice}</p>}
-    {/* The independent To Do provider belongs above this site generation boundary. */}
     <div inert={switching ? "" : undefined} aria-busy={switching}>
       <EpicFiltersProvider key={context.generation}>
         <React.Suspense fallback={<PageFallback />}>
@@ -78,7 +78,7 @@ const AppLayout = () => {
 
 const router = createHashRouter([
   {
-    element: <AppLayout />,
+    element: <TodosProvider><AppLayout /></TodosProvider>,
     errorElement: <Errors />,
     children: [
       { path: "/", element: <WorkWeekTasks /> },
