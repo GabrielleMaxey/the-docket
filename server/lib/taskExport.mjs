@@ -241,7 +241,13 @@ export const createTaskExportService = ({ metaDb, dataDir, env = process.env, re
         const batch = response.data.values;
         if (batch.some(p => !projectKey.test(p?.key))) throw fail("Jira returned invalid project choices", 502);
         projects.push(...batch.slice(0, 5000 - projects.length).map(p => ({ key: p.key, name: typeof p.name === "string" ? p.name : p.key })));
-        if (response.data.isLast === true || projects.length >= response.data.total || !batch.length) { complete = true; break; }
+        const total = response.data.total;
+        const hasTotal = Number.isSafeInteger(total) && total >= 0;
+        if (response.data.isLast === true || (hasTotal && projects.length >= total && response.data.isLast !== false)) {
+          complete = !hasTotal || projects.length >= total;
+          break;
+        }
+        if (!batch.length) break;
       }
       return { ...identity, projects, projectsComplete: complete, presets: settings.presets.map(p => ({ id: p.id, name: p.name })) };
     } catch (error) {

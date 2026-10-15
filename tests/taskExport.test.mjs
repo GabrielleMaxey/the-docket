@@ -467,3 +467,48 @@ test("null Jira total does not prove completion at the row bound", async () => {
   assert.equal(result.isComplete, false);
   assert.equal(result.completeness, "limit");
 });
+
+test("project scope discovery follows a second page when the first total is null", async t => {
+  const f = fixture(t, { request: async options => {
+    const startAt = new URL(options.pathWithQuery, "https://lumen.atlassian.net").searchParams.get("startAt");
+    return startAt === "0"
+      ? { ok: true, data: { values: [{ key: "FIRST", name: "First project" }], total: null, isLast: false } }
+      : { ok: true, data: { values: [{ key: "SECOND", name: "Second project" }], total: 2, isLast: true } };
+  } });
+  const scopes = await f.service.getExportScopes(f.saved[0].id);
+  assert.deepEqual(scopes.projects.map(project => project.key), ["FIRST", "SECOND"]);
+  assert.equal(scopes.projectsComplete, true);
+  assert.equal(f.calls.length, 2);
+});
+
+test("explicit nonfinal project pages override conflicting totals and invalid totals are not completion evidence", async t => {
+  for (const total of [1, "1", -1, 0.5]) {
+    let requests = 0;
+    const f = fixture(t, { request: async () => {
+      requests += 1;
+      return requests === 1
+        ? { ok: true, data: { values: [{ key: "FIRST" }], total, ...(total === 1 ? { isLast: false } : {}) } }
+        : { ok: true, data: { values: [{ key: "SECOND" }], total: 2, isLast: true } };
+    } });
+    const scopes = await f.service.getExportScopes(f.saved[0].id);
+    assert.deepEqual(scopes.projects.map(project => project.key), ["FIRST", "SECOND"]);
+    assert.equal(scopes.projectsComplete, true);
+    assert.equal(requests, 2);
+  }
+});
+
+test("inconsistent empty project pages are incomplete while verified empty scopes are complete", async t => {
+  for (const [page, complete] of [
+    [{ total: null, isLast: false }, false],
+    [{ total: 3, isLast: false }, false],
+    [{ total: 3, isLast: true }, false],
+    [{ total: null }, false],
+    [{ total: 0, isLast: true }, true],
+  ]) {
+    const f = fixture(t, { request: async () => ({ ok: true, data: { values: [], ...page } }) });
+    const scopes = await f.service.getExportScopes(f.saved[0].id);
+    assert.deepEqual(scopes.projects, []);
+    assert.equal(scopes.projectsComplete, complete);
+    assert.equal(f.calls.length, 1);
+  }
+});
