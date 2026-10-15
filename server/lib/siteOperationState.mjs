@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { clearCreateMetaCache } from "./jiraCreateIssueFields.mjs";
 
 const changed = () => Object.assign(new Error("The active Jira site changed. Keep your drafts and reload before continuing."), {
   status: 409,
@@ -55,6 +56,7 @@ export const createSiteOperationState = ({ snapshot, activate }) => {
       if (leases > 0) await new Promise((resolve) => { drained = resolve; });
       const id = await mutation();
       const next = await activate(id);
+      clearCreateMetaCache();
       active = Object.freeze({ ...next, credentials: Object.freeze({ ...next.credentials }) });
       generation = randomUUID();
       return getSiteContext();

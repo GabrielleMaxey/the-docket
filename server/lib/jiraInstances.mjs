@@ -279,26 +279,25 @@ export function setActiveInstanceId(metaDb, id) {
 
 export function resolveJiraCredentials(metaDb, env = process.env) {
   const activeId = getActiveInstanceId(metaDb);
-  if (activeId) {
-    const row = getInstanceRow(metaDb, activeId);
-    if (row) {
-      return {
-        mode: "instance",
-        instanceId: row.id,
-        displayName: row.display_name,
-        ...getInstanceCredentials(metaDb, activeId, env),
-      };
-    }
-  }
-
-  return {
-    mode: "legacy",
-    instanceId: null,
-    displayName: "",
-    baseUrl: trimOrEmpty(env.JIRA_BASE_URL) ? assertAllowedJiraBaseUrl(env.JIRA_BASE_URL, getAllowedJiraHosts(env)) : "",
-    email: trimOrEmpty(env.JIRA_EMAIL),
-    apiToken: trimOrEmpty(env.JIRA_API_TOKEN),
+  const row = activeId ? getInstanceRow(metaDb, activeId) : null;
+  const credentials = {
+    mode: row ? "instance" : "legacy",
+    instanceId: row?.id || null,
+    displayName: row?.display_name || "",
+    baseUrl: row ? row.base_url : trimOrEmpty(env.JIRA_BASE_URL),
+    email: row ? row.email : trimOrEmpty(env.JIRA_EMAIL),
+    apiToken: "",
   };
+  try {
+    if (credentials.baseUrl) credentials.baseUrl = assertAllowedJiraBaseUrl(credentials.baseUrl, getAllowedJiraHosts(env));
+    credentials.apiToken = trimOrEmpty(env.JIRA_API_TOKEN);
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+    // Keep local data attached to its saved identity while Settings can recover a blocked site.
+    credentials.configurationError = error.message;
+    if (!URL.canParse(credentials.baseUrl)) credentials.baseUrl = "";
+  }
+  return credentials;
 }
 
 export function createInstance(metaDb, input, allowedHosts = getAllowedJiraHosts()) {

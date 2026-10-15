@@ -27,7 +27,10 @@ it("rejects unapproved destinations before credentials are used", () => {
   instances.initInstancesSchema(db);
   let tokenReads = 0;
   const env = { JIRA_BASE_URL: "https://evil.example", get JIRA_API_TOKEN() { tokenReads++; return "fixture"; } };
-  assert.throws(() => instances.resolveJiraCredentials(db, env));
+  const blocked = instances.resolveJiraCredentials(db, env);
+  assert.equal(blocked.baseUrl, "https://evil.example");
+  assert.equal(blocked.apiToken, "");
+  assert.match(blocked.configurationError, /approved HTTPS site/);
   assert.equal(tokenReads, 0);
   db.close();
 });

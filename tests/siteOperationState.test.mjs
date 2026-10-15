@@ -221,3 +221,110 @@ test("Gantt batch failure cannot release a surviving paginated batch's lease", a
   assert.equal(res.statusCode, 500);
   assert.equal(old.db.closeCalls, 1);
 });
+
+
+test("comment failure waits for sibling fallback before switching and closing A", async () => {
+  const { fetchLatestCommentTextBulk } = await import("../server/lib/jiraCommentText.mjs");
+  const { state, old } = setup();
+  const context = state.getSiteContext();
+  const blocked = deferred();
+  const seen = [];
+  const running = state.withSiteOperation(() => fetchLatestCommentTextBulk({ issueKeys: ["SAME-1", "SAME-2"], jiraRequest: async ({ pathWithQuery }) => {
+    seen.push(state.getSnapshot().credentials.instanceId);
+    if (pathWithQuery.includes("SAME-1")) throw new Error("first comment failed");
+    if (pathWithQuery.includes("orderBy")) { await blocked.promise; return { ok: false }; }
+    return { ok: true, data: { total: 0, comments: [] } };
+  } }))(request(context), response());
+  const failed = assert.rejects(running, /first comment failed/);
+  await new Promise((resolve) => setImmediate(resolve));
+  const switching = state.switchSite("b", context.generation);
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(old.db.closeCalls, 0);
+  } finally { blocked.resolve(); await failed; await switching; }
+  assert.deepEqual(seen, ["a", "a", "a"]);
+  assert.equal(old.db.closeCalls, 1);
+});
+
+test("create field failure waits for a late cache fill before clearing on switch", async () => {
+  const { clearCreateMetaCache, loadCreateFieldOptions, loadProjectCreateMeta } = await import("../server/lib/jiraCreateIssueFields.mjs");
+  clearCreateMetaCache();
+  const { state, old } = setup();
+  const context = state.getSiteContext();
+  const blocked = deferred();
+  const running = state.withSiteOperation(() => loadCreateFieldOptions({ projectKey: "SAME", jiraRequest: async ({ pathWithQuery }) => {
+    if (pathWithQuery.includes("components")) throw new Error("components failed");
+    await blocked.promise;
+    return { ok: true, data: { projects: [{ key: "SAME", id: "a" }] } };
+  } }))(request(context), response());
+  const failed = assert.rejects(running, /components failed/);
+  await new Promise((resolve) => setImmediate(resolve));
+  const switching = state.switchSite("b", context.generation);
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(old.db.closeCalls, 0);
+  } finally { blocked.resolve(); await failed; await switching; }
+  const loaded = await loadProjectCreateMeta({ projectKey: "SAME", jiraRequest: async () => ({ ok: true, data: { projects: [{ key: "SAME", id: "b" }] } }) });
+  assert.equal(loaded.project.id, "b");
+  clearCreateMetaCache();
+});
+
+test("create field options and payload metadata follow A to B to A for identical keys", async () => {
+  const { clearCreateMetaCache, loadCreateFieldOptions, buildJiraCreatePayload } = await import("../server/lib/jiraCreateIssueFields.mjs");
+  clearCreateMetaCache();
+  const { state } = setup();
+  const jiraRequest = async ({ pathWithQuery }) => {
+    const id = state.getSnapshot().credentials.instanceId;
+    return { ok: true, data: pathWithQuery.includes("/components") ? [{ id: `${id}-component`, name: `${id}-only` }] : { projects: [{ key: "SAME", id, issuetypes: [{ id: `${id}-story`, name: "Story", fields: {} }] }] } };
+  };
+  for (const id of ["a", "b", "a"]) {
+    if (state.getSiteContext().instanceId !== id) await state.switchSite(id, state.getSiteContext().generation);
+    const options = await loadCreateFieldOptions({ projectKey: "SAME", jiraRequest });
+    assert.deepEqual(options.components, [`${id}-only`]);
+    const payload = await buildJiraCreatePayload({ projectKey: "SAME", issueType: "Story", summary: "Synthetic", jiraRequest });
+    assert.equal(payload.ok, true);
+    assert.deepEqual(payload.fields.issuetype, { id: `${id}-story` });
+  }
+  clearCreateMetaCache();
+});
+
+test("Rovo deadline aborts stalled body and waits for its settlement before switching", async (t) => {
+  const { callRovoSearch } = await import("../server/lib/rovoMcpClient.mjs");
+  const nativeFetch = globalThis.fetch;
+  const previousTimeout = process.env.ROVO_REQUEST_TIMEOUT_MS;
+  t.after(() => { globalThis.fetch = nativeFetch; if (previousTimeout === undefined) delete process.env.ROVO_REQUEST_TIMEOUT_MS; else process.env.ROVO_REQUEST_TIMEOUT_MS = previousTimeout; });
+  process.env.ROVO_REQUEST_TIMEOUT_MS = "20";
+  const started = deferred();
+  const aborted = deferred();
+  const settle = deferred();
+  const { state, old } = setup();
+  let calls = 0;
+  globalThis.fetch = async (_url, { signal }) => {
+    calls += 1;
+    return { ok: true, headers: new Headers({ "content-type": "text/event-stream" }), text: async () => {
+      started.resolve(signal);
+      await new Promise((resolve) => signal?.addEventListener("abort", resolve, { once: true }));
+      aborted.resolve();
+      await settle.promise;
+      throw signal.reason;
+    } };
+  };
+  const context = state.getSiteContext();
+  const running = state.withSiteOperation(() => callRovoSearch({ accessToken: "synthetic", query: "synthetic" }))(request(context), response());
+  const failure = assert.rejects(running, /timed out/i);
+  const signal = await started.promise;
+  const switching = state.switchSite("b", context.generation);
+  // Explicit failure cleanup lets the pre-fix test terminate without any real transport.
+  if (!signal) {
+    globalThis.fetch = nativeFetch;
+    assert.fail("Rovo transport did not receive an abort signal");
+  }
+  await aborted.promise;
+  assert.equal(signal.aborted, true);
+  assert.equal(old.db.closeCalls, 0);
+  settle.resolve();
+  await failure;
+  await switching;
+  assert.equal(old.db.closeCalls, 1);
+  assert.equal(calls, 1, "no automatic replay");
+});

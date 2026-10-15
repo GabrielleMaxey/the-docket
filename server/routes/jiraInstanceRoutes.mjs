@@ -98,6 +98,7 @@ export const registerJiraInstanceRoutes = (app, { metaDb, switchSite, changeSite
     }
 
     try {
+      assertAllowedJiraBaseUrl(instance.baseUrl, allowedHosts);
       const siteContext = await switchSite(id, req.headers["x-docket-generation"]);
       const creds = getCredentials();
       log.info(`activated Jira instance ${id}`);

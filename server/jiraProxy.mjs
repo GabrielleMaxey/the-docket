@@ -246,6 +246,11 @@ const getMissingEnv = () => {
 };
 
 const ensureEnvOrRespond = (res) => {
+  const configurationError = getCredentials().configurationError;
+  if (configurationError) {
+    res.status(400).json({ error: configurationError });
+    return false;
+  }
   const missing = getMissingEnv();
   if (missing.length > 0) {
     res.status(500).json({ error: "Missing required Jira environment variables", missing });
