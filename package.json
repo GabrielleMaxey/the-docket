@@ -9,7 +9,7 @@
   "scripts": {
     "check:node": "node scripts/check-node-version.cjs",
     "preinstall": "node scripts/check-node-version.cjs",
-    "postinstall": "electron-builder install-app-deps",
+    "postinstall": "npm rebuild better-sqlite3",
     "check:jira-client-exports": "node scripts/check-jira-client-exports.cjs",
     "pretest": "npm rebuild better-sqlite3",
     "test": "node --test tests/**/*.test.mjs",
@@ -32,57 +32,11 @@
     "desktop:dev": "concurrently -k -n ui,electron \"npm:dev:ui\" \"npm:dev:electron\"",
     "desktop:rebuild-native": "electron-rebuild -f -w better-sqlite3",
     "desktop:doctor": "npm run desktop:rebuild-native && npm run desktop:dev",
-    "desktop:generate-icons": "node -e \"require('fs').mkdirSync('build/icons', { recursive: true })\" && icon-gen -i public/icons/app-icon.svg -o build/icons --ico --icns --ico-name icon --icns-name icon",
     "build": "vite build",
     "desktop:build": "npm run build",
-    "desktop:pack": "npm run desktop:generate-icons && npm run build && electron-builder --dir",
-    "desktop:dist": "npm run desktop:generate-icons && npm run build && electron-builder --publish never",
-    "desktop:dist:mac": "npm run desktop:generate-icons && npm run build && electron-builder --mac dmg --publish never",
-    "desktop:dist:win": "npm run desktop:generate-icons && npm run build && electron-builder --win nsis --publish never",
     "preview": "vite preview",
     "team-db:migrate": "node scripts/migrate-team-db.mjs",
     "team-db:import-demo": "node scripts/import-team-demo.mjs"
-  },
-  "build": {
-    "appId": "com.gmaxey.taskmanager",
-    "productName": "The Docket",
-    "asar": true,
-    "asarUnpack": [
-      "**/node_modules/better-sqlite3/**"
-    ],
-    "directories": {
-      "buildResources": "build",
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "public/**/*",
-      "server/**/*",
-      "package.json"
-    ],
-    "mac": {
-      "icon": "build/icons/icon.icns",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "universal"
-          ]
-        }
-      ],
-      "category": "public.app-category.productivity"
-    },
-    "win": {
-      "icon": "build/icons/icon.ico",
-      "target": [
-        "nsis"
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
@@ -104,7 +58,6 @@
     "node": ">=22"
   },
   "overrides": {
-    "sharp": "^0.35.5",
     "exceljs": {
       "uuid": "11.1.1"
     }
@@ -116,9 +69,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^10.0.6",
     "electron": "^43.7.9",
-    "electron-builder": "^26.15.3",
     "esbuild": "^0.28.0",
-    "icon-gen": "^5.0.0",
     "vite": "^8.0.16",
     "wait-on": "^9.5.1"
   }

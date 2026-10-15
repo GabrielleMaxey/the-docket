@@ -109,7 +109,7 @@ When **Managed / Company AI** is configured (`MANAGED_AI_BASE_URL`, `MANAGED_AI_
 npm install
 ```
 
-`npm install` runs `electron-builder install-app-deps` after install so native modules match the bundled Electron version. For browser-only API dev, `predev:api` also rebuilds `better-sqlite3` for Node when needed.
+`npm install` rebuilds `better-sqlite3` for Node. Browser API startup also rebuilds for Node; desktop startup uses the existing Electron rebuild. Stop the running workflow before switching between browser and desktop mode.
 
 **Browser mode (Vite + proxy)** — macOS, Windows, or Linux:
 ```bash
@@ -319,32 +319,17 @@ netstat -ano | findstr :8787
 
 ---
 
-## Desktop app (packaged Electron)
+## Desktop app (local Electron development)
 
-The **Task Manager** desktop installer (macOS universal `.dmg` for Intel and Apple Silicon, or Windows NSIS) bundles the UI and starts the Express proxy automatically. No separate `npm run dev:all` step.
-
-Availability depends on local device policy. Some corporate secure laptops may block unsigned Electron installers, local app execution, or the embedded proxy. If the package is unavailable or blocked, use browser mode and install the browser UI as its own desktop-style app window.
-
-### First launch
-
-On first run, the app creates a user data folder and a template `.env` file if one does not exist. Edit that file with your Jira credentials, then restart the app.
-
-| OS | User data folder | Credentials file | SQLite database |
-|----|------------------|------------------|-----------------|
-| **macOS** | `~/Library/Application Support/Task Manager/` | `.env` in that folder | Legacy: `data/workweek.sqlite`; multi-site: `data/instances-meta.sqlite` + `data/workweek-<id>.sqlite` per site |
-| **Windows** | `%APPDATA%\Task Manager\` | `.env` in that folder | Same layout under `data\` |
-
-The packaged app loads the UI from `http://127.0.0.1:8787` (same port as the proxy). Change `API_PORT` in `.env` only if you also update how the app connects (default `8787`).
-
-### Building installers locally
+Packaged installers, including unsigned Mac `.dmg` and Windows NSIS installers, are unsupported. The installer scripts and packaging workflow have been removed. Use the project checkout, Node, dependencies, and project `.env` described above, then run:
 
 ```bash
-npm run desktop:rebuild-native   # after npm install or Electron version change
-npm run desktop:dist:mac       # macOS universal .dmg (Intel + Apple Silicon) → release/
-npm run desktop:dist:win       # Windows NSIS → release/
+npm run desktop:dev
 ```
 
-GitHub Actions builds both platforms on tagged releases (see `DEVELOPER_GUIDE.md`).
+Electron starts the local proxy and loads the Vite UI at `http://localhost:5173`. Local development uses the project `.env` and `data/` folder. If a native SQLite ABI error persists, stop the app and run `npm run desktop:doctor` to rebuild for Electron and relaunch.
+
+For browser mode, stop the desktop workflow and run `npm run dev:all`; its API startup rebuilds SQLite for Node. If needed, run `npm rebuild better-sqlite3` first. On devices that block Electron, use browser mode and optionally [install the browser UI as its own application window](./END_USER_GUIDE.md#install-as-its-own-application-window).
 
 ---
 
@@ -352,7 +337,6 @@ GitHub Actions builds both platforms on tagged releases (see `DEVELOPER_GUIDE.md
 
 | Mode | How the proxy URL is resolved |
 |------|------------------------------|
-| Desktop (packaged) | Proxy serves UI + API on `http://127.0.0.1:8787`; data in user data folder |
 | Desktop (dev) | Vite at `localhost:5173`; proxy spawned by Electron; repo `data/` + `.env` |
 | Browser dev (`dev:all`) | Vite proxies `/api/*` to `localhost:8787` via `vite.config.js` |
 | Browser production | Set **App URL** in Settings → Past due rules to `http://localhost:8787` |

@@ -63,12 +63,7 @@ Before anything else works, your Jira credentials need to be in place.
 
 **Developers (browser or desktop dev):** copy `.env.example` to `.env` in the project folder and fill in Jira credentials — see [JIRA_SETUP.md](./JIRA_SETUP.md).
 
-**Packaged desktop app (Mac or Windows installer):** on first launch the app creates a template `.env` in your user data folder. Edit that file and restart. The Mac `.dmg` is universal — one installer for Intel and Apple Silicon Macs; no need to pick a chip type.
-
-| OS | Open this file |
-|----|----------------|
-| macOS | `~/Library/Application Support/The Docket/.env` |
-| Windows | `%APPDATA%\The Docket\.env` |
+**Local desktop app:** packaged Mac and Windows installers, including unsigned builds, are unsupported. Use a project checkout with Node and installed dependencies, configure the project `.env`, and run `npm run desktop:dev`. See the [quick start and native SQLite recovery](../README.md#quick-start).
 
 Then in the app:
 

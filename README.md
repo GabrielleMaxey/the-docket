@@ -111,9 +111,15 @@ npm run dev:all
 npm run desktop:dev
 ```
 
-Some corporate secure laptops may block Electron windows, unsigned installers, local desktop apps, or the embedded proxy. If `npm run desktop:dev` or the packaged app is unavailable, run `npm run dev:all` and install the browser UI as its own desktop-style app window; see [END_USER_GUIDE.md](./docs/END_USER_GUIDE.md#install-as-its-own-application-window).
+Some corporate secure laptops may block Electron windows, local desktop apps, or the embedded proxy. If `npm run desktop:dev` is unavailable, run `npm run dev:all` and install the browser UI as its own desktop-style app window; see [END_USER_GUIDE.md](./docs/END_USER_GUIDE.md#install-as-its-own-application-window).
 
-**Packaged desktop (no Node required):** install the universal Mac `.dmg` (Intel or Apple Silicon) or Windows NSIS installer, edit `.env` — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) § Desktop app.
+Packaged installers, including unsigned Mac `.dmg` and Windows NSIS installers, are unsupported. Both supported launch workflows require the project checkout, Node, installed dependencies, and the local `.env` setup above. `npm run build` builds the browser assets; `npm run desktop:build` remains an alias for that build.
+
+### Native SQLite recovery
+
+Installation rebuilds `better-sqlite3` for Node. `npm run dev:all` rebuilds it for the browser API, while `npm run desktop:dev` rebuilds it for Electron before launching. These runtimes use different native ABIs, so stop the current workflow before switching.
+
+If a native-module version error persists, run `npm rebuild better-sqlite3` before `npm run dev:all`, or `npm run desktop:rebuild-native` before `npm run desktop:dev`. `npm run desktop:doctor` combines the Electron rebuild and desktop launch. `npm test` also rebuilds for Node; restart the desktop workflow afterward if switching back to Electron.
 
 ### Local API security and Jira configuration
 
@@ -230,7 +236,6 @@ Collection is sequential with the existing Jira request timeout plus `DOCKET_EXP
 | Due date / MRD changes | Jira (your Atlassian instance) | Yes |
 | Notes you push as comments | Jira (your Atlassian instance) | Yes — text and attachments, rendered as markdown |
 | Metrics snapshot | `data/workweek.sqlite` | No |
-| Desktop `.env` + local DB (packaged app) | OS user data folder | No |
 | Jira credentials | `.env` file on this machine | No — only the local proxy reads them |
 | Chat message content | Your configured LLM provider (Anthropic/OpenAI/etc.) when you send a message | Yes — to that provider's API |
 
@@ -244,7 +249,7 @@ Migration keeps source databases and a durable record ledger, so deleting a migr
 
 - **Frontend**: React 18, Vite 8, Semantic UI React, React Router
 - **Backend**: Express.js proxy (`server/`), better-sqlite3
-- **Desktop**: Electron 31 + electron-builder
+- **Desktop**: Electron 43 (local development)
 - **AI**: Anthropic / OpenAI / Ollama (configurable in `.env`)
 - **Database**: SQLite at `data/workweek.sqlite` (auto-created on first run)
 
