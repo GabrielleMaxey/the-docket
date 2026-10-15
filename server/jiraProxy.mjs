@@ -72,6 +72,19 @@ app.use(localRequestPolicy({
   ],
 }));
 
+app.use((_req, res, next) => {
+  res.setHeader("Content-Security-Policy", [
+    "default-src 'self'", "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' blob: data:", "media-src 'self' blob: data:",
+    "connect-src 'self' https://icanhazdadjoke.com https://v2.jokeapi.dev",
+    "frame-src 'self' blob:", "object-src 'none'", "base-uri 'none'",
+    "form-action 'self'", "frame-ancestors 'none'",
+  ].join("; "));
+  next();
+});
+
 app.use(express.json({ limit: "5mb" }));
 
 // Request logger — records method, path, and response status/duration.

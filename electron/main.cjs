@@ -1,7 +1,10 @@
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
-const { app, BrowserWindow, Menu } = require("electron");
+const { app, BrowserWindow, Menu, shell } = require("electron");
+const dotenv = require("dotenv");
+const { getAllowedJiraHosts } = require("../server/lib/jiraInstances.mjs");
+const { isAppNavigation, isAllowedExternalUrl } = require("./navigationPolicy.cjs");
 
 let apiPort = process.env.API_PORT || "8787";
 let apiProcess = null;
@@ -136,6 +139,32 @@ async function waitForApi(maxAttempts = 40) {
 }
 
 function createWindow() {
+  // Match server dotenv precedence, retaining only navigation configuration in the main process.
+  const navigationEnv = {
+    JIRA_ALLOWED_HOSTS: process.env.JIRA_ALLOWED_HOSTS,
+    DOCKET_EXTERNAL_HOSTS: process.env.DOCKET_EXTERNAL_HOSTS,
+  };
+  const envPaths = [path.join(app.getAppPath(), ".env")];
+  const userDataRoot = app.isPackaged ? getPackagedUserDataRoot() : process.env.TASK_MANAGER_USER_DATA;
+  if (userDataRoot) envPaths.push(path.join(userDataRoot, ".env"));
+  for (const [index, envPath] of envPaths.entries()) {
+    if (!fs.existsSync(envPath)) continue;
+    const parsed = dotenv.parse(fs.readFileSync(envPath, "utf8"));
+    for (const key of ["JIRA_ALLOWED_HOSTS", "DOCKET_EXTERNAL_HOSTS"]) {
+      if (parsed[key] !== undefined && (index > 0 || navigationEnv[key] === undefined)) {
+        navigationEnv[key] = parsed[key];
+      }
+    }
+  }
+  const jiraHosts = getAllowedJiraHosts(navigationEnv);
+  const externalHosts = ["auth.atlassian.com", ...String(navigationEnv.DOCKET_EXTERNAL_HOSTS || "")
+    .split(",").map((host) => host.trim().toLowerCase()).filter(Boolean)];
+  const appOrigin = app.isPackaged ? `http://127.0.0.1:${apiPort}` : "http://localhost:5173";
+  const openExternal = (url) => {
+    if (isAllowedExternalUrl(url, { jiraHosts, externalHosts })) {
+      void shell.openExternal(new URL(url).href).catch(() => console.error("[electron] Could not open external link."));
+    }
+  };
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -147,23 +176,32 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       // Always point the renderer at the API Electron spawned (CORS allows localhost:5173 → :8787).
       // Do not use the Vite origin as apiBase — that races the proxy and can hide the site switcher.
       additionalArguments: [`--api-port=${apiPort}`],
     },
   });
 
+  win.webContents.on("will-navigate", (event, url) => {
+    if (!isAppNavigation(url, { appOrigin })) {
+      event.preventDefault();
+      openExternal(url);
+    }
+  });
+  win.webContents.on("will-redirect", (event, url) => {
+    if (!isAppNavigation(url, { appOrigin })) event.preventDefault();
+  });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    openExternal(url);
+    return { action: "deny" };
+  });
+
   win.once("ready-to-show", () => {
     win.show();
   });
 
-  if (!app.isPackaged) {
-    win.loadURL("http://localhost:5173");
-    return;
-  }
-
-  win.loadURL(`http://127.0.0.1:${apiPort}`);
+  win.loadURL(appOrigin);
 }
 
 function installApplicationMenu() {
