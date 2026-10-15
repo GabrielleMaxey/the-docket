@@ -544,7 +544,7 @@ export const registerAppConfigRoutes = ( app, { withSiteOperation = (handler) =>
 
       try
       {
-        const searchResult = await runJiraSearchRequest( jql, maxResults );
+        const searchResult = await runJiraSearchRequest( jql, { maxResults } );
         if ( !searchResult.ok )
         {
           const message =
@@ -603,7 +603,7 @@ export const registerAppConfigRoutes = ( app, { withSiteOperation = (handler) =>
 
       try
       {
-        const searchResult = await runJiraSearchRequest( jql, maxResults );
+        const searchResult = await runJiraSearchRequest( jql, { maxResults } );
         if ( !searchResult.ok )
         {
           const message =
