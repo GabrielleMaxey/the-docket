@@ -54,3 +54,6 @@ MiscFIles/
 .env
 .env.*
 !.env.example
+
+# Disposable local planning and mockups
+.superpowers/

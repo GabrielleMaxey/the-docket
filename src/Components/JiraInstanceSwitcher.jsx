@@ -1,3 +1,4 @@
+import { getSiteContext, subscribeSiteContext, getSiteRecoveryNotice } from "../utils/siteContextStore.js";
 import React from "react";
 import { activateJiraInstance, fetchJiraInstances } from "../services/jiraClient.js";
 
@@ -21,6 +22,8 @@ const loadInstances = async () => {
 
 const JiraInstanceSwitcher = () => {
   const [state, setState] = React.useState(null);
+  const siteContext = React.useSyncExternalStore(subscribeSiteContext, getSiteContext);
+  const [error, setError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
@@ -35,7 +38,7 @@ const JiraInstanceSwitcher = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [siteContext?.generation]);
 
   if (!state) return null;
 
@@ -51,11 +54,13 @@ const JiraInstanceSwitcher = () => {
   const onChange = async (event) => {
     const id = event.target.value;
     if (!id || id === activeInstanceId) return;
+    setError("");
     setBusy(true);
     try {
       await activateJiraInstance(id);
-      window.location.reload();
-    } catch {
+      setBusy(false);
+    } catch (error) {
+      setError(error.message);
       setBusy(false);
     }
   };
@@ -75,6 +80,7 @@ const JiraInstanceSwitcher = () => {
           </option>
         ))}
       </select>
+      {(error || getSiteRecoveryNotice()) && <span role="alert">{error || getSiteRecoveryNotice()}</span>}
     </label>
   );
 };

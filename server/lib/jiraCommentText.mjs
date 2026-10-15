@@ -240,11 +240,13 @@ export const fetchLatestCommentTextBulk = async ({
   const items = {};
 
   for (const chunk of chunkArray(uniqueKeys, chunkSize)) {
-    const results = await Promise.all(
+    const settled = await Promise.allSettled(
       chunk.map((issueKey) => fetchLatestCommentTextForIssue({ issueKey, jiraRequest }))
     );
 
-    results.forEach(({ issueKey, text, author, created }) => {
+    const failed = settled.find((result) => result.status === "rejected");
+    if (failed) throw failed.reason;
+    settled.forEach(({ value: { issueKey, text, author, created } }) => {
       if (text) {
         const entry = { text, author: author || "", created: created || "" };
         items[issueKey] = entry;

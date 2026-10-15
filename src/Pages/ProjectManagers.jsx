@@ -864,12 +864,15 @@ const ProjectManagers = () => {
   // null selectedIds = never initialized (select all). [] = deliberately none.
   const sanitizeIdList = (parsed) => (Array.isArray(parsed) ? parsed.filter((id) => Number.isFinite(id)) : null);
   const [selectedIds, setSelectedIds] = usePersistedState("pm-selected-entry-ids", null, {
+    siteScoped: true,
     sanitize: sanitizeIdList,
   });
   const [knownIds, setKnownIds] = usePersistedState("pm-known-entry-ids", null, {
+    siteScoped: true,
     sanitize: sanitizeIdList,
   });
   const [wipLimits, setWipLimits] = usePersistedState("pm-wip-limits", DEFAULT_WIP_LIMITS, {
+    siteScoped: true,
     sanitize: (parsed) =>
       Array.isArray(parsed) && parsed.every((e) => typeof e.status === "string" && typeof e.limit === "number")
         ? parsed

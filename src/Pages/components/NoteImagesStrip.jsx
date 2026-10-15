@@ -1,4 +1,5 @@
 import React from "react";
+import { Button, Modal } from "semantic-ui-react";
 
 const ACCEPT_TYPES =
   "image/png,image/jpeg,image/gif,image/webp,text/plain,text/markdown,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/vnd.ms-excel,.txt,.md,.pdf,.doc,.docx,.xlsx,.csv";
@@ -17,6 +18,7 @@ const NoteImagesStrip = ({
   onKeepChange,
 }) => {
   const fileInputRef = React.useRef(null);
+  const [preview, setPreview] = React.useState(null);
 
   const addFiles = (files) => {
     if (!disabled && files?.length > 0) {
@@ -58,7 +60,7 @@ const NoteImagesStrip = ({
             <div className="ww-note-image-thumb" key={image.localId}>
               {isImage ? (
                 <>
-                  <a href={image.previewUrl} target="_blank" rel="noreferrer" title={`Preview ${image.filename}`}>
+                  <a href={image.previewUrl} onClick={(event) => { event.preventDefault(); setPreview(image); }} title={`Preview ${image.filename}`}>
                     <img src={image.previewUrl} alt={image.filename} />
                   </a>
                   <span>{formatByteSize(image.byteSize)}</span>
@@ -67,8 +69,7 @@ const NoteImagesStrip = ({
                 <a
                   className="ww-note-file-chip"
                   href={image.previewUrl}
-                  target="_blank"
-                  rel="noreferrer"
+                  onClick={(event) => { event.preventDefault(); setPreview(image); }}
                   title={image.filename}
                 >
                   <span className="ww-note-file-chip-name">{image.filename}</span>
@@ -117,6 +118,23 @@ const NoteImagesStrip = ({
         </label>
       ) : null}
       {error ? <p className="ww-inline-error">{error}</p> : null}
+      <Modal open={Boolean(preview)} onClose={() => setPreview(null)} size="large">
+        <Modal.Header>{preview?.filename}</Modal.Header>
+        <Modal.Content scrolling>
+          {(preview?.mimeType || preview?.type || "").startsWith("image/") ? (
+            <img src={preview.previewUrl} alt={preview.filename} style={{ maxWidth: "100%" }} />
+          ) : preview ? (
+            <>
+              <iframe src={preview.previewUrl} title={preview.filename} sandbox="" style={{ width: "100%", height: "60vh", border: 0 }} />
+              <p>If this file cannot be previewed, download it to open it.</p>
+            </>
+          ) : null}
+        </Modal.Content>
+        <Modal.Actions>
+          <Button as="a" href={preview?.previewUrl} download={preview?.filename}>Download</Button>
+          <Button onClick={() => setPreview(null)}>Close</Button>
+        </Modal.Actions>
+      </Modal>
     </div>
   );
 };

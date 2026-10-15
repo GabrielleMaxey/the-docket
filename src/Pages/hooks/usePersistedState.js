@@ -1,14 +1,17 @@
+import { getSiteContext, siteStorageKey, readSiteStorage } from "../../utils/siteContextStore.js";
 import React from "react";
 
 // Optional sanitize(parsed, defaultValue) for stored-shape validation beyond JSON.parse.
-export const usePersistedState = (key, defaultValue, { sanitize } = {}) => {
+export const usePersistedState = (key, defaultValue, { sanitize, siteScoped = false } = {}) => {
+  const instanceId = React.useRef(getSiteContext()?.instanceId).current;
+  const storageKey = siteScoped ? siteStorageKey(key, instanceId) : key;
   const [state, setState] = React.useState(() => {
     if (typeof window === "undefined") {
       return defaultValue;
     }
 
     try {
-      const raw = window.localStorage.getItem(key);
+      const raw = siteScoped ? readSiteStorage(window.localStorage, key, instanceId) : window.localStorage.getItem(key);
       if (!raw) {
         return defaultValue;
       }
@@ -26,11 +29,11 @@ export const usePersistedState = (key, defaultValue, { sanitize } = {}) => {
     }
 
     try {
-      window.localStorage.setItem(key, JSON.stringify(state));
+      window.localStorage.setItem(storageKey, JSON.stringify(state));
     } catch (error) {
       console.warn(`Could not persist "${key}" to localStorage (size or quota).`, error);
     }
-  }, [key, state]);
+  }, [storageKey, state]);
 
   return [state, setState];
 };

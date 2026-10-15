@@ -231,17 +231,26 @@ export const resolveJiraUser = async ({ query, jiraRequest }) => {
   return mapJiraUserRow(selectedUser);
 };
 
-export const searchAllIssues = async ({ jql, runJiraSearchRequest, batchSize = 100, maxTotal = 5000 }) => {
+export const searchAllIssues = async ({ jql, runJiraSearchRequest, batchSize = 100, maxTotal = 5000, signal }) => {
   const issues = [];
   let nextPageToken = "";
   let jiraTotal = null;
   let reachedLastPage = false;
+  let completeness = "pagination";
 
   while (issues.length < maxTotal) {
-    const result = await runJiraSearchRequest(jql, {
-      maxResults: Math.min(batchSize, maxTotal - issues.length),
-      ...(nextPageToken ? { nextPageToken } : {}),
-    });
+    if (signal?.aborted) { completeness = "interrupted"; break; }
+    let result;
+    try {
+      result = await runJiraSearchRequest(jql, {
+        maxResults: Math.min(batchSize, maxTotal - issues.length),
+        ...(nextPageToken ? { nextPageToken } : {}),
+      });
+    } catch (error) {
+      if (!signal?.aborted) throw error;
+      completeness = "interrupted";
+      break;
+    }
     if (!result.ok) {
       throw new Error(
         result.data?.errorMessages?.join(" ") ||
@@ -251,26 +260,30 @@ export const searchAllIssues = async ({ jql, runJiraSearchRequest, batchSize = 1
       );
     }
 
-    const batch = Array.isArray(result.data?.issues) ? result.data.issues : [];
+    if (!Array.isArray(result.data?.issues)) throw new Error("Jira search returned an invalid page");
+    const batch = result.data.issues;
     if (jiraTotal === null) {
-      const reported = Number(result.data?.total);
-      if (Number.isFinite(reported) && reported >= 0) {
+      // Null/missing totals are unknown, never evidence that a page is final.
+      const reported = result.data?.total;
+      if (Number.isSafeInteger(reported) && reported >= 0) {
         jiraTotal = reported;
       }
     }
 
     issues.push(...batch);
 
-    if (batch.length === 0 || result.data?.isLast) {
-      reachedLastPage = true;
+    const token = String(result.data?.nextPageToken || "").trim();
+    if (result.data?.isLast === true || (jiraTotal !== null && issues.length >= jiraTotal && !token && result.data?.isLast !== false)) {
+      reachedLastPage = issues.length <= maxTotal && (jiraTotal === null || issues.length >= jiraTotal);
       break;
     }
-
-    nextPageToken = String(result.data?.nextPageToken || "").trim();
-    if (!nextPageToken) {
-      reachedLastPage = true;
+    if (issues.length >= maxTotal) { completeness = "limit"; break; }
+    if (!token) {
+      reachedLastPage = result.data?.isLast !== false && (jiraTotal === null || issues.length >= jiraTotal);
       break;
     }
+    if (batch.length === 0) break;
+    nextPageToken = token;
   }
 
   const loaded = Math.min(issues.length, maxTotal);
@@ -283,6 +296,7 @@ export const searchAllIssues = async ({ jql, runJiraSearchRequest, batchSize = 1
     total,
     loaded,
     isComplete,
+    completeness: isComplete ? "complete" : completeness,
   };
 };
 

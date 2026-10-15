@@ -131,3 +131,56 @@ describe("issueMetadataImport", () => {
     assert.equal(byKey["PROJ-2"].note, "Keep me");
   });
 });
+
+
+describe("supported CSV patches", () => {
+  it("supports priority-less optional edits and multiline notes with ignored headers", () => {
+    const parsed = parseIssueMetadataCsv('Key,Notes,Requestor,now / next,Flag,planned start,planned finish,actual start,decision note\nabc-1,"first\nsecond",Team,NEXT,yes,2026-10-01,2026-10-04,2026-09-30,Review');
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.rows.length, 1);
+    assert.deepEqual(parsed.ignoredHeaders, ["flag"]);
+    const plan = planIssueMetadataImport(parsed.rows, {});
+    assert.deepEqual(plan.upserts[0].patch, { note: "first\nsecond", requestor: "Team", followUp: "next", plannedStart: "2026-10-01", plannedFinish: "2026-10-04", startDate: "2026-09-30", openDecisionNote: "Review" });
+    assert.equal(plan.updatedPriorities, 0);
+  });
+  it("preserves blank optional fields and saved notes while exposing clamped priority", () => {
+    const parsed = parseIssueMetadataCsv("Key,Priority,Notes,Follow up,Requestor\nABC-1,P25,replace,,");
+    const plan = planIssueMetadataImport(parsed.rows, { "ABC-1": { note: "saved", priority: 1, followUp: "now", requestor: "Keep" } });
+    assert.deepEqual(plan.upserts[0].patch, { priority: 20 });
+    assert.equal(plan.upserts[0].priority, 20);
+    const reduced = parseIssueMetadataCsv("Key,Requestor\nABC-1,Team");
+    assert.deepEqual(planIssueMetadataImport(reduced.rows).upserts[0].patch, { requestor: "Team" });
+  });
+  it("rejects duplicate normalized keys, calendar dates and too many rows", () => {
+    const parsed = parseIssueMetadataCsv("Key,Priority,planned start\nABC-1,1,2026-02-30\nabc-2,2,\nABC 2,3,");
+    const plan = planIssueMetadataImport(parsed.rows);
+    assert.ok(plan.errors.some((error) => /date|YYYY/i.test(error.reason)));
+    assert.ok(plan.errors.some((error) => /duplicate/i.test(error.reason)));
+    assert.equal(parseIssueMetadataCsv("Key,Priority\n" + "ABC-1,1\n".repeat(5001)).ok, false);
+  });
+});
+
+it("edited import rows retain explicit clears and scope saved-note replacement to each row", () => {
+  const rows = [
+    { rowId: "one", issueKey: "ABC-1", selected: true, patch: { note: "replace", followUp: null }, replaceNote: true },
+    { rowId: "two", issueKey: "ABC-2", selected: true, patch: { note: "protected", requestor: "" }, replaceNote: false },
+    { rowId: "three", issueKey: "ABC-3", selected: false, patch: { note: "skip" } },
+  ];
+  const plan = planIssueMetadataImport(rows, { "ABC-1": { note: "old", followUp: "now" }, "ABC-2": { note: "keep", requestor: "Team" } });
+  assert.equal(plan.errors.length, 0);
+  assert.equal(plan.upserts.length, 2);
+  assert.equal(plan.upserts[0].rowId, "one");
+  assert.deepEqual(plan.upserts[0].patch, { note: "replace", followUp: null });
+  assert.deepEqual(plan.upserts[1].patch, { requestor: "" });
+});
+
+it("edited import priority is normalized before approval and malformed patches are reported", () => {
+  const plan = planIssueMetadataImport([
+    { rowId: "a", issueKey: "ABC-1", patch: { priority: "P25" } },
+    { rowId: "b", issueKey: "ABC-2", patch: "invalid" },
+  ]);
+  assert.equal(plan.upserts.length, 1);
+  assert.deepEqual(plan.upserts[0].patch, { priority: 20 });
+  assert.equal(plan.errors.length, 1);
+  assert.match(plan.errors[0].reason, /patch/i);
+});

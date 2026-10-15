@@ -1,0 +1,6 @@
+.combined-open-work { padding: 2rem 0; }
+.combined-open-work-site { display: block; margin: 0.6rem 0; overflow-wrap: anywhere; }
+.combined-open-work-site input { margin-right: 0.6rem; }
+.combined-open-work-table { overflow-x: auto; }
+.combined-open-work-table table { min-width: 700px; }
+.combined-open-work-table td { overflow-wrap: anywhere; }

@@ -28,7 +28,7 @@ const resolveMaxMb = () => {
   return Number.isFinite(value) && value > 0 ? value : ATTACHMENT_DEFAULT_MAX_MB;
 };
 
-export const registerAttachmentRoutes = (app, { jiraRequest, jiraMultipartRequest, ensureEnvOrRespond }) => {
+export const registerAttachmentRoutes = (app, { withSiteOperation = (handler) => handler, jiraRequest, jiraMultipartRequest, ensureEnvOrRespond }) => {
   const maxMb = resolveMaxMb();
   const uploadDir = path.join(os.tmpdir(), "taskmanager-attachments");
   mkdirSync(uploadDir, { recursive: true });
@@ -48,11 +48,7 @@ export const registerAttachmentRoutes = (app, { jiraRequest, jiraMultipartReques
     },
   });
 
-  const handleUploadError = (err, req, res, next) => {
-    if (!err) {
-      return next();
-    }
-    void removeTempFiles(req.files);
+  const handleUploadError = (err, res) => {
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
         return res.status(413).json({ error: attachmentTooLargeMessage(maxMb) });
@@ -65,11 +61,11 @@ export const registerAttachmentRoutes = (app, { jiraRequest, jiraMultipartReques
     return res.status(400).json({ error: err.message || ATTACHMENT_BAD_TYPE_MESSAGE });
   };
 
-  app.get("/api/jira/attachment-limits", (_req, res) => {
+  app.get("/api/jira/attachment-limits", withSiteOperation((_req, res) => {
     res.json({ maxMb, maxCount: ATTACHMENT_MAX_COUNT });
-  });
+  }));
 
-  app.get("/api/jira/issues/:issueKey/attachments", async (req, res) => {
+  app.get("/api/jira/issues/:issueKey/attachments", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) return;
     const issueKey = String(req.params.issueKey || "").trim();
     if (!ISSUE_KEY_RE.test(issueKey)) {
@@ -85,15 +81,17 @@ export const registerAttachmentRoutes = (app, { jiraRequest, jiraMultipartReques
       log.error("list attachments failed", error instanceof Error ? error.message : error);
       return res.status(500).json({ error: "Could not load attachments from Jira" });
     }
-  });
+  }));
 
   app.post(
     "/api/jira/issues/:issueKey/attachments",
-    upload.array("files", ATTACHMENT_MAX_COUNT),
-    handleUploadError,
-    async (req, res) => {
-      const files = req.files || [];
+    withSiteOperation(async (req, res) => {
       try {
+        const uploadError = await new Promise((resolve) => {
+          upload.array("files", ATTACHMENT_MAX_COUNT)(req, res, resolve);
+        });
+        if (uploadError) return handleUploadError(uploadError, res);
+        const files = req.files || [];
         if (!ensureEnvOrRespond(res)) return;
         const issueKey = String(req.params.issueKey || "").trim();
         if (!ISSUE_KEY_RE.test(issueKey)) {
@@ -123,8 +121,8 @@ export const registerAttachmentRoutes = (app, { jiraRequest, jiraMultipartReques
         log.error("upload attachments failed", error instanceof Error ? error.message : error);
         return res.status(500).json({ error: "Attachment upload failed" });
       } finally {
-        await removeTempFiles(files);
+        await removeTempFiles(req.files || []);
       }
-    }
+    })
   );
 };

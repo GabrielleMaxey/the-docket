@@ -1,13 +1,13 @@
+import { getLocalMetadata, writeLocalMetadata } from "../lib/issueMetadataStore.mjs";
+import { finished } from "node:stream/promises";
 // Issue mutations (comment, status, assignee) and SQLite note/priority metadata.
 
 import fs from "fs";
 import multer from "multer";
 import { fetchLatestCommentTextBulk } from "../lib/jiraCommentText.mjs";
-import {
-  normalizeImportIssueKey,
-  parseIssueMetadataCsv,
-  planIssueMetadataImport,
-} from "../lib/issueMetadataImport.mjs";
+import { normalizeImportIssueKey, parseIssueMetadataCsv } from "../lib/issueMetadataImport.mjs";
+import { createIssueImportPreviewStore } from "../lib/issueImportPreview.mjs";
+import { getTeamMetadata, writeTeamMetadata, teamDatabaseError } from "../lib/teamPriorityPostgres.mjs";
 import { pushNoteCommentWithImages } from "../lib/jiraNoteComment.mjs";
 import {
   listNoteImages,
@@ -58,29 +58,6 @@ const handleNoteImageUploadError = (err, _req, res, next) => {
   return res.status(400).json({ error: err.message || NOTE_IMAGE_BAD_MIME_MESSAGE });
 };
 
-const ISSUE_METADATA_SELECT_COLUMNS =
-  "issue_key, note, priority, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note";
-
-const upsertIssueMetadata = (db, payload) =>
-  db
-    .prepare(`
-    INSERT INTO issue_metadata (issue_key, note, priority, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note, updated_at)
-    VALUES (@issueKey, @note, @priority, @startDate, @completeDate, @hasOpenDecision, @plannedStart, @plannedFinish, @pmOverride, @requestor, @openDecisionNote, CURRENT_TIMESTAMP)
-    ON CONFLICT(issue_key) DO UPDATE SET
-      note = excluded.note,
-      priority = excluded.priority,
-      start_date = excluded.start_date,
-      complete_date = excluded.complete_date,
-      has_open_decision = excluded.has_open_decision,
-      planned_start = excluded.planned_start,
-      planned_finish = excluded.planned_finish,
-      pm_override = excluded.pm_override,
-      requestor = excluded.requestor,
-      open_decision_note = excluded.open_decision_note,
-      updated_at = CURRENT_TIMESTAMP
-  `)
-    .run(payload);
-
 const setKeepNoteImages = (db, payload) =>
   db
     .prepare(`
@@ -94,7 +71,7 @@ const setKeepNoteImages = (db, payload) =>
 
 export const registerIssueMetadataRoutes = (
   app,
-  { getDb, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, getNoteImagesDir }
+  { withSiteOperation = (handler) => handler, getDb, getSiteContext, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, getNoteImagesDir }
 ) => {
   const isUnassignAssigneeRequest = (value) => {
     const normalized = String(value || "").trim().toLowerCase();
@@ -105,7 +82,7 @@ export const registerIssueMetadataRoutes = (
     "/api/jira/issues/:issueKey/comment",
     uploadNoteImages.array("images", NOTE_IMAGE_MAX_COUNT),
     handleNoteImageUploadError,
-    async (req, res) => {
+    withSiteOperation(async (req, res) => {
       if (!ensureEnvOrRespond(res)) {
         return;
       }
@@ -155,10 +132,10 @@ export const registerIssueMetadataRoutes = (
           message: error instanceof Error ? error.message : "Unknown error",
         });
       }
-    }
+    })
   );
 
-  app.post("/api/jira/issues/:issueKey/status", async (req, res) => {
+  app.post("/api/jira/issues/:issueKey/status", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -232,9 +209,9 @@ export const registerIssueMetadataRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.post("/api/jira/issues/:issueKey/assignee", async (req, res) => {
+  app.post("/api/jira/issues/:issueKey/assignee", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -309,9 +286,9 @@ export const registerIssueMetadataRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.post("/api/jira/issues/comments/latest/bulk", async (req, res) => {
+  app.post("/api/jira/issues/comments/latest/bulk", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -335,9 +312,9 @@ export const registerIssueMetadataRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.post("/api/jira/issue-metadata/bulk", (req, res) => {
+  app.post("/api/jira/issue-metadata/bulk", withSiteOperation((req, res) => {
     const issueKeys = Array.isArray(req.body?.issueKeys)
       ? req.body.issueKeys
           .map((key) => String(key || "").trim())
@@ -348,38 +325,12 @@ export const registerIssueMetadataRoutes = (
       return res.json({ items: {} });
     }
 
-    const db = getDb();
-    const placeholders = issueKeys.map(() => "?").join(",");
-    const rows = db
-      .prepare(
-        `SELECT issue_key, note, priority, keep_note_images, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note, pinned_gantt FROM issue_metadata WHERE issue_key IN (${placeholders})`
-      )
-      .all(...issueKeys);
-
-    const items = rows.reduce((acc, row) => {
-      const keepNoteImages = Boolean(row.keep_note_images);
-      acc[row.issue_key] = {
-        note: String(row.note || ""),
-        priority: clampIssuePriority(row.priority),
-        keepNoteImages,
-        images: keepNoteImages ? listNoteImages(db, row.issue_key) : [],
-        startDate: String(row.start_date || ""),
-        completeDate: String(row.complete_date || ""),
-        hasOpenDecision: Boolean(row.has_open_decision),
-        plannedStart: String(row.planned_start || ""),
-        plannedFinish: String(row.planned_finish || ""),
-        pmOverride: String(row.pm_override || ""),
-        requestor: String(row.requestor || ""),
-        openDecisionNote: String(row.open_decision_note || ""),
-        pinnedGantt: Boolean(row.pinned_gantt),
-      };
-      return acc;
-    }, {});
+    const items = getLocalMetadata(getDb(), issueKeys);
 
     return res.json({ items });
-  });
+  }));
 
-  app.get("/api/jira/issue-metadata/recent-notes", (req, res) => {
+  app.get("/api/jira/issue-metadata/recent-notes", withSiteOperation((req, res) => {
     const since = String(req.query?.since || "").trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
       return res.status(400).json({ error: "Query param 'since' must be a YYYY-MM-DD date." });
@@ -394,9 +345,9 @@ export const registerIssueMetadataRoutes = (
       .all(`${since} 00:00:00`);
 
     return res.json({ issueKeys: rows.map((row) => row.issue_key) });
-  });
+  }));
 
-  app.patch("/api/jira/issue-metadata/:issueKey/pin-gantt", (req, res) => {
+  app.patch("/api/jira/issue-metadata/:issueKey/pin-gantt", withSiteOperation((req, res) => {
     const issueKey = String(req.params.issueKey || "").trim().toUpperCase();
     if (!issueKey) return res.status(400).json({ error: "Missing issue key" });
     const pinned = Boolean(req.body?.pinned);
@@ -408,84 +359,52 @@ export const registerIssueMetadataRoutes = (
         updated_at = CURRENT_TIMESTAMP
     `).run(issueKey, pinned ? 1 : 0);
     return res.json({ ok: true, pinnedGantt: pinned });
+  }));
+
+  const previews = createIssueImportPreviewStore({
+    writeMetadata: async ({ destination, siteContext, entries }) => {
+      if (destination === "local") return writeLocalMetadata(getDb(), entries);
+      try {
+        return await writeTeamMetadata({ siteHost: siteContext.siteHost, entries, updatedBy: "csv-import" });
+      } catch (error) { throw teamDatabaseError(error); }
+    },
   });
+  const importError = (res, error) => res.status(error.status || 500).json({ error: error.status ? error.message : "Import failed. Keep your edits and try again.", code: error.code || "IMPORT_FAILED" });
 
-  app.post("/api/jira/issue-metadata/import", (req, res) => {
-    const csvText = String(req.body?.csvText || "");
-    if (!csvText.trim()) {
-      return res.status(400).json({ error: "Missing csvText" });
-    }
-
-    const parsed = parseIssueMetadataCsv(csvText);
-    if (!parsed.ok) {
-      return res.status(400).json({ error: parsed.error || "Invalid CSV" });
-    }
-
+  app.post("/api/jira/issue-metadata/import/preview", withSiteOperation(async (req, res) => {
     try {
-      const db = getDb();
-      const issueKeys = [
-        ...new Set(
-          parsed.rows
-            .map((row) => normalizeImportIssueKey(row.odi))
-            .filter((key) => key.length > 0)
-        ),
-      ];
-
-      const existingByKey = {};
-      if (issueKeys.length > 0) {
-        const placeholders = issueKeys.map(() => "?").join(",");
-        const existingRows = db
-          .prepare(
-            `SELECT issue_key, note, priority, start_date, complete_date FROM issue_metadata WHERE issue_key IN (${placeholders})`
-          )
-          .all(...issueKeys);
-        for (const row of existingRows) {
-          existingByKey[row.issue_key] = {
-            note: String(row.note || ""),
-            priority: clampIssuePriority(row.priority),
-            startDate: String(row.start_date || ""),
-            completeDate: String(row.complete_date || ""),
-          };
-        }
+      const { destination, csvText, rows, supersedesPreviewId } = req.body || {};
+      if (!["local", "team"].includes(destination) || (csvText !== undefined) === (rows !== undefined)) return res.status(400).json({ error: "Choose local or team and provide exactly one of csvText or rows" });
+      let input = rows;
+      let ignoredHeaders = [];
+      if (csvText !== undefined) {
+        if (typeof csvText !== "string") return res.status(400).json({ error: "csvText must be text" });
+        const parsed = parseIssueMetadataCsv(csvText);
+        if (!parsed.ok) return res.status(400).json({ error: parsed.error || "Invalid CSV" });
+        input = parsed.rows;
+        ignoredHeaders = parsed.ignoredHeaders;
       }
-
-      const plan = planIssueMetadataImport(parsed.rows, existingByKey);
-      const apply = db.transaction((upserts) => {
-        for (const item of upserts) {
-          upsertIssueMetadata(db, {
-            issueKey: item.issueKey,
-            note: item.note,
-            priority: item.priority,
-            startDate: existingByKey[item.issueKey]?.startDate || "",
-            completeDate: existingByKey[item.issueKey]?.completeDate || "",
-          });
-        }
-      });
-      apply(plan.upserts);
-
-      const items = {};
-      for (const item of plan.upserts) {
-        items[item.issueKey] = { priority: item.priority, note: item.note };
+      if (!Array.isArray(input) || !input.length || input.length > 5000 || input.some(row => !row || typeof row !== "object")) return res.status(400).json({ error: "Import must contain between 1 and 5,000 rows" });
+      const siteContext = getSiteContext();
+      const issueKeys = [...new Set(input.map(row => normalizeImportIssueKey(row.issueKey ?? row.odi)).filter(key => /^[A-Z][A-Z0-9_]*-[1-9][0-9]*$/.test(key)))];
+      let existingByKey;
+      if (destination === "local") existingByKey = getLocalMetadata(getDb(), issueKeys);
+      else {
+        try { existingByKey = await getTeamMetadata({ siteHost: siteContext.siteHost, issueKeys }); }
+        catch (error) { throw teamDatabaseError(error); }
       }
+      return res.json(previews.createImportPreview({ siteContext, destination, rows: input, existingByKey, ignoredHeaders, supersedesPreviewId }));
+    } catch (error) { return importError(res, error); }
+  }));
+  app.post("/api/jira/issue-metadata/import/commit", withSiteOperation(async (req, res) => {
+    try { return res.json(await previews.commitImportPreview({ previewId: req.body?.previewId, siteContext: getSiteContext() })); }
+    catch (error) { return importError(res, error); }
+  }));
+  app.post("/api/jira/issue-metadata/import", withSiteOperation((_req, res) => res.status(409).json({
+    error: "Review and approve this CSV in Settings → Import metadata before saving.", code: "IMPORT_PREVIEW_REQUIRED",
+  })));
 
-      return res.json({
-        ok: true,
-        updatedPriorities: plan.updatedPriorities,
-        filledNotes: plan.filledNotes,
-        skipped: plan.skipped,
-        errors: plan.errors,
-        items,
-      });
-    } catch (error) {
-      log.error("issue metadata import failed", error instanceof Error ? error.message : error);
-      return res.status(500).json({
-        error: "Failed to import issue metadata",
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-  });
-
-  app.get("/api/jira/issue-metadata/:issueKey/images/:id", (req, res) => {
+  app.get("/api/jira/issue-metadata/:issueKey/images/:id", withSiteOperation(async (req, res) => {
     const issueKey = String(req.params.issueKey || "").trim();
     const id = Number(req.params.id);
 
@@ -511,14 +430,18 @@ export const registerIssueMetadataRoutes = (
       res.removeHeader("Content-Length");
       res.status(404).json({ error: "Image not found" });
     });
+    res.once("close", () => stream.destroy());
     stream.pipe(res);
-  });
+    await finished(stream).catch((error) => {
+      if (error.code !== "ERR_STREAM_PREMATURE_CLOSE" && error.code !== "ENOENT") throw error;
+    });
+  }));
 
   app.post(
     "/api/jira/issue-metadata/:issueKey/images",
     uploadNoteImages.array("images", NOTE_IMAGE_MAX_COUNT),
     handleNoteImageUploadError,
-    (req, res) => {
+    withSiteOperation((req, res) => {
       const issueKey = String(req.params.issueKey || "").trim();
       if (!issueKey) {
         return res.status(400).json({ error: "Missing issue key" });
@@ -540,10 +463,10 @@ export const registerIssueMetadataRoutes = (
 
       log.info(`kept ${images.length} note image(s) on this machine for ${issueKey}`);
       return res.json({ ok: true, issueKey, images });
-    }
+    })
   );
 
-  app.delete("/api/jira/issue-metadata/:issueKey/images", (req, res) => {
+  app.delete("/api/jira/issue-metadata/:issueKey/images", withSiteOperation((req, res) => {
     const issueKey = String(req.params.issueKey || "").trim();
     if (!issueKey) {
       return res.status(400).json({ error: "Missing issue key" });
@@ -555,95 +478,32 @@ export const registerIssueMetadataRoutes = (
 
     log.info(`deleted kept note images for ${issueKey}`);
     return res.json({ ok: true, issueKey });
-  });
+  }));
 
-  app.put("/api/jira/issue-metadata/:issueKey", (req, res) => {
+  app.put("/api/jira/issue-metadata/:issueKey", withSiteOperation((req, res) => {
     const issueKey = String(req.params.issueKey || "").trim();
     if (!issueKey) {
       return res.status(400).json({ error: "Missing issue key" });
     }
 
     const db = getDb();
-    const current =
-      db.prepare(`SELECT ${ISSUE_METADATA_SELECT_COLUMNS} FROM issue_metadata WHERE issue_key = ?`).get(issueKey) || {};
-    const hasNote = typeof req.body?.note === "string";
-    const hasPriority = req.body?.priority !== undefined;
-    const hasStartDate = typeof req.body?.startDate === "string";
-    const hasCompleteDate = typeof req.body?.completeDate === "string";
-    const hasOpenDecision = req.body?.hasOpenDecision !== undefined;
-    const hasPlannedStart = typeof req.body?.plannedStart === "string";
-    const hasPlannedFinish = typeof req.body?.plannedFinish === "string";
-    const hasPmOverride = typeof req.body?.pmOverride === "string";
-    const hasRequestor = typeof req.body?.requestor === "string";
-    const hasOpenDecisionNote = typeof req.body?.openDecisionNote === "string";
-
-    if (!hasNote && !hasPriority && !hasStartDate && !hasCompleteDate &&
-        !hasOpenDecision && !hasPlannedStart && !hasPlannedFinish && !hasPmOverride && !hasRequestor && !hasOpenDecisionNote) {
-      return res.status(400).json({ error: "Provide note, priority, startDate, completeDate, or a planning field" });
+    const patch = { ...req.body };
+    if (Object.hasOwn(patch, "priority")) patch.priority = clampIssuePriority(patch.priority);
+    for (const field of ["startDate", "completeDate", "plannedStart", "plannedFinish", "pmOverride", "requestor"]) {
+      if (typeof patch[field] === "string") patch[field] = patch[field].trim();
     }
-
-    const nextNote = hasNote ? String(req.body.note) : String(current.note || "");
-    const nextPriority = hasPriority
-      ? clampIssuePriority(req.body.priority)
-      : clampIssuePriority(current.priority);
-    const nextStartDate = hasStartDate
-      ? String(req.body.startDate).trim()
-      : String(current.start_date || "");
-    const nextCompleteDate = hasCompleteDate
-      ? String(req.body.completeDate).trim()
-      : String(current.complete_date || "");
-    const nextHasOpenDecision = hasOpenDecision
-      ? (req.body.hasOpenDecision ? 1 : 0)
-      : (current.has_open_decision || 0);
-    const nextPlannedStart = hasPlannedStart
-      ? String(req.body.plannedStart).trim()
-      : String(current.planned_start || "");
-    const nextPlannedFinish = hasPlannedFinish
-      ? String(req.body.plannedFinish).trim()
-      : String(current.planned_finish || "");
-    const nextPmOverride = hasPmOverride
-      ? String(req.body.pmOverride).trim()
-      : String(current.pm_override || "");
-    const nextRequestor = hasRequestor
-      ? String(req.body.requestor).trim()
-      : String(current.requestor || "");
-    const nextOpenDecisionNote = hasOpenDecisionNote
-      ? String(req.body.openDecisionNote)
-      : String(current.open_decision_note || "");
-
-    upsertIssueMetadata(db, {
-      issueKey,
-      note: nextNote,
-      priority: nextPriority,
-      startDate: nextStartDate,
-      completeDate: nextCompleteDate,
-      hasOpenDecision: nextHasOpenDecision,
-      plannedStart: nextPlannedStart,
-      plannedFinish: nextPlannedFinish,
-      pmOverride: nextPmOverride,
-      requestor: nextRequestor,
-      openDecisionNote: nextOpenDecisionNote,
-    });
-
-    return res.json({
-      ok: true,
-      issueKey,
-      note: nextNote,
-      priority: nextPriority,
-      startDate: nextStartDate,
-      completeDate: nextCompleteDate,
-      hasOpenDecision: Boolean(nextHasOpenDecision),
-      plannedStart: nextPlannedStart,
-      plannedFinish: nextPlannedFinish,
-      pmOverride: nextPmOverride,
-      requestor: nextRequestor,
-      openDecisionNote: nextOpenDecisionNote,
-    });
-  });
+    try {
+      writeLocalMetadata(db, [{ issueKey, patch }]);
+      return res.json({ ok: true, issueKey, ...getLocalMetadata(db, [issueKey])[issueKey.toUpperCase()] });
+    } catch (error) {
+      if (error.status) return res.status(error.status).json({ error: error.message });
+      throw error;
+    }
+  }));
 
   // Pushes a date-valued Jira field (Due date or MRD) directly to Jira — respects
   // Settings → field mappings so a remapped MRD field ID is honored, not hardcoded.
-  app.post("/api/jira/issues/:issueKey/date-field", async (req, res) => {
+  app.post("/api/jira/issues/:issueKey/date-field", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -692,5 +552,5 @@ export const registerIssueMetadataRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 };

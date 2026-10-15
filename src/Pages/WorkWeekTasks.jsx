@@ -7,6 +7,7 @@ import CollapsibleSection from "../Components/CollapsibleSection";
 import JiraResultsTable from "./components/JiraResultsTable";
 import TaskManagerHeaderPanel from "./components/TaskManagerHeaderPanel";
 import JiraFilterImportModal from "./components/JiraFilterImportModal";
+import TaskExportModal from "./components/TaskExportModal";
 import CreateIssueModal from "./components/CreateIssueModal";
 import JqlControlsPanel from "./components/JqlControlsPanel";
 import WeeklyPlanPanel from "./components/WeeklyPlanPanel";
@@ -72,6 +73,10 @@ const WorkWeekTasks = () => {
   const {
     sorted: todosSorted,
     error: todosError,
+    recoveryNotice: todosRecoveryNotice,
+    loading: todosLoading,
+    handleRetry: handleTodoRetry,
+    loadTodos,
     canAdd: canAddTodo,
     handleTextChange: handleTodoTextChange,
     handlePriorityChange: handleTodoPriorityChange,
@@ -82,6 +87,7 @@ const WorkWeekTasks = () => {
     handleClearCompleted: handleTodoClearCompleted,
   } = useTodos();
   const [importSlotIndex, setImportSlotIndex] = React.useState(null);
+  const [taskExportOpen, setTaskExportOpen] = React.useState(false);
   const [createIssueOpen, setCreateIssueOpen] = React.useState(false);
   const [createIssuePrefill, setCreateIssuePrefill] = React.useState(null);
   const createIssueSourceAskIdRef = React.useRef(null);
@@ -89,11 +95,20 @@ const WorkWeekTasks = () => {
   const drillDownBannerRef = React.useRef(null);
   const [generatedSharedProgramJqlBySlot, setGeneratedSharedProgramJqlBySlot] = usePersistedState(
     WORK_WEEK_STORAGE_KEYS.generatedSharedProgramJqlBySlot,
-    {}
+    {}, { siteScoped: true }
   );
 
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const combinedOpenWorkActive = searchParams.get("tab") === "combined-open-work";
+  const handleCombinedOpenWorkChange = React.useCallback((active) => {
+    setSearchParams((current) => {
+      if (active) return { tab: "combined-open-work" };
+      const next = new URLSearchParams(current);
+      next.delete("tab");
+      return next;
+    });
+  }, [setSearchParams]);
   const drillDownFilters = React.useMemo(
     () => ({
       key: searchParams.get("key") || "",
@@ -167,7 +182,7 @@ const WorkWeekTasks = () => {
   const [activeRunIndex, setActiveRunIndex] = usePersistedState(
     WORK_WEEK_STORAGE_KEYS.activeRunIndex,
     0,
-    { sanitize: (parsed) => (Number.isFinite(Number(parsed)) ? Number(parsed) : 0) }
+    { siteScoped: true, sanitize: (parsed) => (Number.isFinite(Number(parsed)) ? Number(parsed) : 0) }
   );
 
   const activeRun = React.useMemo(() => {
@@ -489,6 +504,7 @@ const WorkWeekTasks = () => {
     <>
       <Container fluid className="work-week-page">
         <TaskManagerHeaderPanel
+          onDownloadTasks={() => setTaskExportOpen(true)}
           showJokeTicker={showJokeTicker}
           showUpcomingDueBanner={showUpcomingDueBanner}
           onShowJokeTickerChange={handleShowJokeTickerChange}
@@ -505,6 +521,10 @@ const WorkWeekTasks = () => {
           calendarCells={calendarCells} todayDay={todayDay}
           todos={todosSorted}
           todosError={todosError}
+          todosRecoveryNotice={todosRecoveryNotice}
+          todosLoading={todosLoading}
+          onTodoRetry={handleTodoRetry}
+          onTodoReload={loadTodos}
           canAddTodo={canAddTodo}
           onTodoTextChange={handleTodoTextChange}
           onTodoPriorityChange={handleTodoPriorityChange}
@@ -552,7 +572,7 @@ const WorkWeekTasks = () => {
           ) : null}
         </CollapsibleSection>
 
-        {showRestoredJqlBanner && jqlRuns.some(isConfiguredJqlRun) ? (
+        {!combinedOpenWorkActive && showRestoredJqlBanner && jqlRuns.some(isConfiguredJqlRun) ? (
           <div className="ww-restored-banner">
             <div className="ww-restored-banner-content">
               <strong>Showing saved results</strong>
@@ -566,7 +586,7 @@ const WorkWeekTasks = () => {
           </div>
         ) : null}
 
-        {hasDrillDownFilter ? (
+        {!combinedOpenWorkActive && hasDrillDownFilter ? (
           <div className="ww-drill-down-banner" ref={drillDownBannerRef}>
             <div className="ww-drill-down-banner-content">
               <strong>Dashboard drill-down</strong>
@@ -590,12 +610,12 @@ const WorkWeekTasks = () => {
           </div>
         ) : null}
 
-        {assigneeRefreshNotice ? (
+        {!combinedOpenWorkActive && assigneeRefreshNotice ? (
           <p className="ww-jira-status ww-inline-hint">{assigneeRefreshNotice}</p>
         ) : null}
 
         {/* My Metrics — directly below restored-results banner; scoped to active tab */}
-        {jqlRuns.some((r) => isConfiguredJqlRun(r) && r.issues?.length > 0) && activeRun?.issues?.length > 0 ? (
+        {!combinedOpenWorkActive && jqlRuns.some((r) => isConfiguredJqlRun(r) && r.issues?.length > 0) && activeRun?.issues?.length > 0 ? (
           <MyMetricsSection run={activeRun} jiraRowPriorities={jiraRowPriorities} jqlRuns={jqlRuns} />
         ) : null}
 
@@ -639,6 +659,8 @@ const WorkWeekTasks = () => {
           handleNoteImagesAdd={handleNoteImagesAdd} handleNoteImageRemove={handleNoteImageRemove}
           handleKeepNoteImagesToggle={handleKeepNoteImagesToggle}
           handleSelectForPush={handleSelectForPush} handlePushNote={handlePushNote}
+          combinedOpenWorkActive={combinedOpenWorkActive}
+          onCombinedOpenWorkChange={handleCombinedOpenWorkChange}
           onActiveTabChange={setActiveRunIndex}
           initialActiveRunIndex={activeRunIndex}
           jqlSharedProgramIds={jqlSharedProgramIds}
@@ -662,6 +684,7 @@ const WorkWeekTasks = () => {
         />
       ) : null}
 
+      <TaskExportModal open={taskExportOpen} onClose={() => setTaskExportOpen(false)} />
       <CreateIssueModal
         open={createIssueOpen}
         onClose={() => {

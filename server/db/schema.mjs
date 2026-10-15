@@ -215,6 +215,7 @@ const migrateDatabase = (db) => {
   ensureColumn(db, "issue_metadata", "requestor", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "issue_metadata", "open_decision_note", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "issue_metadata", "pinned_gantt", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "issue_metadata", "follow_up", "TEXT CHECK (follow_up IN ('now', 'next'))");
   db.exec(`
     CREATE TABLE IF NOT EXISTS pm_asks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

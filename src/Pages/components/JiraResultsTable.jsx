@@ -1,5 +1,7 @@
+import { FOLLOW_UP_OPTIONS } from "../../../shared/issueMetadataFields.mjs";
 import React from "react";
 import { Button, Modal } from "semantic-ui-react";
+import CombinedOpenWork from "../CombinedOpenWork.jsx";
 import PriorityCell from "./cells/PriorityCell";
 import AssigneeCell from "./cells/AssigneeCell.jsx";
 import NoteImagesStrip from "./NoteImagesStrip.jsx";
@@ -175,6 +177,8 @@ const JiraResultsTable = ({
   handleSelectForPush,
   handlePushNote,
   onActiveTabChange,
+  combinedOpenWorkActive,
+  onCombinedOpenWorkChange,
   initialActiveRunIndex,
   prioritySourceByKey,
   jqlSharedProgramIds,
@@ -335,12 +339,9 @@ const JiraResultsTable = ({
     setPageByRunIndex((prevPages) => ({ ...prevPages, [stateKey]: 1 }));
   }, [drillDownFilters, getJqlRunsIndex, onActiveTabChange, visibleRuns]);
 
-  if (visibleRuns.length === 0) {
-    return null;
-  }
-
+  const showCombinedOpenWork = combinedOpenWorkActive || visibleRuns.length === 0;
   const safeTab = Math.min(activeTab, visibleRuns.length - 1);
-  const run = visibleRuns[safeTab];
+  const run = visibleRuns[safeTab] || {};
   const runStateKey = getRunStateKey(run, safeTab);
   const runSlotIndex = run.index ?? safeTab;
   const allLoadedIssues = run.issues || [];
@@ -380,6 +381,7 @@ const JiraResultsTable = ({
   const hasMoreToLoad = !run.isDrillDown && !run.loadComplete && jiraTotal > loadedCount;
 
   const handleTabChange = (idx, item) => {
+    onCombinedOpenWorkChange?.(false);
     setActiveTab(idx);
     if (onActiveTabChange && !item?.isPendingDrillDown) {
       const runsIdx = getJqlRunsIndex(item);
@@ -489,17 +491,17 @@ const JiraResultsTable = ({
               key={`jql-tab-${getRunStateKey(item, idx)}`}
               className={
                 "ww-jql-tab-item" +
-                (idx === safeTab ? " is-active" : "") +
+                (!showCombinedOpenWork && idx === safeTab ? " is-active" : "") +
                 (item.isDrillDown ? " is-drill-down" : "")
               }
             >
               <button
                 type="button"
                 role="tab"
-                aria-selected={idx === safeTab}
+                aria-selected={!showCombinedOpenWork && idx === safeTab}
                 className={
                   "ww-jql-tab-btn" +
-                  (idx === safeTab ? " is-active" : "") +
+                  (!showCombinedOpenWork && idx === safeTab ? " is-active" : "") +
                   (item.isDrillDown ? " is-drill-down" : "")
                 }
                 onClick={() => handleTabChange(idx, item)}
@@ -519,10 +521,21 @@ const JiraResultsTable = ({
               ) : null}
             </div>
           ))}
+          <div className={"ww-jql-tab-item" + (showCombinedOpenWork ? " is-active" : "")}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={showCombinedOpenWork}
+              className={"ww-jql-tab-btn" + (showCombinedOpenWork ? " is-active" : "")}
+              onClick={() => onCombinedOpenWorkChange?.(true)}
+            >
+              Combined Open Work
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="ww-jql-result">
+      {showCombinedOpenWork ? <CombinedOpenWork /> : <div className="ww-jql-result">
         <div className="ww-jql-result-header">
           <p className="ww-jql-title">{run.label}</p>
         </div>
@@ -834,6 +847,7 @@ const JiraResultsTable = ({
                     const sharedProgramId = String(
                       run.sharedProgramId || jqlSharedProgramIds?.[runSlotIndex] || ""
                     ).trim();
+                    const followUp = sharedProgramId ? planningMeta.teamFollowUp : planningMeta.followUp;
                     const hasAnyTracking = startDateByKey[issueKey] || completeDateByKey[issueKey] ||
                       planningMeta.plannedStart || planningMeta.plannedFinish || planningMeta.pmOverride ||
                       planningMeta.requestor;
@@ -858,6 +872,7 @@ const JiraResultsTable = ({
                           </button>
                         </td>
                         <td className="ww-cell-key">
+                          {followUp ? <span className="ww-planning-label">{FOLLOW_UP_OPTIONS.find((option) => option.value === followUp)?.label} </span> : null}
                           {issueBrowseUrl ? (
                             <a href={issueBrowseUrl} target="_blank" rel="noreferrer noopener">
                               {issueKey}
@@ -942,6 +957,7 @@ const JiraResultsTable = ({
                                     className={`${isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}${hasAnyTracking ? " ww-row-has-tracking" : ""}`}
                                   >
                                     <td className="ww-cell-key">
+                                      {followUp ? <span className="ww-planning-label">{FOLLOW_UP_OPTIONS.find((option) => option.value === followUp)?.label} </span> : null}
                                       <button
                                         type="button"
                                         className="ww-row-expand-btn ww-row-expand-btn--open"
@@ -1266,6 +1282,21 @@ const JiraResultsTable = ({
                             <td colSpan={5} className="ww-planning-panel-cell">
                               <div className="ww-planning-panel">
                                 <div className="ww-planning-panel-fields">
+                                  <div className="ww-planning-field">
+                                    <span className="ww-planning-label">Now / Next</span>
+                                    {FOLLOW_UP_OPTIONS.map((option) => (
+                                      <label key={option.value}>
+                                        <input
+                                          type="checkbox"
+                                          aria-label={`${option.label} for ${issueKey}`}
+                                          checked={followUp === option.value}
+                                          disabled={isClosedOrResolved}
+                                          onChange={(e) => handlePlanningFieldChange(issueKey, "followUp", e.target.checked ? option.value : null, { sharedProgramId })}
+                                        />
+                                        {option.label}
+                                      </label>
+                                    ))}
+                                  </div>
                                   <label className="ww-planning-field">
                                     <span className="ww-planning-label">Open decision</span>
                                     <input
@@ -1482,7 +1513,7 @@ const JiraResultsTable = ({
             />
           </div>
         )}
-      </div>
+      </div>}
       <AttachFilesModal
         open={Boolean(attachTarget)}
         issueKey={attachTarget?.key || ""}

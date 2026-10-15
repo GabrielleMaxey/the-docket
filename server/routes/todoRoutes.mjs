@@ -16,29 +16,10 @@ const mapRow = (row) => ({
 
 const isValidDate = (v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(String(v));
 
-// Migration: pull legacy reminders into todos on first GET if todos table is empty
-const migrateReminders = (db) => {
-  const run = db.transaction(() => {
-    if (db.prepare(`SELECT COUNT(*) as n FROM todos`).get().n > 0) return;
-    const legacy = db.prepare(
-      `SELECT text, done FROM reminders WHERE trim(text) != '' ORDER BY slot_index ASC`
-    ).all();
-    const now = new Date().toISOString().slice(0, 10);
-    for (const row of legacy) {
-      db.prepare(
-        `INSERT INTO todos (text, priority, due_date, done, created_at, completed_at)
-         VALUES (?, 3, '', ?, CURRENT_TIMESTAMP, ?)`
-      ).run(row.text, row.done ? 1 : 0, row.done ? now : "");
-    }
-  });
-  run();
-};
-
-export const registerTodoRoutes = (app, { getDb }) => {
+export const registerTodoRoutes = (app, { getDb, getMigrationStatus = () => ({ unresolved: [] }) }) => {
   app.get("/api/todos", (_req, res) => {
     try {
       const db = getDb();
-      migrateReminders(db);
       const items = db
         .prepare(
           `SELECT * FROM todos ORDER BY done ASC, priority ASC,
@@ -46,7 +27,7 @@ export const registerTodoRoutes = (app, { getDb }) => {
         )
         .all()
         .map(mapRow);
-      return res.json({ items });
+      return res.json({ items, migration: getMigrationStatus() });
     } catch (err) {
       log.error("GET /api/todos failed", err.message);
       return res.status(500).json({ error: "Failed to load to dos" });
@@ -56,12 +37,13 @@ export const registerTodoRoutes = (app, { getDb }) => {
   app.get("/api/todos/completed", (req, res) => {
     try {
       const db = getDb();
-      const days = Math.max(0, Math.min(3650, Math.floor(Number(req.query?.days) || 90)));
+      const requestedDays = Number(req.query?.days ?? 90);
+      const days = Number.isFinite(requestedDays) ? Math.max(0, Math.min(3650, Math.floor(requestedDays))) : 90;
       const sql =
         days > 0
           ? `SELECT * FROM todos WHERE done = 1 AND completed_at >= date('now', '-${days} days') ORDER BY completed_at DESC`
           : `SELECT * FROM todos WHERE done = 1 ORDER BY completed_at DESC`;
-      return res.json({ items: db.prepare(sql).all().map(mapRow), days });
+      return res.json({ items: db.prepare(sql).all().map(mapRow), days, migration: getMigrationStatus() });
     } catch (err) {
       log.error("GET /api/todos/completed failed", err.message);
       return res.status(500).json({ error: "Failed to load completed to dos" });
@@ -82,6 +64,14 @@ export const registerTodoRoutes = (app, { getDb }) => {
   app.post("/api/todos", (req, res) => {
     try {
       const db = getDb();
+      const clientId = req.body?.clientId ?? null;
+      if (clientId !== null && (typeof clientId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientId))) {
+        return res.status(400).json({ error: "clientId must be a UUID" });
+      }
+      if (clientId) {
+        const existing = db.prepare(`SELECT * FROM todos WHERE client_id = ?`).get(clientId);
+        if (existing) return res.json(mapRow(existing));
+      }
       if (db.prepare(`SELECT COUNT(*) as n FROM todos WHERE done = 0`).get().n >= MAX_TODOS) {
         return res.status(400).json({ error: `Maximum of ${MAX_TODOS} active to dos reached.` });
       }
@@ -93,10 +83,10 @@ export const registerTodoRoutes = (app, { getDb }) => {
       }
       const result = db
         .prepare(
-          `INSERT INTO todos (text, priority, due_date, done, created_at, completed_at)
-           VALUES (@text, @priority, @dueDate, 0, CURRENT_TIMESTAMP, '')`
+          `INSERT INTO todos (text, priority, due_date, done, created_at, completed_at, client_id)
+           VALUES (@text, @priority, @dueDate, 0, CURRENT_TIMESTAMP, '', @clientId)`
         )
-        .run({ text, priority, dueDate });
+        .run({ text, priority, dueDate, clientId });
       const row = db.prepare(`SELECT * FROM todos WHERE id = ?`).get(result.lastInsertRowid);
       return res.status(201).json(mapRow(row));
     } catch (err) {
@@ -120,7 +110,7 @@ export const registerTodoRoutes = (app, { getDb }) => {
       }
       const done = req.body?.done !== undefined ? (req.body.done ? 1 : 0) : existing.done;
       const completedAt = done
-        ? (existing.completed_at || new Date().toISOString().slice(0, 10))
+        ? (existing.done ? existing.completed_at : new Date().toISOString().slice(0, 10))
         : "";
 
       db.prepare(

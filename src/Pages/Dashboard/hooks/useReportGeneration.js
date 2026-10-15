@@ -1,3 +1,4 @@
+import { getSiteContext } from "../../../utils/siteContextStore.js";
 import React from "react";
 import { generateReport } from "../../../services/jiraClient";
 import { saveChatSessionArtifact } from "../../../utils/chatSessionContext";
@@ -52,6 +53,7 @@ export const useReportGeneration = ({
   chartVariant = "pie",
   assignees = [],
 }) => {
+  const instanceId = React.useRef(getSiteContext()?.instanceId).current;
   const persisted = loadDashboardReportState();
 
   const [audience, setAudience] = React.useState(persisted?.audience || "executive");
@@ -161,7 +163,7 @@ export const useReportGeneration = ({
           additionalContext: trimmedContext,
           statusCounts: nextStatusCounts,
           chartVariant: nextChartVariant,
-        });
+        }, instanceId);
         saveChatSessionArtifact({
           type: "dashboard_report",
           label: result.label || selectedOption?.label || audience,
@@ -170,7 +172,7 @@ export const useReportGeneration = ({
             audience,
             ...(nextStatusCounts ? { statusCounts: nextStatusCounts, chartVariant: nextChartVariant } : {}),
           },
-        });
+        }, instanceId);
 
         return { result, nextStatusCounts, nextChartVariant };
       },

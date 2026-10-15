@@ -50,24 +50,36 @@ const mcpRequest = async ({ accessToken, sessionId, body, allowEmpty = false }) 
     headers["Mcp-Session-Id"] = sessionId;
   }
 
-  const response = await fetch(ROVO_MCP_URL, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  const configuredTimeout = Number(process.env.ROVO_REQUEST_TIMEOUT_MS);
+  const deadlineMs = Number.isSafeInteger(configuredTimeout) && configuredTimeout > 0 && configuredTimeout <= 2_147_483_647
+    ? configuredTimeout : 30_000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException("Rovo request timed out", "TimeoutError"));
+  }, deadlineMs);
+  try {
+    const response = await fetch(ROVO_MCP_URL, {
+      method: "POST",
+      signal: controller.signal,
+      headers,
+      body: JSON.stringify(body),
+    });
 
-  const data = await parseMcpBody(response);
-  const mcpError = data?.error?.message || data?.error;
+    const data = await parseMcpBody(response);
+    const mcpError = data?.error?.message || data?.error;
 
-  if (!response.ok && !allowEmpty) {
-    throw new Error(mcpError || `Rovo MCP HTTP ${response.status}`);
+    if (!response.ok && !allowEmpty) {
+      throw new Error(mcpError || `Rovo MCP HTTP ${response.status}`);
+    }
+
+    if (mcpError && !allowEmpty) {
+      throw new Error(typeof mcpError === "string" ? mcpError : JSON.stringify(mcpError));
+    }
+
+    return { response, data, sessionId: getSessionId(response) || sessionId };
+  } finally {
+    clearTimeout(timer);
   }
-
-  if (mcpError && !allowEmpty) {
-    throw new Error(typeof mcpError === "string" ? mcpError : JSON.stringify(mcpError));
-  }
-
-  return { response, data, sessionId: getSessionId(response) || sessionId };
 };
 
 const initializeSession = async (accessToken) => {
