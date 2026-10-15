@@ -347,7 +347,7 @@ export const useTaskManagerJira = () => {
     }
 
     const seq = ++enrichSeqRef.current;
-    Promise.all(regular.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows))).then(
+    Promise.all(regular.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows, { siteContext }))).then(
       (enrichedRegular) => {
         if (seq !== enrichSeqRef.current) {
           return;
@@ -678,7 +678,7 @@ export const useTaskManagerJira = () => {
 
     Promise.all(
       images.map(async (image) => {
-        const blob = await fetchKeptNoteImageBlob(issueKey, image.id);
+        const blob = await fetchKeptNoteImageBlob(issueKey, image.id, { siteContext });
         const file = new File([blob], image.filename, { type: image.mimeType });
         return {
           localId: crypto.randomUUID(),
@@ -1145,6 +1145,7 @@ export const useTaskManagerJira = () => {
       label: "Running JQL",
       run: () =>
         runJqlWorkflow({
+          siteContext,
           jqlInputs: nextJqlInputs,
           jqlLabels: nextJqlLabels,
           jqlSharedProgramIds: nextSharedProgramIds,
@@ -1179,6 +1180,7 @@ export const useTaskManagerJira = () => {
       label: "Loading JQL results",
       run: () =>
         loadRemainingJqlIssues({
+          siteContext,
           runIndex,
           jqlRuns,
           jqlMaxResults,
@@ -1208,6 +1210,7 @@ export const useTaskManagerJira = () => {
 
       const fetchSeq = ++drillDownFetchSeqRef.current;
       return loadDrillDownIssueByKey({
+        siteContext,
         issueKey,
         pullLatestComment,
         clampPriority,
@@ -1222,7 +1225,7 @@ export const useTaskManagerJira = () => {
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
-        isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
+        isStale: () => fetchSeq !== drillDownFetchSeqRef.current || siteContext?.generation !== getSiteContext()?.generation,
       });
     },
     [pullLatestComment, clampPriority, fieldMappingRows]
@@ -1239,6 +1242,7 @@ export const useTaskManagerJira = () => {
 
       const fetchSeq = ++drillDownFetchSeqRef.current;
       return loadDrillDownIssuesByAssignee({
+        siteContext,
         assigneeName,
         epicPresetId,
         jqlMaxResults,
@@ -1255,7 +1259,7 @@ export const useTaskManagerJira = () => {
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
-        isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
+        isStale: () => fetchSeq !== drillDownFetchSeqRef.current || siteContext?.generation !== getSiteContext()?.generation,
       });
     },
     [jqlMaxResults, pullLatestComment, clampPriority, fieldMappingRows]
@@ -1270,6 +1274,7 @@ export const useTaskManagerJira = () => {
 
       const fetchSeq = ++drillDownFetchSeqRef.current;
       return loadDrillDownByJql({
+        siteContext,
         jql: query,
         label,
         jqlMaxResults,
@@ -1286,7 +1291,7 @@ export const useTaskManagerJira = () => {
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
-        isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
+        isStale: () => fetchSeq !== drillDownFetchSeqRef.current || siteContext?.generation !== getSiteContext()?.generation,
       });
     },
     [jqlMaxResults, pullLatestComment, clampPriority, fieldMappingRows]

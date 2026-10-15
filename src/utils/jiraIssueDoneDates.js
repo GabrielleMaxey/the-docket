@@ -1,3 +1,4 @@
+import { getSiteContext } from "./siteContextStore.js";
 import { fetchJiraSearch } from "../services/jiraClient.js";
 import { chunkValues } from "../../shared/jiraBatch.mjs";
 import { getFieldValue, formatDateOnly } from "../../shared/dashboardMetrics.mjs";
@@ -20,7 +21,7 @@ export const resolveFieldMappingRows = (rows) => {
 export const issueHasOwnMrdd = (issue, mrdFieldId) =>
   Boolean(formatDateOnly(getFieldValue(issue, mrdFieldId)));
 
-const fetchIssuesByKeys = async (keys) => {
+const fetchIssuesByKeys = async (keys, siteContext) => {
   if (!keys.length) {
     return [];
   }
@@ -28,6 +29,7 @@ const fetchIssuesByKeys = async (keys) => {
   const issues = [];
   for (const batch of chunkValues(keys)) {
     const data = await fetchJiraSearch({
+      siteContext,
       jql: `key in (${batch.join(",")})`,
       maxResults: batch.length,
     });
@@ -55,7 +57,7 @@ export const getMostRecentDoneDateForIssue = (issue, mrdFieldId, parentDateByKey
   return null;
 };
 
-export const buildParentMostRecentDoneDateMap = async (issues, mrdFieldId) => {
+export const buildParentMostRecentDoneDateMap = async (issues, mrdFieldId, { siteContext = getSiteContext() } = {}) => {
   if (!mrdFieldId || !Array.isArray(issues) || issues.length === 0) {
     return {};
   }
@@ -79,7 +81,7 @@ export const buildParentMostRecentDoneDateMap = async (issues, mrdFieldId) => {
         break;
       }
 
-      const fetched = await fetchIssuesByKeys(batch);
+      const fetched = await fetchIssuesByKeys(batch, siteContext);
       keysToFetch = new Set();
 
       for (const issue of fetched) {
@@ -170,15 +172,15 @@ export const getEffectiveDueDateForIssue = (
   return getMostRecentDoneDateForIssue(issue, mrdFieldId, parentMostRecentDoneDateByKey);
 };
 
-export const enrichRunWithParentDoneDates = async (run, fieldMappingRows) => {
+export const enrichRunWithParentDoneDates = async (run, fieldMappingRows, { siteContext = getSiteContext() } = {}) => {
   const mappingsByRole = resolveFieldMappingRows(fieldMappingRows);
   const mrdFieldId = resolveMappedFieldId(mappingsByRole, "most_recent_done_date");
   const iddFieldId = resolveMappedFieldId(mappingsByRole, "initial_done_date");
   const dueFieldId = resolveMappedFieldId(mappingsByRole, "due_date") || "duedate";
 
   const [parentMostRecentDoneDateByKey, parentIddByKey] = await Promise.all([
-    buildParentMostRecentDoneDateMap(run.issues || [], mrdFieldId),
-    buildParentMostRecentDoneDateMap(run.issues || [], iddFieldId),
+    buildParentMostRecentDoneDateMap(run.issues || [], mrdFieldId, { siteContext }),
+    buildParentMostRecentDoneDateMap(run.issues || [], iddFieldId, { siteContext }),
   ]);
 
   return {

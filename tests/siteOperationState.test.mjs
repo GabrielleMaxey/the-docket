@@ -159,3 +159,65 @@ test("active Jira body timeout finishes before a site switch can close its datab
   const removed = await state.changeSite(back.generation, () => null);
   assert.equal(removed.instanceId, null);
 });
+
+test("legacy mode requires both site headers independently", async () => {
+  const legacy = snapshot(null);
+  const state = operations.createSiteOperationState({ snapshot: legacy, activate: () => legacy });
+  const context = state.getSiteContext();
+  for (const headers of [{ "x-docket-generation": context.generation }, { "x-docket-site": "legacy" }]) {
+    const res = response();
+    await state.withSiteOperation(() => res.json({ admitted: true }))({ headers }, res);
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.data.code, "SITE_CONTEXT_CHANGED");
+  }
+  const admitted = response();
+  await state.withSiteOperation(() => admitted.json({ admitted: true }))(request(context), admitted);
+  assert.equal(admitted.data.admitted, true);
+});
+
+test("Gantt batch failure cannot release a surviving paginated batch's lease", async () => {
+  const { build } = await import("esbuild");
+  const bundled = await build({
+    entryPoints: ["server/routes/capacityPlanningRoutes.mjs"], bundle: true, write: false, format: "esm", platform: "node",
+    plugins: [{ name: "synthetic-program-registry", setup(build) {
+      build.onLoad({ filter: /teamPriorityMongo\.mjs$/ }, () => ({ contents: 'export const listSharedPrograms = async () => [{ slug: "synthetic", displayName: "Synthetic", epicRoots: ["ROOT-1"] }]; export const isTeamPriorityMongoConfigured = () => false; export const bulkGetTeamDates = async () => ({});' }));
+    } }],
+  });
+  const { registerCapacityPlanningRoutes } = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`);
+  const { state, old } = setup();
+  const context = state.getSiteContext();
+  const blocked = deferred();
+  const started = deferred();
+  const seenSites = [];
+  let handler;
+  registerCapacityPlanningRoutes({ get(path, registered) { if (path === "/api/project-managers/gantt") handler = registered; } }, {
+    ...state, getDb: () => state.getSnapshot().db, ensureEnvOrRespond: () => true,
+    runJiraSearchRequest: async (jql, options) => {
+      seenSites.push(state.getSnapshot().credentials.instanceId);
+      if (jql.includes("OR key")) return { ok: true, data: { issues: Array.from({ length: 51 }, (_, i) => ({ key: `CHILD-${i + 1}` })), isLast: true } };
+      if (jql.includes("CHILD-1,")) return { ok: false, data: { error: "synthetic first-batch failure" } };
+      if (!options.nextPageToken) {
+        started.resolve();
+        await blocked.promise;
+        return { ok: true, data: { issues: [{ key: "SUB-1" }], nextPageToken: "page-two" } };
+      }
+      return { ok: true, data: { issues: [], isLast: true } };
+    },
+  });
+  const res = response();
+  const running = handler({ ...request(context), query: { slug: "synthetic" } }, res);
+  await started.promise;
+  await new Promise((resolve) => setImmediate(resolve));
+  const switching = state.switchSite("b", context.generation);
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(old.db.closeCalls, 0);
+  } finally {
+    blocked.resolve();
+    await running;
+    await switching;
+  }
+  assert.deepEqual(seenSites, ["a", "a", "a", "a"]);
+  assert.equal(res.statusCode, 500);
+  assert.equal(old.db.closeCalls, 1);
+});

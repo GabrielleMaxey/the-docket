@@ -35,6 +35,7 @@ export const createSiteOperationState = ({ snapshot, activate }) => {
   const withSiteOperation = (handler) => async (req, res, next) => {
     let operation;
     try {
+      if (!req.headers["x-docket-site"] || !req.headers["x-docket-generation"]) throw changed();
       operation = beginSiteOperation({ instanceId: req.headers["x-docket-site"], generation: req.headers["x-docket-generation"] });
     } catch (error) {
       if (error.code !== "SITE_CONTEXT_CHANGED") throw error;

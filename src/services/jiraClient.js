@@ -220,8 +220,9 @@ export const testJiraInstance = async ( id, { baseUrl, email } = {} ) =>
   } );
 
 // Send JQL as POST JSON body to avoid URL-encoding edge cases.
-export const fetchJiraSearch = async ( { jql, maxResults = 5 } ) => {
+export const fetchJiraSearch = async ( { jql, maxResults = 5, siteContext } ) => {
   return requestJson( "/api/jira/search", {
+    siteContext,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -230,8 +231,9 @@ export const fetchJiraSearch = async ( { jql, maxResults = 5 } ) => {
   } );
 };
 
-export const fetchJiraSearchAll = async ( { jql, maxTotal = 200 } ) => {
+export const fetchJiraSearchAll = async ( { jql, maxTotal = 200, siteContext } ) => {
   return requestJson( "/api/jira/search/all", {
+    siteContext,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -304,10 +306,10 @@ export const deleteKeptNoteImages = async ( issueKey ) => {
   } );
 };
 
-export const fetchKeptNoteImageBlob = async ( issueKey, imageId ) => {
+export const fetchKeptNoteImageBlob = async ( issueKey, imageId, { siteContext } = {} ) => {
   const response = await fetch(
     buildApiUrl( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }/images/${ encodeURIComponent( imageId ) }` ),
-    { headers: siteHeaders( await initializeSiteContext() ) }
+    { headers: siteHeaders( siteContext || await initializeSiteContext() ) }
   );
   if ( !response.ok )
   {
@@ -361,8 +363,9 @@ export const resolveJiraUsersByAccountIds = async ( accountIds ) => {
   return data?.items || {};
 };
 
-export const fetchIssueMetadataBulk = async ( issueKeys ) => {
+export const fetchIssueMetadataBulk = async ( issueKeys, { siteContext } = {} ) => {
   const data = await requestJson( "/api/jira/issue-metadata/bulk", {
+    siteContext,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -378,8 +381,9 @@ export const fetchRecentlyNotedIssueKeys = async ( since ) => {
   return Array.isArray( data?.issueKeys ) ? data.issueKeys : [];
 };
 
-export const fetchLatestJiraCommentsBulk = async ( issueKeys ) => {
+export const fetchLatestJiraCommentsBulk = async ( issueKeys, { siteContext } = {} ) => {
   const data = await requestJson( "/api/jira/issues/comments/latest/bulk", {
+    siteContext,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -489,8 +493,9 @@ export const fetchSharedPrograms = async () => {
   return data?.items || [];
 };
 
-export const fetchTeamPriorityBulk = async ( issueKeys ) => {
+export const fetchTeamPriorityBulk = async ( issueKeys, { siteContext } = {} ) => {
   const data = await requestJson( "/api/team-priority/bulk", {
+    siteContext,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -510,8 +515,9 @@ export const saveTeamPriority = async ( { issueKey, priority } ) => {
   } );
 };
 
-export const fetchTeamDatesBulk = async ( issueKeys ) => {
+export const fetchTeamDatesBulk = async ( issueKeys, { siteContext } = {} ) => {
   const data = await requestJson( "/api/team-priority/dates/bulk", {
+    siteContext,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -531,6 +537,7 @@ export const saveTeamDate = async ( { issueKey, startDate, completeDate, ...plan
   }
 
   return requestJson( `/api/team-priority/dates/${ encodeURIComponent( issueKey ) }`, {
+    siteContext,
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -551,13 +558,13 @@ export const fetchEpicPresets = async () => {
   return data?.items || [];
 };
 
-export const fetchEpicPresetScopeJql = async ( epicPresetId ) => {
+export const fetchEpicPresetScopeJql = async ( epicPresetId, { siteContext } = {} ) => {
   const id = String( epicPresetId || "" ).trim();
   if ( !id )
   {
     return "";
   }
-  const data = await requestJson( `/api/epic-presets/${ encodeURIComponent( id ) }/scope-jql` );
+  const data = await requestJson( `/api/epic-presets/${ encodeURIComponent( id ) }/scope-jql`, { siteContext } );
   return String( data?.scopeJql || "" ).trim();
 };
 

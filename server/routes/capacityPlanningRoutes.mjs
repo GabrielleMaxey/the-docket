@@ -165,7 +165,7 @@ export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handl
         // the epics' own direct children again.
         const rootSet = new Set(roots);
         const childKeys = firstPass.map((i) => i.key).filter((k) => !rootSet.has(k));
-        const secondPassBatches = await Promise.all(
+        const secondPassBatches = await Promise.allSettled(
           chunkValues(childKeys).map(async (batch) => {
             const jql = `parent in (${batch.join(", ")}) ORDER BY updated DESC`;
             const { issues } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 2000 });
@@ -173,8 +173,11 @@ export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handl
           })
         );
 
+        // A rejected page must not release the site lease while sibling pages still run.
+        const failedBatch = secondPassBatches.find((result) => result.status === "rejected");
+        if (failedBatch) throw failedBatch.reason;
         const byKey = new Map();
-        for (const issue of [...firstPass, ...secondPassBatches.flat()]) {
+        for (const issue of [...firstPass, ...secondPassBatches.flatMap((result) => result.value)]) {
           byKey.set(issue.key, issue);
         }
         loaded = [...byKey.values()];

@@ -48,11 +48,7 @@ export const registerAttachmentRoutes = (app, { withSiteOperation = (handler) =>
     },
   });
 
-  const handleUploadError = (err, req, res, next) => {
-    if (!err) {
-      return next();
-    }
-    void removeTempFiles(req.files);
+  const handleUploadError = (err, res) => {
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
         return res.status(413).json({ error: attachmentTooLargeMessage(maxMb) });
@@ -89,11 +85,13 @@ export const registerAttachmentRoutes = (app, { withSiteOperation = (handler) =>
 
   app.post(
     "/api/jira/issues/:issueKey/attachments",
-    upload.array("files", ATTACHMENT_MAX_COUNT),
-    handleUploadError,
     withSiteOperation(async (req, res) => {
-      const files = req.files || [];
       try {
+        const uploadError = await new Promise((resolve) => {
+          upload.array("files", ATTACHMENT_MAX_COUNT)(req, res, resolve);
+        });
+        if (uploadError) return handleUploadError(uploadError, res);
+        const files = req.files || [];
         if (!ensureEnvOrRespond(res)) return;
         const issueKey = String(req.params.issueKey || "").trim();
         if (!ISSUE_KEY_RE.test(issueKey)) {
@@ -123,7 +121,7 @@ export const registerAttachmentRoutes = (app, { withSiteOperation = (handler) =>
         log.error("upload attachments failed", error instanceof Error ? error.message : error);
         return res.status(500).json({ error: "Attachment upload failed" });
       } finally {
-        await removeTempFiles(files);
+        await removeTempFiles(req.files || []);
       }
     })
   );

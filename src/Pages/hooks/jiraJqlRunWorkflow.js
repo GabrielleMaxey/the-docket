@@ -1,3 +1,4 @@
+import { getSiteContext } from "../../utils/siteContextStore.js";
 import {
   fetchEpicPresetScopeJql,
   fetchIssueMetadataBulk,
@@ -39,13 +40,13 @@ const lookupCommentEntry = (latestComments, issueKey) => {
   return latestComments[issueKey] ?? latestComments[String(issueKey).toUpperCase()];
 };
 
-const applyLatestCommentNotes = async ({ issueKeys, setJiraNotes }) => {
+const applyLatestCommentNotes = async ({ siteContext, issueKeys, setJiraNotes }) => {
   const keys = dedupeIssueKeys(issueKeys);
   if (keys.length === 0 || typeof setJiraNotes !== "function") {
     return;
   }
   try {
-    const latestComments = await fetchLatestJiraCommentsBulk(keys);
+    const latestComments = await fetchLatestJiraCommentsBulk(keys, { siteContext });
     const commentNotes = {};
     keys.forEach((issueKey) => {
       const { text } = readCommentEntry(lookupCommentEntry(latestComments, issueKey));
@@ -74,6 +75,7 @@ const dedupeIssueKeys = (issueKeys) => [
 ];
 
 const applyTeamPriorityState = async ({
+  siteContext,
   issueKeys,
   clampPriority,
   setJiraRowPriorities,
@@ -85,7 +87,7 @@ const applyTeamPriorityState = async ({
   }
 
   try {
-    const teamItems = await fetchTeamPriorityBulk(keys);
+    const teamItems = await fetchTeamPriorityBulk(keys, { siteContext });
     const teamPriorities = {};
     const teamSource = {};
     Object.entries(teamItems || {}).forEach(([issueKey, item]) => {
@@ -124,7 +126,7 @@ const extractPlanningMeta = (item) => ({
 const hasPlanningData = (item) =>
   item && PLANNING_FIELD_KEYS.some((f) => item[f] !== undefined && item[f] !== "" && item[f] !== false);
 
-const applyTeamDateState = async ({ issueKeys, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }) => {
+const applyTeamDateState = async ({ siteContext, issueKeys, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }) => {
   if (!setStartDateByKey && !setCompleteDateByKey) {
     return;
   }
@@ -134,7 +136,7 @@ const applyTeamDateState = async ({ issueKeys, setStartDateByKey, setCompleteDat
   }
 
   try {
-    const teamItems = await fetchTeamDatesBulk(keys);
+    const teamItems = await fetchTeamDatesBulk(keys, { siteContext });
     const teamStartDates = {};
     const teamCompleteDates = {};
     const teamPlanningMeta = {};
@@ -158,6 +160,7 @@ const applyTeamDateState = async ({ issueKeys, setStartDateByKey, setCompleteDat
 };
 
 const applyDrillDownMetadata = async ({
+  siteContext,
   issueKeys,
   pullLatestComment,
   clampPriority,
@@ -168,13 +171,14 @@ const applyDrillDownMetadata = async ({
   setPlanningMetaByKey,
   hydrateNoteImages,
 }) => {
-  if (issueKeys.length === 0) {
+  if (siteContext?.generation !== getSiteContext()?.generation || issueKeys.length === 0) {
     return;
   }
 
   if (pullLatestComment) {
     try {
-      const latestComments = await fetchLatestJiraCommentsBulk(issueKeys);
+      const latestComments = await fetchLatestJiraCommentsBulk(issueKeys, { siteContext });
+      if (siteContext?.generation !== getSiteContext()?.generation) return;
       const commentNotes = {};
       issueKeys.forEach((key) => {
         const { text } = readCommentEntry(lookupCommentEntry(latestComments, key));
@@ -190,7 +194,8 @@ const applyDrillDownMetadata = async ({
     }
   }
 
-  const persisted = await fetchIssueMetadataBulk(issueKeys);
+  const persisted = await fetchIssueMetadataBulk(issueKeys, { siteContext });
+  if (siteContext?.generation !== getSiteContext()?.generation) return;
   const nextNotes = {};
   const nextPriorities = {};
   const nextStartDates = {};
@@ -238,6 +243,7 @@ const applyDrillDownMetadata = async ({
 };
 
 export async function runJqlWorkflow({
+  siteContext = getSiteContext(),
   jqlInputs,
   jqlLabels,
   jqlSharedProgramIds = [],
@@ -278,7 +284,7 @@ export async function runJqlWorkflow({
         const sharedProgramId = String(jqlSharedProgramIds[idx] || "").trim();
 
         try {
-          const data = await fetchJiraSearchAll({ jql, maxTotal: jqlMaxResults });
+          const data = await fetchJiraSearchAll({ siteContext, jql, maxTotal: jqlMaxResults });
           return {
             index: idx,
             label,
@@ -331,6 +337,7 @@ export async function runJqlWorkflow({
 
     if (pullLatestComment) {
       await applyLatestCommentNotes({
+        siteContext,
         issueKeys: [...localKeys, ...teamKeys],
         setJiraNotes,
       });
@@ -338,7 +345,7 @@ export async function runJqlWorkflow({
 
     if (localKeys.length > 0) {
       try {
-        const persisted = await fetchIssueMetadataBulk(localKeys);
+        const persisted = await fetchIssueMetadataBulk(localKeys, { siteContext });
         const nextNotes = {};
         const nextPriorities = {};
         const nextStartDates = {};
@@ -393,7 +400,7 @@ export async function runJqlWorkflow({
 
     if (teamIssueKeys.size > 0) {
       try {
-        const persisted = await fetchIssueMetadataBulk([...teamIssueKeys]);
+        const persisted = await fetchIssueMetadataBulk([...teamIssueKeys], { siteContext });
         const nextNotes = {};
         const nextStartDates = {};
         const nextCompleteDates = {};
@@ -439,24 +446,25 @@ export async function runJqlWorkflow({
     // Independent endpoints, disjoint state — no reason to serialize them.
     await Promise.all([
       applyTeamPriorityState({
+        siteContext,
         issueKeys: [...teamIssueKeys],
         clampPriority,
         setJiraRowPriorities,
         setPrioritySourceByKey,
       }),
-      applyTeamDateState({ issueKeys: [...teamIssueKeys], setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }),
+      applyTeamDateState({ siteContext, issueKeys: [...teamIssueKeys], setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }),
     ]);
 
     const enrichedRuns = await Promise.all(
-      runResults.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows))
+      runResults.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows, { siteContext }))
     );
 
     const sortedRuns = [...enrichedRuns].sort((a, b) => a.index - b.index);
     setJqlRuns((prev) => {
       const { drillDown } = partitionJqlRuns(prev);
-      const activeDrillDown = drillDown.filter((run) => !isDrillDownDismissed(run.drillDownId));
+      const activeDrillDown = drillDown.filter((run) => !isDrillDownDismissed(run.drillDownId, siteContext?.instanceId ?? null));
       const next = mergeJqlRuns(activeDrillDown, sortedRuns);
-      persistJqlRunsToStorage(next);
+      persistJqlRunsToStorage(next, siteContext?.instanceId ?? null);
       return next;
     });
   } finally {
@@ -465,6 +473,7 @@ export async function runJqlWorkflow({
 }
 
 export async function loadRemainingJqlIssues({
+  siteContext = getSiteContext(),
   runIndex,
   jqlRuns,
   jqlMaxResults,
@@ -491,7 +500,7 @@ export async function loadRemainingJqlIssues({
 
   setJqlLoading(true);
   try {
-    const data = await fetchJiraSearchAll({ jql: run.jql, maxTotal: targetMax });
+    const data = await fetchJiraSearchAll({ siteContext, jql: run.jql, maxTotal: targetMax });
     const nextRun = {
       ...run,
       issues: data?.issues || [],
@@ -500,16 +509,16 @@ export async function loadRemainingJqlIssues({
       loadComplete: Boolean(data?.isComplete),
     };
 
-    const enriched = await enrichRunWithParentDoneDates(nextRun, fieldMappingRows);
+    const enriched = await enrichRunWithParentDoneDates(nextRun, fieldMappingRows, { siteContext });
     setJqlRuns((prev) => {
       const { drillDown, regular } = partitionJqlRuns(prev);
-      const activeDrillDown = drillDown.filter((run) => !isDrillDownDismissed(run.drillDownId));
+      const activeDrillDown = drillDown.filter((run) => !isDrillDownDismissed(run.drillDownId, siteContext?.instanceId ?? null));
       const nextRegular = regular.map((item, idx) => {
         const itemIndex = item.index ?? idx;
         return itemIndex === runIndex ? enriched : item;
       });
       const next = mergeJqlRuns(activeDrillDown, nextRegular);
-      persistJqlRunsToStorage(next);
+      persistJqlRunsToStorage(next, siteContext?.instanceId ?? null);
       return next;
     });
 
@@ -523,26 +532,27 @@ export async function loadRemainingJqlIssues({
 
     if (sharedProgramId) {
       if (pullLatestComment) {
-        await applyLatestCommentNotes({ issueKeys, setJiraNotes });
+        await applyLatestCommentNotes({ siteContext, issueKeys, setJiraNotes });
       }
       await Promise.all([
         applyTeamPriorityState({
+          siteContext,
           issueKeys,
           clampPriority,
           setJiraRowPriorities,
           setPrioritySourceByKey,
         }),
-        applyTeamDateState({ issueKeys, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }),
+        applyTeamDateState({ siteContext, issueKeys, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }),
       ]);
       return;
     }
 
     if (pullLatestComment) {
-      await applyLatestCommentNotes({ issueKeys, setJiraNotes });
+      await applyLatestCommentNotes({ siteContext, issueKeys, setJiraNotes });
     }
 
     try {
-      const persisted = await fetchIssueMetadataBulk(issueKeys);
+      const persisted = await fetchIssueMetadataBulk(issueKeys, { siteContext });
       const nextPriorities = {};
       const nextStartDates = {};
       const nextCompleteDates = {};
@@ -590,6 +600,7 @@ const makeDrillDownId = (kind, value) =>
   `${kind}:${String(value || "").trim().toLowerCase()}`;
 
 export async function loadDrillDownIssueByKey({
+  siteContext = getSiteContext(),
   issueKey,
   pullLatestComment,
   clampPriority,
@@ -606,12 +617,13 @@ export async function loadDrillDownIssueByKey({
   fieldMappingRows,
   isStale = () => false,
 }) {
+  const isCurrent = () => !isStale() && siteContext?.generation === getSiteContext()?.generation;
   const normalized = String(issueKey || "").trim().toUpperCase();
   if (!normalized) {
     return false;
   }
 
-  if (isDrillDownDismissed(makeDrillDownId("issue", normalized))) {
+  if (isDrillDownDismissed(makeDrillDownId("issue", normalized), siteContext?.instanceId ?? null)) {
     return false;
   }
 
@@ -620,8 +632,8 @@ export async function loadDrillDownIssueByKey({
 
   try {
     const jql = `key = "${normalized}"`;
-    const data = await fetchJiraSearchAll({ jql, maxTotal: 5 });
-    if (isStale()) {
+    const data = await fetchJiraSearchAll({ siteContext, jql, maxTotal: 5 });
+    if (!isCurrent()) {
       return false;
     }
 
@@ -647,13 +659,15 @@ export async function loadDrillDownIssueByKey({
       isDrillDown: true,
     };
 
-    const enriched = await enrichRunWithParentDoneDates(drillRun, fieldMappingRows);
+    const enriched = await enrichRunWithParentDoneDates(drillRun, fieldMappingRows, { siteContext });
+    if (!isCurrent()) return false;
     const issueKeys = issues
       .map((issue) => String(issue.key || "").trim())
       .filter(Boolean);
 
     try {
       await applyDrillDownMetadata({
+        siteContext,
         issueKeys,
         pullLatestComment,
         clampPriority,
@@ -668,7 +682,7 @@ export async function loadDrillDownIssueByKey({
       console.error("Failed to enrich drill-down issue", error);
     }
 
-    if (isStale()) {
+    if (!isCurrent()) {
       return false;
     }
 
@@ -679,7 +693,7 @@ export async function loadDrillDownIssueByKey({
         ...drillDown.filter((run) => run.drillDownId !== enriched.drillDownId),
       ];
       const next = mergeJqlRuns(nextDrillDown, regular);
-      persistJqlRunsToStorage(next);
+      persistJqlRunsToStorage(next, siteContext?.instanceId ?? null);
       return next;
     });
 
@@ -693,6 +707,7 @@ export async function loadDrillDownIssueByKey({
 }
 
 export async function loadDrillDownIssuesByAssignee({
+  siteContext = getSiteContext(),
   assigneeName,
   epicPresetId,
   jqlMaxResults = 200,
@@ -711,6 +726,7 @@ export async function loadDrillDownIssuesByAssignee({
   fieldMappingRows,
   isStale = () => false,
 }) {
+  const isCurrent = () => !isStale() && siteContext?.generation === getSiteContext()?.generation;
   const assignee = String(assigneeName || "").trim();
   if (!assignee) {
     return false;
@@ -718,7 +734,7 @@ export async function loadDrillDownIssuesByAssignee({
   const scopedPresetId = String(epicPresetId || "").trim();
   const scopeSuffix = scopedPresetId ? `:${scopedPresetId}` : "";
 
-  if (isDrillDownDismissed(makeDrillDownId("assignee", `${assignee}${scopeSuffix}`))) {
+  if (isDrillDownDismissed(makeDrillDownId("assignee", `${assignee}${scopeSuffix}`), siteContext?.instanceId ?? null)) {
     return false;
   }
 
@@ -732,11 +748,13 @@ export async function loadDrillDownIssuesByAssignee({
     let scopeJql = "";
     if (scopedPresetId) {
       try {
-        scopeJql = await fetchEpicPresetScopeJql(scopedPresetId);
+        scopeJql = await fetchEpicPresetScopeJql(scopedPresetId, { siteContext });
       } catch {
         scopeJql = "";
       }
     }
+
+    if (!isCurrent()) return false;
 
     const assigneeClause = isUnassigned
       ? "assignee is EMPTY"
@@ -750,8 +768,8 @@ export async function loadDrillDownIssuesByAssignee({
       jql = `${assigneeClause} ORDER BY updated DESC`;
     }
 
-    const data = await fetchJiraSearchAll({ jql, maxTotal: jqlMaxResults });
-    if (isStale()) {
+    const data = await fetchJiraSearchAll({ siteContext, jql, maxTotal: jqlMaxResults });
+    if (!isCurrent()) {
       return false;
     }
 
@@ -788,13 +806,15 @@ export async function loadDrillDownIssuesByAssignee({
       drillDownEpicPresetId: scopedPresetId || null,
     };
 
-    const enriched = await enrichRunWithParentDoneDates(drillRun, fieldMappingRows);
+    const enriched = await enrichRunWithParentDoneDates(drillRun, fieldMappingRows, { siteContext });
+    if (!isCurrent()) return false;
     const issueKeys = issues
       .map((issue) => String(issue.key || "").trim())
       .filter(Boolean);
 
     try {
       await applyDrillDownMetadata({
+        siteContext,
         issueKeys,
         pullLatestComment,
         clampPriority,
@@ -809,7 +829,7 @@ export async function loadDrillDownIssuesByAssignee({
       console.error("Failed to enrich assignee drill-down issues", error);
     }
 
-    if (isStale()) {
+    if (!isCurrent()) {
       return false;
     }
 
@@ -820,7 +840,7 @@ export async function loadDrillDownIssuesByAssignee({
         ...drillDown.filter((run) => run.drillDownId !== enriched.drillDownId),
       ];
       const next = mergeJqlRuns(nextDrillDown, regular);
-      persistJqlRunsToStorage(next);
+      persistJqlRunsToStorage(next, siteContext?.instanceId ?? null);
       return next;
     });
 
@@ -834,6 +854,7 @@ export async function loadDrillDownIssuesByAssignee({
 }
 
 export async function loadDrillDownByJql({
+  siteContext = getSiteContext(),
   jql,
   label,
   jqlMaxResults = 200,
@@ -852,6 +873,7 @@ export async function loadDrillDownByJql({
   fieldMappingRows,
   isStale = () => false,
 }) {
+  const isCurrent = () => !isStale() && siteContext?.generation === getSiteContext()?.generation;
   const query = String(jql || "").trim();
   const tabLabel = String(label || "Work Week").trim() || "Work Week";
   if (!query) {
@@ -859,7 +881,7 @@ export async function loadDrillDownByJql({
   }
 
   const drillDownId = makeDrillDownId("jql", `${tabLabel}:${query}`.slice(0, 160));
-  if (isDrillDownDismissed(drillDownId)) {
+  if (isDrillDownDismissed(drillDownId, siteContext?.instanceId ?? null)) {
     return false;
   }
 
@@ -867,8 +889,8 @@ export async function loadDrillDownByJql({
   setJqlError("");
 
   try {
-    const data = await fetchJiraSearchAll({ jql: query, maxTotal: jqlMaxResults });
-    if (isStale()) {
+    const data = await fetchJiraSearchAll({ siteContext, jql: query, maxTotal: jqlMaxResults });
+    if (!isCurrent()) {
       return false;
     }
 
@@ -889,13 +911,15 @@ export async function loadDrillDownByJql({
       isDrillDown: true,
     };
 
-    const enriched = await enrichRunWithParentDoneDates(drillRun, fieldMappingRows);
+    const enriched = await enrichRunWithParentDoneDates(drillRun, fieldMappingRows, { siteContext });
+    if (!isCurrent()) return false;
     const issueKeys = issues
       .map((issue) => String(issue.key || "").trim())
       .filter(Boolean);
 
     try {
       await applyDrillDownMetadata({
+        siteContext,
         issueKeys,
         pullLatestComment,
         clampPriority,
@@ -910,7 +934,7 @@ export async function loadDrillDownByJql({
       console.error("Failed to enrich JQL drill-down", error);
     }
 
-    if (isStale()) {
+    if (!isCurrent()) {
       return false;
     }
 
@@ -921,7 +945,7 @@ export async function loadDrillDownByJql({
         ...drillDown.filter((run) => run.drillDownId !== enriched.drillDownId),
       ];
       const next = mergeJqlRuns(nextDrillDown, regular);
-      persistJqlRunsToStorage(next);
+      persistJqlRunsToStorage(next, siteContext?.instanceId ?? null);
       return next;
     });
 
