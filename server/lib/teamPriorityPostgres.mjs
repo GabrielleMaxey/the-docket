@@ -74,7 +74,7 @@ export const teamDatabaseError = (error) => {
 export const getTeamStatus = async () => {
   if (!isTeamPriorityConfigured()) return { configured: false, connected: false };
   try {
-    await getTeamPool().query("SELECT priority, follow_up, note, start_date, planned_finish FROM team_issue_metadata LIMIT 0");
+    await getTeamPool().query("SELECT priority, follow_up, note, start_date, planned_finish, has_tracking FROM team_issue_metadata LIMIT 0");
     await getTeamPool().query("SELECT p.slug, e.site_host FROM shared_programs p LEFT JOIN shared_program_epics e ON e.program_slug = p.slug LIMIT 0");
     return { configured: true, connected: true };
   } catch (error) { return { configured: true, connected: false, error: teamDatabaseError(error).message }; }
@@ -105,16 +105,19 @@ const fieldValue = (field, value) => {
   return value;
 };
 
-export const getTeamMetadata = async ({ siteHost, issueKeys }) => {
+// Both readers share one query so tracking presence and values cannot race a clear.
+const readTeamMetadata = async ({ siteHost, issueKeys }, trackingOnly = false) => {
   const db = getTeamPool();
   const host = normalizeTeamSiteHost(siteHost);
   const keys = [...new Set((Array.isArray(issueKeys) ? issueKeys : []).map(issueKey))];
   if (!keys.length) return {};
   try {
-    const { rows } = await db.query(`SELECT issue_key, ${selectMetadata}, updated_at AS "updatedAt", updated_by AS "updatedBy" FROM team_issue_metadata WHERE site_host = $1 AND issue_key = ANY($2::text[])`, [host, keys]);
+    const { rows } = await db.query(`SELECT issue_key, ${selectMetadata}, updated_at AS "updatedAt", updated_by AS "updatedBy" FROM team_issue_metadata WHERE site_host = $1 AND issue_key = ANY($2::text[])${trackingOnly ? " AND has_tracking = TRUE" : ""}`, [host, keys]);
     return Object.fromEntries(rows.map(({ issue_key, ...row }) => [issue_key, row]));
   } catch (error) { throw teamDatabaseError(error); }
 };
+
+export const getTeamMetadata = (input) => readTeamMetadata(input);
 
 // Reused by the explicit demo migration so all imported collections commit together.
 export const writeTeamMetadataEntries = async (client, { siteHost, entries, updatedBy = "" }) => {
@@ -135,6 +138,7 @@ export const writeTeamMetadataEntries = async (client, { siteHost, entries, upda
       }
     }
     const assignments = values.map(([field], index) => `${fields[field]} = $${index + 3}`);
+    if (values.some(([field]) => trackingFields.includes(field))) assignments.push("has_tracking = TRUE");
     await client.query(`UPDATE team_issue_metadata SET ${assignments.join(", ")}, updated_at = CURRENT_TIMESTAMP, updated_by = $${values.length + 3} WHERE site_host = $1 AND issue_key = $2`, [host, key, ...values.map(([, value]) => value), String(updatedBy || "")]);
     updated += 1;
   }
@@ -178,7 +182,7 @@ export const bulkPutTeamPriorities = async (entries, updatedBy = "csv-import", s
   return { updated: patches.length - deleted, deleted };
 };
 export const bulkGetTeamDates = async (issueKeys, siteHost) => {
-  const rows = await getTeamMetadata({ siteHost, issueKeys });
+  const rows = await readTeamMetadata({ siteHost, issueKeys }, true);
   return Object.fromEntries(Object.entries(rows).map(([key, row]) => [key, {
     ...Object.fromEntries(trackingFields.map((field) => [field, row[field] ?? ""])), updatedAt: row.updatedAt, updatedBy: row.updatedBy,
   }]));
@@ -190,8 +194,14 @@ export const putTeamDate = async ({ siteHost, issueKey: key, updatedBy, ...input
   return { ok: true, deleted: false, issueKey: issueKey(key), ...patch, updatedAt: row.updatedAt, updatedBy: row.updatedBy };
 };
 export const deleteTeamDate = async ({ siteHost, issueKey: key, updatedBy }) => {
-  await writeTeamMetadata({ siteHost, entries: [{ issueKey: key, patch: { startDate: null, completeDate: null, plannedStart: null, plannedFinish: null, pmOverride: "" } }], updatedBy });
-  return { ok: true, deleted: true, issueKey: issueKey(key) };
+  try {
+    await getTeamPool().query(`UPDATE team_issue_metadata SET
+      start_date = NULL, complete_date = NULL, planned_start = NULL, planned_finish = NULL, pm_override = '',
+      has_tracking = (requestor <> '' OR open_decision_note <> '' OR has_open_decision),
+      updated_at = CURRENT_TIMESTAMP, updated_by = $3
+      WHERE site_host = $1 AND issue_key = $2`, [normalizeTeamSiteHost(siteHost), issueKey(key), String(updatedBy || "")]);
+    return { ok: true, deleted: true, issueKey: issueKey(key) };
+  } catch (error) { throw teamDatabaseError(error); }
 };
 export const listSharedPrograms = async (siteHost) => {
   try {

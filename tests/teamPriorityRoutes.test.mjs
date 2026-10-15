@@ -42,6 +42,8 @@ test("real PostgreSQL routes scope reads/writes to server site and preserve comp
   assert.ok(["127.0.0.1", "localhost", "[::1]"].includes(url.hostname));
   assert.match(url.pathname, /^\/docket_test_[a-z0-9_]+$/);
   assert.ok(url.port);
+  const errors = [];
+  t.mock.method(console, "error", (...parts) => { errors.push(parts.join(" ")); });
   const store = await import("../server/lib/teamPriorityPostgres.mjs");
   const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
   process.env.TEAM_PRIORITY_DATABASE_URL = url.href;
@@ -65,11 +67,15 @@ test("real PostgreSQL routes scope reads/writes to server site and preserve comp
     assert.deepEqual((await request("/api/team-priority/metadata/bulk", "POST", { issueKeys: ["ABC-1"] }).then((r) => r.json())).items, {});
     assert.equal((await request("/api/team-priority/metadata/import", "POST", { entries: [] })).status, 404);
   });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /update team date tracking failed plannedStart must be YYYY-MM-DD/);
   await store.getTeamPool().query("DELETE FROM team_issue_metadata WHERE site_host IN ('d1-route-a.example.test', 'd1-route-b.example.test')");
 });
 
 
-test("configured but disconnected routes return safe 503 responses", async () => {
+test("configured but disconnected routes return safe 503 responses", async (t) => {
+  const errors = [];
+  t.mock.method(console, "error", (...parts) => { errors.push(parts.join(" ")); });
   const store = await import("../server/lib/teamPriorityPostgres.mjs");
   const { Pool } = await import("pg");
   const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
@@ -83,6 +89,9 @@ test("configured but disconnected routes return safe 503 responses", async () =>
       const body = await response.json();
       assert.match(body.error, /unavailable/i);
       assert.doesNotMatch(JSON.stringify(body), /SECRET|internal-db/);
+      assert.equal(errors.length, 1);
+      assert.match(errors[0], /fetch team metadata failed Team database unavailable/);
+      assert.doesNotMatch(errors[0], /SECRET|internal-db/);
     });
   } finally {
     Pool.prototype.query = original;

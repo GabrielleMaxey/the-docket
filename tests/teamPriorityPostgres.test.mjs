@@ -159,3 +159,102 @@ test("real demo migration rejects unknown sites before connecting and rolls back
   data.shared_programs[0].epicRoots[0].source = "unknown";
   await assert.rejects(importTeamDemo(data, mapping, { connect: () => assert.fail("unknown mapping must fail before a transaction") }), /mapping|source/i);
 });
+
+
+test("real compatibility dates preserve child inheritance source and explicit shared false until deliberate deletion", { skip: !databaseUrl }, async (t) => {
+  assertTestDatabase(databaseUrl);
+  const store = await loadStore();
+  const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
+  process.env.TEAM_PRIORITY_DATABASE_URL = databaseUrl;
+  const siteHost = "d1-cascade.example.test";
+  t.after(async () => {
+    await store.getTeamPool().query("DELETE FROM team_issue_metadata WHERE site_host = $1", [siteHost]);
+    await store.closeTeamPool();
+    if (previous === undefined) delete process.env.TEAM_PRIORITY_DATABASE_URL; else process.env.TEAM_PRIORITY_DATABASE_URL = previous;
+  });
+  const { migrateTeamDatabase } = await import("../scripts/migrate-team-db.mjs");
+  await migrateTeamDatabase(store.getTeamPool());
+  const fs = await import("node:fs/promises");
+  const { build } = await import("esbuild");
+  const source = await fs.readFile(new URL("../src/Pages/components/CreateIssueModal.jsx", import.meta.url), "utf8");
+  // Execute the existing private cascade unchanged, avoiding rendering the unrelated modal.
+  const cascade = source.slice(source.indexOf("const CASCADABLE_PLANNING_FIELDS"), source.indexOf('\nimport {\n  ODI_BUG_PRIORITIES'));
+  const services = ["fetchTeamDatesBulk", "fetchIssueMetadataBulk", "saveTeamDate", "saveIssueMetadata"];
+  const bundled = await build({ stdin: { contents: `import { ${services.join(", ")} } from "cascade-services";\n${cascade}\nexport { cascadePlanningFieldsToChildren }; export { configure } from "cascade-services";`, resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node", plugins: [{ name: "cascade-services", setup(build) {
+    build.onResolve({ filter: /^cascade-services$/ }, () => ({ path: "cascade-services", namespace: "synthetic" }));
+    build.onLoad({ filter: /.*/, namespace: "synthetic" }, () => ({ contents: `let services; export const configure = (next) => { services = next; }; ${services.map((name) => `export const ${name} = (...args) => services.${name}(...args);`).join("\n")}` }));
+  } }] });
+  const actual = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`);
+  const personalWrites = [];
+  const teamWrites = [];
+  actual.configure({
+    fetchTeamDatesBulk: (keys) => store.bulkGetTeamDates(keys, siteHost),
+    fetchIssueMetadataBulk: async () => ({ "ABC-1": { plannedStart: "2026-11-02", plannedFinish: "2026-11-06", requestor: "Personal requestor", hasOpenDecision: true } }),
+    saveTeamDate: async (patch) => { teamWrites.push(patch); },
+    saveIssueMetadata: async (patch) => { personalWrites.push(patch); },
+  });
+  await store.putTeamPriority({ siteHost, issueKey: "ABC-1", priority: 3 });
+  await actual.cascadePlanningFieldsToChildren("ABC-1", ["CHILD-1"]);
+  assert.deepEqual(teamWrites, [], "a priority-only team row must never cause a shared child write");
+  assert.deepEqual(personalWrites, [{ issueKey: "CHILD-1", plannedStart: "2026-11-02", plannedFinish: "2026-11-06", requestor: "Personal requestor", hasOpenDecision: true }]);
+  assert.deepEqual(await store.bulkGetTeamDates(["ABC-1"], siteHost), {});
+  await store.putTeamDate({ siteHost, issueKey: "ABC-1", hasOpenDecision: false });
+  await actual.cascadePlanningFieldsToChildren("ABC-1", ["CHILD-2"]);
+  assert.deepEqual(teamWrites, [{ issueKey: "CHILD-2", hasOpenDecision: false }]);
+  assert.equal(personalWrites.length, 1);
+  assert.equal(Object.hasOwn((await store.getTeamMetadata({ siteHost, issueKeys: ["ABC-1"] }))["ABC-1"], "hasTracking"), false);
+  assert.equal(Object.hasOwn((await store.getTeamMetadata({ siteHost, issueKeys: ["ABC-1"] }))["ABC-1"], "has_tracking"), false);
+  await store.putTeamDate({ siteHost, issueKey: "ABC-1", plannedStart: "2026-12-01", plannedFinish: "2026-12-03", requestor: "Team requestor" });
+  await actual.cascadePlanningFieldsToChildren("ABC-1", ["CHILD-3"]);
+  assert.deepEqual(teamWrites[1], { issueKey: "CHILD-3", plannedStart: "2026-12-01", plannedFinish: "2026-12-03", requestor: "Team requestor", hasOpenDecision: false });
+  await store.putTeamDate({ siteHost, issueKey: "ABC-1", plannedStart: "", plannedFinish: "", requestor: "" });
+  assert.ok((await store.bulkGetTeamDates(["ABC-1"], siteHost))["ABC-1"], "explicit empty tracking writes retain shared presence");
+  await store.deleteTeamDate({ siteHost, issueKey: "ABC-1" });
+  assert.deepEqual(await store.bulkGetTeamDates(["ABC-1"], siteHost), {}, "deliberate deletion removes otherwise empty tracking presence");
+  await actual.cascadePlanningFieldsToChildren("ABC-1", ["CHILD-4"]);
+  assert.equal(personalWrites.at(-1).issueKey, "CHILD-4");
+  assert.equal(personalWrites.at(-1).plannedStart, "2026-11-02");
+  assert.equal(teamWrites.length, 2);
+  const { importTeamDemo } = await import("../scripts/import-team-demo.mjs");
+  await importTeamDemo({ team_issue_dates: [{ _id: "ABC-2", source: "synthetic", hasOpenDecision: false }] }, { synthetic: siteHost }, store.getTeamPool());
+  assert.equal((await store.bulkGetTeamDates(["ABC-2"], siteHost))["ABC-2"].hasOpenDecision, false, "explicit false imported from the old tracking collection retains provenance");
+  for (const retained of [{ requestor: "Retained requestor" }, { openDecisionNote: "Retained decision note", requestor: "" }, { hasOpenDecision: true, openDecisionNote: "" }]) {
+    await store.putTeamDate({ siteHost, issueKey: "ABC-1", ...retained });
+    await store.deleteTeamDate({ siteHost, issueKey: "ABC-1" });
+    assert.ok((await store.bulkGetTeamDates(["ABC-1"], siteHost))["ABC-1"], "retained decision/requestor fields keep shared tracking presence");
+  }
+});
+
+
+test("real tracking migration backfills only recoverable values and is repeatable", { skip: !databaseUrl }, async (t) => {
+  assertTestDatabase(databaseUrl);
+  const { Pool } = await import("pg");
+  const fs = await import("node:fs/promises");
+  const pool = new Pool({ connectionString: databaseUrl, max: 1 });
+  await pool.query("CREATE SCHEMA docket_test_tracking_upgrade");
+  const scoped = new Pool({ connectionString: databaseUrl, max: 1, options: "-c search_path=docket_test_tracking_upgrade" });
+  t.after(async () => { await scoped.end(); await pool.query("DROP SCHEMA docket_test_tracking_upgrade CASCADE"); await pool.end(); });
+  await scoped.query(await fs.readFile(new URL("../server/db/team/001-team-metadata.sql", import.meta.url), "utf8"));
+  await scoped.query("CREATE TABLE team_schema_versions (version TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP); INSERT INTO team_schema_versions (version) VALUES ('001-team-metadata.sql')");
+  await scoped.query(`INSERT INTO team_issue_metadata (site_host, issue_key, priority, has_open_decision, planned_start, requestor, open_decision_note, note) VALUES
+    ('d1-upgrade.example.test', 'ABC-1', 4, false, NULL, '', '', ''),
+    ('d1-upgrade.example.test', 'ABC-2', 0, false, NULL, '', '', ''),
+    ('d1-upgrade.example.test', 'ABC-3', 0, true, NULL, '', '', ''),
+    ('d1-upgrade.example.test', 'ABC-4', 0, false, '2026-11-01', '', '', ''),
+    ('d1-upgrade.example.test', 'ABC-5', 0, false, NULL, 'Requestor', '', ''),
+    ('d1-upgrade.example.test', 'ABC-6', 0, false, NULL, '', 'Decision', ''),
+    ('d1-upgrade.example.test', 'ABC-7', 0, false, NULL, '', '', 'Local-independent team note')`);
+  const { migrateTeamDatabase } = await import("../scripts/migrate-team-db.mjs");
+  assert.deepEqual(await migrateTeamDatabase(scoped), { applied: 1 });
+  assert.deepEqual(await migrateTeamDatabase(scoped), { applied: 0 });
+  const { rows } = await scoped.query("SELECT issue_key, has_tracking FROM team_issue_metadata ORDER BY issue_key");
+  assert.deepEqual(rows, [
+    { issue_key: "ABC-1", has_tracking: false },
+    { issue_key: "ABC-2", has_tracking: false },
+    { issue_key: "ABC-3", has_tracking: true },
+    { issue_key: "ABC-4", has_tracking: true },
+    { issue_key: "ABC-5", has_tracking: true },
+    { issue_key: "ABC-6", has_tracking: true },
+    { issue_key: "ABC-7", has_tracking: false },
+  ]);
+});
