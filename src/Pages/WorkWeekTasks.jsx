@@ -99,7 +99,16 @@ const WorkWeekTasks = () => {
   );
 
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const combinedOpenWorkActive = searchParams.get("tab") === "combined-open-work";
+  const handleCombinedOpenWorkChange = React.useCallback((active) => {
+    setSearchParams((current) => {
+      if (active) return { tab: "combined-open-work" };
+      const next = new URLSearchParams(current);
+      next.delete("tab");
+      return next;
+    });
+  }, [setSearchParams]);
   const drillDownFilters = React.useMemo(
     () => ({
       key: searchParams.get("key") || "",
@@ -563,7 +572,7 @@ const WorkWeekTasks = () => {
           ) : null}
         </CollapsibleSection>
 
-        {showRestoredJqlBanner && jqlRuns.some(isConfiguredJqlRun) ? (
+        {!combinedOpenWorkActive && showRestoredJqlBanner && jqlRuns.some(isConfiguredJqlRun) ? (
           <div className="ww-restored-banner">
             <div className="ww-restored-banner-content">
               <strong>Showing saved results</strong>
@@ -577,7 +586,7 @@ const WorkWeekTasks = () => {
           </div>
         ) : null}
 
-        {hasDrillDownFilter ? (
+        {!combinedOpenWorkActive && hasDrillDownFilter ? (
           <div className="ww-drill-down-banner" ref={drillDownBannerRef}>
             <div className="ww-drill-down-banner-content">
               <strong>Dashboard drill-down</strong>
@@ -601,12 +610,12 @@ const WorkWeekTasks = () => {
           </div>
         ) : null}
 
-        {assigneeRefreshNotice ? (
+        {!combinedOpenWorkActive && assigneeRefreshNotice ? (
           <p className="ww-jira-status ww-inline-hint">{assigneeRefreshNotice}</p>
         ) : null}
 
         {/* My Metrics — directly below restored-results banner; scoped to active tab */}
-        {jqlRuns.some((r) => isConfiguredJqlRun(r) && r.issues?.length > 0) && activeRun?.issues?.length > 0 ? (
+        {!combinedOpenWorkActive && jqlRuns.some((r) => isConfiguredJqlRun(r) && r.issues?.length > 0) && activeRun?.issues?.length > 0 ? (
           <MyMetricsSection run={activeRun} jiraRowPriorities={jiraRowPriorities} jqlRuns={jqlRuns} />
         ) : null}
 
@@ -650,6 +659,8 @@ const WorkWeekTasks = () => {
           handleNoteImagesAdd={handleNoteImagesAdd} handleNoteImageRemove={handleNoteImageRemove}
           handleKeepNoteImagesToggle={handleKeepNoteImagesToggle}
           handleSelectForPush={handleSelectForPush} handlePushNote={handlePushNote}
+          combinedOpenWorkActive={combinedOpenWorkActive}
+          onCombinedOpenWorkChange={handleCombinedOpenWorkChange}
           onActiveTabChange={setActiveRunIndex}
           initialActiveRunIndex={activeRunIndex}
           jqlSharedProgramIds={jqlSharedProgramIds}

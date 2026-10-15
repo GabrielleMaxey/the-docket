@@ -20,6 +20,7 @@ import { registerCapacityPlanningRoutes } from "./routes/capacityPlanningRoutes.
 import { registerTeamPriorityRoutes } from "./routes/teamPriorityRoutes.mjs";
 import { registerPmAsksRoutes } from "./routes/pmAsksRoutes.mjs";
 import { registerTaskExportRoutes } from "./routes/taskExportRoutes.mjs";
+import { registerCombinedOpenWorkRoutes } from "./routes/combinedOpenWorkRoutes.mjs";
 import { registerTodoRoutes } from "./routes/todoRoutes.mjs";
 import { registerAttachmentRoutes } from "./routes/attachmentRoutes.mjs";
 import { resolveJiraUser, fetchJiraMyself } from "./lib/jiraSearchHelpers.mjs";
@@ -381,6 +382,7 @@ const routeCtx = {
 };
 
 registerTaskExportRoutes(app, routeCtx);
+registerCombinedOpenWorkRoutes(app, routeCtx);
 registerJiraInstanceRoutes(app, routeCtx);
 registerJiraCoreRoutes(app, routeCtx);
 registerJiraIssueRoutes(app, routeCtx);

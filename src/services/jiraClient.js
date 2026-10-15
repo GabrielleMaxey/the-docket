@@ -179,6 +179,14 @@ export const fetchJiraHealth = async () => requestJson( "/api/health" );
 
 export const testJiraConnection = async () => fetchJiraMyself();
 
+export const fetchCombinedOpenWork = ( instanceIds, { signal } = {} ) =>
+  requestJsonNow( "/api/combined-open-work", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify( { instanceIds } ),
+    signal,
+  } );
+
 export const fetchJiraInstances = async () => requestJson( "/api/jira/instances" );
 
 export const createJiraInstance = async ( body ) =>

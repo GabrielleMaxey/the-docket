@@ -1,7 +1,7 @@
 import { initializeSiteContext } from "./services/jiraClient.js";
 import { getSiteContext, subscribeSiteContext, getSiteRecoveryNotice, isSiteSwitching } from "./utils/siteContextStore.js";
 import React from "react";
-import { createHashRouter, Outlet, NavLink } from "react-router-dom";
+import { createHashRouter, Outlet, NavLink, Navigate } from "react-router-dom";
 import { FiSettings } from "react-icons/fi";
 import Errors from "./Pages/Errors.jsx";
 import "semantic-ui-css/semantic.min.css";
@@ -83,6 +83,7 @@ const router = createHashRouter([
     children: [
       { path: "/", element: <WorkWeekTasks /> },
       { path: "/work-week", element: <WorkWeekTasks /> },
+      { path: "/combined-open-work", element: <Navigate to="/work-week?tab=combined-open-work" replace /> },
       { path: "/dashboard", element: <Dashboard /> },
       { path: "/project-managers", element: <ProjectManagers /> },
       { path: "/reports", element: <ReportArchive /> },
