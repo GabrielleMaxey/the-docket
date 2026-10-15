@@ -240,3 +240,96 @@ test("real SQL: team destination rereads a different note and a conflict saves n
     assert.equal(db.prepare("SELECT note FROM issue_metadata").get().note, "local saved");
   });
 });
+
+const withActualPreviewEditor = async ({ patch, local = {}, team = {} }, run) => {
+  const { build } = await import("esbuild");
+  const { createRequire } = await import("node:module");
+  const { createIssueImportPreviewStore } = await import("../server/lib/issueImportPreview.mjs");
+  const { getLocalMetadata, writeLocalMetadata } = await import("../server/lib/issueMetadataStore.mjs");
+  const React = (await import("react")).default;
+  const databases = { local: new Database(":memory:"), team: new Database(":memory:") };
+  for (const [destination, db] of Object.entries(databases)) {
+    initDatabase(db);
+    const values = destination === "local" ? local : team;
+    if (Object.keys(values).length) writeLocalMetadata(db, [{ issueKey: "ABC-1", patch: values }]);
+  }
+  let writes = 0;
+  const store = createIssueImportPreviewStore({ writeMetadata: ({ destination, entries }) => { writes++; return writeLocalMetadata(databases[destination], entries); } });
+  const create = (input) => store.createImportPreview({ ...input, siteContext: context, existingByKey: getLocalMetadata(databases[input.destination], ["ABC-1"]) });
+  const initialPreview = create({ destination: "local", rows: [row("ABC-1", patch)] });
+  let latest = initialPreview;
+  const state = [];
+  let cursor = 0;
+  globalThis.d3Hooks = { ...React, useState: (initial) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === "function" ? initial() : initial; return [state[i], update => { state[i] = typeof update === "function" ? update(state[i]) : update; }]; }, useRef: (value) => { const i = cursor++; return state[i] ||= { current: value }; }, useSyncExternalStore: () => context };
+  globalThis.d3Services = { previewIssueMetadataImport: async input => { latest = create(input); return latest; }, commitIssueMetadataImport: previewId => store.commitImportPreview({ previewId, siteContext: context }) };
+  const bundled = await build({ entryPoints: ["src/Pages/Settings/components/IssueImportPreview.jsx"], bundle: true, write: false, format: "cjs", platform: "node", external: ["semantic-ui-react"], plugins: [{ name: "editor-preview-boundary", setup(build) {
+    build.onResolve({ filter: /^react$/ }, () => ({ path: "hooks", namespace: "fixture" }));
+    build.onResolve({ filter: /siteContextStore\.js$/ }, () => ({ path: "context", namespace: "fixture" }));
+    build.onResolve({ filter: /services\/jiraClient\.js$/ }, () => ({ path: "services", namespace: "fixture" }));
+    build.onLoad({ filter: /.*/, namespace: "fixture" }, ({ path }) => ({ contents: path === "context" ? 'export const getSiteContext = () => ({ instanceId: "synthetic", generation: "g1" }); export const subscribeSiteContext = () => () => {};' : path === "hooks" ? "export default globalThis.d3Hooks;" : "export const previewIssueMetadataImport = (...args) => globalThis.d3Services.previewIssueMetadataImport(...args); export const commitIssueMetadataImport = (...args) => globalThis.d3Services.commitIssueMetadataImport(...args);" }));
+  } }] });
+  const mod = { exports: {} };
+  new Function("require", "module", "exports", bundled.outputFiles[0].text)(createRequire(import.meta.url), mod, mod.exports);
+  const render = () => { cursor = 0; return mod.exports.default({ initialPreview, teamAvailable: true, siteContext: context, onLocalSaved: () => {} }); };
+  const flatten = value => !value ? [] : Array.isArray(value) ? value.flatMap(flatten) : typeof value === "object" ? [value, ...flatten(value.props?.children)] : [];
+  const named = (tree, name) => flatten(tree).find(node => node.props?.["aria-label"] === name || node.props?.children === name);
+  try { await run({ render, named, flatten, latest: () => latest, writes: () => writes, metadata: destination => getLocalMetadata(databases[destination], ["ABC-1"])["ABC-1"] }); }
+  finally { databases.local.close(); databases.team.close(); delete globalThis.d3Hooks; delete globalThis.d3Services; }
+};
+
+test("editor can compare and save team when the protected local note leaves no local changes", () => withActualPreviewEditor({ patch: { note: "imported note" }, local: { note: "protected local" } }, async ({ render, named, flatten, latest, writes, metadata }) => {
+  let tree = render();
+  assert.deepEqual(latest().diff[0].changes, {});
+  assert.equal(named(tree, "Approve changes").props.disabled, true);
+  const comparison = named(tree, "Comparison destination");
+  assert.ok(comparison, "destination must be selectable before local approval");
+  assert.equal(comparison.props.disabled, false);
+  await comparison.props.onChange({ target: { value: "team" } });
+  tree = render();
+  assert.equal(latest().destination, "team");
+  assert.equal(latest().diff[0].changes.note.after, "imported note");
+  assert.equal(writes(), 0);
+  assert.equal(named(tree, "Save to team").props.disabled, true);
+  named(tree, "Approve changes").props.onClick();
+  tree = render();
+  await named(tree, "Save to team").props.onClick();
+  tree = render();
+  assert.equal(writes(), 1);
+  assert.equal(metadata("team").note, "imported note");
+  assert.equal(metadata("local").note, "protected local");
+  assert.ok(flatten(tree).some(node => String(node.props?.children || "").startsWith("Saved 1 row to team.")));
+}));
+
+test("editor can compare team when planned dates are invalid only against local saved dates", () => withActualPreviewEditor({ patch: { plannedStart: "2026-10-05" }, local: { plannedFinish: "2026-10-02" }, team: { plannedFinish: "2026-10-10" } }, async ({ render, named, latest, writes }) => {
+  let tree = render();
+  assert.ok(latest().errors.length);
+  assert.equal(named(tree, "Approve changes").props.disabled, true);
+  const comparison = named(tree, "Comparison destination");
+  assert.ok(comparison, "local validation cannot block team comparison");
+  await comparison.props.onChange({ target: { value: "team" } });
+  tree = render();
+  assert.deepEqual(latest().errors, []);
+  assert.equal(named(tree, "Approve changes").props.disabled, false);
+  assert.equal(named(tree, "Save to team").props.disabled, true);
+  assert.equal(writes(), 0);
+}));
+
+test("editor priority clear uses numeric zero while untouched omission and P-rank parsing survive", async () => {
+  for (const [input, expected] of [["0", 0], ["", 0], ["P4", 4], ["P25", 20]]) {
+    await withActualPreviewEditor({ patch: { note: "new note" }, local: { priority: 8 } }, async ({ render, named, latest, metadata }) => {
+      let tree = render();
+      assert.equal(Object.hasOwn(latest().rows[0].patch, "priority"), false);
+      named(tree, "Priority for ABC-1").props.onChange({ target: { value: input } });
+      tree = render();
+      await named(tree, "Review changes").props.onClick();
+      tree = render();
+      assert.deepEqual(latest().errors, [], JSON.stringify(input));
+      assert.equal(latest().diff[0].changes.priority.after, expected);
+      assert.equal(metadata("local").priority, 8, "review does not save");
+      named(tree, "Approve changes").props.onClick();
+      tree = render();
+      await named(tree, "Save locally").props.onClick();
+      assert.equal(metadata("local").priority, expected);
+    });
+  }
+});

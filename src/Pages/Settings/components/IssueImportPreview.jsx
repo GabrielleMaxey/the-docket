@@ -22,7 +22,10 @@ const IssueImportPreview = ({ initialPreview, teamAvailable, teamReason, siteCon
   const stale = currentSite?.generation !== siteContext?.generation || currentSite?.instanceId !== siteContext?.instanceId;
   const edit = (next) => { setRows(next); setReviewed(false); setApproved(false); setMessage(""); setSaved(false); };
   const editRow = (rowId, change) => edit(rows.map(row => row.rowId === rowId ? { ...row, ...change } : row));
-  const editField = (row, field, value) => editRow(row.rowId, { patch: { ...row.patch, [field]: value } });
+  const editField = (row, field, value) => {
+    const nextValue = field === "priority" && ["", "0"].includes(value.trim()) ? 0 : value;
+    editRow(row.rowId, { patch: { ...row.patch, [field]: nextValue } });
+  };
   const review = async (destination = preview.destination) => {
     if (pending.current || stale || (saved && destination === preview.destination)) return;
     pending.current = true;
@@ -47,7 +50,7 @@ const IssueImportPreview = ({ initialPreview, teamAvailable, teamReason, siteCon
     try {
       const result = await commitIssueMetadataImport(preview.previewId, { siteContext });
       setSaved(true); setApproved(false); previousId.current = null; onPreview(null);
-      setMessage(`${result.duplicate ? "Already saved" : "Saved"} ${result.updated} rows ${result.destination === "team" ? "to team" : "locally"}. Re-run your task query to load them.`);
+      setMessage(`${result.duplicate ? "Already saved" : "Saved"} ${result.updated} ${result.updated === 1 ? "row" : "rows"} ${result.destination === "team" ? "to team" : "locally"}. Re-run your task query to load them.`);
       if (result.destination === "local") onLocalSaved(preview);
     } catch (error) {
       if ([409, 410].includes(error.status)) { setApproved(false); setReviewed(false); previousId.current = null; onPreview(null); }
@@ -56,6 +59,13 @@ const IssueImportPreview = ({ initialPreview, teamAvailable, teamReason, siteCon
   };
   return <div className="issue-import-preview" aria-label="Editable import preview">
     <p><strong>Jira site:</strong> {siteContext.siteHost} · <strong>{preview.destination === "local" ? "Local" : "Team"} comparison</strong>. Importing changes Docket metadata; Jira is unchanged.</p>
+    <div className="issue-import-actions">
+      <label>Compare with <select aria-label="Comparison destination" value={preview.destination} disabled={busy || stale || sourceChanged} onChange={event => review(event.target.value)}>
+        <option value="local">Local</option>
+        <option value="team" disabled={!teamAvailable}>Team</option>
+      </select></label>
+      <span>Choose a destination to review its saved values before approval.</span>
+    </div>
     {stale ? <Message warning>The Jira site changed. Your edits are kept; return to the original site and create a new preview before saving.</Message> : null}
     {initialPreview.ignoredHeaders?.length ? <Message warning>Ignored columns: {initialPreview.ignoredHeaders.join(", ")}</Message> : null}
     <div className="issue-import-actions"><label>Add column <select aria-label="Add column" value="" disabled={busy || stale} onChange={event => { if (event.target.value) { setColumns([...columns, event.target.value]); edit(rows); } }}><option value="">Choose supported field</option>{IMPORT_FIELDS.filter(field => !columns.includes(field)).map(field => <option key={field} value={field}>{labels[field]}</option>)}</select></label><span>{rows.filter(row => row.selected).length} of {rows.length} rows selected</span></div>
