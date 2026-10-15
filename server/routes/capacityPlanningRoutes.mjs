@@ -2,13 +2,13 @@ import { createLogger } from "../lib/logger.mjs";
 import { fetchCapacityWorkloads } from "../lib/capacityPlanning.mjs";
 import { mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildFieldMappingsMap } from "../lib/epicFilterJql.mjs";
-import { listSharedPrograms, bulkGetTeamDates, isTeamPriorityMongoConfigured } from "../lib/teamPriorityMongo.mjs";
+import { listSharedPrograms, bulkGetTeamDates, isTeamPriorityConfigured } from "../lib/teamPriorityPostgres.mjs";
 import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
 import { chunkValues } from "../../shared/jiraBatch.mjs";
 
 const log = createLogger("capacity-planning");
 
-export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handler) => handler, getDb, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
+export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handler) => handler, getDb, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond, getSiteContext }) => {
   // On-demand only (hover-triggered on the frontend) — a single-issue changelog
   // fetch, not part of the bulk Gantt load. Bulk-fetching changelogs for every
   // issue would bloat every Gantt load; this stays cheap by only firing per bar.
@@ -142,7 +142,7 @@ export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handl
         const jql = `key in (${keyList}) ORDER BY updated DESC`;
         ({ issues: loaded } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 500 }));
       } else {
-        const programs = await listSharedPrograms();
+        const programs = await listSharedPrograms(getSiteContext().siteHost);
         const program = programs.find((p) => p.slug === slug);
         if (!program) return res.status(404).json({ error: "Program not found" });
         displayName = program.displayName;
@@ -185,10 +185,10 @@ export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handl
 
       const issueKeys = loaded.map((i) => i.key);
 
-      // MongoDB dates (if configured)
-      const mongoDatesByKey =
-        isTeamPriorityMongoConfigured() && issueKeys.length > 0
-          ? await bulkGetTeamDates(issueKeys)
+      // Team dates (if configured)
+      const teamDatesByKey =
+        isTeamPriorityConfigured() && issueKeys.length > 0
+          ? await bulkGetTeamDates(issueKeys, getSiteContext().siteHost)
           : {};
 
       // SQLite metadata (dates + requestor) for all keys
@@ -214,10 +214,10 @@ export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handl
 
       const issues = loaded.map((issue) => {
         const fields = issue.fields || {};
-        const mongo = mongoDatesByKey[issue.key] || {};
+        const team = teamDatesByKey[issue.key] || {};
         const sqlite = sqliteMetaByKey[issue.key] || {};
-        // Merge per-field (Mongo wins when set) rather than picking one source for
-        // the whole issue — a partial Mongo save must not blank out unrelated SQLite fields.
+        // Merge per-field (team wins when set) rather than picking one source for
+        // the whole issue — a partial team save must not blank out unrelated SQLite fields.
         return {
           key: issue.key,
           parentKey: String(fields.parent?.key || ""),
@@ -227,11 +227,11 @@ export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handl
           statusCategory: String(fields.status?.statusCategory?.name || ""),
           assignee: String(fields.assignee?.displayName || "Unassigned"),
           dueDate: String(fields.duedate || ""),
-          startDate: String(mongo.startDate || sqlite.startDate || ""),
-          completeDate: String(mongo.completeDate || sqlite.completeDate || ""),
-          plannedStart: String(mongo.plannedStart || sqlite.plannedStart || ""),
-          plannedFinish: String(mongo.plannedFinish || sqlite.plannedFinish || ""),
-          requestor: String(mongo.requestor || sqlite.requestor || ""),
+          startDate: String(team.startDate || sqlite.startDate || ""),
+          completeDate: String(team.completeDate || sqlite.completeDate || ""),
+          plannedStart: String(team.plannedStart || sqlite.plannedStart || ""),
+          plannedFinish: String(team.plannedFinish || sqlite.plannedFinish || ""),
+          requestor: String(team.requestor || sqlite.requestor || ""),
         };
       });
 

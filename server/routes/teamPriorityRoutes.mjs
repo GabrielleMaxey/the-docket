@@ -1,16 +1,18 @@
 import {
+  getTeamMetadata,
+  teamDatabaseError,
   bulkGetTeamDates,
   bulkGetTeamPriorities,
   bulkPutTeamPriorities,
   deleteTeamDate,
-  isTeamPriorityMongoConfigured,
+  isTeamPriorityConfigured,
   listAllTeamPriorities,
   listSharedPrograms,
-  pingTeamPriorityMongo,
+  getTeamStatus,
   putTeamDate,
   putTeamPriority,
   seedSharedPrograms,
-} from "../lib/teamPriorityMongo.mjs";
+} from "../lib/teamPriorityPostgres.mjs";
 import {
   parseIssueMetadataCsv,
   planIssueMetadataImport,
@@ -20,41 +22,36 @@ import { createLogger } from "../lib/logger.mjs";
 const log = createLogger("team-priority");
 
 const notConfigured = (res) =>
-  res.status(503).json({ error: "Team priority demo not configured" });
-
-const errorMessage = (error) =>
-  error instanceof Error ? error.message : "Unknown error";
+  res.status(503).json({ error: "Team data not configured — set TEAM_PRIORITY_DATABASE_URL" });
 
 const resolveUpdatedBy = async (resolveCurrentJiraUser) => {
   if (typeof resolveCurrentJiraUser !== "function") {
-    return "demo";
+    return "";
   }
   try {
     const me = await resolveCurrentJiraUser();
-    return String(me?.displayName || me?.accountId || "").trim() || "demo";
+    return String(me?.displayName || me?.accountId || "").trim();
   } catch {
-    return "demo";
+    return "";
   }
 };
 
-const withTeamMongo = (label, handler) => async (req, res) => {
-  if (!isTeamPriorityMongoConfigured()) {
+const withTeamDatabase = (label, handler) => async (req, res) => {
+  if (!isTeamPriorityConfigured()) {
     return notConfigured(res);
   }
   try {
     return await handler(req, res);
   } catch (error) {
-    log.error(`${label} failed`, errorMessage(error));
-    return res.status(500).json({
-      error: `Failed to ${label}`,
-      message: errorMessage(error),
-    });
+    const safe = teamDatabaseError(error);
+    log.error(`${label} failed`, safe.message);
+    return res.status(safe.status || 503).json({ error: safe.message, code: safe.code });
   }
 };
 
-export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) => handler, getDb, resolveCurrentJiraUser }) => {
+export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) => handler, getDb, resolveCurrentJiraUser, getSiteContext }) => {
   app.get("/api/team-priority/health", withSiteOperation(async (_req, res) => {
-    const status = await pingTeamPriorityMongo();
+    const status = await getTeamStatus();
     return res.json({
       ok: status.connected === true,
       configured: status.configured === true,
@@ -65,15 +62,15 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
 
   app.post(
     "/api/team-priority/seed",
-    withSiteOperation(withTeamMongo("seed shared programs", async (_req, res) => {
-      const programs = await seedSharedPrograms();
+    withSiteOperation(withTeamDatabase("seed shared programs", async (_req, res) => {
+      const programs = await seedSharedPrograms(getSiteContext().siteHost);
       return res.json({ ok: true, programs });
     }))
   );
 
   app.post(
     "/api/team-priority/import-csv",
-    withSiteOperation(withTeamMongo("import team priorities to Atlas", async (req, res) => {
+    withSiteOperation(withTeamDatabase("import team priorities", async (req, res) => {
       const csvText = String(req.body?.csvText || "");
       if (!csvText.trim()) {
         return res.status(400).json({ error: "Missing csvText" });
@@ -90,7 +87,8 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
           issueKey: item.issueKey,
           priority: item.priority,
         })),
-        "nora-csv-import"
+        "csv-import",
+        getSiteContext().siteHost
       );
       return res.json({
         ok: true,
@@ -103,7 +101,7 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
 
   app.post(
     "/api/team-priority/sync-local",
-    withSiteOperation(withTeamMongo("sync local priorities to Atlas", async (_req, res) => {
+    withSiteOperation(withTeamDatabase("sync local priorities to team", async (_req, res) => {
       const db = getDb();
       if (!db) {
         return res.status(500).json({ error: "Local database unavailable" });
@@ -119,7 +117,7 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
         issueKey: String(row.issue_key || "").trim().toUpperCase(),
         priority: row.priority,
       }));
-      const result = await bulkPutTeamPriorities(entries, "local-sqlite-sync");
+      const result = await bulkPutTeamPriorities(entries, "local-sqlite-sync", getSiteContext().siteHost);
       return res.json({
         ok: true,
         updatedPriorities: result.updated,
@@ -130,13 +128,13 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
 
   app.post(
     "/api/team-priority/pull-to-local",
-    withSiteOperation(withTeamMongo("pull Atlas priorities to local", async (_req, res) => {
+    withSiteOperation(withTeamDatabase("pull team priorities to local", async (_req, res) => {
       const db = getDb();
       if (!db) {
         return res.status(500).json({ error: "Local database unavailable" });
       }
 
-      const entries = await listAllTeamPriorities();
+      const entries = await listAllTeamPriorities(getSiteContext().siteHost);
       const upsert = db.prepare(`
         INSERT INTO issue_metadata (issue_key, note, priority, updated_at)
         VALUES (@issueKey, '', @priority, CURRENT_TIMESTAMP)
@@ -158,37 +156,32 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
     }))
   );
 
-  app.get("/api/shared-programs", withSiteOperation(async (_req, res) => {
-    if (!isTeamPriorityMongoConfigured()) {
-      return res.json({ items: [] });
-    }
-    try {
-      const items = await listSharedPrograms();
-      return res.json({ items });
-    } catch (error) {
-      log.error("list programs failed", errorMessage(error));
-      return res.status(500).json({
-        error: "Failed to list shared programs",
-        message: errorMessage(error),
-      });
-    }
-  }));
+  app.get("/api/shared-programs", withSiteOperation(withTeamDatabase("list shared programs", async (_req, res) => {
+    const items = await listSharedPrograms(getSiteContext().siteHost);
+    return res.json({ items });
+  })));
+
+  app.post("/api/team-priority/metadata/bulk", withSiteOperation(withTeamDatabase("fetch team metadata", async (req, res) => {
+    const items = await getTeamMetadata({ siteHost: getSiteContext().siteHost, issueKeys: req.body?.issueKeys });
+    return res.json({ items });
+  })));
 
   app.post(
     "/api/team-priority/bulk",
-    withSiteOperation(withTeamMongo("fetch team priorities", async (req, res) => {
+    withSiteOperation(withTeamDatabase("fetch team priorities", async (req, res) => {
       const issueKeys = Array.isArray(req.body?.issueKeys) ? req.body.issueKeys : [];
-      const items = await bulkGetTeamPriorities(issueKeys);
+      const items = await bulkGetTeamPriorities(issueKeys, getSiteContext().siteHost);
       return res.json({ items });
     }))
   );
 
   app.put(
     "/api/team-priority/:issueKey",
-    withSiteOperation(withTeamMongo("update team priority", async (req, res) => {
+    withSiteOperation(withTeamDatabase("update team priority", async (req, res) => {
       const updatedBy = await resolveUpdatedBy(resolveCurrentJiraUser);
 
       const result = await putTeamPriority({
+        siteHost: getSiteContext().siteHost,
         issueKey: req.params.issueKey,
         priority: req.body?.priority,
         updatedBy,
@@ -199,16 +192,16 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
 
   app.post(
     "/api/team-priority/dates/bulk",
-    withSiteOperation(withTeamMongo("fetch team dates", async (req, res) => {
+    withSiteOperation(withTeamDatabase("fetch team dates", async (req, res) => {
       const issueKeys = Array.isArray(req.body?.issueKeys) ? req.body.issueKeys : [];
-      const items = await bulkGetTeamDates(issueKeys);
+      const items = await bulkGetTeamDates(issueKeys, getSiteContext().siteHost);
       return res.json({ items });
     }))
   );
 
   app.put(
     "/api/team-priority/dates/:issueKey",
-    withSiteOperation(withTeamMongo("update team date tracking", async (req, res) => {
+    withSiteOperation(withTeamDatabase("update team date tracking", async (req, res) => {
       const fields = ["startDate", "completeDate", "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
       const hasAny = fields.some((f) => req.body?.[f] !== undefined);
       if (!hasAny) {
@@ -221,7 +214,7 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
       for (const f of fields) {
         if (req.body?.[f] !== undefined) patch[f] = req.body[f];
       }
-      const result = await putTeamDate({ issueKey: req.params.issueKey, ...patch, updatedBy });
+      const result = await putTeamDate({ siteHost: getSiteContext().siteHost, issueKey: req.params.issueKey, ...patch, updatedBy });
       return res.json(result);
     }))
   );
@@ -229,8 +222,8 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
   // Explicit, deliberate clear — never triggered just by blanking a date field.
   app.delete(
     "/api/team-priority/dates/:issueKey",
-    withSiteOperation(withTeamMongo("clear team date tracking", async (req, res) => {
-      const result = await deleteTeamDate({ issueKey: req.params.issueKey });
+    withSiteOperation(withTeamDatabase("clear team date tracking", async (req, res) => {
+      const result = await deleteTeamDate({ siteHost: getSiteContext().siteHost, issueKey: req.params.issueKey });
       return res.json(result);
     }))
   );

@@ -39,7 +39,9 @@
     "desktop:dist": "npm run desktop:generate-icons && npm run build && electron-builder --publish never",
     "desktop:dist:mac": "npm run desktop:generate-icons && npm run build && electron-builder --mac dmg --publish never",
     "desktop:dist:win": "npm run desktop:generate-icons && npm run build && electron-builder --win nsis --publish never",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "team-db:migrate": "node scripts/migrate-team-db.mjs",
+    "team-db:import-demo": "node scripts/import-team-demo.mjs"
   },
   "build": {
     "appId": "com.gmaxey.taskmanager",
@@ -86,8 +88,8 @@
     "better-sqlite3": "^12.11.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "mongodb": "^6.21.0",
     "multer": "^2.4.0",
+    "pg": "8.23.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-icons": "^4.8.0",

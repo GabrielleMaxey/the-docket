@@ -476,7 +476,7 @@ export const syncLocalPrioritiesToTeam = async () => {
   const data = await requestJson( "/api/team-priority/sync-local", { method: "POST" } );
   if ( !data || data.ok !== true || typeof data.updatedPriorities !== "number" )
   {
-    throw new Error( "Local → Atlas priority sync failed or returned an incomplete response." );
+    throw new Error( "Local → team priority sync failed or returned an incomplete response." );
   }
   return data;
 };
@@ -485,7 +485,7 @@ export const pullTeamPrioritiesToLocal = async () => {
   const data = await requestJson( "/api/team-priority/pull-to-local", { method: "POST" } );
   if ( !data || data.ok !== true || typeof data.updatedPriorities !== "number" )
   {
-    throw new Error( "Atlas → local priority pull failed or returned an incomplete response." );
+    throw new Error( "team → local priority pull failed or returned an incomplete response." );
   }
   return data;
 };
@@ -493,6 +493,16 @@ export const pullTeamPrioritiesToLocal = async () => {
 export const fetchSharedPrograms = async () => {
   const data = await requestJson( "/api/shared-programs" );
   return data?.items || [];
+};
+
+export const fetchTeamMetadataBulk = async ( issueKeys, { siteContext } = {} ) => {
+  const data = await requestJson( "/api/team-priority/metadata/bulk", {
+    siteContext,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify( { issueKeys } ),
+  } );
+  return data?.items || {};
 };
 
 export const fetchTeamPriorityBulk = async ( issueKeys, { siteContext } = {} ) => {
@@ -548,7 +558,7 @@ export const saveTeamDate = async ( { issueKey, startDate, completeDate, ...plan
   } );
 };
 
-// Explicit, deliberate clear of the whole shared date-tracking row for an issue.
+// Explicit, deliberate clear of the shared dates and planning values for an issue.
 export const deleteTeamDate = async ( issueKey ) => {
   return requestJson( `/api/team-priority/dates/${ encodeURIComponent( issueKey ) }`, {
     method: "DELETE",

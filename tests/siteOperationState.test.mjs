@@ -180,7 +180,7 @@ test("Gantt batch failure cannot release a surviving paginated batch's lease", a
   const bundled = await build({
     entryPoints: ["server/routes/capacityPlanningRoutes.mjs"], bundle: true, write: false, format: "esm", platform: "node",
     plugins: [{ name: "synthetic-program-registry", setup(build) {
-      build.onLoad({ filter: /teamPriorityMongo\.mjs$/ }, () => ({ contents: 'export const listSharedPrograms = async () => [{ slug: "synthetic", displayName: "Synthetic", epicRoots: ["ROOT-1"] }]; export const isTeamPriorityMongoConfigured = () => false; export const bulkGetTeamDates = async () => ({});' }));
+      build.onLoad({ filter: /teamPriorityPostgres\.mjs$/ }, () => ({ contents: 'export const listSharedPrograms = async () => [{ slug: "synthetic", displayName: "Synthetic", epicRoots: ["ROOT-1"] }]; export const isTeamPriorityConfigured = () => false; export const bulkGetTeamDates = async () => ({});' }));
     } }],
   });
   const { registerCapacityPlanningRoutes } = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`);

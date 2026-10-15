@@ -141,6 +141,67 @@ Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 
 ---
 
+## Optional shared team data (PostgreSQL)
+
+Local SQLite works without a team database. A company database is neither provisioned nor needed for local use. To enable shared data, have the database owner provide an approved PostgreSQL database and set server-only `TEAM_PRIORITY_DATABASE_URL` (explicit user, hostname and database). Optionally set `TEAM_PRIORITY_DATABASE_CA_FILE` to an absolute PEM trust-file path. Keep credentials out of browser settings, source control and exported files.
+
+Remote connections always verify TLS against the system trust roots or the supplied CA. Remove SSL options from the URL when providing a CA; conflicting URL options are rejected. URLs may contain only `sslmode=verify-full`, or `sslmode=disable` for explicit loopback development/test hosts. TLS-free access is allowed only for `localhost`, `127.0.0.1` or `::1` outside production. Production requires verified TLS even on loopback. The pool opens lazily, has at most five connections, a five-second connect timeout and a thirty-second statement timeout.
+
+With that server environment exported, run:
+
+```sh
+npm run team-db:migrate
+npm run dev:all
+```
+
+The migration CLI reads the exported environment; it does not read `.env`. The API also supports its normal server `.env`. Migrations run only when explicitly requested. Version records in `team_schema_versions` and a transaction-level migration lock make repeated/concurrent runs safe. A failed migration rolls back; correct the reported setup problem and rerun. Before an upgrade, use your approved database backup process; restore that backup into a separate database for recovery. Do not edit an applied migration or drop shared tables as a recovery shortcut.
+
+Settings → **Team data** shows configured/connected status. An absent schema is unavailable with `npm run team-db:migrate` guidance, rather than an empty shared-data result. The existing priority/date writes, priority CSV upload and priority push/pull remain compatible. The full metadata read endpoint is `POST /api/team-priority/metadata/bulk`; full metadata import writes are not exposed yet. Approval/preview alone performs no write. Local and team save flows for all fields are being completed separately.
+
+Shared identity is the accepted server Jira hostname plus issue key. The browser never selects a hostname through a payload. Priority zero clears only priority. Clearing date tracking clears start/complete/planned dates and PM override, preserving notes, follow-up, requestor, open-decision information, pin and priority. SQL DATE values cross the store boundary as `YYYY-MM-DD` strings or null; legacy date reads retain empty-string clears. Note images and local image paths are not stored in team rows. Shared programs retain source-qualified epic roots and are returned only for the accepted site; there are no built-in seed programs.
+
+### Explicit migration of old demo exports
+
+There is no automatic MongoDB/Atlas connection or startup migration. Preserve the original JSON exports unchanged. Prepare a separate annotated JSON copy containing the old collection arrays below, with a `source` identifier on every issue row. Old issue keys alone do not establish a Jira site. Convert each program epic string into an explicit `{ "source": "old-demo-a", "issueKey": "ABC-1" }` reference using verified source knowledge; do not guess. Supply a separate source-to-canonical-hostname mapping file. Missing or unknown source mappings and unknown collections fail before a transaction opens.
+
+`annotated-demo.json` (synthetic example):
+
+```json
+{
+  "team_issue_priorities": [
+    { "_id": "ABC-1", "source": "old-demo-a", "priority": 4 }
+  ],
+  "team_issue_dates": [
+    { "_id": "ABC-1", "source": "old-demo-a", "startDate": "2026-10-01", "plannedFinish": "2026-10-05", "requestor": "Synthetic requestor" }
+  ],
+  "shared_programs": [
+    { "slug": "synthetic", "displayName": "Synthetic", "enabled": true,
+      "epicRoots": [{ "source": "old-demo-a", "issueKey": "ABC-1" }] }
+  ]
+}
+```
+
+`site-map.json`:
+
+```json
+{ "old-demo-a": "jira.example.test" }
+```
+
+```sh
+npm run team-db:import-demo -- annotated-demo.json site-map.json
+```
+
+Issue records accept `_id` or `issueKey`. Date records preserve the existing `startDate`, `completeDate`, `hasOpenDecision`, `plannedStart`, `plannedFinish`, `pmOverride`, `requestor`, and `openDecisionNote` fields. Export-only IDs/audit fields are not imported; writes are attributed to `explicit-demo-migration`. Program display/enabled settings are upserted and explicitly mapped roots are merged. All collections commit together or roll back together, and input files are read only. Repeating the same import does not duplicate program roots. Review the annotated copy and mapping before running; this explicit command writes team data immediately.
+
+### Team database validation
+
+```sh
+node --test tests/teamPriorityPostgres.test.mjs tests/teamPriorityRoutes.test.mjs
+DOCKET_TEST_DATABASE_URL=postgresql://docket_test@127.0.0.1:55432/docket_test_application_review node --test tests/teamPriorityPostgres.test.mjs tests/teamPriorityRoutes.test.mjs
+```
+
+The first command skips SQL integration cases. The second requires your own disposable `docket_test_*` database, explicit loopback host/port and PostgreSQL server; it must never target a company or personal database. Tests verify real SQL site isolation, fields, clears, conflicts, migrations and rollback. CI's PostgreSQL 16 job must set the URL and reject skipped integration cases. Local PostgreSQL 14.1 fixture evidence does not establish production/CI compatibility. Company SonarQube remains a required pre-merge gate; no Ruff substitution applies to this JavaScript code.
+
 ## Data & privacy
 
 | What | Where stored | Leaves your machine? |

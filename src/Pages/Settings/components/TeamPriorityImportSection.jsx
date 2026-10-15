@@ -116,7 +116,7 @@ const TeamPriorityImportSection = () => {
         });
         if (!data.updatedPriorities) {
           setLocalError(
-            `Atlas import finished but no priorities were updated (skipped ${data.skipped || 0}).`
+            `Team import finished but no priorities were updated (skipped ${data.skipped || 0}).`
           );
         }
         return;
@@ -150,9 +150,9 @@ const TeamPriorityImportSection = () => {
       description="Upload a CSV to set priorities in bulk"
     >
       <p style={{ marginTop: 0, color: "#475569", fontSize: "0.9rem" }}>
-        This uploads a CSV file — it does not copy priorities that already exist in Atlas onto
+        This uploads a CSV file — it does not copy priorities that already exist in the team database onto
         this machine. To bring existing shared priorities down instead, use{" "}
-        <strong>Pull from Atlas</strong> in <strong>Team priority (Atlas demo)</strong> below.
+        <strong>Pull from the team database</strong> in <strong>Team data</strong> below.
       </p>
       <p style={{ marginTop: 0, color: "#475569", fontSize: "0.9rem" }}>
         Export the team's NORA tracker from Excel as <strong>CSV UTF-8</strong> (not the .xlsx
@@ -182,7 +182,7 @@ const TeamPriorityImportSection = () => {
           title={
             atlasConnected
               ? undefined
-              : "Atlas isn't reachable right now — check Team priority (Atlas demo) below"
+              : "The team database isn't reachable right now — check Team data below"
           }
         >
           <input
@@ -192,7 +192,7 @@ const TeamPriorityImportSection = () => {
             onChange={() => setTarget("atlas")}
             disabled={!atlasConnected}
           />
-          Atlas (demo) — shared database, doesn't change this machine until pulled
+          Team database — shared database, doesn't change this machine until pulled
         </label>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
@@ -215,13 +215,13 @@ const TeamPriorityImportSection = () => {
       {result?.ok && result.updatedPriorities > 0 ? (
         <Message positive size="small" style={{ marginTop: "0.85rem" }}>
           {result.target === "atlas"
-            ? `Seeded ${result.updatedPriorities} priorities to Atlas`
+            ? `Seeded ${result.updatedPriorities} priorities to the team database`
             : `Updated ${result.updatedPriorities} priorities`}
           {result.filledNotes ? `, filled ${result.filledNotes} notes` : ""}
           {result.skipped ? `, skipped ${result.skipped}` : ""}.
           {result.target === "local"
             ? " Open Work Week again (or re-run JQL) to see the new priorities."
-            : " Link a Work Week slot to a shared program to use them live, or use Pull from Atlas below to copy them to this machine."}
+            : " Link a Work Week slot to a shared program to use them live, or use Pull from the team database below to copy them to this machine."}
         </Message>
       ) : null}
       {Array.isArray(result?.errors) && result.errors.length > 0 ? (
