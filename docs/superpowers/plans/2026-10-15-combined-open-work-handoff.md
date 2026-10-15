@@ -55,3 +55,27 @@ Reproducible evidence on this development machine: `/tmp/combined-focused-final.
 - Preserve the existing active-site-switch remount behavior — cancellation on unmount matches the spec and changing the shell is outside this feature — if wrong, users must reselect/reload the combined view after switching active sites.
 - Keep registry loading on page mount without cross-session polling — matches the approved no-polling scope — if wrong, users must reopen the page to see saved-site edits made elsewhere.
 - Defer pre-existing synthetic-error test-log cleanup — unrelated to this feature — if wrong, expected log noise may obscure future failures.
+
+## Tab placement completion
+
+Product commit `dfc1014` on `codex/combined-open-work-tab`. Independent task and full-branch reviews approved with no actionable code defects. Review range `a885411..dfc1014`; later handoff changes are documentation only. No push or merge.
+
+Updated files for placement:
+
+| Updated/created file | Lines | Change |
+| --- | --- | --- |
+| `src/AppRouter.jsx` | 4, 14, 21, 86 | Remove standalone navigation/lazy import; redirect old route. |
+| `src/Pages/WorkWeekTasks.jsx` | 102, 575, 589, 613, 618, 662 | Search-param selection/callback; hide ordinary banners/metrics; pass combined selection separately from saved run index. |
+| `src/Pages/components/JiraResultsTable.jsx` | 4, 180, 342, 383, 494, 524, 538, 1516 | Combined tab/selected styling and reusable view; no-runs availability; ordinary callbacks remain limited to real runs. |
+| `src/Pages/CombinedOpenWork.jsx` | 62, 98 | Embedded section/h2 semantics; existing loading/cancellation logic retained. |
+| `tests/combinedOpenWorkTab.test.mjs` (created) | 39, 45, 67, 83 | No-runs tab, preserved selection/load-more, no fake index, drill-down transition and old-route redirect behavior. |
+| `tests/combinedOpenWorkClient.test.mjs` | 156 | Embedded section/h2 regression; prior client load/error/cancellation tests retained. |
+| `README.md` | 280 | Document Task Management tab and old-link redirect. |
+| `docs/superpowers/plans/2026-10-15-combined-open-work-handoff.md` | 3, 7, 9 | Current branch/placement; mark earlier standalone placement as historical while preserving review evidence. |
+
+
+The placement plan was added at `docs/superpowers/plans/2026-10-15-combined-open-work-tab.md:1`.
+
+Verification:55/55 focused tests, build, whitespace checks and actual synthetic full-application browser smoke passed. Checked ordinary preset restoration/controls, same-row combined tab, hidden ordinary metrics/banners, empty runs, legacy URL redirect, leaving-tab cancellation (two upstream aborts), and unchanged active site. Existing Semantic UI findDOMNode deprecation warning remains. The prior full-suite occupied-port failure was not rerun; company Sonar remains blocked and unverified. Backend search/data behavior is unchanged; no live Jira re-audit claimed.
+
+Test preparation initially rebuilt the isolated SQLite binary for Node before detecting the user's running Electron session. No process was stopped. After tests, the existing `npm run desktop:rebuild-native` restored the original Electron-compatible binary successfully (exit0, Rebuild Complete); no Node SQLite tests ran afterward. Temporary owned fixtures/tabs were closed. Evidence: `/tmp/combined-tab-focused.log`, `/tmp/combined-tab-build.log`, `/tmp/combined-tab-browser-evidence.json`, `/tmp/combined-tab-browser.png`, `/tmp/combined-tab-electron-restore.log`.

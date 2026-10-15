@@ -10,3 +10,6 @@ The user explicitly requests Combined Open Work as a tab alongside existing JQL 
 - Update README and the latest feature handoff to identify Task Management placement and current branch. Historical design may be marked superseded for placement; do not rewrite prior review evidence.
 - Run focused existing/new client and result-table behavior regressions plus build, whitespace checks, and actual synthetic browser smoke for tab switching and no-runs case. No real.env/data/Jira. Do not repeat the known full-suite occupied5173 failure or bypass company Sonar restrictions. Report verification limits honestly.
 - Self-review, commit and write concise report with changed files, test commands and evidence. Controller owns independent review.
+
+## Completion
+Completed in dfc1014. Both independent reviews approved;55 focused tests, build and synthetic full-app browser smoke passed. See the combined-open-work-handoff.md file beside this plan for changed-file lines, complete validation limits, and native runtime restoration evidence.
