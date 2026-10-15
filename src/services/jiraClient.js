@@ -149,7 +149,6 @@ const requestJsonNow = async ( path, options = {} ) => {
     {
       data = JSON.parse( text );
       parsedJson = true;
-      extractJiraErrorMessage.empty = true;
     } catch
     {
       data = { message: text };
