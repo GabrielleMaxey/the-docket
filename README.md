@@ -204,6 +204,16 @@ DOCKET_TEST_DATABASE_URL=postgresql://docket_test@127.0.0.1:55432/docket_test_ap
 
 The first command skips SQL integration cases. The second requires your own disposable `docket_test_*` database, explicit loopback host/port and PostgreSQL server; it must never target a company or personal database. Tests verify real SQL site isolation, fields, clears, conflicts, migrations and rollback. CI's PostgreSQL 16 job must set the URL and reject skipped integration cases. Local PostgreSQL 14.1 fixture evidence does not establish production/CI compatibility. Company SonarQube remains a required pre-merge gate; no Ruff substitution applies to this JavaScript code.
 
+## Excel task export API
+
+The local API creates a reviewed, server-held snapshot with `POST /api/task-export/preview`, then downloads an actual Excel workbook with `POST /api/task-export/download`. Download accepts only `{previewId, excludedRows, allowPartial}`. Exclusions use all three fields `{instanceId, siteHost, issueKey}` from that preview. Partial or failed entries require explicit `allowPartial: true`; invalid or expired preview IDs return HTTP 409 and require a new preview. Preview storage lasts fifteen minutes, supports three live/in-flight previews and at most 25 MiB of serialized snapshots. Downloads read the captured snapshot without fetching Jira or databases again.
+
+Each selected saved Jira entry gets its own worksheet, including entries sharing a hostname and issue key. Overview maps saved IDs, labels and full hostnames to worksheet names, and records scopes, filters, metadata source, counts and omissions. Empty and failed entries remain visible. Sheets include **Latest Jira comment only**, with its author, supplied timestamp and availability status, plus separate **Docket local notes** and **Team notes**. Local selection leaves Team notes blank and marks them not selected. Unavailable comments or local notes stay visibly unavailable; no note-source fallback occurs.
+
+Notes and formula-looking text remain literal strings. Date-only planning fields keep their exact `YYYY-MM-DD` strings. Jira hyperlinks derive from the snapshot's validated hostname and issue key. The writer rejects cells over 32,767 characters or containing invalid XML characters, identifying the saved entry, issue and column so an affected task can be excluded. It rejects workbooks exceeding 25 MiB without truncating data. ExcelJS 4.4.0 is pinned with a narrowly scoped uuid 11.1.1 override; neither dependency runs in the browser. Disconnects discard the response, and snapshot expiration is checked again before sending. Library writing may finish after cancellation; crash recovery is not provided.
+
+Collection is sequential with the existing Jira request timeout plus `DOCKET_EXPORT_TIMEOUT_MS` (default 120000 ms, positive integer capped at 600000 ms). `DOCKET_EXPORT_MAX_ROWS_PER_SITE` defaults to and is capped at 5000 tasks per saved entry. Reaching a limit without verified completion marks the entry partial. These are server environment settings; no export operation migrates a source database or uploads the workbook.
+
 ## Data & privacy
 
 | What | Where stored | Leaves your machine? |

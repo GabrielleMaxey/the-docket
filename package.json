@@ -97,13 +97,17 @@
     "react-scroll": "^1.9.3",
     "semantic-ui-css": "^2.5.0",
     "semantic-ui-react": "^2.1.5",
-    "styled-components": "^5.3.9"
+    "styled-components": "^5.3.9",
+    "exceljs": "4.4.0"
   },
   "engines": {
     "node": ">=22"
   },
   "overrides": {
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "exceljs": {
+      "uuid": "11.1.1"
+    }
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
