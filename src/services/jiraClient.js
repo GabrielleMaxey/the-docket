@@ -430,46 +430,28 @@ export const updateJiraIssueDateField = async ( { issueKey, role, value } ) => {
   } );
 };
 
-export const importIssueMetadataCsv = async ( csvText, { siteContext } = {} ) => {
-  const data = await requestJson( "/api/jira/issue-metadata/import", {
+export const previewIssueMetadataImport = ( payload, { siteContext } = {} ) =>
+  requestJson( "/api/jira/issue-metadata/import/preview", {
     siteContext,
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify( { csvText } ),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify( payload ),
   } );
-  if ( !data || data.ok !== true || typeof data.updatedPriorities !== "number" )
-  {
-    throw new Error(
-      "Priority import API response was incomplete. Restart npm run dev:all and try again."
-    );
-  }
-  return data;
-};
 
-export const fetchTeamPriorityHealth = async () => {
-  return requestJson( "/api/team-priority/health" );
+export const commitIssueMetadataImport = ( previewId, { siteContext } = {} ) =>
+  requestJson( "/api/jira/issue-metadata/import/commit", {
+    siteContext,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify( { previewId } ),
+  } );
+
+export const fetchTeamPriorityHealth = async ( { siteContext } = {} ) => {
+  return requestJson( "/api/team-priority/health", { siteContext } );
 };
 
 export const seedTeamPriorityPrograms = async () => {
   return requestJson( "/api/team-priority/seed", { method: "POST" } );
-};
-
-export const importTeamPriorityCsv = async ( csvText, { siteContext } = {} ) => {
-  const data = await requestJson( "/api/team-priority/import-csv", {
-    siteContext,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify( { csvText } ),
-  } );
-  if ( !data || data.ok !== true || typeof data.updatedPriorities !== "number" )
-  {
-    throw new Error( "Team priority CSV import failed or returned an incomplete response." );
-  }
-  return data;
 };
 
 export const syncLocalPrioritiesToTeam = async () => {

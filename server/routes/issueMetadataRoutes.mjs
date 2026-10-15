@@ -5,11 +5,9 @@ import { finished } from "node:stream/promises";
 import fs from "fs";
 import multer from "multer";
 import { fetchLatestCommentTextBulk } from "../lib/jiraCommentText.mjs";
-import {
-  normalizeImportIssueKey,
-  parseIssueMetadataCsv,
-  planIssueMetadataImport,
-} from "../lib/issueMetadataImport.mjs";
+import { normalizeImportIssueKey, parseIssueMetadataCsv } from "../lib/issueMetadataImport.mjs";
+import { createIssueImportPreviewStore } from "../lib/issueImportPreview.mjs";
+import { getTeamMetadata, writeTeamMetadata, teamDatabaseError } from "../lib/teamPriorityPostgres.mjs";
 import { pushNoteCommentWithImages } from "../lib/jiraNoteComment.mjs";
 import {
   listNoteImages,
@@ -73,7 +71,7 @@ const setKeepNoteImages = (db, payload) =>
 
 export const registerIssueMetadataRoutes = (
   app,
-  { withSiteOperation = (handler) => handler, getDb, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, getNoteImagesDir }
+  { withSiteOperation = (handler) => handler, getDb, getSiteContext, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, getNoteImagesDir }
 ) => {
   const isUnassignAssigneeRequest = (value) => {
     const normalized = String(value || "").trim().toLowerCase();
@@ -363,48 +361,48 @@ export const registerIssueMetadataRoutes = (
     return res.json({ ok: true, pinnedGantt: pinned });
   }));
 
-  app.post("/api/jira/issue-metadata/import", withSiteOperation((req, res) => {
-    const csvText = String(req.body?.csvText || "");
-    if (!csvText.trim()) {
-      return res.status(400).json({ error: "Missing csvText" });
-    }
+  const previews = createIssueImportPreviewStore({
+    writeMetadata: async ({ destination, siteContext, entries }) => {
+      if (destination === "local") return writeLocalMetadata(getDb(), entries);
+      try {
+        return await writeTeamMetadata({ siteHost: siteContext.siteHost, entries, updatedBy: "csv-import" });
+      } catch (error) { throw teamDatabaseError(error); }
+    },
+  });
+  const importError = (res, error) => res.status(error.status || 500).json({ error: error.status ? error.message : "Import failed. Keep your edits and try again.", code: error.code || "IMPORT_FAILED" });
 
-    const parsed = parseIssueMetadataCsv(csvText);
-    if (!parsed.ok) {
-      return res.status(400).json({ error: parsed.error || "Invalid CSV" });
-    }
-
+  app.post("/api/jira/issue-metadata/import/preview", withSiteOperation(async (req, res) => {
     try {
-      const db = getDb();
-      const issueKeys = [
-        ...new Set(
-          parsed.rows
-            .map((row) => normalizeImportIssueKey(row.odi))
-            .filter((key) => key.length > 0)
-        ),
-      ];
-
-      const existingByKey = getLocalMetadata(db, issueKeys.filter((key) => /^[A-Z][A-Z0-9_]*-[1-9][0-9]*$/.test(key)));
-      const plan = planIssueMetadataImport(parsed.rows, existingByKey);
-      writeLocalMetadata(db, plan.upserts);
-      const items = getLocalMetadata(db, plan.upserts.map((item) => item.issueKey));
-
-      return res.json({
-        ok: true,
-        updatedPriorities: plan.updatedPriorities,
-        filledNotes: plan.filledNotes,
-        skipped: plan.skipped,
-        errors: plan.errors,
-        items,
-      });
-    } catch (error) {
-      log.error("issue metadata import failed", error instanceof Error ? error.message : error);
-      return res.status(error.status || 500).json({
-        error: error.status ? error.message : "Failed to import issue metadata",
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
+      const { destination, csvText, rows, supersedesPreviewId } = req.body || {};
+      if (!["local", "team"].includes(destination) || (csvText !== undefined) === (rows !== undefined)) return res.status(400).json({ error: "Choose local or team and provide exactly one of csvText or rows" });
+      let input = rows;
+      let ignoredHeaders = [];
+      if (csvText !== undefined) {
+        if (typeof csvText !== "string") return res.status(400).json({ error: "csvText must be text" });
+        const parsed = parseIssueMetadataCsv(csvText);
+        if (!parsed.ok) return res.status(400).json({ error: parsed.error || "Invalid CSV" });
+        input = parsed.rows;
+        ignoredHeaders = parsed.ignoredHeaders;
+      }
+      if (!Array.isArray(input) || !input.length || input.length > 5000 || input.some(row => !row || typeof row !== "object")) return res.status(400).json({ error: "Import must contain between 1 and 5,000 rows" });
+      const siteContext = getSiteContext();
+      const issueKeys = [...new Set(input.map(row => normalizeImportIssueKey(row.issueKey ?? row.odi)).filter(key => /^[A-Z][A-Z0-9_]*-[1-9][0-9]*$/.test(key)))];
+      let existingByKey;
+      if (destination === "local") existingByKey = getLocalMetadata(getDb(), issueKeys);
+      else {
+        try { existingByKey = await getTeamMetadata({ siteHost: siteContext.siteHost, issueKeys }); }
+        catch (error) { throw teamDatabaseError(error); }
+      }
+      return res.json(previews.createImportPreview({ siteContext, destination, rows: input, existingByKey, ignoredHeaders, supersedesPreviewId }));
+    } catch (error) { return importError(res, error); }
   }));
+  app.post("/api/jira/issue-metadata/import/commit", withSiteOperation(async (req, res) => {
+    try { return res.json(await previews.commitImportPreview({ previewId: req.body?.previewId, siteContext: getSiteContext() })); }
+    catch (error) { return importError(res, error); }
+  }));
+  app.post("/api/jira/issue-metadata/import", withSiteOperation((_req, res) => res.status(409).json({
+    error: "Review and approve this CSV in Settings → Import metadata before saving.", code: "IMPORT_PREVIEW_REQUIRED",
+  })));
 
   app.get("/api/jira/issue-metadata/:issueKey/images/:id", withSiteOperation(async (req, res) => {
     const issueKey = String(req.params.issueKey || "").trim();

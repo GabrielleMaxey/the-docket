@@ -18,6 +18,7 @@ describe("issue metadata image routes", () => {
     const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "metadata-images-test-"));
     registerIssueMetadataRoutes(app, {
       getDb: () => db,
+      getSiteContext: () => ({ instanceId: "synthetic", siteHost: "synthetic.example", generation: "g1" }),
       getNoteImagesDir: () => baseDir,
       jiraRequest: async () => ({ ok: true, status: 201, data: {} }),
       jiraMultipartRequest: async () => ({ ok: true, status: 201, data: {} }),
@@ -113,6 +114,7 @@ describe("issue metadata date fields", () => {
     const jiraRequestCalls = [];
     registerIssueMetadataRoutes(app, {
       getDb: () => db,
+      getSiteContext: () => ({ instanceId: "synthetic", siteHost: "synthetic.example", generation: "g1" }),
       getNoteImagesDir: () => baseDir,
       jiraRequest:
         jiraRequest ||
@@ -261,12 +263,15 @@ describe("issue metadata date fields", () => {
       ).run("ABC-1", "saved", 0, "2026-03-01", "2026-04-15", "2026-03-02", "2026-04-14", 1, "Team", "Decision", "hold", 1, 1);
       const before = db.prepare("SELECT * FROM issue_metadata WHERE issue_key = ?").get("ABC-1");
 
-      const response = await request("/api/jira/issue-metadata/import", {
+      const previewResponse = await request("/api/jira/issue-metadata/import/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csvText: "Key,Priority\nABC-1,5\n" }),
+        body: JSON.stringify({ destination: "local", csvText: "Key,Priority\nABC-1,5\n" }),
       });
 
+      assert.equal(previewResponse.status, 200);
+      const preview = await previewResponse.json();
+      const response = await request("/api/jira/issue-metadata/import/commit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ previewId: preview.previewId }) });
       assert.equal(response.status, 200);
       const row = db
         .prepare("SELECT * FROM issue_metadata WHERE issue_key = ?")

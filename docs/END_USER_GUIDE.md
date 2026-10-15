@@ -275,7 +275,7 @@ A green banner confirms the active drill-down. Use **Clear filter** to remove th
 
 **Parent column:** Sits right after **Key** — links to the issue's parent (Story or Epic) when Jira reports one.
 
-On **shared projects**, link a Task Management slot to a **Shared program** (when the Atlas demo or future MySQL team DB is configured) so priorities sync across machines. Otherwise use local priority + the priority tracker CSV import — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
+On **shared projects**, link a Task Management slot to a **Shared program** (when the PostgreSQL team database is configured) so priorities sync across machines. Otherwise use local priority + the priority tracker CSV import — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
 
 **Closed/resolved issues are read-only** — you can read them but not edit them.
 
@@ -531,15 +531,15 @@ Some teams used a shared Excel tracker so everyone sees the same ranking. In The
 | Local **Notes** box (before push) | No — your machine only |
 | Note **attachments** (before push) | No — your machine only unless **Keep on this machine** is on |
 | **Priority** on a personal Task Management slot | No — local SQLite on this machine |
-| **Priority** on a slot linked to a **Shared program** | Yes — Atlas demo today (Team badge); MySQL long-term |
+| **Priority** on a slot linked to a **Shared program** | Yes — PostgreSQL team database (Team badge) |
 | **Start date** on a personal Task Management slot | No — local SQLite on this machine |
-| **Start date** on a slot linked to a **Shared program** | Yes — same Atlas/MySQL split as Priority |
+| **Start date** on a slot linked to a **Shared program** | Yes — same PostgreSQL team database as Priority |
 | **Due date** and **MRD** | Always — real Jira fields, editing them writes straight to Jira regardless of slot type |
 
 ### Shared-program slots (recommended for team ranking)
 
-1. Configure the team priority demo (`TEAM_PRIORITY_MONGODB_URI`) or wait for production MySQL sync.
-2. In Settings, seed shared programs if needed; optionally **Import team priorities** with target **Atlas (demo)** or **Seed from local priorities**.
+1. Ask your database owner to configure the PostgreSQL team database. Local use requires no company database.
+2. In Settings → **Team data**, check the connection; use **Import metadata** to review a CSV and **Save to team**, or explicitly **Seed from local priorities**.
 3. On Task Management, set the slot’s **Shared program**.
 4. Change **Priority** as usual — it saves to the shared store immediately. Rows show a **Team** badge when priority comes from that store.
 5. **Run JQL** on that slot loads priorities from the shared store (not from Jira comments).
@@ -555,9 +555,14 @@ Push notes as Jira comments when the team needs the text in Jira. Priority is **
 PMs can keep rankings in the priority tracker spreadsheet and share a **CSV** export:
 
 1. In Excel: **File → Save As → CSV UTF-8** (columns: `Priority`, `Issue Key`, `Developer`, `Jira Status`, `notes`).
-2. In The Docket: **Settings → Import team priorities** → choose target (**This machine** or **Atlas (demo)** when connected) → **Import CSV**.
-3. Matching issue keys overwrite priority for that target. **Notes** fill in only when importing to this machine and the local note is empty.
-4. Re-import when spreadsheet rankings change. Reload Task Management (or re-run JQL) if that page is already open.
+2. In The Docket: **Settings → Import metadata → Preview CSV**. The comparison starts with local values for the displayed Jira site; nothing is saved.
+3. Edit values, add supported columns or remove columns, and uncheck rows to exclude them. Existing notes remain protected unless **Replace saved note with this text** is checked on that row. Empty CSV cells leave saved values unchanged; clearing an edited value explicitly removes it.
+4. **Now** and **Next** are checkboxes: select one, or uncheck both to leave the flag unset. This flag is shared when saved to team. Requestor, planned start/finish, actual start and decision note are also supported.
+5. Select **Review changes**, fix or exclude invalid rows, then **Approve changes**. Approval writes nothing. Every edit or selection change requires another review and approval.
+6. Choose **Save locally** or **Save to team**. Both are primary options for all supported fields. Team is disabled with a reason when unavailable. Choosing the other destination loads its own old/new comparison and requires approval again; team saving preserves your local metadata.
+7. A concurrent change rejects the entire import; review a fresh comparison. Failed saves retain edits. If the network outcome is unknown, retry the same save to confirm completion before choosing another destination. Double submission uses the same reviewed save; recent completed saves report “Already saved.” Re-run JQL after saving.
+
+Previews expire after 15 minutes. Restarting the API requires a new preview; browser edits are not a durable saved draft. Unknown columns are listed and ignored. The team database never becomes an automatic fallback for a local save, and team failure never silently saves locally.
 
 **Developers:** Manual export/backup of SQLite is documented in [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) — that is for backup or handoff, not live multi-user editing.
 
@@ -574,8 +579,8 @@ PMs can keep rankings in the priority tracker spreadsheet and share a **CSV** ex
 | Chat session artifacts (for Chat context) | This browser only (`localStorage`) | No |
 | Desktop app credentials + DB (packaged) | `%APPDATA%\The Docket\` (Windows) or `~/Library/Application Support/The Docket/` (Mac) | No |
 | To-dos (Header To Do panel) | Local file (`data/workweek.sqlite`) | No |
-| Issue notes + priorities (P1–P20) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL | No for personal slots — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) |
-| Start date (ad-hoc, for Gantt views) | Local file (`data/workweek.sqlite`); shared-program slots use Atlas demo / future MySQL, same as priority | No for personal slots |
+| Issue notes + priorities (P1–P20) | Local file (`data/workweek.sqlite`); shared-program slots use the PostgreSQL team database | No for personal slots — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) |
+| Start date (ad-hoc, for Gantt views) | Local file (`data/workweek.sqlite`); shared-program slots use the PostgreSQL team database, same as priority | No for personal slots |
 | Note attachments (**Keep on this machine**) | Local file (`data/note-images/` + SQLite) | No — cleared after a successful **Push note** |
 | Epic/JQL preset team pack (export/import) | JSON file you save/share | No |
 | Metrics snapshot | Local file (`data/workweek.sqlite`) | No |
@@ -600,10 +605,10 @@ One person exports a **team pack** from Settings; others **Import team pack** (m
 That's normal — the table was restored from the last time you ran JQL. Click **Run JQL** to get fresh data.
 
 **My notes disappeared on another computer**
-Expected. Notes are stored in a local file on the machine you started the app on. Use one machine, or ask a developer about exporting the SQLite file. For **shared ranking**, link a Task Management slot to a Shared program (or import CSV to Atlas) — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
+Expected. Notes are stored in a local file on the machine you started the app on. Use one machine, or ask a developer about exporting the SQLite file. For **shared ranking**, link a Task Management slot to a Shared program (or review and save a CSV to team) — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
 
 **How do we share priority on a project like we did in Excel?**
-Link the Task Management slot to a **Shared program** so priority reads/writes the team store (Atlas demo today). Or **Settings → Import team priorities** from the priority tracker CSV (local or Atlas). See [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
+Link the Task Management slot to a **Shared program** so priority reads/writes the team store (PostgreSQL). Or **Settings → Import metadata** from a CSV (save locally or to team). See [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers).
 
 **The Push note button is greyed out**
 You've already pushed that exact note (text and attachments) as a comment. Edit the note or change attached files and the button will re-enable.

@@ -1,6 +1,5 @@
 import {
   getTeamMetadata,
-  writeTeamMetadata,
   teamDatabaseError,
   bulkGetTeamDates,
   bulkGetTeamPriorities,
@@ -14,11 +13,6 @@ import {
   putTeamPriority,
   seedSharedPrograms,
 } from "../lib/teamPriorityPostgres.mjs";
-import {
-  normalizeImportIssueKey,
-  parseIssueMetadataCsv,
-  planIssueMetadataImport,
-} from "../lib/issueMetadataImport.mjs";
 import { createLogger } from "../lib/logger.mjs";
 
 const log = createLogger("team-priority");
@@ -70,33 +64,9 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
     }))
   );
 
-  app.post(
-    "/api/team-priority/import-csv",
-    withSiteOperation(withTeamDatabase("import team priorities", async (req, res) => {
-      const csvText = String(req.body?.csvText || "");
-      if (!csvText.trim()) {
-        return res.status(400).json({ error: "Missing csvText" });
-      }
-
-      const parsed = parseIssueMetadataCsv(csvText);
-      if (!parsed.ok) {
-        return res.status(400).json({ error: parsed.error || "Invalid CSV" });
-      }
-
-      const siteHost = getSiteContext().siteHost;
-      const issueKeys = [...new Set(parsed.rows.map((row) => normalizeImportIssueKey(row.odi)).filter((key) => /^[A-Z][A-Z0-9_]*-[1-9][0-9]*$/.test(key)))];
-      const existing = await getTeamMetadata({ siteHost, issueKeys });
-      const plan = planIssueMetadataImport(parsed.rows, existing);
-      await writeTeamMetadata({ siteHost, entries: plan.upserts, updatedBy: "csv-import" });
-      return res.json({
-        ok: true,
-        updatedPriorities: plan.updatedPriorities,
-        filledNotes: plan.filledNotes,
-        skipped: plan.skipped,
-        errors: plan.errors,
-      });
-    }))
-  );
+  app.post("/api/team-priority/import-csv", withSiteOperation((_req, res) => res.status(409).json({
+    error: "Review and approve this CSV in Settings → Import metadata before saving to team.", code: "IMPORT_PREVIEW_REQUIRED",
+  })));
 
   app.post(
     "/api/team-priority/sync-local",

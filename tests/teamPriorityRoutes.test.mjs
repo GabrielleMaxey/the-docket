@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
 import { registerTeamPriorityRoutes } from "../server/routes/teamPriorityRoutes.mjs";
+import { registerIssueMetadataRoutes } from "../server/routes/issueMetadataRoutes.mjs";
 import { createSiteOperationState } from "../server/lib/siteOperationState.mjs";
 
 const withServer = async (run) => {
@@ -9,6 +10,7 @@ const withServer = async (run) => {
   const app = express();
   app.use(express.json());
   registerTeamPriorityRoutes(app, { ...state, getDb: () => null, resolveCurrentJiraUser: async () => ({ displayName: "Synthetic user" }) });
+  registerIssueMetadataRoutes(app, { ...state, getDb: () => null });
   const server = await new Promise((resolve) => { const listener = app.listen(0, "127.0.0.1", () => resolve(listener)); });
   const request = (url, method = "GET", body = {}, context = state.getSiteContext()) => fetch(`http://127.0.0.1:${server.address().port}${url}`, { method, headers: { "Content-Type": "application/json", "X-Docket-Site": context.instanceId, "X-Docket-Generation": context.generation }, ...(method === "GET" ? {} : { body: JSON.stringify(body) }) });
   try { await run({ state, request }); } finally { await new Promise((resolve) => server.close(resolve)); }
@@ -136,9 +138,11 @@ test("real team CSV import preserves priority on optional edits and followUp-onl
   await migrateTeamDatabase(store.getTeamPool());
   await store.writeTeamMetadata({ siteHost: "d1-route-a.example.test", entries: [{ issueKey: "ABC-10", patch: { priority: 8, note: "saved", plannedStart: "2026-10-01", plannedFinish: "2026-10-05", hasOpenDecision: true } }] });
   await withServer(async ({ request }) => {
-    const imported = await request("/api/team-priority/import-csv", "POST", { csvText: "Key,Notes,Requestor,Follow up\nABC-10,protected,Team,now" });
+    const preview = await request("/api/jira/issue-metadata/import/preview", "POST", { destination: "team", csvText: "Key,Notes,Requestor,Follow up\nABC-10,protected,Team,now" });
+    assert.equal(preview.status, 200);
+    const imported = await request("/api/jira/issue-metadata/import/commit", "POST", { previewId: (await preview.json()).previewId });
     assert.equal(imported.status, 200);
-    assert.equal((await imported.json()).updatedPriorities, 0);
+    assert.equal((await imported.json()).updated, 1);
     const result = await request("/api/team-priority/metadata/bulk", "POST", { issueKeys: ["ABC-10"] }).then((response) => response.json());
     assert.equal(result.items["ABC-10"].priority, 8);
     assert.equal(result.items["ABC-10"].note, "saved");
