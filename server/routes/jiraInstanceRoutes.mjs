@@ -6,23 +6,16 @@ import {
   updateInstance,
   deleteInstance,
   getActiveInstanceId,
-  getInstanceCredentials,
-  normalizeBaseUrl,
+  assertAllowedJiraBaseUrl,
+  getAllowedJiraHosts,
 } from "../lib/jiraInstances.mjs";
 import { parseJiraResponse } from "../lib/jiraResponse.mjs";
 import { createLogger } from "../lib/logger.mjs";
 
 const log = createLogger("jira-instances");
 
-const isValidBaseUrl = (value) => {
-  try {
-    return new URL(value).protocol.startsWith("http");
-  } catch {
-    return false;
-  }
-};
-
-export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getCredentials }) => {
+export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getCredentials, env = process.env }) => {
+  const allowedHosts = getAllowedJiraHosts(env);
   const listPayload = () => ({
     instances: listInstances(metaDb),
     activeInstanceId: getActiveInstanceId(metaDb),
@@ -34,16 +27,16 @@ export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getC
   });
 
   app.post("/api/jira/instances", (req, res) => {
-    const { displayName, baseUrl, email, apiToken } = req.body || {};
-    if (!String(displayName || "").trim() || !String(email || "").trim() || !String(apiToken || "").trim()) {
-      return res.status(400).json({ error: "displayName, baseUrl, email, and apiToken are required" });
+    const { displayName, baseUrl, email } = req.body || {};
+    if (Object.hasOwn(req.body || {}, "apiToken")) {
+      return res.status(400).json({ error: "Set JIRA_API_TOKEN in the server .env; submitted tokens are not accepted" });
     }
-    if (!isValidBaseUrl(baseUrl)) {
-      return res.status(400).json({ error: "baseUrl must be a valid http(s) URL" });
+    if (!String(displayName || "").trim() || !String(email || "").trim()) {
+      return res.status(400).json({ error: "displayName, baseUrl, and email are required" });
     }
 
     try {
-      const instance = createInstance(metaDb, { displayName, baseUrl, email, apiToken });
+      const instance = createInstance(metaDb, { displayName, baseUrl, email }, allowedHosts);
       // First site: activate immediately so local data seeds from legacy and the UI isn't stuck in limbo.
       if (listInstances(metaDb).length === 1 && !getActiveInstanceId(metaDb)) {
         activateInstance(instance.id);
@@ -61,12 +54,9 @@ export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getC
     if (!listInstances(metaDb).some((instance) => instance.id === id)) {
       return res.status(404).json({ error: "Jira instance not found" });
     }
-    if (req.body?.baseUrl !== undefined && !isValidBaseUrl(req.body.baseUrl)) {
-      return res.status(400).json({ error: "baseUrl must be a valid http(s) URL" });
-    }
 
     try {
-      const instance = updateInstance(metaDb, id, req.body || {});
+      const instance = updateInstance(metaDb, id, req.body || {}, allowedHosts);
       log.info(`updated Jira instance ${id}`);
       return res.json(instance);
     } catch (error) {
@@ -118,38 +108,31 @@ export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getC
     }
   });
 
-  // Tests unsaved form values directly — never routed through the active-instance jiraRequest helper,
-  // and never touches active state, so in-progress edits can be verified before Save.
+  // Verify unsaved site settings with the environment token, without changing active state.
   app.post("/api/jira/instances/:id/test", async (req, res) => {
     const id = req.params.id;
-    const bodyBaseUrl = normalizeBaseUrl(req.body?.baseUrl);
-    const bodyEmail = String(req.body?.email || "").trim();
-    const bodyApiToken = String(req.body?.apiToken || "").trim();
-    const hasFullOverride =
-      isValidBaseUrl(bodyBaseUrl) && bodyEmail !== "" && bodyApiToken !== "";
-
+    if (Object.hasOwn(req.body || {}, "apiToken")) {
+      return res.status(400).json({ error: "Set JIRA_API_TOKEN in the server .env; submitted tokens are not accepted" });
+    }
+    const saved = listInstances(metaDb).find((instance) => instance.id === id);
+    if (!saved && id !== "new") {
+      return res.status(404).json({ error: "Jira instance not found" });
+    }
     let baseUrl;
-    let email;
-    let apiToken;
-    if (hasFullOverride) {
-      baseUrl = bodyBaseUrl;
-      email = bodyEmail;
-      apiToken = bodyApiToken;
-    } else {
-      const stored = getInstanceCredentials(metaDb, id);
-      if (!stored) {
-        return res.status(404).json({ error: "Jira instance not found" });
-      }
-      baseUrl = normalizeBaseUrl(stored.baseUrl);
-      email = String(stored.email || "").trim();
-      apiToken = String(stored.apiToken || "").trim();
-      if (!isValidBaseUrl(baseUrl) || !email || !apiToken) {
-        return res.status(400).json({ error: "baseUrl, email, and apiToken are required to test connection" });
-      }
+    try {
+      baseUrl = assertAllowedJiraBaseUrl(req.body?.baseUrl ?? saved?.baseUrl, allowedHosts);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    const email = String(req.body?.email ?? saved?.email ?? "").trim();
+    const apiToken = String(env.JIRA_API_TOKEN || "").trim();
+    if (!email || !apiToken) {
+      return res.status(400).json({ error: "Set JIRA_API_TOKEN in the server .env, restart the app, and provide the site's email before testing" });
     }
 
     try {
       const response = await fetch(`${baseUrl}/rest/api/3/myself`, {
+        redirect: "error",
         headers: {
           Accept: "application/json",
           Authorization: `Basic ${Buffer.from(`${email}:${apiToken}`).toString("base64")}`,
@@ -157,13 +140,22 @@ export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getC
       });
       const data = await parseJiraResponse(response);
       if (!response.ok) {
-        const detail = data?.errorMessages?.join(" ") || data?.message || "Connection failed";
-        return res.status(response.status).json({ error: detail });
+        return res.status(response.status).json({ error: "Connection failed. Check JIRA_API_TOKEN in the server .env and the site's email, then restart and test again" });
+      }
+      if (typeof data?.accountId !== "string" || !data.accountId.trim()) {
+        return res.status(502).json({ error: "Jira identity could not be verified; the saved token has been preserved" });
+      }
+      // Only verification of the saved site/email can retire that site's recovery credential.
+      if (saved && baseUrl === saved.baseUrl && email === saved.email) {
+        metaDb.prepare("UPDATE jira_instances SET api_token = '' WHERE id = ? AND base_url = ? AND email = ?")
+          .run(id, saved.baseUrl, saved.email);
       }
       return res.json({ ok: true, displayName: data?.displayName || "", accountId: data?.accountId || "" });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return res.status(502).json({ error: message });
+      if (error instanceof TypeError || error instanceof SyntaxError) {
+        return res.status(502).json({ error: "Connection could not be verified. Check the site's URL and JIRA_API_TOKEN in the server .env, then restart and test again" });
+      }
+      throw error;
     }
   });
 };

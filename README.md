@@ -115,6 +115,20 @@ Some corporate secure laptops may block Electron windows, unsigned installers, l
 
 **Packaged desktop (no Node required):** install the universal Mac `.dmg` (Intel or Apple Silicon) or Windows NSIS installer, edit `.env` — see [JIRA_SETUP.md](./docs/JIRA_SETUP.md) § Desktop app.
 
+### Local API security and Jira configuration
+
+The API listens only on `127.0.0.1` (`API_PORT`, default `8787`). Keep using `npm run dev:all` or `npm run desktop:dev`; Vite forwards `/api` to the IPv4 loopback API. Requests must have a loopback Host with the actual API port. Forwarded host headers do not grant access.
+
+The default allowed browser origins are exactly `http://localhost:5173`, `http://127.0.0.1:5173`, and `http://localhost:<API_PORT>` / `http://127.0.0.1:<API_PORT>`. Other origins, including `null`, are rejected before any API handler runs. Add explicit origins using comma-separated `DOCKET_ALLOWED_ORIGINS` in the local server environment. Use complete origins with no path or trailing slash; do not add `null` or untrusted origins.
+
+Origin-free requests with a valid Host are permitted for trusted local processes. App-session authentication is deferred: this protects the browser boundary and limits network exposure, but other processes running as the same user can call the API or read local files. It does not provide isolation from those processes.
+
+Jira destinations must use HTTPS, port 443, no user information, and an exact approved hostname. Pasted `/browse/...` links become the site origin. The seven default hosts are `lumen.atlassian.net`, `lumen-nm.atlassian.net`, `lumen-vyvx.atlassian.net`, `lumen-bll.atlassian.net`, `lumen-sre.atlassian.net`, `lumengss.atlassian.net`, and `lumen-bira.atlassian.net`. Add explicitly trusted hostnames with comma-separated `JIRA_ALLOWED_HOSTS` (hostnames only, without scheme, path, or port). Jira credential requests do not follow redirects.
+
+Set the personal Jira token using `JIRA_API_TOKEN` in the server `.env` and restart after changes. Settings stores each site's URL and email, and never accepts or returns tokens. `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_INSTANCE_1_NAME` remain supported, as do `JIRA_INSTANCE_1_BASE_URL` / `JIRA_INSTANCE_1_EMAIL` / `JIRA_INSTANCE_1_NAME` through instance 5. Numbered `JIRA_INSTANCE_n_API_TOKEN` values are ignored; all sites use `JIRA_API_TOKEN` with their own saved email.
+
+Previously saved token columns are transitional recovery data only and are never used for Jira calls. To retire a saved token, set `JIRA_API_TOKEN`, restart, then use **Settings → Jira sites → Edit → Test connection** with the saved site's URL and email. Only a successful verification of those saved settings clears that site's old token. Missing or invalid environment credentials, failed checks, and tests of changed unsaved settings preserve it.
+
 Full setup details → **[JIRA_SETUP.md](./docs/JIRA_SETUP.md)**
 Code architecture → **[DEVELOPER_GUIDE.md](./docs/DEVELOPER_GUIDE.md)**
 Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**

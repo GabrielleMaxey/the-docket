@@ -160,13 +160,14 @@ export const activateJiraInstance = async ( id ) =>
     body: "{}",
   } );
 
-export const testJiraInstance = async ( id, body = {} ) =>
+// Connection tests send site settings only; the API supplies JIRA_API_TOKEN.
+export const testJiraInstance = async ( id, { baseUrl, email } = {} ) =>
   requestJson( `/api/jira/instances/${ encodeURIComponent( id ) }/test`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify( body ),
+    body: JSON.stringify( { baseUrl, email } ),
   } );
 
 // Send JQL as POST JSON body to avoid URL-encoding edge cases.

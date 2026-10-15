@@ -82,9 +82,8 @@ describe("seedInstanceAppDbFromLegacyIfNeeded", () => {
 
     const row = createInstance(meta, {
       displayName: "Site A",
-      baseUrl: "https://a.atlassian.net",
+      baseUrl: "https://lumen.atlassian.net",
       email: "a@b.com",
-      apiToken: "tok",
     });
 
     const first = seedInstanceAppDbFromLegacyIfNeeded(meta, dir, row.id);
@@ -110,12 +109,12 @@ describe("resolveJiraCredentials", () => {
   it("uses legacy env when registry empty", () => {
     const meta = freshMeta();
     const creds = resolveJiraCredentials(meta, {
-      JIRA_BASE_URL: "https://legacy.atlassian.net/",
+      JIRA_BASE_URL: "https://lumen-nm.atlassian.net/",
       JIRA_EMAIL: "a@b.com",
       JIRA_API_TOKEN: "tok",
     });
     assert.equal(creds.mode, "legacy");
-    assert.equal(creds.baseUrl, "https://legacy.atlassian.net");
+    assert.equal(creds.baseUrl, "https://lumen-nm.atlassian.net");
     assert.equal(creds.email, "a@b.com");
     assert.equal(creds.apiToken, "tok");
     assert.equal(creds.instanceId, null);
@@ -125,38 +124,36 @@ describe("resolveJiraCredentials", () => {
     const meta = freshMeta();
     const row = createInstance(meta, {
       displayName: "Site A",
-      baseUrl: "https://a.atlassian.net",
+      baseUrl: "https://lumen.atlassian.net",
       email: "a@b.com",
-      apiToken: "secret-a",
     });
     setActiveInstanceId(meta, row.id);
     const creds = resolveJiraCredentials(meta, {
-      JIRA_BASE_URL: "https://legacy.atlassian.net",
+      JIRA_BASE_URL: "https://lumen-nm.atlassian.net",
       JIRA_EMAIL: "legacy@b.com",
       JIRA_API_TOKEN: "legacy-tok",
     });
     assert.equal(creds.mode, "instance");
     assert.equal(creds.instanceId, row.id);
-    assert.equal(creds.baseUrl, "https://a.atlassian.net");
-    assert.equal(creds.apiToken, "secret-a");
+    assert.equal(creds.baseUrl, "https://lumen.atlassian.net");
+    assert.equal(creds.apiToken, "legacy-tok");
     assert.equal(creds.displayName, "Site A");
   });
 });
 
 describe("getInstanceCredentials", () => {
-  it("returns stored creds for id or null when missing", () => {
+  it("returns site settings and the environment token for id or null when missing", () => {
     const meta = freshMeta();
     assert.equal(getInstanceCredentials(meta, "missing"), null);
     const row = createInstance(meta, {
       displayName: "A",
-      baseUrl: "https://a.atlassian.net",
+      baseUrl: "https://lumen.atlassian.net",
       email: "a@b.com",
-      apiToken: "secret",
     });
-    const creds = getInstanceCredentials(meta, row.id);
-    assert.equal(creds.baseUrl, "https://a.atlassian.net");
+    const creds = getInstanceCredentials(meta, row.id, { JIRA_API_TOKEN: "fixture" });
+    assert.equal(creds.baseUrl, "https://lumen.atlassian.net");
     assert.equal(creds.email, "a@b.com");
-    assert.equal(creds.apiToken, "secret");
+    assert.equal(creds.apiToken, "fixture");
   });
 });
 
@@ -166,18 +163,16 @@ describe("createInstance", () => {
     for (let i = 0; i < MAX_JIRA_INSTANCES; i++) {
       createInstance(meta, {
         displayName: `S${i}`,
-        baseUrl: `https://s${i}.atlassian.net`,
+        baseUrl: "https://lumen.atlassian.net",
         email: "a@b.com",
-        apiToken: `t${i}`,
       });
     }
     assert.throws(
       () =>
         createInstance(meta, {
           displayName: "S5",
-          baseUrl: "https://s5.atlassian.net",
+          baseUrl: "https://lumen.atlassian.net",
           email: "a@b.com",
-          apiToken: "t5",
         }),
       (err) => err && err.code === "MAX_INSTANCES"
     );
@@ -187,29 +182,29 @@ describe("createInstance", () => {
     const meta = freshMeta();
     createInstance(meta, {
       displayName: "A",
-      baseUrl: "https://a.atlassian.net",
+      baseUrl: "https://lumen.atlassian.net",
       email: "a@b.com",
-      apiToken: "secret",
     });
     const listed = listInstances(meta);
     assert.equal(listed.length, 1);
-    assert.equal(listed[0].hasToken, true);
+    assert.equal("hasToken" in listed[0], false);
     assert.equal("apiToken" in listed[0], false);
   });
 });
 
 describe("updateInstance", () => {
-  it("keeps token when apiToken omitted or blank", () => {
+  it("rejects submitted tokens while preserving legacy recovery data", () => {
     const meta = freshMeta();
     const row = createInstance(meta, {
-      displayName: "A",
-      baseUrl: "https://a.atlassian.net",
-      email: "a@b.com",
-      apiToken: "secret",
+      displayName: "A", baseUrl: "https://lumen.atlassian.net", email: "a@b.com",
     });
-    updateInstance(meta, row.id, { displayName: "A2", apiToken: "" });
+    meta.prepare("UPDATE jira_instances SET api_token = ? WHERE id = ?").run("legacy-fixture", row.id);
+    assert.throws(() => updateInstance(meta, row.id, { apiToken: "" }), /JIRA_API_TOKEN/);
+    updateInstance(meta, row.id, { displayName: "A2" });
+    assert.equal(meta.prepare("SELECT api_token FROM jira_instances WHERE id = ?").get(row.id).api_token, "legacy-fixture");
     setActiveInstanceId(meta, row.id);
-    assert.equal(resolveJiraCredentials(meta, {}).apiToken, "secret");
+    assert.equal(resolveJiraCredentials(meta, {}).apiToken, "");
+    assert.equal(resolveJiraCredentials(meta, { JIRA_API_TOKEN: "fixture" }).apiToken, "fixture");
   });
 });
 
@@ -218,9 +213,8 @@ describe("deleteInstance", () => {
     const meta = freshMeta();
     const row = createInstance(meta, {
       displayName: "A",
-      baseUrl: "https://a.atlassian.net",
+      baseUrl: "https://lumen.atlassian.net",
       email: "a@b.com",
-      apiToken: "secret",
     });
     setActiveInstanceId(meta, row.id);
     const result = deleteInstance(meta, row.id);
@@ -233,7 +227,7 @@ describe("seedInstancesFromEnv", () => {
   it("seeds legacy as instance 1 when registry empty", () => {
     const meta = freshMeta();
     const r = seedInstancesFromEnv(meta, {
-      JIRA_BASE_URL: "https://legacy.atlassian.net",
+      JIRA_BASE_URL: "https://lumen-nm.atlassian.net",
       JIRA_EMAIL: "a@b.com",
       JIRA_API_TOKEN: "tok",
       JIRA_INSTANCE_1_NAME: "Primary",
@@ -247,12 +241,11 @@ describe("seedInstancesFromEnv", () => {
     const meta = freshMeta();
     createInstance(meta, {
       displayName: "Existing",
-      baseUrl: "https://e.atlassian.net",
+      baseUrl: "https://lumen-sre.atlassian.net",
       email: "a@b.com",
-      apiToken: "t",
     });
     const r = seedInstancesFromEnv(meta, {
-      JIRA_BASE_URL: "https://legacy.atlassian.net",
+      JIRA_BASE_URL: "https://lumen-nm.atlassian.net",
       JIRA_EMAIL: "a@b.com",
       JIRA_API_TOKEN: "tok",
     });

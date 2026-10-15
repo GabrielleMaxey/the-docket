@@ -39,7 +39,11 @@ import {
   noteImagesDirFor,
   setActiveInstanceId,
   MAX_JIRA_INSTANCES,
+  assertAllowedJiraBaseUrl,
+  getAllowedJiraHosts,
 } from "./lib/jiraInstances.mjs";
+
+import { localRequestPolicy } from "./lib/localRequestPolicy.mjs";
 
 const log = createLogger("server");
 
@@ -60,20 +64,14 @@ loadEnvFiles();
 const app = express();
 const port = Number(process.env.API_PORT || 8787);
 
-// Electron dev loads the UI from localhost:5173 while the API runs on :8787 — allow that cross-origin traffic.
-app.use((req, res, next) => {
-  const origin = String(req.headers.origin || "").trim();
-  if (origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
-    res.setHeader("Vary", "Origin");
-  }
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-  next();
-});
+app.use(localRequestPolicy({
+  apiPort: port,
+  allowedOrigins: [
+    "http://localhost:5173", "http://127.0.0.1:5173",
+    `http://localhost:${port}`, `http://127.0.0.1:${port}`,
+    ...String(process.env.DOCKET_ALLOWED_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean),
+  ],
+}));
 
 app.use(express.json({ limit: "5mb" }));
 
@@ -215,7 +213,7 @@ const getMissingEnv = () => {
   const missing = [];
   if (!c.baseUrl) missing.push(c.mode === "legacy" ? "JIRA_BASE_URL" : "instance.baseUrl");
   if (!c.email) missing.push(c.mode === "legacy" ? "JIRA_EMAIL" : "instance.email");
-  if (!c.apiToken) missing.push(c.mode === "legacy" ? "JIRA_API_TOKEN" : "instance.apiToken");
+  if (!c.apiToken) missing.push("JIRA_API_TOKEN");
   return missing;
 };
 
@@ -241,9 +239,10 @@ const activateInstance = (id) => {
 };
 
 const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
-  const target = `${getCredentials().baseUrl}${pathWithQuery}`;
+  const target = `${assertAllowedJiraBaseUrl(getCredentials().baseUrl, getAllowedJiraHosts())}${pathWithQuery}`;
   const response = await fetch(target, {
     method,
+    redirect: "error",
     headers: {
       Accept: "application/json",
       "Accept-Language": "en-US,en;q=0.9",
@@ -272,9 +271,10 @@ const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
 
 // Jira uploads need X-Atlassian-Token: no-check; omit Content-Type so fetch sets the multipart boundary.
 const jiraMultipartRequest = async ({ method = "POST", pathWithQuery, formData }) => {
-  const target = `${getCredentials().baseUrl}${pathWithQuery}`;
+  const target = `${assertAllowedJiraBaseUrl(getCredentials().baseUrl, getAllowedJiraHosts())}${pathWithQuery}`;
   const response = await fetch(target, {
     method,
+    redirect: "error",
     headers: {
       Accept: "application/json",
       Authorization: getAuthHeader(),
@@ -300,7 +300,7 @@ const resolveJiraAttachmentMediaId = async (attachmentId) => {
     return "";
   }
 
-  const target = `${getCredentials().baseUrl}/rest/api/3/attachment/content/${encodeURIComponent(id)}`;
+  const target = `${assertAllowedJiraBaseUrl(getCredentials().baseUrl, getAllowedJiraHosts())}/rest/api/3/attachment/content/${encodeURIComponent(id)}`;
   const response = await fetch(target, {
     method: "GET",
     headers: {
@@ -436,8 +436,8 @@ if (fs.existsSync(distDir)) {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-const server = app.listen(port, () => {
-  log.info(`Jira proxy listening on http://localhost:${port}`);
+const server = app.listen(port, "127.0.0.1", () => {
+  log.info(`Jira proxy listening on http://127.0.0.1:${port}`);
   log.info(`Database: ${runtime.dbPath}`);
   const missing = getMissingEnv();
   if (missing.length > 0) {

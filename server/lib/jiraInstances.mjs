@@ -4,6 +4,36 @@ import path from "node:path";
 import Database from "better-sqlite3";
 
 export const MAX_JIRA_INSTANCES = 5;
+export const DEFAULT_JIRA_ALLOWED_HOSTS = [
+  "lumen.atlassian.net", "lumen-nm.atlassian.net", "lumen-vyvx.atlassian.net",
+  "lumen-bll.atlassian.net", "lumen-sre.atlassian.net", "lumengss.atlassian.net",
+  "lumen-bira.atlassian.net",
+];
+
+export function getAllowedJiraHosts(env = process.env) {
+  return [
+    ...DEFAULT_JIRA_ALLOWED_HOSTS,
+    ...String(env.JIRA_ALLOWED_HOSTS || "").split(",").map((host) => host.trim().toLowerCase()).filter(Boolean),
+  ];
+}
+
+export function assertAllowedJiraBaseUrl(value, allowedHosts = getAllowedJiraHosts()) {
+  let parsed;
+  try {
+    parsed = new URL(String(value ?? "").trim());
+  } catch {
+    throw new TypeError("Jira URL must be an approved HTTPS site URL");
+  }
+  if (
+    parsed.protocol !== "https:" || parsed.username || parsed.password ||
+    parsed.port || !allowedHosts.includes(parsed.hostname) ||
+    (parsed.pathname !== "/" && !/^\/browse(\/|$)/i.test(parsed.pathname)) ||
+    parsed.search || parsed.hash
+  ) {
+    throw new TypeError("Jira URL must be an approved HTTPS site URL; configure additional hostnames with JIRA_ALLOWED_HOSTS");
+  }
+  return parsed.origin;
+}
 
 const ACTIVE_INSTANCE_KEY = "active_instance_id";
 const legacySeedMetaKey = (instanceId) => `legacy_db_seeded:${instanceId}`;
@@ -161,7 +191,6 @@ export function toPublicInstance(row) {
     displayName: row.display_name,
     baseUrl: row.base_url,
     email: row.email,
-    hasToken: Boolean(trimOrEmpty(row.api_token)),
     enabled: Boolean(row.enabled),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -173,13 +202,13 @@ function getInstanceRow(metaDb, id) {
 }
 
 /** Server-side only — never expose via list/public APIs. */
-export function getInstanceCredentials(metaDb, id) {
+export function getInstanceCredentials(metaDb, id, env = process.env) {
   const row = getInstanceRow(metaDb, id);
   if (!row) return null;
   return {
-    baseUrl: row.base_url,
+    baseUrl: assertAllowedJiraBaseUrl(row.base_url, getAllowedJiraHosts(env)),
     email: row.email,
-    apiToken: row.api_token,
+    apiToken: trimOrEmpty(env.JIRA_API_TOKEN),
   };
 }
 
@@ -202,7 +231,7 @@ export function setActiveInstanceId(metaDb, id) {
   setMetaValue(metaDb, ACTIVE_INSTANCE_KEY, id);
 }
 
-export function resolveJiraCredentials(metaDb, env = {}) {
+export function resolveJiraCredentials(metaDb, env = process.env) {
   const activeId = getActiveInstanceId(metaDb);
   if (activeId) {
     const row = getInstanceRow(metaDb, activeId);
@@ -211,9 +240,7 @@ export function resolveJiraCredentials(metaDb, env = {}) {
         mode: "instance",
         instanceId: row.id,
         displayName: row.display_name,
-        baseUrl: row.base_url,
-        email: row.email,
-        apiToken: row.api_token,
+        ...getInstanceCredentials(metaDb, activeId, env),
       };
     }
   }
@@ -222,13 +249,17 @@ export function resolveJiraCredentials(metaDb, env = {}) {
     mode: "legacy",
     instanceId: null,
     displayName: "",
-    baseUrl: normalizeBaseUrl(env.JIRA_BASE_URL),
+    baseUrl: trimOrEmpty(env.JIRA_BASE_URL) ? assertAllowedJiraBaseUrl(env.JIRA_BASE_URL, getAllowedJiraHosts(env)) : "",
     email: trimOrEmpty(env.JIRA_EMAIL),
     apiToken: trimOrEmpty(env.JIRA_API_TOKEN),
   };
 }
 
-export function createInstance(metaDb, input) {
+export function createInstance(metaDb, input, allowedHosts = getAllowedJiraHosts()) {
+  if (Object.hasOwn(input, "apiToken")) {
+    throw new TypeError("Set JIRA_API_TOKEN in the server .env; submitted tokens are not accepted");
+  }
+  const baseUrl = assertAllowedJiraBaseUrl(input.baseUrl, allowedHosts);
   const count = metaDb.prepare("SELECT COUNT(*) AS c FROM jira_instances").get().c;
   if (count >= MAX_JIRA_INSTANCES) {
     throw Object.assign(new Error("Maximum of 5 Jira instances"), { code: "MAX_INSTANCES" });
@@ -245,9 +276,9 @@ export function createInstance(metaDb, input) {
     .run(
       id,
       trimOrEmpty(input.displayName),
-      normalizeBaseUrl(input.baseUrl),
+      baseUrl,
       trimOrEmpty(input.email),
-      trimOrEmpty(input.apiToken),
+      "",
       now,
       now
     );
@@ -255,7 +286,10 @@ export function createInstance(metaDb, input) {
   return toPublicInstance(getInstanceRow(metaDb, id));
 }
 
-export function updateInstance(metaDb, id, patch) {
+export function updateInstance(metaDb, id, patch, allowedHosts = getAllowedJiraHosts()) {
+  if (Object.hasOwn(patch, "apiToken")) {
+    throw new TypeError("Set JIRA_API_TOKEN in the server .env; submitted tokens are not accepted");
+  }
   const row = getInstanceRow(metaDb, id);
   if (!row) {
     throw new Error(`Jira instance not found: ${id}`);
@@ -263,22 +297,18 @@ export function updateInstance(metaDb, id, patch) {
 
   const displayName =
     patch.displayName !== undefined ? trimOrEmpty(patch.displayName) : row.display_name;
-  const baseUrl = patch.baseUrl !== undefined ? normalizeBaseUrl(patch.baseUrl) : row.base_url;
+  const baseUrl = assertAllowedJiraBaseUrl(patch.baseUrl !== undefined ? patch.baseUrl : row.base_url, allowedHosts);
   const email = patch.email !== undefined ? trimOrEmpty(patch.email) : row.email;
-  let apiToken = row.api_token;
-  if (patch.apiToken !== undefined && trimOrEmpty(patch.apiToken) !== "") {
-    apiToken = trimOrEmpty(patch.apiToken);
-  }
   const enabled = patch.enabled !== undefined ? (patch.enabled ? 1 : 0) : row.enabled;
   const now = new Date().toISOString();
 
   metaDb
     .prepare(
       `UPDATE jira_instances
-       SET display_name = ?, base_url = ?, email = ?, api_token = ?, enabled = ?, updated_at = ?
+       SET display_name = ?, base_url = ?, email = ?, enabled = ?, updated_at = ?
        WHERE id = ?`
     )
-    .run(displayName, baseUrl, email, apiToken, enabled, now, id);
+    .run(displayName, baseUrl, email, enabled, now, id);
 
   return toPublicInstance(getInstanceRow(metaDb, id));
 }
@@ -306,24 +336,22 @@ export function seedInstancesFromEnv(metaDb, env = {}) {
   for (let n = 1; n <= MAX_JIRA_INSTANCES; n++) {
     const baseUrl = trimOrEmpty(env[`JIRA_INSTANCE_${n}_BASE_URL`]);
     const email = trimOrEmpty(env[`JIRA_INSTANCE_${n}_EMAIL`]);
-    const apiToken = trimOrEmpty(env[`JIRA_INSTANCE_${n}_API_TOKEN`]);
-    if (!baseUrl || !email || !apiToken) continue;
+    if (!baseUrl || !email) continue;
     const displayName = trimOrEmpty(env[`JIRA_INSTANCE_${n}_NAME`]) || `Instance ${n}`;
-    toCreate.push({ displayName, baseUrl, email, apiToken });
+    toCreate.push({ displayName, baseUrl, email });
   }
 
   if (toCreate.length === 0) {
     const baseUrl = trimOrEmpty(env.JIRA_BASE_URL);
     const email = trimOrEmpty(env.JIRA_EMAIL);
-    const apiToken = trimOrEmpty(env.JIRA_API_TOKEN);
-    if (baseUrl && email && apiToken) {
+    if (baseUrl && email) {
       const displayName = trimOrEmpty(env.JIRA_INSTANCE_1_NAME) || "Jira";
-      toCreate.push({ displayName, baseUrl, email, apiToken });
+      toCreate.push({ displayName, baseUrl, email });
     }
   }
 
   for (const input of toCreate) {
-    createInstance(metaDb, input);
+    createInstance(metaDb, input, getAllowedJiraHosts(env));
   }
 
   if (toCreate.length > 0) {
