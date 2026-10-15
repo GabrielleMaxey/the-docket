@@ -96,6 +96,23 @@ test("sheet names sanitize forbidden characters, reserve Overview and resolve lo
   assert.deepEqual(book.worksheets.map(s => s.name), ["Overview", "Overview (2)", "overview (3)", "A B C D E F G H", "A".repeat(31), `${"a".repeat(27)} (2)`]);
 });
 
+test("initial worksheet shortening preserves supplementary characters at the 31-unit boundary", async () => {
+  const input = snapshot();
+  input.sites = [site("unicode-empty", { displayName: `${"A".repeat(30)}😀`, rows: [], rowCount: 0, searchedCount: 0 })];
+  const book = await read(await buildTaskWorkbook(input));
+  assert.equal(book.worksheets[1].name, "A".repeat(30));
+  assert.match(text(book.worksheets[1]), /😀/);
+});
+
+test("collision suffix shortening preserves supplementary characters at the suffix boundary", async () => {
+  const input = snapshot();
+  input.sites = [site("unicode-first", { displayName: `${"A".repeat(26)}😀BBBBBBBBBB` }), site("unicode-second", { displayName: `${"a".repeat(26)}😀bbbbbbbbbb` })];
+  const book = await read(await buildTaskWorkbook(input));
+  assert.deepEqual(book.worksheets.map(sheet => sheet.name), ["Overview", `${"A".repeat(26)}😀BBB`, `${"a".repeat(26)} (2)`]);
+  assert.ok(book.worksheets.every(sheet => sheet.name.length <= 31));
+  assert.match(text(book.worksheets[2]), /😀/);
+});
+
 test("unsafe and oversized cells fail with affected row and field, and can be excluded", async () => {
   for (const [field, value, label] of [["localNote", "x".repeat(32768), "Docket local notes"], ["summary", "Invalid\u0000text", "Title"], ["latestJiraComment", { text: "x".repeat(32768), author: null, createdAt: null }, "Latest Jira comment"]]) {
     const input = snapshot(); input.sites[0].rows[0][field] = value;

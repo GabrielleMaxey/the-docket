@@ -14,12 +14,20 @@ const validateCell = (value, location) => {
   } else if (value !== null && typeof value !== "boolean" && !(typeof value === "number" && Number.isFinite(value))) throw fail(`${location}: expected a literal text, number or boolean value. Preview again.`);
   return value;
 };
+const shortenSheetName = (value, limit) => {
+  let result = "";
+  for (const character of value) {
+    if (result.length + character.length > limit) break;
+    result += character;
+  }
+  return result;
+};
 const sheetName = (savedName, used) => {
   const base = savedName.replace(/[\\/*?:\[\]]/g, " ").replace(/\s+/g, " ").trim().replace(/^'+|'+$/g, "").trim() || "Jira entry";
-  let candidate = base.slice(0, 31).replace(/'+$/g, "");
+  let candidate = shortenSheetName(base, 31).replace(/'+$/g, "");
   for (let count = 2; used.has(candidate.toLowerCase()); count++) {
     const suffix = ` (${count})`;
-    candidate = `${base.slice(0, 31 - suffix.length)}${suffix}`;
+    candidate = `${shortenSheetName(base, 31 - suffix.length)}${suffix}`;
   }
   used.add(candidate.toLowerCase());
   return candidate;
