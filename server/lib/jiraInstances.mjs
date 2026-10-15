@@ -174,6 +174,19 @@ export function seedInstanceAppDbFromLegacyIfNeeded(metaDb, dataDir, instanceId)
   }
 
   copySqliteDatabase(legacyPath, destPath);
+  const copiedDb = new Database(destPath, { readonly: true });
+  try {
+    const copiedRecords = {};
+    for (const [table, column] of [["todos", "id"], ["reminders", "slot_index"]]) {
+      if (copiedDb.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)) {
+        copiedRecords[table] = copiedDb.prepare(`SELECT ${column} AS id FROM ${table}`).all().map((row) => row.id);
+      }
+    }
+    // Only a successful copy establishes these source identities; old seed flags do not.
+    setMetaValue(metaDb, `legacy_db_copy_records:${id}`, JSON.stringify(copiedRecords));
+  } finally {
+    copiedDb.close();
+  }
 
   const legacyImages = noteImagesDirFor(dataDir, null);
   const destImages = noteImagesDirFor(dataDir, id);

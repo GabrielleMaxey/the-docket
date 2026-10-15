@@ -6,6 +6,7 @@ import path from "path";
 import fs from "fs";
 import Database from "better-sqlite3";
 import { initDatabase } from "./db/schema.mjs";
+import { openTodoDatabase, migratePersonalTodos, listTodoSources } from "./db/todoDatabase.mjs";
 import { registerAppConfigRoutes } from "./routes/appConfigRoutes.mjs";
 import { registerDashboardRoutes } from "./routes/dashboardRoutes.mjs";
 import { registerReportRoutes } from "./routes/reportRoutes.mjs";
@@ -162,6 +163,9 @@ if (hasExplicitInstanceEnv) {
   seedInstancesFromEnv(metaDb, process.env);
 }
 
+const todoDb = openTodoDatabase(dbDir);
+let todoMigrationStatus = { unresolved: [] };
+
 const runtime = {
   db: null,
   noteImagesDir: null,
@@ -198,6 +202,8 @@ const openAppDbForCurrent = () => {
     runtime.dbPath = nextPath;
     runtime.db = new Database(nextPath);
     runtime.db.pragma("journal_mode = WAL");
+    // Inspect the original schema before initDatabase can erase reminder-conversion evidence.
+    todoMigrationStatus = migratePersonalTodos(todoDb, listTodoSources(metaDb, dbDir));
     initDatabase(runtime.db);
     runtime.noteImagesDir = noteImagesDirFor(dbDir, creds.mode === "instance" ? creds.instanceId : null);
     fs.mkdirSync(runtime.noteImagesDir, { recursive: true });
@@ -376,7 +382,7 @@ registerEpicWorkloadRoutes(app, routeCtx);
 registerCapacityPlanningRoutes(app, routeCtx);
 registerTeamPriorityRoutes(app, routeCtx);
 registerPmAsksRoutes(app, routeCtx);
-registerTodoRoutes(app, routeCtx);
+registerTodoRoutes(app, { getDb: () => todoDb, getMigrationStatus: () => todoMigrationStatus });
 registerAttachmentRoutes(app, routeCtx);
 registerAppConfigRoutes(app, routeCtx);
 registerDashboardRoutes(app, routeCtx);

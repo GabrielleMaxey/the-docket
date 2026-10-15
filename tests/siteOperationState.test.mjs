@@ -76,7 +76,7 @@ test("handler failure releases its lease and missing headers fail closed", async
 
 test("every registered business endpoint rejects missing site context before doing work", async () => {
   const { state } = setup();
-  const names = ["jiraCore", "jiraIssue", "issueMetadata", "epicWorkload", "capacityPlanning", "teamPriority", "pmAsks", "attachment", "appConfig", "dashboard", "report", "chat", "todo"];
+  const names = ["jiraCore", "jiraIssue", "issueMetadata", "epicWorkload", "capacityPlanning", "teamPriority", "pmAsks", "attachment", "appConfig", "dashboard", "report", "chat"];
   for (const name of names) {
     const routes = [];
     const app = Object.fromEntries(["get", "post", "put", "patch", "delete"].map((method) => [method, (path, ...handlers) => routes.push({ path, handler: handlers.at(-1) })]));

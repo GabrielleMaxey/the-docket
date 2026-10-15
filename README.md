@@ -150,7 +150,7 @@ Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 | Chat session artifacts (reports/plans for context) | Browser `localStorage` | No |
 | On-page reports/plans (Task Management + Metrics) | Browser `localStorage` | No |
 | **Past Reports** archive | `data/workweek.sqlite` → `generated_reports` | No |
-| Header reminders | `data/workweek.sqlite` (local file) | No |
+| Personal To Dos + completed history | `data/personal-todos.sqlite` (local file) | No |
 | Per-issue notes + P1–P20 priority | `data/workweek.sqlite` (local file) | No for personal slots |
 | Start date (ad-hoc, for Gantt views) | `data/workweek.sqlite` (local file) | No for personal slots |
 | Status/assignee changes | Jira (your Atlassian instance) | Yes — visible in Jira to anyone with access |
@@ -162,6 +162,10 @@ Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 | Chat message content | Your configured LLM provider (Anthropic/OpenAI/etc.) when you send a message | Yes — to that provider's API |
 
 ---
+
+Personal To Dos save automatically without a Jira connection and remain available across site switches, site deletion, and restarts. They are separate from team priorities. Existing records migrate without applying the 15-active-item creation limit; new items are allowed once fewer than 15 are active. Completed **All time** includes entries whose completion date is unknown.
+
+Migration keeps source databases and a durable record ledger, so deleting a migrated item never recreates it. Historical seed flags cannot prove whether a legacy database was copied, and old reminder conversion left no ledger. Ambiguous records stay in the original local databases for recovery; the To Do response and completed history panel show a recovery notice with source IDs and counts. Other report archives remain scoped to the selected Jira site.
 
 ## Tech stack
 

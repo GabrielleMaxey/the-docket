@@ -84,7 +84,7 @@ const siteHeaders = ( context ) => context ? {
 } : {};
 
 const requestJson = async ( path, options = {} ) => {
-  if ( path === "/api/health" ) return requestJsonNow( path, options );
+  if ( path === "/api/health" || /^\/api\/todos(?:[/?]|$)/.test( path ) ) return requestJsonNow( path, options );
   const context = options.siteContext || await initializeSiteContext();
   const method = options.method || "GET";
   const registryMutation = path.startsWith( "/api/jira/instances" ) && method !== "GET" && !path.endsWith( "/test" );
@@ -690,7 +690,7 @@ export const fetchTodos = async () => {
 export const fetchCompletedTodos = async ( days = 90 ) => {
   const param = Number( days ) >= 0 ? Number( days ) : 90;
   const data = await requestJson( `/api/todos/completed?days=${ param }` );
-  return { items: data?.items || [], days: data?.days ?? param };
+  return { items: data?.items || [], days: data?.days ?? param, migration: data?.migration };
 };
 
 export const clearCompletedTodos = async () =>
