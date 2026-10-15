@@ -114,7 +114,7 @@ test("same-key local and shared followUp edits and Save All preserve their own s
   assert.equal(Object.hasOwn(localWrites.at(-1), "teamFollowUp"), false);
 });
 
-test("task table renders each source selection with one mutually exclusive Now/Next control", async () => {
+test("task table renders exclusive Now/Next checkboxes with source-specific clear", async () => {
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
   const { createRequire } = await import("node:module");
@@ -131,12 +131,44 @@ test("task table renders each source selection with one mutually exclusive Now/N
     const render = (sharedProgramId) => renderToStaticMarkup(React.createElement(Table, { ...props, jqlRuns: [{ jql: "key = ABC-1", label: "Synthetic tasks", sharedProgramId, issues: [{ id: "1", key: "ABC-1", fields: { summary: "Task", status: { name: "Open" }, issuetype: { name: "Bug" } } }] }] }));
     const local = render("");
     const team = render("team");
-    const selection = (html) => html.match(/<select[^>]*aria-label="Now \/ Next for ABC-1"[^>]*>([\s\S]*?)<\/select>/)?.[1];
-    assert.match(selection(local) || "", /value="now" selected=""/);
-    assert.match(selection(team) || "", /value="next" selected=""/);
-    assert.match(selection(team), /value="">Unset/);
+    const checked = (html, choice) => html.match(new RegExp(`<input[^>]*aria-label="${choice} for ABC-1"[^>]*>`))?.[0].includes('checked=""');
+    assert.equal(checked(local, "Now"), true);
+    assert.equal(checked(local, "Next"), false);
+    assert.equal(checked(team, "Now"), false);
+    assert.equal(checked(team, "Next"), true);
     props.planningMetaByKey["ABC-1"].teamFollowUp = null;
-    assert.match(selection(render("team")), /value="" selected="">Unset/);
-    assert.match(selection(render("")), /value="now" selected=""/);
+    assert.equal(checked(render("team"), "Now"), false);
+    assert.equal(checked(render("team"), "Next"), false);
+    assert.equal(checked(render(""), "Now"), true);
   } finally { await fs.rm(temporary, { recursive: true, force: true }); }
+});
+
+
+test("Now/Next checkbox events replace the active choice and unchecking clears it", async () => {
+  const fs = await import("node:fs/promises");
+  const { build } = await import("esbuild");
+  const source = await fs.readFile(new URL("../src/Pages/components/JiraResultsTable.jsx", import.meta.url), "utf8");
+  const labelStart = source.indexOf('<span className="ww-planning-label">Now / Next</span>');
+  const start = source.lastIndexOf('<div className="ww-planning-field">', labelStart);
+  const end = source.indexOf('<label className="ww-planning-field">', labelStart);
+  const fragment = source.slice(start, end);
+  const bundled = await build({ stdin: { contents: `import React from "react"; import { FOLLOW_UP_OPTIONS } from "../../../shared/issueMetadataFields.mjs";
+    export const render = ({ followUp, handlePlanningFieldChange, sharedProgramId = "team" }) => {
+      const issueKey = "ABC-1";
+      const isClosedOrResolved = false;
+      return (${fragment});
+    };`, loader: "jsx", resolveDir: new URL("../src/Pages/components/", import.meta.url).pathname }, bundle: true, write: false, format: "esm", platform: "node" });
+  const actual = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`);
+  let followUp = "now";
+  const changes = [];
+  const render = () => actual.render({ followUp, handlePlanningFieldChange: (...args) => { changes.push(args); followUp = args[2]; } });
+  const inputs = () => render().props.children[1].map((label) => label.props.children[0]);
+  assert.deepEqual(inputs().map((input) => input.props.checked), [true, false]);
+  inputs()[1].props.onChange({ target: { checked: true } });
+  assert.equal(followUp, "next");
+  assert.deepEqual(inputs().map((input) => input.props.checked), [false, true]);
+  assert.deepEqual(changes[0], ["ABC-1", "followUp", "next", { sharedProgramId: "team" }]);
+  inputs()[1].props.onChange({ target: { checked: false } });
+  assert.equal(followUp, null);
+  assert.deepEqual(inputs().map((input) => input.props.checked), [false, false]);
 });

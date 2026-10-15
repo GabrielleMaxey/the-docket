@@ -1270,19 +1270,21 @@ const JiraResultsTable = ({
                             <td colSpan={5} className="ww-planning-panel-cell">
                               <div className="ww-planning-panel">
                                 <div className="ww-planning-panel-fields">
-                                  <label className="ww-planning-field">
+                                  <div className="ww-planning-field">
                                     <span className="ww-planning-label">Now / Next</span>
-                                    <select
-                                      className="ww-edit-input"
-                                      aria-label={`Now / Next for ${issueKey}`}
-                                      value={followUp || ""}
-                                      disabled={isClosedOrResolved}
-                                      onChange={(e) => handlePlanningFieldChange(issueKey, "followUp", e.target.value || null, { sharedProgramId })}
-                                    >
-                                      <option value="">Unset</option>
-                                      {FOLLOW_UP_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                                    </select>
-                                  </label>
+                                    {FOLLOW_UP_OPTIONS.map((option) => (
+                                      <label key={option.value}>
+                                        <input
+                                          type="checkbox"
+                                          aria-label={`${option.label} for ${issueKey}`}
+                                          checked={followUp === option.value}
+                                          disabled={isClosedOrResolved}
+                                          onChange={(e) => handlePlanningFieldChange(issueKey, "followUp", e.target.checked ? option.value : null, { sharedProgramId })}
+                                        />
+                                        {option.label}
+                                      </label>
+                                    ))}
+                                  </div>
                                   <label className="ww-planning-field">
                                     <span className="ww-planning-label">Open decision</span>
                                     <input
