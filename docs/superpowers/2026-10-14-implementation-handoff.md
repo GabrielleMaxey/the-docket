@@ -140,11 +140,11 @@ Counts compare the cumulative base above to this final worktree once, including 
 
 | Category | Added | Removed | Files |
 | --- | ---: | ---: | ---: |
-| Dependencies/config | 2,681 | 4,647 | 9 |
+| Dependencies/config | 2,685 | 4,651 | 9 |
 | Source/scripts | 3,480 | 28,851 | 177 |
-| Docs | 615 | 144 | 13 |
+| Docs | 620 | 150 | 13 |
 | Tests | 4,338 | 46 | 25 |
-| Total | 11,114 | 33,688 | 224 |
+| Total | 11,123 | 33,698 | 224 |
 
 ## Changed files and line anchors
 
@@ -152,7 +152,7 @@ This exhaustive cumulative table includes modifications, additions and deletions
 
 | File / first changed line | Change | + / − |
 | --- | --- | --- |
-| [.env.example:22](../../.env.example#L22) | Modified | 8 / 7 |
+| [.env.example:1](../../.env.example#L1) | Modified | 12 / 11 |
 | `.github/workflows/desktop-packaging.yml:1` (deleted) | Deleted | 0 / 79 |
 | [.github/workflows/validate.yml:1](../../.github/workflows/validate.yml#L1) | Created | 48 / 0 |
 | [.gitignore:57](../../.gitignore#L57) | Modified | 3 / 0 |
@@ -248,7 +248,7 @@ This exhaustive cumulative table includes modifications, additions and deletions
 | `build/icons/icon.ico:1` (deleted) | Deleted | - / - |
 | [docs/DEVELOPER_GUIDE.md:9](../../docs/DEVELOPER_GUIDE.md#L9) | Modified | 12 / 13 |
 | [docs/END_USER_GUIDE.md:66](../../docs/END_USER_GUIDE.md#L66) | Modified | 18 / 18 |
-| [docs/JIRA_SETUP.md:112](../../docs/JIRA_SETUP.md#L112) | Modified | 7 / 33 |
+| [docs/JIRA_SETUP.md:31](../../docs/JIRA_SETUP.md#L31) | Modified | 12 / 39 |
 | [docs/canvases/task-manager-docs.canvas.tsx:221](../../docs/canvases/task-manager-docs.canvas.tsx#L221) | Modified | 4 / 5 |
 | [docs/superpowers/2026-10-14-implementation-handoff.md:1](../../docs/superpowers/2026-10-14-implementation-handoff.md#L1) | Created | 378 / 0 |
 | [docs/superpowers/plans/2026-10-14-application-review.md:3](../../docs/superpowers/plans/2026-10-14-application-review.md#L3) | Modified | 17 / 13 |

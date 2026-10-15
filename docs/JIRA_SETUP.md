@@ -28,7 +28,7 @@ Copy-Item .env.example .env
 copy .env.example .env
 ```
 
-Open `.env` in any text editor and fill in:
+Open `.env` in any text editor and fill in the values below. Use the `.env` in the project copy you launch: the API loads it beside that copy's `package.json`. Separate Git worktrees do not share this file. Stop and restart the running API after edits; switching branches or opening another project folder does not restart an existing server.
 
 | Variable | Example | Notes |
 |----------|---------|-------|
@@ -43,12 +43,12 @@ Open `.env` in any text editor and fill in:
 | Setup | Registry | Local SQLite | Jira credentials |
 |-------|----------|--------------|------------------|
 | **Legacy** — only `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | Empty | `data/workweek.sqlite` (unchanged for existing installs) | Read from `.env` |
-| **Env seed** — at least one `JIRA_INSTANCE_N_BASE_URL` (+ matching `_EMAIL`, `_API_TOKEN`, optional `_NAME`) for N=1…5 | Populated at API startup | `data/workweek-<instanceId>.sqlite` per registered site | Active instance from registry |
-| **Settings** — add/edit sites in the app | Populated in UI | Per-site files as above | Active instance from registry |
+| **Env seed** — at least one `JIRA_INSTANCE_N_BASE_URL` (+ matching `_EMAIL`, optional `_NAME`) for N=1…5 | Populated at API startup | `data/workweek-<instanceId>.sqlite` per registered site | Saved URL/email plus shared `JIRA_API_TOKEN` |
+| **Settings** — add/edit sites in the app | Populated in UI | Per-site files as above | Saved URL/email plus shared `JIRA_API_TOKEN` |
 
 Startup **does not** create registry rows from bare legacy `JIRA_*` alone. Use legacy mode for one site with your existing database, or set explicit `JIRA_INSTANCE_N_*` vars (or **Settings → Jira sites**) to use the instance registry.
 
-When the registry has at least one row, **active instance credentials** are used for all Jira proxy calls. Legacy `JIRA_*` vars remain a fallback only when the registry is empty (for example after removing every configured site).
+When the registry has at least one row, the active site's saved URL and email are used for Jira proxy calls. `JIRA_BASE_URL` and `JIRA_EMAIL` are used only when the registry is empty. Every site uses the single server-side `JIRA_API_TOKEN`; numbered `JIRA_INSTANCE_N_API_TOKEN` values and previously saved tokens are not used for requests.
 
 Optional env vars (see `.env.example`):
 
@@ -57,9 +57,8 @@ Optional env vars (see `.env.example`):
 | `JIRA_INSTANCE_N_NAME` | Display name (N = 1…5) |
 | `JIRA_INSTANCE_N_BASE_URL` | No trailing slash; **any** set `N` triggers startup seeding when the registry is empty |
 | `JIRA_INSTANCE_N_EMAIL` | Atlassian account email |
-| `JIRA_INSTANCE_N_API_TOKEN` | API token for that site |
 
-Hard cap: **5** sites total. API tokens are stored on the proxy host only; list/get instance APIs never return full tokens.
+Hard cap: **5** sites total. Settings stores site URLs and emails, not new API tokens. Keep `JIRA_API_TOKEN` in the server environment; list/get instance APIs never return tokens.
 
 **In the app:** **Settings → Jira sites** — add, edit, remove, **Set active**, and **Test connection** (modal). **Header → Site** dropdown switches the active site when two or more are registered; the page reloads so presets, notes, and metrics match that site’s local data. With only legacy `.env` credentials, the header shows **Jira** (link/tooltip points you to Settings to add more sites).
 
