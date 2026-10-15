@@ -512,3 +512,56 @@ test("inconsistent empty project pages are incomplete while verified empty scope
     assert.equal(f.calls.length, 1);
   }
 });
+
+
+test("client workbook download returns binary bytes, keeps snapshot identity and surfaces retry guidance", async t => {
+  const { build } = await import("esbuild");
+  const result = await build({ entryPoints: ["src/services/jiraClient.js"], bundle: true, write: false, platform: "browser", format: "esm", define: { "import.meta.env": "{}" } });
+  const client = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString("base64")}`);
+  const nativeFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = nativeFetch; });
+  const options = { previewId: "reviewed", excludedRows: [{ instanceId: "saved-a", siteHost: "lumen.atlassian.net", issueKey: "ABC-1" }], allowPartial: true };
+  let requests = 0;
+  globalThis.fetch = async (url, request) => {
+    requests++;
+    assert.ok(String(url).endsWith("/api/task-export/download"));
+    assert.deepEqual(JSON.parse(request.body), options);
+    assert.equal(request.headers["X-Docket-Site"], undefined);
+    return new Response(new Uint8Array([80, 75, 3, 4]), { headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" } });
+  };
+  const blob = await client.downloadTaskExport(options);
+  assert.ok(blob instanceof Blob);
+  assert.deepEqual([...new Uint8Array(await blob.arrayBuffer())], [80, 75, 3, 4]);
+  assert.equal(requests, 1);
+  for (const status of [400, 409, 413, 500]) {
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: "Preview again or narrow filters." }), { status, headers: { "Content-Type": "application/json" } });
+    await assert.rejects(client.downloadTaskExport(options), error => error.status === status && /Preview again/.test(error.message));
+  }
+  globalThis.fetch = async () => new Response("<html>Wrong API</html>", { headers: { "Content-Type": "text/html" } });
+  await assert.rejects(client.downloadTaskExport(options), /workbook|XLSX/i);
+  const controller = new AbortController();
+  globalThis.fetch = async () => { controller.abort(); throw controller.signal.reason; };
+  await assert.rejects(client.downloadTaskExport(options, { signal: controller.signal }), { name: "AbortError" });
+});
+
+test("real export routes require a fresh preview for source changes, enforce consent and reject forged exclusions and expired IDs", async t => {
+  const { registerTaskExportRoutes } = await import("../server/routes/taskExportRoutes.mjs");
+  let now = Date.now();
+  const f = fixture(t, { service: { now: () => now }, request: async o => o.pathWithQuery.includes("/comment") ? { ok: false, status: 403 } : { ok: true, data: { issues: [issue()], isLast: true } } });
+  const app = express(); app.use(express.json());
+  registerTaskExportRoutes(app, { taskExportService: f.service });
+  const server = await new Promise(resolve => { const listener = app.listen(0, "127.0.0.1", () => resolve(listener)); });
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const post = (route, body) => fetch(`http://127.0.0.1:${server.address().port}/api/task-export/${route}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const preview = await (await post("preview", { sites: [selected(f.saved[0].id)] })).json();
+  assert.equal((await post("download", { previewId: preview.previewId })).status, 400);
+  assert.equal((await post("download", { previewId: preview.previewId, allowPartial: true, source: "team" })).status, 400);
+  assert.equal((await post("download", { previewId: preview.previewId, allowPartial: true, excludedRows: [{ instanceId: f.saved[1].id, siteHost: "lumen.atlassian.net", issueKey: "ABC-1" }] })).status, 400);
+  const team = await (await post("preview", { sites: [selected(f.saved[0].id, "team")] })).json();
+  assert.notEqual(team.previewId, preview.previewId);
+  assert.equal(team.snapshot.sites[0].rows[0].priority, 9);
+  assert.equal(f.service.getPreview(preview.previewId).snapshot.sites[0].rows[0].priority, 1);
+  assert.equal((await post("download", { previewId: preview.previewId, allowPartial: true })).status, 200);
+  now += 15 * 60 * 1000 + 1;
+  assert.equal((await post("download", { previewId: preview.previewId, allowPartial: true })).status, 409);
+});

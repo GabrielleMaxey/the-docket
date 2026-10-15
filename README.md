@@ -247,3 +247,11 @@ Migration keeps source databases and a durable record ledger, so deleting a migr
 - **Desktop**: Electron 31 + electron-builder
 - **AI**: Anthropic / OpenAI / Ollama (configurable in `.env`)
 - **Database**: SQLite at `data/workweek.sqlite` (auto-created on first run)
+
+### Download a task workbook
+
+In Task Management, choose **Download tasks**, select saved Jira entries, and choose projects or saved presets for each entry. Local metadata is the default; Team is an explicit per-entry choice and is disabled when the Team database is unavailable. Optional filters include completed work, Docket priority, and Now / Next. Each saved entry has its own worksheet, even when entries share a Jira hostname and issue keys. Export does not change the active entry.
+
+Finish pending saves before previewing. If a save failed, retry it or explicitly choose to export saved values; unsaved edits are excluded. Review the snapshot time, entry completeness, and separate **Docket local notes**, **Team notes**, and **Latest Jira comment** columns. **Latest Jira comment only** means the most recently created comment visible to the selected Jira account, with author/date when available. Notes are text only; images and attachment files are excluded. Unavailable data is labeled, and partial or failed entries require explicit partial-download consent. Row exclusions apply to the saved entry, hostname, and issue key together.
+
+Changes to selected entries, source, scope, or filters clear the preview. Retry preview collects a new snapshot; download uses the reviewed snapshot without refreshing sources. Previews expire after fifteen minutes. If a download fails, follow its guidance to retry, refresh the preview, narrow filters, or exclude an identified oversized row. Save the `.xlsx` file and share it manually through SharePoint. A workbook is a snapshot, not real-time synchronization; the application does not upload it to SharePoint.

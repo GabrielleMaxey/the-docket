@@ -7,6 +7,7 @@ import CollapsibleSection from "../Components/CollapsibleSection";
 import JiraResultsTable from "./components/JiraResultsTable";
 import TaskManagerHeaderPanel from "./components/TaskManagerHeaderPanel";
 import JiraFilterImportModal from "./components/JiraFilterImportModal";
+import TaskExportModal from "./components/TaskExportModal";
 import CreateIssueModal from "./components/CreateIssueModal";
 import JqlControlsPanel from "./components/JqlControlsPanel";
 import WeeklyPlanPanel from "./components/WeeklyPlanPanel";
@@ -86,6 +87,7 @@ const WorkWeekTasks = () => {
     handleClearCompleted: handleTodoClearCompleted,
   } = useTodos();
   const [importSlotIndex, setImportSlotIndex] = React.useState(null);
+  const [taskExportOpen, setTaskExportOpen] = React.useState(false);
   const [createIssueOpen, setCreateIssueOpen] = React.useState(false);
   const [createIssuePrefill, setCreateIssuePrefill] = React.useState(null);
   const createIssueSourceAskIdRef = React.useRef(null);
@@ -493,6 +495,7 @@ const WorkWeekTasks = () => {
     <>
       <Container fluid className="work-week-page">
         <TaskManagerHeaderPanel
+          onDownloadTasks={() => setTaskExportOpen(true)}
           showJokeTicker={showJokeTicker}
           showUpcomingDueBanner={showUpcomingDueBanner}
           onShowJokeTickerChange={handleShowJokeTickerChange}
@@ -670,6 +673,7 @@ const WorkWeekTasks = () => {
         />
       ) : null}
 
+      <TaskExportModal open={taskExportOpen} onClose={() => setTaskExportOpen(false)} />
       <CreateIssueModal
         open={createIssueOpen}
         onClose={() => {

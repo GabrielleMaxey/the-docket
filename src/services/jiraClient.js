@@ -1192,3 +1192,23 @@ export const previewTaskExport = async ( options, { signal } = {} ) =>
     body: JSON.stringify( options ),
     signal,
   } );
+
+
+export const downloadTaskExport = async ( options, { signal } = {} ) => {
+  const response = await fetch( buildApiUrl( "/api/task-export/download" ), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+    body: JSON.stringify( options ),
+    signal,
+  } );
+  if ( !response.ok ) {
+    const data = await response.json();
+    const error = new Error( extractJiraErrorMessage( data, response.status ) );
+    error.status = response.status;
+    throw error;
+  }
+  if ( !response.headers.get( "Content-Type" )?.includes( "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ) ) {
+    throw new Error( "API did not return an XLSX workbook. Restart the local API and retry." );
+  }
+  return response.blob();
+};

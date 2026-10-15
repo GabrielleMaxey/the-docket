@@ -14,6 +14,7 @@ const PRIORITY_LABELS = {
 };
 
 const TaskManagerHeaderPanel = ({
+  onDownloadTasks,
   showJokeTicker,
   showUpcomingDueBanner,
   onShowJokeTickerChange,
@@ -50,6 +51,7 @@ const TaskManagerHeaderPanel = ({
 
   return (
     <>
+      <div className="ww-export-launch"><button type="button" className="ui button" onClick={onDownloadTasks}>Download tasks</button></div>
       <WorkWeekHeaderBanners
         showJokeTicker={showJokeTicker}
         showUpcomingDueBanner={showUpcomingDueBanner}

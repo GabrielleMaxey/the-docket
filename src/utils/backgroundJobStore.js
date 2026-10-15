@@ -6,6 +6,7 @@ export const BACKGROUND_JOB_IDS = {
   DASHBOARD_REFRESH: "dashboard-refresh",
   DASHBOARD_REPORT: "dashboard-report",
   DASHBOARD_WEEKLY_DIGEST: "dashboard-weekly-digest",
+  TASK_EXPORT: "task-export",
   WORK_WEEK_JQL: "work-week-jql-run",
   WORK_WEEK_WEEK_PLAN: "work-week-week-plan",
 };
