@@ -264,7 +264,10 @@ test("real tracking migration backfills only recoverable values and is repeatabl
 test("database integration command rejects missing dedicated fixture configuration", () => {
   const env = { ...process.env };
   delete env.DOCKET_TEST_DATABASE_URL;
-  const result = spawnSync("npm", ["run", "test:team-db"], { env, encoding: "utf8" });
+  const npmCli = process.env.npm_execpath;
+  assert.ok(npmCli, "Run via npm test, or set npm_execpath to npm-cli.js for focused node --test.");
+  const result = spawnSync(process.execPath, [npmCli, "run", "test:team-db"], { env, encoding: "utf8" });
+  assert.ifError(result.error);
   assert.equal(result.status, 1);
   assert.match(result.stdout + result.stderr, /DOCKET_TEST_DATABASE_URL is required/);
 });

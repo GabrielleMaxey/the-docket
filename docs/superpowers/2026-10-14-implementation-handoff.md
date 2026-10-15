@@ -47,6 +47,8 @@ All final commands ran with a sanitized environment and synthetic data on Node 2
 | Missing DB command regression | RED exit 1: missing script; GREEN test exit 0: command exits 1 with required-variable guidance | `command-red.log`, `command-green.log` |
 | Owned PostgreSQL shutdown | Exit 0; server stopped after checks | `postgres-stop.log` |
 
+The command regression invokes npm’s JavaScript CLI through the current Node executable, using `npm_execpath` supplied by npm. Direct focused `node --test` runs must set `npm_execpath` to the installed `npm-cli.js`; an assertion supplies that guidance when omitted. This avoids spawning Windows `npm.cmd` as an executable. The focused launch regression was verified with no npm executable on PATH; a native Windows run is still unverified.
+
 The first aggregate SQL run failed 1 of 72 cases with a serialization conflict while separate fixture files concurrently migrated/cleaned/wrote shared tables. PostgreSQL logged a canceled read/write pivot at COMMIT. The command now uses Node's `--test-concurrency=1`; existing explicit concurrent-transaction race tests still run. The final 72-case run passed; application isolation/transaction behavior was unchanged. CI explicitly blanks `DOCKET_TEST_DATABASE_URL` for the unit step, then provides it only for the separate mandatory DB step. All fixtures validate loopback, explicit port and `docket_test_*` database before destructive cleanup.
 
 Local SQL evidence is PostgreSQL **14.1**, owned fixture only, on a fresh loopback port; it does not establish PostgreSQL 16 execution. The workflow configures `postgres:16` with synthetic credentials, health checks and dynamic port, checkout v5/setup-node v6 retained from the prior workflow, Node from `.nvmrc`, PR/manual triggers and `contents: read`. No secrets, artifact uploads or packaging actions are present.
@@ -82,7 +84,7 @@ Execute the configured PostgreSQL 16 CI before merge; its local equivalent passe
 
 ## Branch and focused commits
 
-The cumulative branch begins at `d27903ee78d55b7351f7663c32786c5550f7ccbe`; C4 starts at `a6b67b6`. The final C4 commit is titled `ci: validate pull requests without company credentials`. Resolve its SHA with `git log -1`; no remote integration was performed. Earlier focused implementation/review-fix commits:
+The cumulative branch begins at `d27903ee78d55b7351f7663c32786c5550f7ccbe`; C4 starts at `a6b67b6`. The C4 CI commit is `2edff1e` — `ci: validate pull requests without company credentials`. A focused test portability correction follows it; resolve the final SHA with `git log -1`. No remote integration was performed. Focused implementation/review-fix commits:
 
 - `4b41021` — fix: restrict local API and Jira credential destinations
 - `ffc3c45` — fix: bound Jira requests and preserve uncertain write outcomes
@@ -110,6 +112,7 @@ The cumulative branch begins at `d27903ee78d55b7351f7663c32786c5550f7ccbe`; C4 s
 - `d77c5b8` — fix: retain existing note images until replacement commits
 - `4651379` — fix: pass search limits through the options contract
 - `a6b67b6` — chore: remove verified inactive application code
+- `2edff1e` — ci: validate pull requests without company credentials
 
 ## Cumulative change counts
 
@@ -119,9 +122,9 @@ Counts compare the cumulative base above to this final worktree once, including 
 | --- | ---: | ---: | ---: |
 | Dependencies/config | 2,678 | 4,647 | 9 |
 | Source/scripts | 3,413 | 28,816 | 174 |
-| Docs | 585 | 144 | 13 |
-| Tests | 4,006 | 46 | 23 |
-| Total | 10,682 | 33,653 | 219 |
+| Docs | 590 | 144 | 13 |
+| Tests | 4,009 | 46 | 23 |
+| Total | 10,690 | 33,653 | 219 |
 
 ## Changed files and line anchors
 
@@ -220,14 +223,14 @@ This exhaustive cumulative table includes modifications, additions and deletions
 | `Pages/projectManagers.css:1` (deleted) | Deleted | 0 / 1272 |
 | `Pages/reportArchive.css:1` (deleted) | Deleted | 0 / 78 |
 | `Pages/workWeekTaskElements.css:1` (deleted) | Deleted | 0 / 2522 |
-| [README.md:114](../../README.md#L114) | Modified | 127 / 5 |
+| [README.md:114](../../README.md#L114) | Modified | 129 / 5 |
 | `build/icons/icon.icns:1` (deleted) | Deleted | - / - |
 | `build/icons/icon.ico:1` (deleted) | Deleted | - / - |
 | [docs/DEVELOPER_GUIDE.md:9](../../docs/DEVELOPER_GUIDE.md#L9) | Modified | 12 / 13 |
 | [docs/END_USER_GUIDE.md:66](../../docs/END_USER_GUIDE.md#L66) | Modified | 18 / 18 |
 | [docs/JIRA_SETUP.md:112](../../docs/JIRA_SETUP.md#L112) | Modified | 7 / 33 |
 | [docs/canvases/task-manager-docs.canvas.tsx:221](../../docs/canvases/task-manager-docs.canvas.tsx#L221) | Modified | 4 / 5 |
-| [docs/superpowers/2026-10-14-implementation-handoff.md:1](../../docs/superpowers/2026-10-14-implementation-handoff.md#L1) | Created | 350 / 0 |
+| [docs/superpowers/2026-10-14-implementation-handoff.md:1](../../docs/superpowers/2026-10-14-implementation-handoff.md#L1) | Created | 353 / 0 |
 | [docs/superpowers/plans/2026-10-14-application-review.md:3](../../docs/superpowers/plans/2026-10-14-application-review.md#L3) | Modified | 17 / 13 |
 | [docs/superpowers/plans/2026-10-14-cleanup-validation.md:3](../../docs/superpowers/plans/2026-10-14-cleanup-validation.md#L3) | Modified | 2 / 0 |
 | [docs/superpowers/plans/2026-10-14-local-security.md:3](../../docs/superpowers/plans/2026-10-14-local-security.md#L3) | Modified | 4 / 0 |
@@ -341,7 +344,7 @@ This exhaustive cumulative table includes modifications, additions and deletions
 | [tests/siteOperationState.test.mjs:1](../../tests/siteOperationState.test.mjs#L1) | Created | 223 / 0 |
 | [tests/taskExport.test.mjs:1](../../tests/taskExport.test.mjs#L1) | Created | 567 / 0 |
 | [tests/taskWorkbook.test.mjs:1](../../tests/taskWorkbook.test.mjs#L1) | Created | 184 / 0 |
-| [tests/teamPriorityPostgres.test.mjs:1](../../tests/teamPriorityPostgres.test.mjs#L1) | Created | 286 / 0 |
+| [tests/teamPriorityPostgres.test.mjs:1](../../tests/teamPriorityPostgres.test.mjs#L1) | Created | 289 / 0 |
 | [tests/teamPriorityRoutes.test.mjs:1](../../tests/teamPriorityRoutes.test.mjs#L1) | Created | 160 / 0 |
 | [tests/todoMigration.test.mjs:1](../../tests/todoMigration.test.mjs#L1) | Created | 174 / 0 |
 | [tests/todoRoutes.test.mjs:1](../../tests/todoRoutes.test.mjs#L1) | Created | 244 / 0 |

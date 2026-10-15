@@ -157,6 +157,8 @@ The read-only pull-request/manual workflow runs `npm ci`, the Jira client export
 DOCKET_TEST_DATABASE_URL=postgresql://docket_test:synthetic_test_only@127.0.0.1:5432/docket_test_ci npm run test:team-db
 ```
 
+The missing-database command regression uses npm’s `npm_execpath` to run its JavaScript CLI through the current Node executable on every platform. Run tests through npm; for a focused `node --test` invocation, explicitly set `npm_execpath` to your installed `npm-cli.js`.
+
 Unit and PostgreSQL results are reported separately in CI. Company SonarQube remains a required pre-merge gate with no newly introduced Major/Critical findings; local tests and the CI workflow do not replace it. See the [implementation handoff](docs/superpowers/2026-10-14-implementation-handoff.md) for actual verification, recovery instructions and outstanding checks.
 
 ## Optional shared team data (PostgreSQL)
