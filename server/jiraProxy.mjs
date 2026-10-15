@@ -27,7 +27,7 @@ import {
   sanitizeJiraErrorData,
 } from "../shared/jiraErrorUtils.mjs";
 import { extractMediaIdFromUrl } from "./lib/jiraNoteComment.mjs";
-import { parseJiraResponse } from "./lib/jiraResponse.mjs";
+import { requestJira } from "./lib/jiraTransport.mjs";
 import {
   openInstancesMetaDb,
   initInstancesSchema,
@@ -39,8 +39,6 @@ import {
   noteImagesDirFor,
   setActiveInstanceId,
   MAX_JIRA_INSTANCES,
-  assertAllowedJiraBaseUrl,
-  getAllowedJiraHosts,
 } from "./lib/jiraInstances.mjs";
 
 import { localRequestPolicy } from "./lib/localRequestPolicy.mjs";
@@ -226,11 +224,6 @@ const ensureEnvOrRespond = (res) => {
   return true;
 };
 
-const getAuthHeader = () => {
-  const c = getCredentials();
-  return `Basic ${Buffer.from(`${c.email}:${c.apiToken}`).toString("base64")}`;
-};
-
 const activateInstance = (id) => {
   setActiveInstanceId(metaDb, id);
   openAppDbForCurrent();
@@ -238,85 +231,41 @@ const activateInstance = (id) => {
   return { mode, instanceId, displayName, baseUrl };
 };
 
-const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
-  const target = `${assertAllowedJiraBaseUrl(getCredentials().baseUrl, getAllowedJiraHosts())}${pathWithQuery}`;
-  const response = await fetch(target, {
-    method,
-    redirect: "error",
-    headers: {
-      Accept: "application/json",
-      "Accept-Language": "en-US,en;q=0.9",
-      Authorization: getAuthHeader(),
-      ...(body ? { "Content-Type": "application/json" } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-
-  const data = await parseJiraResponse(response);
-
-  if (!response.ok) {
-    const sanitized = sanitizeJiraErrorData(data);
-    if (hasOnlyWorkfrontJiraErrors(data)) {
-      log.warn(`${method} ${target} → ${response.status} (Workfront sync error suppressed)`);
-      return { ok: true, status: response.status, data: sanitized || {}, workfrontSuppressed: true };
+const jiraRequest = async (options) => {
+  const result = await requestJira({ ...options, credentials: getCredentials() });
+  const { method = "GET" } = options;
+  if (!result.ok) {
+    const sanitized = sanitizeJiraErrorData(result.data);
+    if (hasOnlyWorkfrontJiraErrors(result.data)) {
+      log.warn(`${method} Jira request → ${result.status} (Workfront sync error suppressed)`);
+      return { ok: true, status: result.status, data: sanitized || {}, workfrontSuppressed: true };
     }
-
-    const detail = sanitized?.errors || sanitized?.errorMessages || sanitized?.message;
-    log.error(`${method} ${target} → ${response.status}`, detail ? JSON.stringify(detail) : "");
-    return { ok: false, status: response.status, data: sanitized || {} };
+    log.error(`${method} Jira request → ${result.status}`);
+    return { ...result, data: sanitized || {} };
   }
-  log.debug(`${method} ${target} → ${response.status}`);
-  return { ok: true, status: response.status, data };
+  log.debug(`${method} Jira request → ${result.status}`);
+  return result;
 };
 
-// Jira uploads need X-Atlassian-Token: no-check; omit Content-Type so fetch sets the multipart boundary.
-const jiraMultipartRequest = async ({ method = "POST", pathWithQuery, formData }) => {
-  const target = `${assertAllowedJiraBaseUrl(getCredentials().baseUrl, getAllowedJiraHosts())}${pathWithQuery}`;
-  const response = await fetch(target, {
-    method,
-    redirect: "error",
-    headers: {
-      Accept: "application/json",
-      Authorization: getAuthHeader(),
-      "X-Atlassian-Token": "no-check",
-    },
-    body: formData,
-  });
-
-  const data = await parseJiraResponse(response);
-
-  if (!response.ok) {
-    const sanitized = sanitizeJiraErrorData(data);
-    log.error(`${method} ${target} → ${response.status}`);
-    return { ok: false, status: response.status, data: sanitized || {} };
+const jiraMultipartRequest = async (options) => {
+  const result = await requestJira({ method: "POST", ...options, credentials: getCredentials() });
+  if (!result.ok) {
+    log.error(`Jira upload → ${result.status}`);
+    return { ...result, data: sanitizeJiraErrorData(result.data) || {} };
   }
-  log.debug(`${method} ${target} → ${response.status}`);
-  return { ok: true, status: response.status, data };
+  log.debug(`Jira upload → ${result.status}`);
+  return result;
 };
 
 const resolveJiraAttachmentMediaId = async (attachmentId) => {
   const id = String(attachmentId || "").trim();
-  if (!id) {
-    return "";
-  }
-
-  const target = `${assertAllowedJiraBaseUrl(getCredentials().baseUrl, getAllowedJiraHosts())}/rest/api/3/attachment/content/${encodeURIComponent(id)}`;
-  const response = await fetch(target, {
-    method: "GET",
-    headers: {
-      Accept: "*/*",
-      Authorization: getAuthHeader(),
-    },
-    redirect: "manual",
+  if (!id) return "";
+  const result = await requestJira({
+    credentials: getCredentials(),
+    pathWithQuery: `/rest/api/3/attachment/content/${encodeURIComponent(id)}`,
+    responseMode: "redirect",
   });
-
-  const location = response.headers.get("location") || "";
-  const fromLocation = extractMediaIdFromUrl(location);
-  if (fromLocation) {
-    return fromLocation;
-  }
-
-  return extractMediaIdFromUrl(response.url);
+  return extractMediaIdFromUrl(result.location || "");
 };
 
 const runJiraSearchRequest = async (input, legacyOptions = {}) => {

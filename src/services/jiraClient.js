@@ -30,6 +30,12 @@ const formatErrorDetail = ( value ) => {
 };
 
 const extractJiraErrorMessage = ( data, status ) => {
+  if ( data?.code === "JIRA_TIMEOUT" )
+  {
+    return data.outcome === "unknown"
+      ? "Jira timed out. Keep your edits. The change may have succeeded in Jira; check Jira before submitting again."
+      : "Jira timed out. Keep your edits and try the read again when Jira is available.";
+  }
   if ( Array.isArray( data?.errorMessages ) && data.errorMessages.length > 0 )
   {
     const messages = filterWorkfrontErrorMessages( data.errorMessages );

@@ -1,5 +1,7 @@
-export const parseJiraResponse = async (response) => {
+export const parseJiraResponse = async (response, signal) => {
+  signal?.throwIfAborted();
   const text = await response.text();
+  signal?.throwIfAborted();
   if (!text) {
     return null;
   }

@@ -9,7 +9,7 @@ import {
   assertAllowedJiraBaseUrl,
   getAllowedJiraHosts,
 } from "../lib/jiraInstances.mjs";
-import { parseJiraResponse } from "../lib/jiraResponse.mjs";
+import { requestJira } from "../lib/jiraTransport.mjs";
 import { createLogger } from "../lib/logger.mjs";
 
 const log = createLogger("jira-instances");
@@ -131,16 +131,15 @@ export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getC
     }
 
     try {
-      const response = await fetch(`${baseUrl}/rest/api/3/myself`, {
-        redirect: "error",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Basic ${Buffer.from(`${email}:${apiToken}`).toString("base64")}`,
-        },
+      const result = await requestJira({
+        credentials: { baseUrl, email, apiToken },
+        pathWithQuery: "/rest/api/3/myself",
+        timeoutMs: env.JIRA_REQUEST_TIMEOUT_MS,
       });
-      const data = await parseJiraResponse(response);
-      if (!response.ok) {
-        return res.status(response.status).json({ error: "Connection failed. Check JIRA_API_TOKEN in the server .env and the site's email, then restart and test again" });
+      const data = result.data;
+      if (!result.ok) {
+        if (data?.code === "JIRA_TIMEOUT") return res.status(result.status).json(data);
+        return res.status(result.status).json({ error: "Connection failed. Check JIRA_API_TOKEN in the server .env and the site's email, then restart and test again" });
       }
       if (typeof data?.accountId !== "string" || !data.accountId.trim()) {
         return res.status(502).json({ error: "Jira identity could not be verified; the saved token has been preserved" });
