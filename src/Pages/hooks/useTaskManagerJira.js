@@ -292,6 +292,7 @@ export const useTaskManagerJira = () => {
   const hydratedNoteImageKeysRef = React.useRef(new Set());
   const pendingNoteImageKeepSyncKeysRef = React.useRef(new Set());
   const latestNoteDraftsRef = React.useRef(storedNotes);
+  const pendingNoteSavesRef = React.useRef(new Map());
 
   React.useEffect(() => {
     noteImagesRef.current = noteImagesByKey;
@@ -571,8 +572,9 @@ export const useTaskManagerJira = () => {
   };
 
   const scheduleNoteAutosave = React.useCallback((issueKey) => {
+    if (pendingNoteSavesRef.current.has(issueKey)) return;
     const delay = new Promise((resolve) => window.setTimeout(resolve, NOTE_AUTOSAVE_DELAY_MS));
-    runBackgroundJob(`note-autosave:${issueKey}`, {
+    const pending = runBackgroundJob(`note-autosave:${issueKey}`, {
       instanceId, siteSave: true, queue: true, label: "Saving note",
       run: async () => {
         await delay;
@@ -582,9 +584,11 @@ export const useTaskManagerJira = () => {
           await saveIssueMetadata({ issueKey, note: savedNote }, { siteContext });
         } while (String(latestNoteDraftsRef.current[issueKey] || "") !== savedNote);
       },
-    }).catch((error) => {
-      setSaveState((prev) => ({ ...prev, [issueKey]: { loading: false, error: errorMessage(error, "Failed to save note"), success: "" } }));
     });
+    pendingNoteSavesRef.current.set(issueKey, pending);
+    pending.catch((error) => {
+      setSaveState((prev) => ({ ...prev, [issueKey]: { loading: false, error: errorMessage(error, "Failed to save note"), success: "" } }));
+    }).finally(() => { pendingNoteSavesRef.current.delete(issueKey); });
   }, [instanceId, siteContext]);
 
   const handleNoteChange = (issueKey, note) => {

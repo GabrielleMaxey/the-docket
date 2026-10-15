@@ -101,7 +101,7 @@ const requestJson = async ( path, options = {} ) => {
     }
   }
   const run = () => requestJsonNow( path, { ...options, siteContext: context } );
-  const isSave = ["PUT", "PATCH", "DELETE"].includes( method ) || ( method === "POST" && !/\/(search|resolve-bulk|bulk|parent-candidates|generate-description|generate|refresh|project|gantt-summary|week|test|scope-jql|run)(\/all)?$/.test( path ) );
+  const isSave = ["PUT", "PATCH", "DELETE"].includes( method ) || ( method === "POST" && path !== "/api/jira/issue-metadata/import/preview" && !/\/(search|resolve-bulk|bulk|parent-candidates|generate-description|generate|refresh|project|gantt-summary|week|test|scope-jql|run)(\/all)?$/.test( path ) );
   return isSave ? runBackgroundJob( `site-save:${method}:${path}`, {
     instanceId: context.instanceId, siteSave: true, queue: true, label: "Saving Jira changes", run,
   } ) : run();
@@ -1201,7 +1201,10 @@ export const downloadTaskExport = async ( options, { signal } = {} ) => {
     signal,
   } );
   if ( !response.ok ) {
-    const data = await response.json();
+    const data = await response.json().catch( ( error ) => {
+      if ( !( error instanceof SyntaxError ) ) throw error;
+      return {};
+    } );
     const error = new Error( extractJiraErrorMessage( data, response.status ) );
     error.status = response.status;
     throw error;
