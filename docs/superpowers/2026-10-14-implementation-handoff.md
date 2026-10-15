@@ -1,6 +1,26 @@
 # Application review implementation handoff
 
-The approved S1–S4, T1–T2, D1–D3, E1–E3 and C1–C4 code tasks are implemented on `codex/cleanup-validation` in the isolated `docket-security/taskManager` worktree. Final local checks pass. Company SonarQube and execution of the configured PostgreSQL 16 workflow remain required before merge. Native browser saved-file completion remains a manual check. No push, merge, deployment, company database provisioning, workbook upload or installer packaging occurred.
+The approved S1–S4, T1–T2, D1–D3, E1–E3 and C1–C4 code tasks are implemented on `codex/final-review-fixes` in the isolated `docket-security/taskManager` worktree. The consolidated final-review correction wave is implemented and final local checks pass; scoped review remains pending. Company SonarQube and execution of the configured PostgreSQL 16 workflow remain required before merge. Native browser saved-file completion remains a manual check. No push, merge, deployment, company database provisioning, workbook upload or installer packaging occurred.
+
+## Consolidated final-review corrections (2026-10-15)
+
+The final review at `e74804c` identified I1–I5 and M1–M2. All seven received the narrow corrections below on `codex/final-review-fixes`. This is implementation evidence, not final review approval or merge authorization.
+
+| Finding | Correction and regression evidence |
+| --- | --- |
+| I1 | Explicit activation validates the proposed hostname before persistence. A blocked saved/legacy active site retains its local identity/data and starts Settings/local APIs/personal To Dos with a configuration error and no environment token read. Copied-code startup fixtures block every outbound attempt and prove failed activation leaves persisted ID and public generation unchanged, source data survives, and an allowed entry remains recoverable. |
+| I2 | The existing create-metadata cache clears only after successful drained activation. Same-key A→B→A tests cover component options and create payload issue-type metadata. |
+| I3 | The import preview POST is explicitly read-only. Invalid CSV creates no failed-save/export-consent job and activation succeeds; failed import commits still block switching until retried successfully. |
+| I4 | Comment chunks and create-field siblings all settle before the first rejection propagates. Deferred regressions prove A fallback requests and late cache fills complete before B activates or A's DB closes. |
+| I5 | Rovo MCP fetch and response-body consumption share a finite abort deadline, default 30 seconds, configurable through `ROVO_REQUEST_TIMEOUT_MS`. The handler waits for actual aborted-body settlement before releasing its site lease; there is no automatic replay. Longer legitimate responses may require a larger setting. Other provider behavior is unchanged. |
+| M1 | Each mounted page coalesces outstanding autosaves per issue while retaining the captured site and existing queued job across navigation. A 100-edit regression requires only the latest initial write, one in-flight update, and the remounted page's final write; failure retry still clears the save barrier. |
+| M2 | Empty/non-JSON binary errors preserve HTTP status with a safe generic message; raw HTML/text is not surfaced. The actual modal download handler invalidates a non-JSON 409 preview. JSON errors keep their useful messages. |
+
+Final-wave validation uses synthetic transport and copied-code temporary loopback fixtures only. `npm test` passed **608 tests: 598 passes, 10 explicit SQL skips, zero failures** (exit 0; `/private/tmp/docket-final-unit-final.log`). `npm run build` passed, including Node and client-export checks (exit 0; `/private/tmp/docket-final-build.log`). Focused server regressions passed 61/61 and focused client regressions 5/5; the final full run also includes the updated no-token-read assertion. The first full run failed only the superseded startup-throws expectation; its replacement retains the stronger no-token-read requirement and was independently observed RED then GREEN before the final full run.
+
+No database schema, SQL or transaction code changed, so the earlier PostgreSQL 14.1 integration evidence below was retained rather than rerun. PostgreSQL 16 CI remains unexecuted. The existing CommonJS/ESM ExperimentalWarning and expected negative-case logs remain. No scanner/source upload, install, live-service call, native-file-save test, push, merge or deployment was performed in this wave. SonarQube, native file-save/open, native Windows and company-environment limitations remain exactly as recorded below.
+
+Focused final-wave commits: `6839df0` (site recovery/lifetime/cache/Rovo) and `21d07c2` (client preview/notes/download). The following documentation commit refreshes this handoff and cumulative inventory; use `git log -1` for its final SHA. Detailed finding anchors, red/green evidence, command statuses and limitations are recorded in `/private/tmp/docket-final-fix-report.md`.
 
 ## Original findings and task dispositions
 
@@ -120,11 +140,11 @@ Counts compare the cumulative base above to this final worktree once, including 
 
 | Category | Added | Removed | Files |
 | --- | ---: | ---: | ---: |
-| Dependencies/config | 2,678 | 4,647 | 9 |
-| Source/scripts | 3,413 | 28,816 | 174 |
-| Docs | 590 | 144 | 13 |
-| Tests | 4,009 | 46 | 23 |
-| Total | 10,690 | 33,653 | 219 |
+| Dependencies/config | 2,681 | 4,647 | 9 |
+| Source/scripts | 3,480 | 28,851 | 177 |
+| Docs | 615 | 144 | 13 |
+| Tests | 4,338 | 46 | 25 |
+| Total | 11,114 | 33,688 | 224 |
 
 ## Changed files and line anchors
 
@@ -132,7 +152,7 @@ This exhaustive cumulative table includes modifications, additions and deletions
 
 | File / first changed line | Change | + / − |
 | --- | --- | --- |
-| [.env.example:22](../../.env.example#L22) | Modified | 5 / 7 |
+| [.env.example:22](../../.env.example#L22) | Modified | 8 / 7 |
 | `.github/workflows/desktop-packaging.yml:1` (deleted) | Deleted | 0 / 79 |
 | [.github/workflows/validate.yml:1](../../.github/workflows/validate.yml#L1) | Created | 48 / 0 |
 | [.gitignore:57](../../.gitignore#L57) | Modified | 3 / 0 |
@@ -230,7 +250,7 @@ This exhaustive cumulative table includes modifications, additions and deletions
 | [docs/END_USER_GUIDE.md:66](../../docs/END_USER_GUIDE.md#L66) | Modified | 18 / 18 |
 | [docs/JIRA_SETUP.md:112](../../docs/JIRA_SETUP.md#L112) | Modified | 7 / 33 |
 | [docs/canvases/task-manager-docs.canvas.tsx:221](../../docs/canvases/task-manager-docs.canvas.tsx#L221) | Modified | 4 / 5 |
-| [docs/superpowers/2026-10-14-implementation-handoff.md:1](../../docs/superpowers/2026-10-14-implementation-handoff.md#L1) | Created | 353 / 0 |
+| [docs/superpowers/2026-10-14-implementation-handoff.md:1](../../docs/superpowers/2026-10-14-implementation-handoff.md#L1) | Created | 378 / 0 |
 | [docs/superpowers/plans/2026-10-14-application-review.md:3](../../docs/superpowers/plans/2026-10-14-application-review.md#L3) | Modified | 17 / 13 |
 | [docs/superpowers/plans/2026-10-14-cleanup-validation.md:3](../../docs/superpowers/plans/2026-10-14-cleanup-validation.md#L3) | Modified | 2 / 0 |
 | [docs/superpowers/plans/2026-10-14-local-security.md:3](../../docs/superpowers/plans/2026-10-14-local-security.md#L3) | Modified | 4 / 0 |
@@ -250,17 +270,20 @@ This exhaustive cumulative table includes modifications, additions and deletions
 | [server/db/team/001-team-metadata.sql:1](../../server/db/team/001-team-metadata.sql#L1) | Created | 32 / 0 |
 | [server/db/team/002-tracking-presence.sql:1](../../server/db/team/002-tracking-presence.sql#L1) | Created | 9 / 0 |
 | [server/db/todoDatabase.mjs:1](../../server/db/todoDatabase.mjs#L1) | Created | 117 / 0 |
-| [server/jiraProxy.mjs:1](../../server/jiraProxy.mjs#L1) | Modified | 74 / 99 |
+| [server/jiraProxy.mjs:1](../../server/jiraProxy.mjs#L1) | Modified | 79 / 99 |
 | [server/lib/issueImportPreview.mjs:1](../../server/lib/issueImportPreview.mjs#L1) | Created | 74 / 0 |
 | [server/lib/issueMetadataImport.mjs:2](../../server/lib/issueMetadataImport.mjs#L2) | Modified | 83 / 51 |
 | [server/lib/issueMetadataStore.mjs:1](../../server/lib/issueMetadataStore.mjs#L1) | Created | 53 / 0 |
-| [server/lib/jiraInstances.mjs:7](../../server/lib/jiraInstances.mjs#L7) | Modified | 107 / 28 |
+| [server/lib/jiraCommentText.mjs:243](../../server/lib/jiraCommentText.mjs#L243) | Modified | 4 / 2 |
+| [server/lib/jiraCreateIssueFields.mjs:89](../../server/lib/jiraCreateIssueFields.mjs#L89) | Modified | 5 / 1 |
+| [server/lib/jiraInstances.mjs:7](../../server/lib/jiraInstances.mjs#L7) | Modified | 123 / 45 |
 | [server/lib/jiraResponse.mjs:1](../../server/lib/jiraResponse.mjs#L1) | Modified | 3 / 1 |
 | [server/lib/jiraSearchHelpers.mjs:234](../../server/lib/jiraSearchHelpers.mjs#L234) | Modified | 28 / 14 |
 | [server/lib/jiraTransport.mjs:1](../../server/lib/jiraTransport.mjs#L1) | Created | 72 / 0 |
 | [server/lib/localRequestPolicy.mjs:1](../../server/lib/localRequestPolicy.mjs#L1) | Created | 41 / 0 |
 | [server/lib/noteImageStore.mjs:3](../../server/lib/noteImageStore.mjs#L3) | Modified | 61 / 24 |
-| [server/lib/siteOperationState.mjs:1](../../server/lib/siteOperationState.mjs#L1) | Created | 74 / 0 |
+| [server/lib/rovoMcpClient.mjs:53](../../server/lib/rovoMcpClient.mjs#L53) | Modified | 27 / 15 |
+| [server/lib/siteOperationState.mjs:1](../../server/lib/siteOperationState.mjs#L1) | Created | 76 / 0 |
 | [server/lib/taskExport.mjs:1](../../server/lib/taskExport.mjs#L1) | Created | 284 / 0 |
 | [server/lib/taskWorkbook.mjs:1](../../server/lib/taskWorkbook.mjs#L1) | Created | 137 / 0 |
 | `server/lib/teamPriorityMongo.mjs:1` (deleted) | Deleted | 0 / 364 |
@@ -273,7 +296,7 @@ This exhaustive cumulative table includes modifications, additions and deletions
 | [server/routes/epicWorkloadRoutes.mjs:29](../../server/routes/epicWorkloadRoutes.mjs#L29) | Modified | 5 / 5 |
 | [server/routes/issueMetadataRoutes.mjs:1](../../server/routes/issueMetadataRoutes.mjs#L1) | Modified | 85 / 225 |
 | [server/routes/jiraCoreRoutes.mjs:12](../../server/routes/jiraCoreRoutes.mjs#L12) | Modified | 15 / 15 |
-| [server/routes/jiraInstanceRoutes.mjs:9](../../server/routes/jiraInstanceRoutes.mjs#L9) | Modified | 75 / 77 |
+| [server/routes/jiraInstanceRoutes.mjs:9](../../server/routes/jiraInstanceRoutes.mjs#L9) | Modified | 76 / 77 |
 | [server/routes/jiraIssueRoutes.mjs:148](../../server/routes/jiraIssueRoutes.mjs#L148) | Modified | 17 / 17 |
 | [server/routes/pmAsksRoutes.mjs:20](../../server/routes/pmAsksRoutes.mjs#L20) | Modified | 9 / 9 |
 | [server/routes/reportRoutes.mjs:258](../../server/routes/reportRoutes.mjs#L258) | Modified | 25 / 25 |
@@ -313,11 +336,11 @@ This exhaustive cumulative table includes modifications, additions and deletions
 | `src/Pages/hooks/useEpicFilters.js:1` (deleted) | Deleted | 0 / 56 |
 | [src/Pages/hooks/usePersistedState.js:1](../../src/Pages/hooks/usePersistedState.js#L1) | Modified | 7 / 4 |
 | `src/Pages/hooks/useReminders.js:1` (deleted) | Deleted | 0 / 101 |
-| [src/Pages/hooks/useTaskManagerJira.js:1](../../src/Pages/hooks/useTaskManagerJira.js#L1) | Modified | 57 / 67 |
+| [src/Pages/hooks/useTaskManagerJira.js:1](../../src/Pages/hooks/useTaskManagerJira.js#L1) | Modified | 61 / 67 |
 | [src/Pages/hooks/useTodos.js:1](../../src/Pages/hooks/useTodos.js#L1) | Modified | 1 / 180 |
 | [src/Pages/workWeekTaskElements.css:2697](../../src/Pages/workWeekTaskElements.css#L2697) | Modified | 11 / 0 |
 | [src/context/TodosContext.jsx:1](../../src/context/TodosContext.jsx#L1) | Created | 127 / 0 |
-| [src/services/jiraClient.js:1](../../src/services/jiraClient.js#L1) | Modified | 158 / 61 |
+| [src/services/jiraClient.js:1](../../src/services/jiraClient.js#L1) | Modified | 161 / 61 |
 | [src/utils/backgroundJobStore.js:1](../../src/utils/backgroundJobStore.js#L1) | Modified | 25 / 5 |
 | [src/utils/chatSessionContext.js:1](../../src/utils/chatSessionContext.js#L1) | Modified | 8 / 7 |
 | [src/utils/jiraIssueDoneDates.js:1](../../src/utils/jiraIssueDoneDates.js#L1) | Modified | 8 / 6 |
@@ -330,6 +353,7 @@ This exhaustive cumulative table includes modifications, additions and deletions
 | [tests/appConfigRoutes.test.mjs:8](../../tests/appConfigRoutes.test.mjs#L8) | Modified | 69 / 2 |
 | [tests/electronContentSecurityPolicy.test.mjs:1](../../tests/electronContentSecurityPolicy.test.mjs#L1) | Created | 97 / 0 |
 | [tests/electronNavigationPolicy.test.mjs:1](../../tests/electronNavigationPolicy.test.mjs#L1) | Created | 131 / 0 |
+| [tests/finalReviewClient.test.mjs:1](../../tests/finalReviewClient.test.mjs#L1) | Created | 136 / 0 |
 | [tests/issueImportPreview.test.mjs:1](../../tests/issueImportPreview.test.mjs#L1) | Created | 335 / 0 |
 | [tests/issueMetadataFields.test.mjs:1](../../tests/issueMetadataFields.test.mjs#L1) | Created | 276 / 0 |
 | [tests/issueMetadataImport.test.mjs:134](../../tests/issueMetadataImport.test.mjs#L134) | Modified | 53 / 0 |
@@ -337,11 +361,12 @@ This exhaustive cumulative table includes modifications, additions and deletions
 | [tests/issueMetadataStore.test.mjs:1](../../tests/issueMetadataStore.test.mjs#L1) | Created | 97 / 0 |
 | [tests/jiraAttachments.test.mjs:127](../../tests/jiraAttachments.test.mjs#L127) | Modified | 80 / 0 |
 | [tests/jiraInstances.test.mjs:85](../../tests/jiraInstances.test.mjs#L85) | Modified | 54 / 35 |
+| [tests/jiraRecoveryStartup.test.mjs:1](../../tests/jiraRecoveryStartup.test.mjs#L1) | Created | 83 / 0 |
 | [tests/jiraTransport.test.mjs:1](../../tests/jiraTransport.test.mjs#L1) | Created | 143 / 0 |
-| [tests/localRequestPolicy.test.mjs:1](../../tests/localRequestPolicy.test.mjs#L1) | Created | 205 / 0 |
+| [tests/localRequestPolicy.test.mjs:1](../../tests/localRequestPolicy.test.mjs#L1) | Created | 208 / 0 |
 | [tests/noteImageStore.test.mjs:1](../../tests/noteImageStore.test.mjs#L1) | Modified | 112 / 1 |
 | [tests/siteContextStore.test.mjs:1](../../tests/siteContextStore.test.mjs#L1) | Created | 214 / 0 |
-| [tests/siteOperationState.test.mjs:1](../../tests/siteOperationState.test.mjs#L1) | Created | 223 / 0 |
+| [tests/siteOperationState.test.mjs:1](../../tests/siteOperationState.test.mjs#L1) | Created | 330 / 0 |
 | [tests/taskExport.test.mjs:1](../../tests/taskExport.test.mjs#L1) | Created | 567 / 0 |
 | [tests/taskWorkbook.test.mjs:1](../../tests/taskWorkbook.test.mjs#L1) | Created | 184 / 0 |
 | [tests/teamPriorityPostgres.test.mjs:1](../../tests/teamPriorityPostgres.test.mjs#L1) | Created | 289 / 0 |
