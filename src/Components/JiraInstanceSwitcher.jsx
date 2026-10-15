@@ -1,13 +1,31 @@
 import React from "react";
 import { activateJiraInstance, fetchJiraInstances } from "../services/jiraClient.js";
 
+const LOAD_ATTEMPTS = 8;
+const LOAD_RETRY_MS = 250;
+
+const loadInstances = async () => {
+  let lastError;
+  for (let attempt = 0; attempt < LOAD_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetchJiraInstances();
+    } catch (error) {
+      lastError = error;
+      if (attempt < LOAD_ATTEMPTS - 1) {
+        await new Promise((resolve) => setTimeout(resolve, LOAD_RETRY_MS));
+      }
+    }
+  }
+  throw lastError;
+};
+
 const JiraInstanceSwitcher = () => {
   const [state, setState] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
-    fetchJiraInstances()
+    loadInstances()
       .then((data) => {
         if (!cancelled) setState(data);
       })
