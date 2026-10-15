@@ -1,3 +1,4 @@
+import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { createLogger } from "../lib/logger.mjs";
 const log = createLogger( "config" );
@@ -247,7 +248,8 @@ const normalizeEpicPresetPayload = ( body, existing = null ) => {
     };
   };
 
-export const registerAppConfigRoutes = ( app, { withSiteOperation = (handler) => handler, getDb, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest } ) => {
+export const registerAppConfigRoutes = ( app, context ) => {
+  const { withSiteOperation = (handler) => handler, getDb, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest } = context;
   app.get( "/api/epic-presets", withSiteOperation(( _req, res ) => {
     const items = createStatements( getDb() ).listEpicPresetsStmt.all().map( mapEpicPresetRow );
     return res.json( { items } );
@@ -652,6 +654,7 @@ export const registerAppConfigRoutes = ( app, { withSiteOperation = (handler) =>
   }) );
 
   app.get( "/api/jira/field-mappings", withSiteOperation(( _req, res ) => {
+    const { getDb } = getRequestOperationContext( _req, context );
     const items = createStatements( getDb() ).listFieldMappingsStmt.all().map( ( row ) => ( {
       role: row.role,
       fieldId: String( row.field_id || "" ).trim(),
@@ -777,6 +780,7 @@ export const registerAppConfigRoutes = ( app, { withSiteOperation = (handler) =>
   }) );
 
   app.get( "/api/settings", withSiteOperation(( _req, res ) => {
+    const { getDb } = getRequestOperationContext( _req, context );
     return res.json( { settings: readSettingsMap( createStatements( getDb() ) ) } );
   }) );
 

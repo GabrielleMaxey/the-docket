@@ -12,7 +12,7 @@ export const registerCombinedOpenWorkRoutes = (app, context) => {
       if (!req.body || typeof req.body !== "object" || Array.isArray(req.body) || Object.keys(req.body).some(key => key !== "instanceIds")) {
         throw Object.assign(new TypeError("Submit only instanceIds for saved Jira entries."), { status: 400 });
       }
-      const result = await collectCombinedOpenWork({ metaDb: context.metaDb, env: context.env, requestJira: context.requestJira, instanceIds: req.body.instanceIds, signal: controller.signal });
+      const result = await collectCombinedOpenWork({ metaDb: context.metaDb, dataDir: context.dataDir, env: context.env, requestJira: context.requestJira, instanceIds: req.body.instanceIds, signal: controller.signal });
       if (!controller.signal.aborted && !res.headersSent) res.json(result);
     } catch (error) {
       if (!controller.signal.aborted) res.status(error.status === 400 ? 400 : 500).json({ error: error.status === 400 ? error.message : "Combined open work unavailable. Retry the selection." });

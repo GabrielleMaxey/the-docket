@@ -1,3 +1,4 @@
+import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 import {
   getTeamMetadata,
   teamDatabaseError,
@@ -45,7 +46,8 @@ const withTeamDatabase = (label, handler) => async (req, res) => {
   }
 };
 
-export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) => handler, getDb, resolveCurrentJiraUser, getSiteContext }) => {
+export const registerTeamPriorityRoutes = (app, context) => {
+  const { withSiteOperation = (handler) => handler, getDb, getSiteContext } = context;
   app.get("/api/team-priority/health", withSiteOperation(async (_req, res) => {
     const status = await getTeamStatus();
     return res.json({
@@ -126,11 +128,13 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
   );
 
   app.get("/api/shared-programs", withSiteOperation(withTeamDatabase("list shared programs", async (_req, res) => {
+    const { getSiteContext } = getRequestOperationContext(_req, context);
     const items = await listSharedPrograms(getSiteContext().siteHost);
     return res.json({ items });
   })));
 
   app.post("/api/team-priority/metadata/bulk", withSiteOperation(withTeamDatabase("fetch team metadata", async (req, res) => {
+    const { getSiteContext } = getRequestOperationContext(req, context);
     const items = await getTeamMetadata({ siteHost: getSiteContext().siteHost, issueKeys: req.body?.issueKeys });
     return res.json({ items });
   })));
@@ -138,6 +142,7 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
   app.post(
     "/api/team-priority/bulk",
     withSiteOperation(withTeamDatabase("fetch team priorities", async (req, res) => {
+      const { getSiteContext } = getRequestOperationContext(req, context);
       const issueKeys = Array.isArray(req.body?.issueKeys) ? req.body.issueKeys : [];
       const items = await bulkGetTeamPriorities(issueKeys, getSiteContext().siteHost);
       return res.json({ items });
@@ -147,6 +152,7 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
   app.put(
     "/api/team-priority/:issueKey",
     withSiteOperation(withTeamDatabase("update team priority", async (req, res) => {
+      const { resolveCurrentJiraUser, getSiteContext } = getRequestOperationContext(req, context);
       const updatedBy = await resolveUpdatedBy(resolveCurrentJiraUser);
 
       const result = await putTeamPriority({
@@ -162,6 +168,7 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
   app.post(
     "/api/team-priority/dates/bulk",
     withSiteOperation(withTeamDatabase("fetch team dates", async (req, res) => {
+      const { getSiteContext } = getRequestOperationContext(req, context);
       const issueKeys = Array.isArray(req.body?.issueKeys) ? req.body.issueKeys : [];
       const items = await bulkGetTeamDates(issueKeys, getSiteContext().siteHost);
       return res.json({ items });
@@ -171,6 +178,7 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
   app.put(
     "/api/team-priority/dates/:issueKey",
     withSiteOperation(withTeamDatabase("update team date tracking", async (req, res) => {
+      const { resolveCurrentJiraUser, getSiteContext } = getRequestOperationContext(req, context);
       const fields = ["followUp", "startDate", "completeDate", "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
       const hasAny = fields.some((f) => req.body?.[f] !== undefined);
       if (!hasAny) {
@@ -192,6 +200,7 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
   app.delete(
     "/api/team-priority/dates/:issueKey",
     withSiteOperation(withTeamDatabase("clear team date tracking", async (req, res) => {
+      const { getSiteContext } = getRequestOperationContext(req, context);
       const result = await deleteTeamDate({ siteHost: getSiteContext().siteHost, issueKey: req.params.issueKey });
       return res.json(result);
     }))

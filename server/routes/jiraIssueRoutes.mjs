@@ -1,3 +1,4 @@
+import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 import { createLogger } from "../lib/logger.mjs";
 import {
   completeLlmText,
@@ -145,8 +146,9 @@ const buildGenerateDescriptionResponse = (parsed, { isStory, isBug, allowSummary
 
 export const registerJiraIssueRoutes = (
   app,
-  { withSiteOperation = (handler) => handler, getDb, jiraRequest, ensureEnvOrRespond, resolveJiraUser, runJiraSearchRequest }
+  context
 ) => {
+  const { withSiteOperation = (handler) => handler, getDb, jiraRequest, ensureEnvOrRespond, resolveJiraUser, runJiraSearchRequest } = context;
   app.get("/api/jira/projects", withSiteOperation(async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
@@ -272,6 +274,7 @@ export const registerJiraIssueRoutes = (
   }));
 
   app.get("/api/jira/issues/:issueKey/summary", withSiteOperation(async (req, res) => {
+    const { jiraRequest, ensureEnvOrRespond } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -297,6 +300,7 @@ export const registerJiraIssueRoutes = (
   }));
 
   app.get("/api/jira/epics/:epicKey/parent-options", withSiteOperation(async (req, res) => {
+    const { jiraRequest, ensureEnvOrRespond, runJiraSearchRequest } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -346,6 +350,7 @@ export const registerJiraIssueRoutes = (
   }));
 
   app.post("/api/jira/issues/parent-candidates", withSiteOperation(async (req, res) => {
+    const { getDb, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }

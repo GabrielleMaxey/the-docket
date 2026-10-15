@@ -1,3 +1,4 @@
+import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 import { getLocalMetadata, writeLocalMetadata } from "../lib/issueMetadataStore.mjs";
 import { finished } from "node:stream/promises";
 // Issue mutations (comment, status, assignee) and SQLite note/priority metadata.
@@ -71,8 +72,9 @@ const setKeepNoteImages = (db, payload) =>
 
 export const registerIssueMetadataRoutes = (
   app,
-  { withSiteOperation = (handler) => handler, getDb, getSiteContext, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, getNoteImagesDir }
+  context
 ) => {
+  const { withSiteOperation = (handler) => handler, getDb, getSiteContext } = context;
   const isUnassignAssigneeRequest = (value) => {
     const normalized = String(value || "").trim().toLowerCase();
     return normalized === "unassigned" || normalized === "__unassigned__";
@@ -83,6 +85,7 @@ export const registerIssueMetadataRoutes = (
     uploadNoteImages.array("images", NOTE_IMAGE_MAX_COUNT),
     handleNoteImageUploadError,
     withSiteOperation(async (req, res) => {
+      const { getDb, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, getNoteImagesDir } = getRequestOperationContext(req, context);
       if (!ensureEnvOrRespond(res)) {
         return;
       }
@@ -136,6 +139,7 @@ export const registerIssueMetadataRoutes = (
   );
 
   app.post("/api/jira/issues/:issueKey/status", withSiteOperation(async (req, res) => {
+    const { jiraRequest, ensureEnvOrRespond } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -212,6 +216,7 @@ export const registerIssueMetadataRoutes = (
   }));
 
   app.post("/api/jira/issues/:issueKey/assignee", withSiteOperation(async (req, res) => {
+    const { jiraRequest, ensureEnvOrRespond, resolveJiraUser } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -289,6 +294,7 @@ export const registerIssueMetadataRoutes = (
   }));
 
   app.post("/api/jira/issues/comments/latest/bulk", withSiteOperation(async (req, res) => {
+    const { jiraRequest, ensureEnvOrRespond } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -315,6 +321,7 @@ export const registerIssueMetadataRoutes = (
   }));
 
   app.post("/api/jira/issue-metadata/bulk", withSiteOperation((req, res) => {
+    const { getDb } = getRequestOperationContext(req, context);
     const issueKeys = Array.isArray(req.body?.issueKeys)
       ? req.body.issueKeys
           .map((key) => String(key || "").trim())
@@ -331,6 +338,7 @@ export const registerIssueMetadataRoutes = (
   }));
 
   app.get("/api/jira/issue-metadata/recent-notes", withSiteOperation((req, res) => {
+    const { getDb } = getRequestOperationContext(req, context);
     const since = String(req.query?.since || "").trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
       return res.status(400).json({ error: "Query param 'since' must be a YYYY-MM-DD date." });
@@ -348,6 +356,7 @@ export const registerIssueMetadataRoutes = (
   }));
 
   app.patch("/api/jira/issue-metadata/:issueKey/pin-gantt", withSiteOperation((req, res) => {
+    const { getDb } = getRequestOperationContext(req, context);
     const issueKey = String(req.params.issueKey || "").trim().toUpperCase();
     if (!issueKey) return res.status(400).json({ error: "Missing issue key" });
     const pinned = Boolean(req.body?.pinned);
@@ -405,6 +414,7 @@ export const registerIssueMetadataRoutes = (
   })));
 
   app.get("/api/jira/issue-metadata/:issueKey/images/:id", withSiteOperation(async (req, res) => {
+    const { getDb } = getRequestOperationContext(req, context);
     const issueKey = String(req.params.issueKey || "").trim();
     const id = Number(req.params.id);
 
@@ -442,6 +452,7 @@ export const registerIssueMetadataRoutes = (
     uploadNoteImages.array("images", NOTE_IMAGE_MAX_COUNT),
     handleNoteImageUploadError,
     withSiteOperation((req, res) => {
+      const { getDb, getNoteImagesDir } = getRequestOperationContext(req, context);
       const issueKey = String(req.params.issueKey || "").trim();
       if (!issueKey) {
         return res.status(400).json({ error: "Missing issue key" });
@@ -467,6 +478,7 @@ export const registerIssueMetadataRoutes = (
   );
 
   app.delete("/api/jira/issue-metadata/:issueKey/images", withSiteOperation((req, res) => {
+    const { getDb, getNoteImagesDir } = getRequestOperationContext(req, context);
     const issueKey = String(req.params.issueKey || "").trim();
     if (!issueKey) {
       return res.status(400).json({ error: "Missing issue key" });
@@ -481,6 +493,7 @@ export const registerIssueMetadataRoutes = (
   }));
 
   app.put("/api/jira/issue-metadata/:issueKey", withSiteOperation((req, res) => {
+    const { getDb } = getRequestOperationContext(req, context);
     const issueKey = String(req.params.issueKey || "").trim();
     if (!issueKey) {
       return res.status(400).json({ error: "Missing issue key" });
@@ -504,6 +517,7 @@ export const registerIssueMetadataRoutes = (
   // Pushes a date-valued Jira field (Due date or MRD) directly to Jira — respects
   // Settings → field mappings so a remapped MRD field ID is honored, not hardcoded.
   app.post("/api/jira/issues/:issueKey/date-field", withSiteOperation(async (req, res) => {
+    const { getDb, jiraRequest, ensureEnvOrRespond } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
