@@ -14,6 +14,7 @@ const PRIORITY_LABELS = {
 };
 
 const TaskManagerHeaderPanel = ({
+  onDownloadTasks,
   showJokeTicker,
   showUpcomingDueBanner,
   onShowJokeTickerChange,
@@ -32,6 +33,10 @@ const TaskManagerHeaderPanel = ({
   todayDay,
   todos,
   todosError,
+  todosRecoveryNotice,
+  todosLoading,
+  onTodoRetry,
+  onTodoReload,
   canAddTodo,
   onTodoTextChange,
   onTodoPriorityChange,
@@ -46,6 +51,7 @@ const TaskManagerHeaderPanel = ({
 
   return (
     <>
+      <div className="ww-export-launch"><button type="button" className="ui button" onClick={onDownloadTasks}>Download tasks</button></div>
       <WorkWeekHeaderBanners
         showJokeTicker={showJokeTicker}
         showUpcomingDueBanner={showUpcomingDueBanner}
@@ -106,64 +112,76 @@ const TaskManagerHeaderPanel = ({
                   <div className="ww-reminders-block">
                     <p className="ww-reminders-label">To Do</p>
                     {todosError ? (
-                      <p className="ww-todo-error">{todosError}</p>
+                      <p className="ww-todo-error" role="alert">{todosError} <button type="button" onClick={onTodoReload} disabled={todosLoading}>Retry loading</button></p>
                     ) : null}
+                    {todosRecoveryNotice && <p role="status">{todosRecoveryNotice}</p>}
+                    {todosLoading && <p role="status">Loading To Dos…</p>}
                     <ul className="ww-reminders-list">
                       {(todos || []).map((row) => (
                         <li
-                          key={row._index}
-                          className={`ww-reminder-row ww-todo-row${row.done ? " ww-reminder-row-done" : ""}`}
+                          key={row.clientId}
+                          className={`ww-reminder-row${row.done ? " ww-reminder-row-done" : ""}`}
                         >
-                          <input
-                            type="checkbox"
-                            className="ww-reminder-check"
-                            checked={row.done}
-                            onChange={(e) => onTodoDoneChange(row._index, e.target.checked)}
-                            disabled={!String(row.text || "").trim()}
-                            title={
-                              !String(row.text || "").trim()
-                                ? "Enter a to do before marking it done."
-                                : undefined
-                            }
-                            aria-label={`To do ${row._index + 1} done`}
-                          />
-                          <input
-                            type="text"
-                            className="ww-reminder-input ww-todo-text"
-                            value={row.text}
-                            onChange={(e) => onTodoTextChange(row._index, e.target.value)}
-                            placeholder="To do…"
-                            aria-label={`To do ${row._index + 1} text`}
-                            disabled={row.done}
-                          />
-                          <select
-                            className="ww-todo-priority"
-                            value={row.priority}
-                            onChange={(e) => onTodoPriorityChange(row._index, e.target.value)}
-                            aria-label={`To do ${row._index + 1} priority`}
-                            disabled={row.done}
-                          >
-                            {[1, 2, 3, 4, 5].map((p) => (
-                              <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
-                            ))}
-                          </select>
-                          <input
-                            type="date"
-                            className="ww-todo-due"
-                            value={row.dueDate || ""}
-                            onChange={(e) => onTodoDueDateChange(row._index, e.target.value)}
-                            aria-label={`To do ${row._index + 1} due date`}
-                            disabled={row.done}
-                          />
-                          <button
-                            type="button"
-                            className="ww-todo-delete"
-                            onClick={() => onTodoDelete(row._index)}
-                            aria-label={`Delete to do ${row._index + 1}`}
-                            title="Delete"
-                          >
-                            ×
-                          </button>
+                          <div className="ww-todo-row">
+                            <input
+                              type="checkbox"
+                              className="ww-reminder-check"
+                              checked={row.done}
+                              onChange={(e) => onTodoDoneChange(row._index, e.target.checked)}
+                              disabled={row.deleting || !String(row.text || "").trim()}
+                              title={
+                                !String(row.text || "").trim()
+                                  ? "Enter a to do before marking it done."
+                                  : undefined
+                              }
+                              aria-label={`To do ${row._index + 1} done`}
+                            />
+                            <input
+                              type="text"
+                              className="ww-reminder-input ww-todo-text"
+                              value={row.text}
+                              onChange={(e) => onTodoTextChange(row._index, e.target.value)}
+                              placeholder="To do…"
+                              aria-label={`To do ${row._index + 1} text`}
+                              disabled={row.done || row.deleting}
+                            />
+                            <select
+                              className="ww-todo-priority"
+                              value={row.priority}
+                              onChange={(e) => onTodoPriorityChange(row._index, e.target.value)}
+                              aria-label={`To do ${row._index + 1} priority`}
+                              disabled={row.done || row.deleting}
+                            >
+                              {[1, 2, 3, 4, 5].map((p) => (
+                                <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
+                              ))}
+                            </select>
+                            <input
+                              type="date"
+                              className="ww-todo-due"
+                              value={row.dueDate || ""}
+                              onChange={(e) => onTodoDueDateChange(row._index, e.target.value)}
+                              aria-label={`To do ${row._index + 1} due date`}
+                              disabled={row.done || row.deleting}
+                            />
+                            <button
+                              type="button"
+                              className="ww-todo-delete"
+                              onClick={() => onTodoDelete(row._index)}
+                              aria-label={`Delete to do ${row._index + 1}`}
+                              title="Delete"
+                              disabled={row.deleting}
+                            >
+                              ×
+                            </button>
+                          </div>
+                          {row.saveError ? (
+                            <p className="ww-todo-error" role="alert">
+                              {row.saveError} <button type="button" onClick={() => onTodoRetry(row._index)}>Retry</button>
+                            </p>
+                          ) : row.saving ? (
+                            <span role="status">{row.deleting ? "Deleting…" : "Saving…"}</span>
+                          ) : null}
                         </li>
                       ))}
                     </ul>

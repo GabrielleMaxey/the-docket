@@ -1,3 +1,4 @@
+import { getSiteContext, siteStorageKey, readSiteStorage } from "../../utils/siteContextStore.js";
 import React from "react";
 
 const isIssueOpen = (issue) => {
@@ -45,24 +46,25 @@ const CapacityRow = ({ label, current, limit, onLimitChange, limitTitle }) => {
 };
 
 const JqlRunMetrics = ({ run }) => {
+  const instanceId = React.useRef(getSiteContext()?.instanceId).current;
   const [maxCapacity, setMaxCapacity] = React.useState(() => {
-    const v = parseInt(localStorage.getItem("ic-max-capacity"), 10);
+    const v = parseInt(readSiteStorage(localStorage, "ic-max-capacity", instanceId), 10);
     return v > 0 ? v : CAPACITY_DEFAULT;
   });
   const [wipLimit, setWipLimit] = React.useState(() => {
-    const v = parseInt(localStorage.getItem("ic-wip-limit"), 10);
+    const v = parseInt(readSiteStorage(localStorage, "ic-wip-limit", instanceId), 10);
     return v > 0 ? v : WIP_DEFAULT;
   });
 
   const handleCapacityChange = (e) => {
     const n = Math.max(1, parseInt(e.target.value, 10) || 1);
     setMaxCapacity(n);
-    localStorage.setItem("ic-max-capacity", String(n));
+    localStorage.setItem(siteStorageKey("ic-max-capacity", instanceId), String(n));
   };
   const handleWipChange = (e) => {
     const n = Math.max(1, parseInt(e.target.value, 10) || 1);
     setWipLimit(n);
-    localStorage.setItem("ic-wip-limit", String(n));
+    localStorage.setItem(siteStorageKey("ic-wip-limit", instanceId), String(n));
   };
 
   const issues = run.issues || [];

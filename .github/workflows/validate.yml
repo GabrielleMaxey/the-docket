@@ -1,0 +1,48 @@
+name: Validate pull requests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: docket_test
+          POSTGRES_PASSWORD: synthetic_test_only
+          POSTGRES_DB: docket_test_ci
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U docket_test -d docket_test_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify jiraClient exports
+        run: npm run check:jira-client-exports
+      - name: Unit tests (database integration explicitly skipped here)
+        env:
+          DOCKET_TEST_DATABASE_URL: ""
+        run: npm test
+      - name: PostgreSQL integration (required database, no integration skips)
+        env:
+          DOCKET_TEST_DATABASE_URL: postgresql://docket_test:synthetic_test_only@127.0.0.1:${{ job.services.postgres.ports[5432] }}/docket_test_ci
+        run: npm run test:team-db
+      - name: Build browser assets
+        run: npm run build

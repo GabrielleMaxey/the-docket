@@ -124,3 +124,83 @@ describe("listIssueAttachments", () => {
     assert.deepEqual(result.attachments.map((a) => a.filename), ["new.mov", "old.png"]);
   });
 });
+
+it("actual multipart chain leaves no disk files for stale site context", async (t) => {
+  const { default: express } = await import("express");
+  const { registerAttachmentRoutes } = await import("../server/routes/attachmentRoutes.mjs");
+  const { createSiteOperationState } = await import("../server/lib/siteOperationState.mjs");
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const uploadDir = path.join(os.tmpdir(), "taskmanager-attachments");
+  await fs.mkdir(uploadDir, { recursive: true });
+  const before = new Set(await fs.readdir(uploadDir));
+  const state = createSiteOperationState({ snapshot: { credentials: { instanceId: "a", baseUrl: "https://lumen.atlassian.net" } }, activate: () => ({ credentials: { instanceId: "b", baseUrl: "https://lumen-nm.atlassian.net" } }) });
+  const context = state.getSiteContext();
+  await state.switchSite("b", context.generation);
+  const app = express();
+  registerAttachmentRoutes(app, { ...state, ensureEnvOrRespond: () => true, jiraMultipartRequest: () => assert.fail("Stale upload reached Jira") });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    for (const name of await fs.readdir(uploadDir)) if (!before.has(name)) await fs.rm(path.join(uploadDir, name), { force: true });
+  });
+  const form = new FormData();
+  form.append("files", new Blob(["synthetic recording"]), "recording.mov");
+  const result = await fetch(`http://127.0.0.1:${server.address().port}/api/jira/issues/SAME-1/attachments`, {
+    method: "POST", body: form, headers: { "X-Docket-Site": "a", "X-Docket-Generation": context.generation },
+  });
+  assert.equal(result.status, 409);
+  assert.equal((await result.json()).code, "SITE_CONTEXT_CHANGED");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual((await fs.readdir(uploadDir)).filter((name) => !before.has(name)), []);
+});
+
+it("admitted multipart upload drains through Jira completion and disk cleanup before switching", async (t) => {
+  const { default: express } = await import("express");
+  const { registerAttachmentRoutes } = await import("../server/routes/attachmentRoutes.mjs");
+  const { createSiteOperationState } = await import("../server/lib/siteOperationState.mjs");
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const uploadDir = path.join(os.tmpdir(), "taskmanager-attachments");
+  await fs.mkdir(uploadDir, { recursive: true });
+  const before = new Set(await fs.readdir(uploadDir));
+  let closed = false;
+  const state = createSiteOperationState({ snapshot: { credentials: { instanceId: "a", baseUrl: "https://lumen.atlassian.net" } }, activate: () => { closed = true; return { credentials: { instanceId: "b", baseUrl: "https://lumen-nm.atlassian.net" } }; } });
+  const context = state.getSiteContext();
+  let release;
+  let signalStarted;
+  const started = new Promise((resolve) => { signalStarted = resolve; });
+  const app = express();
+  registerAttachmentRoutes(app, { ...state, ensureEnvOrRespond: () => true, jiraMultipartRequest: async ({ formData }) => {
+    signalStarted();
+    await new Promise((resolve) => { release = resolve; });
+    assert.equal(state.getSiteContext().instanceId, "a");
+    return { ok: true, status: 200, data: [{ id: "synthetic", filename: formData.get("file").name }] };
+  } });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    for (const name of await fs.readdir(uploadDir)) if (!before.has(name)) await fs.rm(path.join(uploadDir, name), { force: true });
+  });
+  const form = new FormData();
+  form.append("files", new Blob(["synthetic recording"]), "recording.mov");
+  const pending = fetch(`http://127.0.0.1:${server.address().port}/api/jira/issues/SAME-1/attachments`, {
+    method: "POST", body: form, headers: { "X-Docket-Site": "a", "X-Docket-Generation": context.generation },
+  });
+  await started;
+  assert.equal((await fs.readdir(uploadDir)).filter((name) => !before.has(name)).length, 1);
+  const switching = state.switchSite("b", context.generation);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(closed, false);
+  release();
+  const response = await pending;
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).uploaded[0].filename, "recording.mov");
+  await switching;
+  assert.equal(closed, true);
+  assert.deepEqual((await fs.readdir(uploadDir)).filter((name) => !before.has(name)), []);
+});

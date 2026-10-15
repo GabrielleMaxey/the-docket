@@ -96,3 +96,21 @@
   line-height: 1;
   padding: 0;
 }
+
+.issue-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.issue-import-preview fieldset { border: 0; padding: 0; min-width: 0; }
+.issue-import-table { overflow-x: auto; }
+.issue-import-table table { width: 100%; border-collapse: collapse; }
+.issue-import-table th, .issue-import-table td { padding: 0.6rem; border-bottom: 1px solid #dde7e9; vertical-align: top; text-align: left; min-width: 130px; }
+.issue-import-table th:first-child, .issue-import-table td:first-child { min-width: 35px; }
+.issue-import-table input:not([type="checkbox"]), .issue-import-table textarea { width: 100%; min-width: 120px; padding: 0.4rem; border: 1px solid #bbc9cd; border-radius: 4px; }
+.issue-import-table textarea { min-width: 230px; min-height: 75px; }
+.issue-import-table small { display: block; margin: 0.3rem 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.issue-import-choice { display: flex; align-items: center; gap: 0.4rem; margin: 0.4rem 0; }
+.issue-import-table .is-excluded { opacity: 0.5; }

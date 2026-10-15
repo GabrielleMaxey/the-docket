@@ -1,12 +1,14 @@
 # The Docket Application Review Implementation Plan
 
+**Implementation status (2026-10-14):** The authorized code tasks are implemented. Current verification, task dispositions, recovery guidance and remaining gates are recorded in the [integrated handoff](../2026-10-14-implementation-handoff.md). Company SonarQube and execution of PostgreSQL 16 CI remain pending; the planned checklists below are historical scope, not claims that those external gates passed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver the approved reliability, security, shared-data, import, and multi-site workbook changes without rewriting unrelated working code.
 
 **Architecture:** Five linked plans implement independently testable subsystems. Keep React/Vite, Express route registration, plain-function helpers, local SQLite, and Electron development. Add optional PostgreSQL and server-generated workbooks through focused modules, not a new application architecture.
 
-**Tech Stack:** Node >=22, React 18, Express 5, better-sqlite3, Vite, Electron, Node test runner; proposed dependencies `pg` and `exceljs` require explicit approval.
+**Tech Stack:** Node >=22, React 18, Express 5, better-sqlite3, Vite, Electron, Node test runner; approved dependencies `pg` 8.23.1 and `exceljs` 4.4.0 (with the scoped uuid 11.1.1 override).
 
 **Spec:** [Approved design](../specs/2026-10-14-application-review-design.md). Read it with every child plan. This overview is the execution order and shared contract, not an additional implementation task.
 
@@ -27,7 +29,7 @@
 
 These adversarial cases are assigned tests in the named plans rather than left implicit:
 
-1. Same Jira key on different sites, including export while a switch is requested → Security S3; Data D1; Export E1.
+1. Same Jira key across saved entries (including the same hostname), including export while a switch is requested → Security S3; Data D1; Export E1.
 2. Server commits a To Do but its response is lost → To Dos T2 retries the same client identity, not a second create.
 3. Existing local and team notes disagree → Data D3 requires destination-specific approval and conflict checking.
 4. Jira times out after accepting a write → Security S2 reports an uncertain write outcome with no automatic retry.
@@ -40,7 +42,7 @@ These adversarial cases are assigned tests in the named plans rather than left i
 | 1 | [Local security and site isolation](2026-10-14-local-security.md) | Restricted local API, environment-only token, safe requests and site switching, scoped caches, Electron controls | None |
 | 2 | [Personal To Dos](2026-10-14-personal-todos.md) | Separate local store, durable migration markers, reliable autosave across navigation | Security S3 context boundary |
 | 3 | [Team data and imports](2026-10-14-team-data-imports.md) | Optional PostgreSQL, complete metadata contract, editable approved imports, equal save choices | Security S1–S3; `pg` approval |
-| 4 | [Workbook export](2026-10-14-workbook-export.md) | Selected sites and source-aware previews; one Excel sheet per site | Security S2/S3, Data D1/D2; `exceljs` approval |
+| 4 | [Workbook export](2026-10-14-workbook-export.md) | Saved-entry source-aware previews, latest Jira comment only, separate local/Team notes; one Excel sheet per saved entry | Security S2/S3, Data D1/D2; `exceljs` approval |
 | 5 | [Cleanup and validation](2026-10-14-cleanup-validation.md) | Installer removal, safe image replacement, search fix, verified dead-code cleanup, PR checks | Final integration follows 1–4; C1–C3 may be done earlier |
 
 S1–S3 precede cross-site data work. Keep work sequential when touching shared files (`jiraProxy.mjs`, `jiraClient.js`, schema, README, package manifests). Do not run agents concurrently on these files. Prefer a focused commit per task and a review before dependent work.
@@ -49,12 +51,12 @@ S1–S3 precede cross-site data work. Keep work sequential when touching shared 
 
 | Proposed package | Use | Gate |
 | --- | --- | --- |
-| `pg` | PostgreSQL connection pool, parameterized statements, explicit transactions | Ask before D1 installation; version selected after checking current registry metadata, license, Node compatibility, and advisories |
-| `exceljs` | Generate and read back actual `.xlsx` workbooks with per-site sheets | Ask before E2 installation; same current-version/security/license check |
+| `pg` | PostgreSQL connection pool, parameterized statements, explicit transactions | Approved and installed: 8.23.1; compatibility and audit evidence recorded in D1 and final handoff |
+| `exceljs` | Generate and read back actual `.xlsx` workbooks with per-site sheets | Approved ExcelJS 4.4.0 and scoped exceljs -> uuid 11.1.1 override; E2 verifies resolution, compatibility, audit and readback |
 
-These are npm libraries, not packaged desktop installers. Approval to write a plan is not approval to install them. Both projects publish MIT licenses, but this is not company license clearance. Use existing tools for all other work.
+The user approved these exact npm libraries before their installation. Both projects publish MIT licenses; this is not company license clearance. No other dependency was added for cleanup.
 
-Primary references consulted for plan decisions: [node-postgres transactions](https://node-postgres.com/features/transactions), [TLS configuration](https://node-postgres.com/features/ssl), [node-postgres license](https://github.com/brianc/node-postgres/blob/master/LICENSE), [ExcelJS documentation](https://github.com/exceljs/exceljs#readme), and [ExcelJS license](https://github.com/exceljs/exceljs/blob/master/LICENSE). Documentation establishes feature fit; no dependency audit or version approval has happened yet.
+Primary references consulted for plan decisions: [node-postgres transactions](https://node-postgres.com/features/transactions), [TLS configuration](https://node-postgres.com/features/ssl), [node-postgres license](https://github.com/brianc/node-postgres/blob/master/LICENSE), [ExcelJS documentation](https://github.com/exceljs/exceljs#readme), and [ExcelJS license](https://github.com/exceljs/exceljs/blob/master/LICENSE). Documentation establishes feature fit. The user subsequently approved pg 8.23.1 (D1 installed) and ExcelJS 4.4.0 with the scoped uuid 11.1.1 override for E2; actual current audit/compatibility evidence remains part of each implementation task.
 
 ## Shared contracts
 
@@ -62,17 +64,19 @@ Primary references consulted for plan decisions: [node-postgres transactions](ht
 - `X-Docket-Site` holds the instance ID or `legacy`; `X-Docket-Generation` is the server-issued generation. Missing/stale context on scoped API requests returns `409 SITE_CONTEXT_CHANGED`; health, instance registry/bootstrap, independent To Dos, and explicit export routes have their documented separate rules.
 - Metadata public names retain `note`, `priority`, `startDate`, `completeDate`, `hasOpenDecision`, `plannedStart`, `plannedFinish`, `pmOverride`, `requestor`, `openDecisionNote`, `pinnedGantt`, `keepNoteImages`; add `followUp: 'now'|'next'|null`. Image storage flags are never shared or exported as an image payload. Import supports only the field subset listed in D2.
 - `MetadataPatch` is a partial object: an absent property means preserve, never reset. `followUp:null` explicitly clears. Dates remain `YYYY-MM-DD` strings; no timezone conversions of date-only values.
-- Shared identity is `(siteHost, issueKey)`, not local instance ID. Local identity remains the site-specific SQLite database plus key.
+- Shared identity is `(siteHost, issueKey)`, not local instance ID. Local identity remains the saved-entry-specific SQLite database plus key. Export sheets/exclusions preserve instanceId even for entries sharing the same host/key.
 - Local and team writes are separate transactions. No automatic fallback, implicit synchronization, or distributed transaction.
 - `getLocalMetadata(db, issueKeys) -> Record<issueKey, Metadata>` belongs to D2 and is reused by imports and export. `getTeamMetadata({siteHost, issueKeys}) -> Promise<Record<issueKey, Metadata>>` belongs to D1.
 
+- Export rows retain selected-source `note` for D2 compatibility but display explicit `localNote`, `localNoteStatus`, `teamNote`, `latestJiraComment:{text,author,createdAt}|null` and `jiraCommentStatus`. Only one latest-created comment is requested, after filters. Team mode adds a separately labeled local note without using it to fill selected Team metadata. See [binding export contracts](2026-10-14-workbook-export.md#binding-export-contracts-2026-10-14-final-clarification) for deadlines, failed provisional search results, selected registry leases, storage limits and E2/E3 handoff.
+
 ## Preparation and finish gates
 
-- [ ] Before implementation, obtain plan review, execution-method choice, and dependency approvals when their tasks are reached. Inspect git status; preserve `.claude/`, mockups, and unrelated pre-existing September documents. Apply the worktree skill at execution time if isolation is needed, not during planning.
-- [ ] Record a fresh build/test baseline with synthetic data. The historical 373/374 test result is not a current result. Socket permissions and native SQLite ABI must be distinguished from application test failures.
-- [ ] For each task: reproduce its meaningful failing behavior, implement minimally, run the named checks, inspect its diff, and commit only its listed files. Apply required local checks; record SonarQube as unavailable here after each code change rather than substituting Ruff for JavaScript.
-- [ ] A verification step passes only when its assertions pass and its command exits zero, with no unexpected skipped tests. Installation/native/socket failures are blockers to that evidence, not passing tests. The final PostgreSQL integration run must have no skipped database cases.
-- [ ] After C4: run integrated browser/Electron and PostgreSQL tests, inspect actual workbooks, and obtain company SonarQube results before merge. If company access is unavailable, deliver verified local work with that merge gate explicitly pending. Do not deploy, merge, provision infrastructure, or upload to SharePoint.
+- [x] Plan review, execution method and exact dependency approvals were obtained; execution used the isolated worktree and preserved unrelated user files.
+- [x] Fresh synthetic baselines and final checks were recorded. The final unit run has 586 passes and 10 explicitly skipped SQL cases; the separate database run has 72 passes and zero skips.
+- [x] Focused task implementation, regression reproduction, checks and commits are recorded in the handoff. SonarQube remains unavailable; Ruff was not substituted for JavaScript.
+- [x] Final local commands exited zero; dedicated PostgreSQL integration passed all 72 cases with zero skips. Initial failures and their corrections remain documented separately.
+- [ ] Before merge, obtain company SonarQube with no new Major/Critical findings and execute the configured PostgreSQL 16 CI. Local PostgreSQL 14.1, browser/Electron smoke and actual workbook inspection are recorded in the handoff; native browser file-save completion remains a manual check. No merge, deployment, provisioning or SharePoint upload is authorized.
 
 ## Plan self-review
 

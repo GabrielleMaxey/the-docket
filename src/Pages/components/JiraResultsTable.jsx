@@ -1,3 +1,4 @@
+import { FOLLOW_UP_OPTIONS } from "../../../shared/issueMetadataFields.mjs";
 import React from "react";
 import { Button, Modal } from "semantic-ui-react";
 import PriorityCell from "./cells/PriorityCell";
@@ -834,6 +835,7 @@ const JiraResultsTable = ({
                     const sharedProgramId = String(
                       run.sharedProgramId || jqlSharedProgramIds?.[runSlotIndex] || ""
                     ).trim();
+                    const followUp = sharedProgramId ? planningMeta.teamFollowUp : planningMeta.followUp;
                     const hasAnyTracking = startDateByKey[issueKey] || completeDateByKey[issueKey] ||
                       planningMeta.plannedStart || planningMeta.plannedFinish || planningMeta.pmOverride ||
                       planningMeta.requestor;
@@ -858,6 +860,7 @@ const JiraResultsTable = ({
                           </button>
                         </td>
                         <td className="ww-cell-key">
+                          {followUp ? <span className="ww-planning-label">{FOLLOW_UP_OPTIONS.find((option) => option.value === followUp)?.label} </span> : null}
                           {issueBrowseUrl ? (
                             <a href={issueBrowseUrl} target="_blank" rel="noreferrer noopener">
                               {issueKey}
@@ -942,6 +945,7 @@ const JiraResultsTable = ({
                                     className={`${isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}${hasAnyTracking ? " ww-row-has-tracking" : ""}`}
                                   >
                                     <td className="ww-cell-key">
+                                      {followUp ? <span className="ww-planning-label">{FOLLOW_UP_OPTIONS.find((option) => option.value === followUp)?.label} </span> : null}
                                       <button
                                         type="button"
                                         className="ww-row-expand-btn ww-row-expand-btn--open"
@@ -1266,6 +1270,21 @@ const JiraResultsTable = ({
                             <td colSpan={5} className="ww-planning-panel-cell">
                               <div className="ww-planning-panel">
                                 <div className="ww-planning-panel-fields">
+                                  <div className="ww-planning-field">
+                                    <span className="ww-planning-label">Now / Next</span>
+                                    {FOLLOW_UP_OPTIONS.map((option) => (
+                                      <label key={option.value}>
+                                        <input
+                                          type="checkbox"
+                                          aria-label={`${option.label} for ${issueKey}`}
+                                          checked={followUp === option.value}
+                                          disabled={isClosedOrResolved}
+                                          onChange={(e) => handlePlanningFieldChange(issueKey, "followUp", e.target.checked ? option.value : null, { sharedProgramId })}
+                                        />
+                                        {option.label}
+                                      </label>
+                                    ))}
+                                  </div>
                                   <label className="ww-planning-field">
                                     <span className="ww-planning-label">Open decision</span>
                                     <input

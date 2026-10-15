@@ -48,10 +48,10 @@ const TeamPriorityDemoSection = () => {
       return "Checking…";
     }
     if (!health?.configured) {
-      return "Not configured — set TEAM_PRIORITY_MONGODB_URI in .env and restart the API.";
+      return "Not configured — set TEAM_PRIORITY_DATABASE_URL in .env and restart the API.";
     }
     if (health.connected) {
-      return "Connected to Atlas.";
+      return "Connected to the team database.";
     }
     return `Configured but not connected${health.error ? `: ${health.error}` : "."}`;
   })();
@@ -60,14 +60,14 @@ const TeamPriorityDemoSection = () => {
 
   return (
     <SettingsSection
-      title="Team priority (Atlas demo)"
-      description="Shared P1–P20 for Work Week slots linked to a program. Long-term target is MySQL."
+      title="Team data"
+      description="Shared priorities and planning for Work Week slots linked to a program."
     >
       <p style={{ marginTop: 0, color: "#475569", fontSize: "0.9rem" }}>
-        {statusLine} Link a Work Week slot to a shared program — priority changes push to Atlas
+        {statusLine} Link a Work Week slot to a shared program — priority changes push to the team database
         immediately. Use <strong>Import team priorities</strong> above with target{" "}
-        <strong>Atlas (demo)</strong> for one-time CSV seeding, or push and pull between local
-        SQLite and Atlas below.
+        <strong>Team database</strong> for CSV imports, or push and pull between local
+        SQLite and the team database below.
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
         <Button
@@ -87,14 +87,14 @@ const TeamPriorityDemoSection = () => {
             void runAction("seed", async () => {
               const data = await seedTeamPriorityPrograms();
               setPrograms(Array.isArray(data?.programs) ? data.programs : []);
-              setMessage(`Seeded ${(data?.programs || []).length} program(s).`);
+              setMessage(`Loaded ${(data?.programs || []).length} program(s).`);
               await loadStatus();
             })
           }
           loading={busy === "seed"}
           disabled={isBusy || !health?.configured}
         >
-          Seed programs
+          Refresh programs
         </Button>
         <Button
           type="button"
@@ -103,14 +103,14 @@ const TeamPriorityDemoSection = () => {
             void runAction("sync", async () => {
               const data = await syncLocalPrioritiesToTeam();
               setMessage(
-                `Synced ${data.updatedPriorities} local priorities to Atlas (scanned ${data.scanned}).`
+                `Synced ${data.updatedPriorities} local priorities to the team database (scanned ${data.scanned}).`
               );
             })
           }
           loading={busy === "sync"}
           disabled={isBusy || !health?.connected}
         >
-          Seed from local priorities
+          Save local priorities to team
         </Button>
         <Button
           type="button"
@@ -119,14 +119,14 @@ const TeamPriorityDemoSection = () => {
             void runAction("pull", async () => {
               const data = await pullTeamPrioritiesToLocal();
               setMessage(
-                `Pulled ${data.updatedPriorities} priorities from Atlas into local SQLite.`
+                `Pulled ${data.updatedPriorities} priorities from the team database into local SQLite.`
               );
             })
           }
           loading={busy === "pull"}
           disabled={isBusy || !health?.connected}
         >
-          Pull from Atlas
+          Pull from the team database
         </Button>
       </div>
       {programs.length > 0 ? (

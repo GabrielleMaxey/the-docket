@@ -6,7 +6,7 @@ Internal reference for code structure, data flow, scripts, and extension points.
 
 ## For Cursor users
 
-The markdown files in `docs/` are canonical for GitHub, packaged desktop, and non-Cursor editors.
+The markdown files in `docs/` are canonical for GitHub, local desktop development, and non-Cursor editors.
 
 Cursor users can optionally mirror the docs canvas from [`docs/canvases/task-manager-docs.canvas.tsx`](./canvases/task-manager-docs.canvas.tsx). See [`docs/canvases/README.md`](./canvases/README.md) for the install note. Edit this guide for long-form changes; update the canvas mirror only when pages, data model, or architecture change materially.
 
@@ -19,7 +19,7 @@ Cursor users can optionally mirror the docs canvas from [`docs/canvases/task-man
 | Layer | Technology |
 |-------|-----------|
 | UI | React 18, Vite 8, React Router 6, Semantic UI React 2 |
-| Desktop shell | Electron 31 + electron-builder |
+| Desktop shell | Electron 43 (local development) |
 | Proxy / API | Express 5 (`server/`) |
 | Database | better-sqlite3 → `data/workweek.sqlite` |
 | AI providers | Anthropic, OpenAI, Ollama, or Rovo via `llmClient.mjs` — explicit `CHAT_PROVIDER` in `.env` |
@@ -54,8 +54,8 @@ nvm use
 
 - **Windows:** install Node 22 from [nodejs.org](https://nodejs.org/), or use [nvm-windows](https://github.com/coreybutler/nvm-windows) / [fnm](https://github.com/Schniz/fnm) and select the version from `.nvmrc`.
 - `npm install` runs a preinstall guard (`scripts/check-node-version.cjs`) and will fail fast if your Node major version does not match `.nvmrc`.
-- `postinstall` runs `electron-builder install-app-deps` so native modules align with Electron.
-- This prevents native module ABI mismatches (for example with `better-sqlite3`).
+- `postinstall` runs `npm rebuild better-sqlite3` for Node. Browser API startup and tests also rebuild for Node; desktop startup rebuilds for Electron through `desktop:rebuild-native`.
+- Stop the running workflow before switching runtimes. For recovery, use `npm rebuild better-sqlite3` before browser mode, or `npm run desktop:doctor` to rebuild and launch desktop mode.
 
 ---
 
@@ -188,7 +188,7 @@ taskManager/
 │   ├── END_USER_GUIDE.md     # Day-to-day usage (incl. browser-as-app)
 │   ├── DEVELOPER_GUIDE.md    # Architecture / API / schema
 │   ├── JIRA_SETUP.md         # Credentials and Jira config
-│   ├── unsigned-installs.md  # Unsigned DMG/NSIS + Electron blocked
+│   ├── unsigned-installs.md  # Unsupported installers + local launch guidance
 │   ├── PR_WriteUps/          # Per-PR summaries for review
 │   ├── specs/                # Feature specs (e.g. team priority sync)
 │   ├── superpowers/          # Agent design specs + implementation plans
@@ -688,9 +688,11 @@ Long-running UI actions run through `src/utils/backgroundJobStore.js` via `runBa
 
 Wired in: `useDashboardRefresh.js`, `useReportGeneration.js`, `WeeklyDigestPanel.jsx`, `useTaskManagerJira.js`, `WorkWeekTasks.jsx` (`ProjectReportPanel`, `WeeklyPlanPanel`).
 
-### Packaged desktop (Electron installer)
+### Historical packaged desktop data (unsupported)
 
-When `TASK_MANAGER_USER_DATA` is set by Electron main (packaged app only):
+Packaged installers are unsupported; the packaging scripts and workflow have been removed. The retained Electron source still describes the old data layout below for recovery reference. Supported local workflows use the project `.env` and `data/` by default.
+
+In the historical packaged path, Electron main sets `TASK_MANAGER_USER_DATA`:
 
 | Path | Contents |
 |------|----------|
@@ -702,7 +704,7 @@ When `TASK_MANAGER_USER_DATA` is set by Electron main (packaged app only):
 
 Dev desktop (`npm run desktop:dev`) and browser dev use the repo `data/` folder and project-root `.env` instead.
 
-Packaged builds load the UI from `http://127.0.0.1:{API_PORT}` (proxy serves `dist/`). `better-sqlite3` is unpacked from ASAR via `asarUnpack` in `package.json`.
+The historical packaged path loads the UI from `http://127.0.0.1:{API_PORT}` (proxy serves `dist/`). Its former ASAR packaging configuration has been removed.
 
 ---
 
@@ -794,9 +796,7 @@ Pages that consume it — `Dashboard/index.jsx`, `Chat.jsx`, `WorkWeekTasks.jsx`
 | `npm test` | Unit tests: `dashboardMetrics.mjs`, `epicFilterJql.mjs`, `chatSessionPrompt.mjs`, `issuePriority.mjs`, … `pretest` rebuilds `better-sqlite3` for system Node first — without it, running the desktop app beforehand leaves the native module built for Electron's ABI and tests fail with `ERR_DLOPEN_FAILED` (an environment artifact, not a real test failure) |
 | `npm run seed:presets` | Seed shared Epic/JQL presets into local SQLite — see [pilot-presets.md](./pilot-presets.md) |
 | `npm run build` | Runs export guard (`prebuild`), then creates production Vite bundle → `dist/` |
-| `npm run desktop:dist` | Full build + electron-builder → `release/` |
-| `npm run desktop:dist:mac` | macOS universal `.dmg` (Intel + Apple Silicon) |
-| `npm run desktop:dist:win` | Windows NSIS installer |
+| `npm run desktop:build` | Alias for `npm run build`; does not create an installer |
 
 ---
 
@@ -882,8 +882,7 @@ Ensure `docs/PR_WriteUps` is **not** listed in `.gitignore` so write-ups are sha
 
 ## GitHub Actions
 
-`.github/workflows/desktop-packaging.yml` — triggered on `workflow_dispatch` or tags matching `v*`.
-Produces artifacts: `desktop-macos` (universal `.dmg` for Intel and Apple Silicon) and `desktop-windows` (NSIS installer).
+Packaged installers are unsupported. The former desktop packaging workflow has been removed; tags no longer produce Mac DMG or Windows NSIS artifacts. Use the local development commands above.
 
 ---
 

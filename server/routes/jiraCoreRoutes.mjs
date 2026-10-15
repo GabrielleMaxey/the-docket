@@ -9,8 +9,8 @@ import { listAvailableJiraFilters } from "../lib/jiraFilterList.mjs";
 
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
 
-export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, runJiraSearchRequest, getDb }) => {
-  app.get("/api/jira/myself", async (_req, res) => {
+export const registerJiraCoreRoutes = (app, { withSiteOperation = (handler) => handler, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest, getDb }) => {
+  app.get("/api/jira/myself", withSiteOperation(async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -27,9 +27,9 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/jira/filters", async (_req, res) => {
+  app.get("/api/jira/filters", withSiteOperation(async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -47,10 +47,10 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
   // Resolves display names / emails for assignee updates.
-  app.get("/api/jira/users/search", async (req, res) => {
+  app.get("/api/jira/users/search", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -69,11 +69,11 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
   // Resolves raw Atlassian account IDs (e.g. saved in Direct Reports queries
   // before a display name/email was available) back to a human-readable name.
-  app.post("/api/jira/users/resolve-bulk", async (req, res) => {
+  app.post("/api/jira/users/resolve-bulk", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -99,7 +99,7 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
   const handleJiraSearch = async (jql, maxResults, res) => {
     if (!ensureEnvOrRespond(res)) {
@@ -132,14 +132,14 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
   };
 
   // Preferred over the GET variant below: JQL in the JSON body avoids URL-encoding issues.
-  app.post("/api/jira/search", async (req, res) => {
+  app.post("/api/jira/search", withSiteOperation(async (req, res) => {
     const jql = String(req.body?.jql || "").trim();
     const maxResults = Number(req.body?.maxResults || 5);
     return handleJiraSearch(jql, maxResults, res);
-  });
+  }));
 
   // Paginated fetch up to maxTotal (cap 5000).
-  app.post("/api/jira/search/all", async (req, res) => {
+  app.post("/api/jira/search/all", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -164,10 +164,10 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
   // Kept for curl/testing convenience; POST /api/jira/search is preferred otherwise.
-  app.get("/api/jira/search", async (req, res) => {
+  app.get("/api/jira/search", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -175,5 +175,5 @@ export const registerJiraCoreRoutes = (app, { jiraRequest, ensureEnvOrRespond, r
     const jql = String(req.query.jql || "").trim();
     const maxResults = Number(req.query.maxResults || 10);
     return handleJiraSearch(jql, maxResults, res);
-  });
+  }));
 };

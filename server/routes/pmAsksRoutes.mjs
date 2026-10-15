@@ -17,15 +17,15 @@ const trimAsk = (row) => ({
   updatedAt: String(row.updated_at || ""),
 });
 
-export const registerPmAsksRoutes = (app, { getDb }) => {
-  app.get("/api/project-managers/asks", (req, res) => {
+export const registerPmAsksRoutes = (app, { withSiteOperation = (handler) => handler, getDb }) => {
+  app.get("/api/project-managers/asks", withSiteOperation((req, res) => {
     const rows = getDb()
       .prepare(`SELECT ${ASK_COLUMNS} FROM pm_asks ORDER BY id ASC`)
       .all();
     return res.json({ items: rows.map(trimAsk) });
-  });
+  }));
 
-  app.post("/api/project-managers/asks", (req, res) => {
+  app.post("/api/project-managers/asks", withSiteOperation((req, res) => {
     const title = String(req.body?.title || "").trim();
     const whoAsked = String(req.body?.whoAsked || "").trim();
     const note = String(req.body?.note || "").trim();
@@ -37,9 +37,9 @@ export const registerPmAsksRoutes = (app, { getDb }) => {
       .get(title, whoAsked, note);
 
     return res.status(201).json(trimAsk(result));
-  });
+  }));
 
-  app.put("/api/project-managers/asks/:id", (req, res) => {
+  app.put("/api/project-managers/asks/:id", withSiteOperation((req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id < 1) {
       return res.status(400).json({ error: "Invalid ask id" });
@@ -79,9 +79,9 @@ export const registerPmAsksRoutes = (app, { getDb }) => {
       .get(nextTitle, nextWhoAsked, nextNote, nextStatus, nextJiraIssueKey, id);
 
     return res.json(trimAsk(updated));
-  });
+  }));
 
-  app.delete("/api/project-managers/asks/:id", (req, res) => {
+  app.delete("/api/project-managers/asks/:id", withSiteOperation((req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id < 1) {
       return res.status(400).json({ error: "Invalid ask id" });
@@ -92,5 +92,5 @@ export const registerPmAsksRoutes = (app, { getDb }) => {
       return res.status(404).json({ error: "Ask not found" });
     }
     return res.json({ ok: true, id });
-  });
+  }));
 };

@@ -145,9 +145,9 @@ const buildGenerateDescriptionResponse = (parsed, { isStory, isBug, allowSummary
 
 export const registerJiraIssueRoutes = (
   app,
-  { getDb, jiraRequest, ensureEnvOrRespond, resolveJiraUser, runJiraSearchRequest }
+  { withSiteOperation = (handler) => handler, getDb, jiraRequest, ensureEnvOrRespond, resolveJiraUser, runJiraSearchRequest }
 ) => {
-  app.get("/api/jira/projects", async (_req, res) => {
+  app.get("/api/jira/projects", withSiteOperation(async (_req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -196,9 +196,9 @@ export const registerJiraIssueRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/jira/projects/:key/createmeta", async (req, res) => {
+  app.get("/api/jira/projects/:key/createmeta", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -236,9 +236,9 @@ export const registerJiraIssueRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/jira/projects/:key/create-field-options", async (req, res) => {
+  app.get("/api/jira/projects/:key/create-field-options", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -269,9 +269,9 @@ export const registerJiraIssueRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/jira/issues/:issueKey/summary", async (req, res) => {
+  app.get("/api/jira/issues/:issueKey/summary", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -294,9 +294,9 @@ export const registerJiraIssueRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/jira/epics/:epicKey/parent-options", async (req, res) => {
+  app.get("/api/jira/epics/:epicKey/parent-options", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -343,9 +343,9 @@ export const registerJiraIssueRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.post("/api/jira/issues/parent-candidates", async (req, res) => {
+  app.post("/api/jira/issues/parent-candidates", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -372,9 +372,9 @@ export const registerJiraIssueRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.post("/api/jira/issues", async (req, res) => {
+  app.post("/api/jira/issues", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -516,7 +516,7 @@ export const registerJiraIssueRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
   // Generates a description (and optional subtasks for Stories) from a title + context.
   // AI Draft token budgets. A full Bug draft with guided intake measured ~1,100 output tokens,
@@ -546,7 +546,7 @@ export const registerJiraIssueRoutes = (
     }
   };
 
-  app.post("/api/jira/issues/generate-description", async (req, res) => {
+  app.post("/api/jira/issues/generate-description", withSiteOperation(async (req, res) => {
     const summary = String(req.body?.summary || "").trim();
     const issueType = String(req.body?.issueType || "Story").trim();
     const epicName = String(req.body?.epicName || "").trim();
@@ -662,7 +662,7 @@ export const registerJiraIssueRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 };
 
 export { ALLOWED_ISSUE_TYPES };

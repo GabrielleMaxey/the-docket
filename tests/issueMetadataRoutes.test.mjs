@@ -18,12 +18,16 @@ describe("issue metadata image routes", () => {
     const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "metadata-images-test-"));
     registerIssueMetadataRoutes(app, {
       getDb: () => db,
+      getSiteContext: () => ({ instanceId: "synthetic", siteHost: "synthetic.example", generation: "g1" }),
       getNoteImagesDir: () => baseDir,
       jiraRequest: async () => ({ ok: true, status: 201, data: {} }),
       jiraMultipartRequest: async () => ({ ok: true, status: 201, data: {} }),
       resolveJiraAttachmentMediaId: async () => "6e7c7f2c-dd7a-499c-bceb-6f32bfbf32b5",
       ensureEnvOrRespond: () => true,
       resolveJiraUser: async () => ({}),
+    });
+    app.use((error, req, res, next) => {
+      res.status(500).json({ error: "Controlled test server failure" });
     });
     const server = await new Promise((resolve) => {
       const listener = app.listen(0, "127.0.0.1", () => resolve(listener));
@@ -79,6 +83,28 @@ describe("issue metadata image routes", () => {
     });
   });
 
+  it("keeps the prior image downloadable when a replacement insert fails", async () => {
+    await withServer(async ({ db, baseDir, request }) => {
+      const [original] = replaceNoteImages(db, baseDir, "ABC-1", [
+        { buffer: Buffer.from("original image"), mimeType: "image/png", filename: "image.png" },
+      ]);
+      db.prepare("INSERT INTO issue_metadata (issue_key, keep_note_images) VALUES (?, 1)").run("ABC-1");
+      db.exec(`CREATE TRIGGER reject_image BEFORE INSERT ON issue_note_images
+        BEGIN SELECT RAISE(ABORT, 'controlled insert failure'); END`);
+      const form = new FormData();
+      form.append("images", new Blob(["replacement"], { type: "image/png" }), "image.png");
+
+      const response = await request("/api/jira/issue-metadata/ABC-1/images", { method: "POST", body: form });
+
+      assert.equal(response.status, 500);
+      assert.deepEqual(listNoteImages(db, "ABC-1"), [original]);
+      assert.equal(db.prepare("SELECT keep_note_images FROM issue_metadata WHERE issue_key = ?").get("ABC-1").keep_note_images, 1);
+      const imageResponse = await request(`/api/jira/issue-metadata/ABC-1/images/${original.id}`);
+      assert.equal(imageResponse.status, 200);
+      assert.equal(await imageResponse.text(), "original image");
+    });
+  });
+
   it("preserves kept images after a text-only comment push", async () => {
     await withServer(async ({ db, baseDir, request }) => {
       replaceNoteImages(db, baseDir, "ABC-1", [
@@ -113,6 +139,7 @@ describe("issue metadata date fields", () => {
     const jiraRequestCalls = [];
     registerIssueMetadataRoutes(app, {
       getDb: () => db,
+      getSiteContext: () => ({ instanceId: "synthetic", siteHost: "synthetic.example", generation: "g1" }),
       getNoteImagesDir: () => baseDir,
       jiraRequest:
         jiraRequest ||
@@ -133,7 +160,7 @@ describe("issue metadata date fields", () => {
       fetch(`http://127.0.0.1:${server.address().port}${pathname}`, options);
 
     try {
-      return await testFn({ db, request, jiraRequestCalls });
+      return await testFn({ db, baseDir, request, jiraRequestCalls });
     } finally {
       await new Promise((resolve) => server.close(resolve));
       db.close();
@@ -252,25 +279,57 @@ describe("issue metadata date fields", () => {
     });
   });
 
-  it("CSV priority import preserves existing start/complete dates instead of wiping them", async () => {
-    await withServer(async ({ db, request }) => {
+  it("CSV priority import preserves all omitted dates, decisions, planning and images", async () => {
+    await withServer(async ({ db, baseDir, request }) => {
+      replaceNoteImages(db, baseDir, "ABC-1", [{ buffer: Buffer.from("synthetic image"), mimeType: "image/png", filename: "image.png" }]);
+      const beforeImages = listNoteImages(db, "ABC-1");
       db.prepare(
-        "INSERT INTO issue_metadata (issue_key, note, priority, start_date, complete_date) VALUES (?, ?, ?, ?, ?)"
-      ).run("ABC-1", "", 0, "2026-03-01", "2026-04-15");
+        "INSERT INTO issue_metadata (issue_key, note, priority, start_date, complete_date, planned_start, planned_finish, has_open_decision, requestor, open_decision_note, pm_override, pinned_gantt, keep_note_images) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run("ABC-1", "saved", 0, "2026-03-01", "2026-04-15", "2026-03-02", "2026-04-14", 1, "Team", "Decision", "hold", 1, 1);
+      const before = db.prepare("SELECT * FROM issue_metadata WHERE issue_key = ?").get("ABC-1");
 
-      const response = await request("/api/jira/issue-metadata/import", {
+      const previewResponse = await request("/api/jira/issue-metadata/import/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csvText: "Key,Priority\nABC-1,5\n" }),
+        body: JSON.stringify({ destination: "local", csvText: "Key,Priority\nABC-1,5\n" }),
       });
 
+      assert.equal(previewResponse.status, 200);
+      const preview = await previewResponse.json();
+      const response = await request("/api/jira/issue-metadata/import/commit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ previewId: preview.previewId }) });
       assert.equal(response.status, 200);
       const row = db
-        .prepare("SELECT priority, start_date, complete_date FROM issue_metadata WHERE issue_key = ?")
+        .prepare("SELECT * FROM issue_metadata WHERE issue_key = ?")
         .get("ABC-1");
+      assert.deepEqual(listNoteImages(db, "ABC-1"), beforeImages);
       assert.equal(row.priority, 5);
       assert.equal(row.start_date, "2026-03-01");
       assert.equal(row.complete_date, "2026-04-15");
+      for (const field of ["note", "planned_start", "planned_finish", "has_open_decision", "requestor", "open_decision_note", "pm_override", "pinned_gantt", "keep_note_images"]) assert.equal(row[field], before[field], field);
+    });
+  });
+
+  it("normal metadata edits preserve followUp on omission and support explicit clearing", async () => {
+    await withServer(async ({ request }) => {
+      const put = (body) => request("/api/jira/issue-metadata/ABC-1", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      assert.equal((await put({ followUp: "next", hasOpenDecision: true })).status, 200);
+      const saved = await (await put({ note: "note only", requestor: "Team" })).json();
+      assert.equal(saved.followUp, "next");
+      assert.equal(saved.hasOpenDecision, true);
+      assert.equal((await (await put({ followUp: null })).json()).followUp, null);
+      assert.equal((await put({ plannedStart: "2026-02-30" })).status, 400);
+      assert.equal((await put({ unsupported: "x" })).status, 400);
+    });
+  });
+
+  it("normal metadata editing retains existing whitespace normalization", async () => {
+    await withServer(async ({ request }) => {
+      const response = await request("/api/jira/issue-metadata/ABC-1", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestor: " Team ", pmOverride: " hold ", startDate: " 2026-10-01 " }) });
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.equal(body.requestor, "Team");
+      assert.equal(body.pmOverride, "hold");
+      assert.equal(body.startDate, "2026-10-01");
     });
   });
 

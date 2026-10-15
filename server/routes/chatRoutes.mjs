@@ -50,8 +50,8 @@ const readSession = (db) => {
   };
 };
 
-export const registerChatRoutes = (app, { getDb, jiraRequest }) => {
-  app.get("/api/chat/status", (req, res) => {
+export const registerChatRoutes = (app, { withSiteOperation = (handler) => handler, getDb, jiraRequest, getSiteContext }) => {
+  app.get("/api/chat/status", withSiteOperation((req, res) => {
     const provider = getConfiguredChatProvider();
     const oauth = getOAuthConfig();
     const session = readSession(getDb());
@@ -83,9 +83,9 @@ export const registerChatRoutes = (app, { getDb, jiraRequest }) => {
       displayLabel: resolved.displayLabel,
       lockedByHost: resolved.lockedByHost,
     });
-  });
+  }));
 
-  app.get("/api/chat/auth/start", (req, res) => {
+  app.get("/api/chat/auth/start", withSiteOperation((req, res) => {
     const oauth = getOAuthConfig();
     if (!oauth.configured) {
       return res.status(400).json({
@@ -95,7 +95,7 @@ export const registerChatRoutes = (app, { getDb, jiraRequest }) => {
     }
 
     const state = crypto.randomBytes(16).toString("hex");
-    pendingOAuthStates.set(state, Date.now() + OAUTH_STATE_TTL_MS);
+    pendingOAuthStates.set(state, { expiresAt: Date.now() + OAUTH_STATE_TTL_MS, siteContext: getSiteContext() });
 
     const params = new URLSearchParams({
       audience: "api.atlassian.com",
@@ -115,22 +115,27 @@ export const registerChatRoutes = (app, { getDb, jiraRequest }) => {
     }
 
     return res.redirect(authorizeUrl);
-  });
+  }));
 
-  app.get("/api/chat/auth/callback", async (req, res) => {
+  app.get("/api/chat/auth/callback", (req, res, next) => {
+    const state = String(req.query.state || "").trim();
+    const pending = pendingOAuthStates.get(state);
+    pendingOAuthStates.delete(state);
+    if (!pending || Date.now() > pending.expiresAt) {
+      return res.status(409).json({ error: "Invalid or expired OAuth state. Try signing in again.", code: "SITE_CONTEXT_CHANGED" });
+    }
+    // OAuth navigation cannot send API headers. Only this server-issued one-time
+    // state supplies callback context; callback query values never supply it.
+    req.headers["x-docket-site"] = pending.siteContext.instanceId || "legacy";
+    req.headers["x-docket-generation"] = pending.siteContext.generation;
+    return next();
+  }, withSiteOperation(async (req, res) => {
     const oauth = getOAuthConfig();
     const code = String(req.query.code || "").trim();
-    const state = String(req.query.state || "").trim();
     const error = String(req.query.error || "").trim();
 
     if (error) {
       return res.status(400).send(`Atlassian sign-in failed: ${error}`);
-    }
-
-    const expiresAt = pendingOAuthStates.get(state);
-    pendingOAuthStates.delete(state);
-    if (!expiresAt || Date.now() > expiresAt) {
-      return res.status(400).send("Invalid or expired OAuth state. Try signing in again.");
     }
 
     if (!code || !oauth.configured) {
@@ -140,6 +145,7 @@ export const registerChatRoutes = (app, { getDb, jiraRequest }) => {
     try {
       const tokenResponse = await fetch("https://auth.atlassian.com/oauth/token", {
         method: "POST",
+        signal: AbortSignal.timeout(60000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           grant_type: "authorization_code",
@@ -178,14 +184,14 @@ export const registerChatRoutes = (app, { getDb, jiraRequest }) => {
         callbackError instanceof Error ? callbackError.message : "OAuth callback failed"
       );
     }
-  });
+  }));
 
-  app.post("/api/chat/auth/signout", (_req, res) => {
+  app.post("/api/chat/auth/signout", withSiteOperation((_req, res) => {
     getDb().prepare("DELETE FROM chat_sessions WHERE id = ?").run(DEFAULT_SESSION_ID);
     return res.json({ ok: true });
-  });
+  }));
 
-  app.post("/api/chat", async (req, res) => {
+  app.post("/api/chat", withSiteOperation(async (req, res) => {
     const message = String(req.body?.message || "").trim();
     const epicContext = req.body?.epicContext || {};
     const preferredPath = String(req.body?.aiPath || "").trim().toLowerCase() || null;
@@ -237,5 +243,5 @@ export const registerChatRoutes = (app, { getDb, jiraRequest }) => {
         message: detail,
       });
     }
-  });
+  }));
 };

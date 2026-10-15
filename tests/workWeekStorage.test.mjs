@@ -82,3 +82,31 @@ describe("shouldReplaceSlotQueryForSharedProgram", () => {
     assert.equal(result.replaceLabel, true);
   });
 });
+
+
+import * as siteStore from "../src/utils/siteContextStore.js";
+
+it("unscoped unknown-origin notes are never adopted", () => {
+  const values = new Map([["workWeekTasksJiraNotes", '{"SAME-1":"private"}']]);
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
+  siteStore.setSiteContext({ instanceId: "a", generation: "1" });
+  assert.equal(siteStore.readSiteStorage(storage, "workWeekTasksJiraNotes"), null);
+  assert.equal(values.get("workWeekTasksJiraNotes"), '{"SAME-1":"private"}');
+  assert.ok(siteStore.getSiteRecoveryNotice());
+});
+
+it("a failed report storage write preserves its actual unscoped legacy source", async (t) => {
+  const key = "taskManagerPersistedDashboardReport";
+  const values = new Map([[key, '{"report":"recoverable report"}']]);
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: () => { throw new Error("quota"); }, removeItem: (key) => values.delete(key) };
+  const originalWindow = globalThis.window;
+  globalThis.window = { localStorage: storage };
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  t.after(() => { globalThis.window = originalWindow; console.warn = originalWarn; });
+  const { saveDashboardReportState, loadDashboardReportState } = await import("../src/utils/pageReportPersistence.js");
+  siteStore.setSiteContext({ instanceId: "a", generation: "1" });
+  saveDashboardReportState({ report: "new report" });
+  assert.equal(values.get(key), '{"report":"recoverable report"}');
+  assert.equal(loadDashboardReportState(), null);
+});

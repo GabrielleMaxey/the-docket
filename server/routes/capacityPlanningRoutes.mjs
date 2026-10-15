@@ -2,17 +2,17 @@ import { createLogger } from "../lib/logger.mjs";
 import { fetchCapacityWorkloads } from "../lib/capacityPlanning.mjs";
 import { mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildFieldMappingsMap } from "../lib/epicFilterJql.mjs";
-import { listSharedPrograms, bulkGetTeamDates, isTeamPriorityMongoConfigured } from "../lib/teamPriorityMongo.mjs";
+import { listSharedPrograms, bulkGetTeamDates, isTeamPriorityConfigured } from "../lib/teamPriorityPostgres.mjs";
 import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
 import { chunkValues } from "../../shared/jiraBatch.mjs";
 
 const log = createLogger("capacity-planning");
 
-export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
+export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handler) => handler, getDb, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond, getSiteContext }) => {
   // On-demand only (hover-triggered on the frontend) — a single-issue changelog
   // fetch, not part of the bulk Gantt load. Bulk-fetching changelogs for every
   // issue would bloat every Gantt load; this stays cheap by only firing per bar.
-  app.get("/api/project-managers/gantt/status-history/:issueKey", async (req, res) => {
+  app.get("/api/project-managers/gantt/status-history/:issueKey", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) return;
 
     const issueKey = String(req.params.issueKey || "").trim();
@@ -73,9 +73,9 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/project-managers/capacity", async (req, res) => {
+  app.get("/api/project-managers/capacity", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -116,9 +116,9 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/project-managers/gantt", async (req, res) => {
+  app.get("/api/project-managers/gantt", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) return;
 
     const slug = String(req.query?.slug || "").trim();
@@ -142,7 +142,7 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
         const jql = `key in (${keyList}) ORDER BY updated DESC`;
         ({ issues: loaded } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 500 }));
       } else {
-        const programs = await listSharedPrograms();
+        const programs = await listSharedPrograms(getSiteContext().siteHost);
         const program = programs.find((p) => p.slug === slug);
         if (!program) return res.status(404).json({ error: "Program not found" });
         displayName = program.displayName;
@@ -165,7 +165,7 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
         // the epics' own direct children again.
         const rootSet = new Set(roots);
         const childKeys = firstPass.map((i) => i.key).filter((k) => !rootSet.has(k));
-        const secondPassBatches = await Promise.all(
+        const secondPassBatches = await Promise.allSettled(
           chunkValues(childKeys).map(async (batch) => {
             const jql = `parent in (${batch.join(", ")}) ORDER BY updated DESC`;
             const { issues } = await searchAllIssues({ jql, runJiraSearchRequest, maxTotal: 2000 });
@@ -173,8 +173,11 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
           })
         );
 
+        // A rejected page must not release the site lease while sibling pages still run.
+        const failedBatch = secondPassBatches.find((result) => result.status === "rejected");
+        if (failedBatch) throw failedBatch.reason;
         const byKey = new Map();
-        for (const issue of [...firstPass, ...secondPassBatches.flat()]) {
+        for (const issue of [...firstPass, ...secondPassBatches.flatMap((result) => result.value)]) {
           byKey.set(issue.key, issue);
         }
         loaded = [...byKey.values()];
@@ -182,10 +185,10 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
 
       const issueKeys = loaded.map((i) => i.key);
 
-      // MongoDB dates (if configured)
-      const mongoDatesByKey =
-        isTeamPriorityMongoConfigured() && issueKeys.length > 0
-          ? await bulkGetTeamDates(issueKeys)
+      // Team dates (if configured)
+      const teamDatesByKey =
+        isTeamPriorityConfigured() && issueKeys.length > 0
+          ? await bulkGetTeamDates(issueKeys, getSiteContext().siteHost)
           : {};
 
       // SQLite metadata (dates + requestor) for all keys
@@ -211,10 +214,10 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
 
       const issues = loaded.map((issue) => {
         const fields = issue.fields || {};
-        const mongo = mongoDatesByKey[issue.key] || {};
+        const team = teamDatesByKey[issue.key] || {};
         const sqlite = sqliteMetaByKey[issue.key] || {};
-        // Merge per-field (Mongo wins when set) rather than picking one source for
-        // the whole issue — a partial Mongo save must not blank out unrelated SQLite fields.
+        // Merge per-field (team wins when set) rather than picking one source for
+        // the whole issue — a partial team save must not blank out unrelated SQLite fields.
         return {
           key: issue.key,
           parentKey: String(fields.parent?.key || ""),
@@ -224,11 +227,11 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
           statusCategory: String(fields.status?.statusCategory?.name || ""),
           assignee: String(fields.assignee?.displayName || "Unassigned"),
           dueDate: String(fields.duedate || ""),
-          startDate: String(mongo.startDate || sqlite.startDate || ""),
-          completeDate: String(mongo.completeDate || sqlite.completeDate || ""),
-          plannedStart: String(mongo.plannedStart || sqlite.plannedStart || ""),
-          plannedFinish: String(mongo.plannedFinish || sqlite.plannedFinish || ""),
-          requestor: String(mongo.requestor || sqlite.requestor || ""),
+          startDate: String(team.startDate || sqlite.startDate || ""),
+          completeDate: String(team.completeDate || sqlite.completeDate || ""),
+          plannedStart: String(team.plannedStart || sqlite.plannedStart || ""),
+          plannedFinish: String(team.plannedFinish || sqlite.plannedFinish || ""),
+          requestor: String(team.requestor || sqlite.requestor || ""),
         };
       });
 
@@ -240,5 +243,5 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 };

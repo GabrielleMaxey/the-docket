@@ -247,13 +247,13 @@ const normalizeEpicPresetPayload = ( body, existing = null ) => {
     };
   };
 
-export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest } ) => {
-  app.get( "/api/epic-presets", ( _req, res ) => {
+export const registerAppConfigRoutes = ( app, { withSiteOperation = (handler) => handler, getDb, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest } ) => {
+  app.get( "/api/epic-presets", withSiteOperation(( _req, res ) => {
     const items = createStatements( getDb() ).listEpicPresetsStmt.all().map( mapEpicPresetRow );
     return res.json( { items } );
-  } );
+  }) );
 
-  app.post( "/api/epic-presets", ( req, res ) => {
+  app.post( "/api/epic-presets", withSiteOperation(( req, res ) => {
     const payload = normalizeEpicPresetPayload( req.body );
     if ( payload.error )
     {
@@ -265,9 +265,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
     const row = stmts.getEpicPresetStmt.get( result.lastInsertRowid );
     log.info( `created epic preset ${ row.id } "${ payload.epicName }" (${ payload.presetType })` );
     return res.status( 201 ).json( mapEpicPresetRow( row ) );
-  } );
+  }) );
 
-  app.put( "/api/epic-presets/:id", ( req, res ) => {
+  app.put( "/api/epic-presets/:id", withSiteOperation(( req, res ) => {
     const id = Number( req.params.id );
     const stmts = createStatements( getDb() );
     const existing = stmts.getEpicPresetStmt.get( id );
@@ -285,9 +285,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
     stmts.updateEpicPresetStmt.run( { id, ...payload } );
     log.info( `updated epic preset ${ id } "${ payload.epicName }"` );
     return res.json( mapEpicPresetRow( stmts.getEpicPresetStmt.get( id ) ) );
-  } );
+  }) );
 
-  app.get( "/api/epic-presets/:id/scope-jql", async ( req, res ) => {
+  app.get( "/api/epic-presets/:id/scope-jql", withSiteOperation(async ( req, res ) => {
     const id = Number( req.params.id );
     const row = createStatements( getDb() ).getEpicPresetStmt.get( id );
     if ( !row )
@@ -313,9 +313,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
         message: error instanceof Error ? error.message : "Unknown error",
       } );
     }
-  } );
+  }) );
 
-  app.delete( "/api/epic-presets/:id", ( req, res ) => {
+  app.delete( "/api/epic-presets/:id", withSiteOperation(( req, res ) => {
     const id = Number( req.params.id );
     const stmts = createStatements( getDb() );
     const existing = stmts.getEpicPresetStmt.get( id );
@@ -327,9 +327,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
     stmts.deleteEpicPresetStmt.run( id );
     log.info( `deleted epic preset ${ id }` );
     return res.json( { ok: true, id } );
-  } );
+  }) );
 
-  app.get( "/api/epic-presets/export", ( _req, res ) => {
+  app.get( "/api/epic-presets/export", withSiteOperation(( _req, res ) => {
     const items = createStatements( getDb() ).listEpicPresetsStmt.all().map( mapEpicPresetRow );
     return res.json( {
       version: 1,
@@ -344,9 +344,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
         sortOrder: preset.sortOrder,
       } ) ),
     } );
-  } );
+  }) );
 
-  app.post( "/api/epic-presets/import", ( req, res ) => {
+  app.post( "/api/epic-presets/import", withSiteOperation(( req, res ) => {
     const incoming = Array.isArray( req.body?.presets ) ? req.body.presets : [];
     const mode = req.body?.mode === "replace" ? "replace" : "merge";
 
@@ -415,9 +415,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
       skipped,
       items: stmts.listEpicPresetsStmt.all().map( mapEpicPresetRow ),
     } );
-  } );
+  }) );
 
-  app.get( "/api/jira/filters/favourite", async ( _req, res ) => {
+  app.get( "/api/jira/filters/favourite", withSiteOperation(async ( _req, res ) => {
     if ( !ensureEnvOrRespond( res ) )
     {
       return;
@@ -439,9 +439,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
         message: error instanceof Error ? error.message : "Unknown error",
       } );
     }
-  } );
+  }) );
 
-  app.get( "/api/jira/filters/:id", async ( req, res ) => {
+  app.get( "/api/jira/filters/:id", withSiteOperation(async ( req, res ) => {
     if ( !ensureEnvOrRespond( res ) )
     {
       return;
@@ -477,9 +477,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
         message: error instanceof Error ? error.message : "Unknown error",
       } );
     }
-  } );
+  }) );
 
-  app.post( "/api/epic-filters/run", async ( req, res ) => {
+  app.post( "/api/epic-filters/run", withSiteOperation(async ( req, res ) => {
     if ( !ensureEnvOrRespond( res ) )
     {
       return;
@@ -544,7 +544,7 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
 
       try
       {
-        const searchResult = await runJiraSearchRequest( jql, maxResults );
+        const searchResult = await runJiraSearchRequest( jql, { maxResults } );
         if ( !searchResult.ok )
         {
           const message =
@@ -603,7 +603,7 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
 
       try
       {
-        const searchResult = await runJiraSearchRequest( jql, maxResults );
+        const searchResult = await runJiraSearchRequest( jql, { maxResults } );
         if ( !searchResult.ok )
         {
           const message =
@@ -649,9 +649,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
     }
 
     return res.json( { runs } );
-  } );
+  }) );
 
-  app.get( "/api/jira/field-mappings", ( _req, res ) => {
+  app.get( "/api/jira/field-mappings", withSiteOperation(( _req, res ) => {
     const items = createStatements( getDb() ).listFieldMappingsStmt.all().map( ( row ) => ( {
       role: row.role,
       fieldId: String( row.field_id || "" ).trim(),
@@ -659,9 +659,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
       updatedAt: row.updated_at,
     } ) );
     return res.json( { items } );
-  } );
+  }) );
 
-  app.put( "/api/jira/field-mappings", ( req, res ) => {
+  app.put( "/api/jira/field-mappings", withSiteOperation(( req, res ) => {
     const mappings = Array.isArray( req.body?.mappings ) ? req.body.mappings : [];
     if ( mappings.length === 0 )
     {
@@ -692,9 +692,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
       updatedAt: row.updated_at,
     } ) );
     return res.json( { items } );
-  } );
+  }) );
 
-  app.post( "/api/jira/field-mappings/sync", async ( _req, res ) => {
+  app.post( "/api/jira/field-mappings/sync", withSiteOperation(async ( _req, res ) => {
     if ( !ensureEnvOrRespond( res ) )
     {
       return;
@@ -743,9 +743,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
         message: error instanceof Error ? error.message : "Unknown error",
       } );
     }
-  } );
+  }) );
 
-  app.get( "/api/jira/fields", async ( _req, res ) => {
+  app.get( "/api/jira/fields", withSiteOperation(async ( _req, res ) => {
     if ( !ensureEnvOrRespond( res ) )
     {
       return;
@@ -774,13 +774,13 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
         message: error instanceof Error ? error.message : "Unknown error",
       } );
     }
-  } );
+  }) );
 
-  app.get( "/api/settings", ( _req, res ) => {
+  app.get( "/api/settings", withSiteOperation(( _req, res ) => {
     return res.json( { settings: readSettingsMap( createStatements( getDb() ) ) } );
-  } );
+  }) );
 
-  app.put( "/api/settings", ( req, res ) => {
+  app.put( "/api/settings", withSiteOperation(( req, res ) => {
     const settings = req.body?.settings;
     if ( !settings || typeof settings !== "object" )
     {
@@ -815,13 +815,13 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
     }
 
     return res.json( { settings: readSettingsMap( stmts ) } );
-  } );
+  }) );
 
-  app.get( "/api/reminders", ( _req, res ) => {
+  app.get( "/api/reminders", withSiteOperation(( _req, res ) => {
     return res.json( { items: readReminders( createStatements( getDb() ) ) } );
-  } );
+  }) );
 
-  app.put( "/api/reminders", ( req, res ) => {
+  app.put( "/api/reminders", withSiteOperation(( req, res ) => {
     const incoming = Array.isArray( req.body?.reminders ) ? req.body.reminders : [];
     const rows = Array.from( { length: REMINDER_SLOT_COUNT }, ( _, index ) => ( {
       slotIndex: index,
@@ -832,14 +832,14 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
     const stmts = createStatements( getDb() );
     stmts.saveRemindersTxn( rows );
     return res.json( { items: readReminders( stmts ) } );
-  } );
+  }) );
 
-  app.get( "/api/watched-assignees", ( _req, res ) => {
+  app.get( "/api/watched-assignees", withSiteOperation(( _req, res ) => {
     const items = createStatements( getDb() ).listWatchedAssigneesStmt.all().map( mapWatchedAssigneeRow );
     return res.json( { items } );
-  } );
+  }) );
 
-  app.post( "/api/watched-assignees", ( req, res ) => {
+  app.post( "/api/watched-assignees", withSiteOperation(( req, res ) => {
     const payload = normalizeWatchedPayload( req.body );
     if ( payload.error )
     {
@@ -850,9 +850,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
     const result = stmts.insertWatchedAssigneeStmt.run( payload );
     const row = stmts.getWatchedAssigneeStmt.get( result.lastInsertRowid );
     return res.status( 201 ).json( mapWatchedAssigneeRow( row ) );
-  } );
+  }) );
 
-  app.put( "/api/watched-assignees/:id", ( req, res ) => {
+  app.put( "/api/watched-assignees/:id", withSiteOperation(( req, res ) => {
     const id = Number( req.params.id );
     const stmts = createStatements( getDb() );
     const existing = stmts.getWatchedAssigneeStmt.get( id );
@@ -869,9 +869,9 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
 
     stmts.updateWatchedAssigneeStmt.run( { id, ...payload } );
     return res.json( mapWatchedAssigneeRow( stmts.getWatchedAssigneeStmt.get( id ) ) );
-  } );
+  }) );
 
-  app.delete( "/api/watched-assignees/:id", ( req, res ) => {
+  app.delete( "/api/watched-assignees/:id", withSiteOperation(( req, res ) => {
     const id = Number( req.params.id );
     const stmts = createStatements( getDb() );
     const existing = stmts.getWatchedAssigneeStmt.get( id );
@@ -882,5 +882,5 @@ export const registerAppConfigRoutes = ( app, { getDb, jiraRequest, ensureEnvOrR
 
     stmts.deleteWatchedAssigneeStmt.run( id );
     return res.json( { ok: true, id } );
-  } );
+  }) );
 };

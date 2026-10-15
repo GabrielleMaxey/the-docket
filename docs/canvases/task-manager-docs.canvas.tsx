@@ -218,7 +218,7 @@ function SectionPanel({ section }: { section: SectionId }) {
         <Callout tone="warning" title="Security boundary">
           <Text>
             Jira and LLM credentials live in <Text weight="semibold">.env</Text>{" "}
-            (or packaged userData). The browser only calls{" "}
+            in the project checkout. The browser only calls{" "}
             <Text weight="semibold">server/jiraProxy.mjs</Text> — never Jira or
             LLM APIs directly.
           </Text>
@@ -357,8 +357,7 @@ function SectionPanel({ section }: { section: SectionId }) {
           Hash router (<Text weight="semibold">createHashRouter</Text>). Web dev:{" "}
           <Text weight="semibold">npm run dev:all</Text>. Desktop:{" "}
           <Text weight="semibold">npm run desktop:dev</Text> — Electron spawns
-          proxy; packaged builds serve <Text weight="semibold">dist/</Text> from
-          the proxy on 127.0.0.1.
+          the local proxy. Packaged installers are unsupported.
         </Text>
         <Card variant="borderless">
           <CardBody>
@@ -378,7 +377,7 @@ function SectionPanel({ section }: { section: SectionId }) {
             ["Dashboard refresh", "server/lib/dashboardRefresh/runDashboardRefresh.mjs", "Parse → metrics → persist snapshot"],
             ["HTTP client", "src/services/jiraClient.js", "All fetch → proxy wrappers"],
             ["Proxy entry", "server/jiraProxy.mjs", "CORS, logging, mounts routes, static dist in prod"],
-            ["Desktop", "electron/main.cjs", "Spawns proxy, TASK_MANAGER_USER_DATA for packaged .env + SQLite"],
+            ["Desktop", "electron/main.cjs", "Spawns local proxy; project .env + SQLite by default"],
           ]}
           striped
         />
@@ -605,7 +604,7 @@ function SectionPanel({ section }: { section: SectionId }) {
             ["npm run seed:presets", "Seed epic/JQL presets into local SQLite"],
             ["npm run check:jira-client-exports", "Verify jiraClient exports (runs on prebuild)"],
             ["npm run build", "Production Vite bundle → dist/"],
-            ["npm run desktop:dist", "Icons + build + electron-builder → release/"],
+            ["npm run desktop:build", "Alias for browser build; packaged installers unsupported"],
           ]}
           striped
         />

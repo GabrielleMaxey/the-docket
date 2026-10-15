@@ -2694,3 +2694,14 @@
   border-radius: 2px;
   flex-shrink: 0;
 }
+
+.ww-export-launch { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+.ww-task-export-modal .ww-export-entry { border: 1px solid #c8d3df; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+.ww-task-export-modal .ww-export-controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+.ww-task-export-modal .ww-export-controls label { display: flex; flex-direction: column; gap: .4rem; }
+.ww-task-export-modal .ww-export-controls select { padding: .5rem; max-width: 100%; }
+.ww-task-export-modal .ww-export-controls select[multiple] { min-width: 240px; min-height: 100px; }
+.ww-task-export-modal input[type="checkbox"] { margin-right: .4rem; }
+.ww-task-export-modal .ww-export-preview-site { border-top: 1px solid #c8d3df; margin-top: 1.5rem; padding-top: .5rem; }
+.ww-task-export-modal .ww-export-table-scroll { overflow-x: auto; }
+.ww-task-export-modal .ww-export-table-scroll td { white-space: pre-wrap; min-width: 130px; max-width: 320px; overflow-wrap: anywhere; }

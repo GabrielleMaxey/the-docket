@@ -115,7 +115,7 @@ const Dashboard = () => {
   );
 
   const [chartVariant, setChartVariant] = usePersistedState("dashboard-chart-variant", "pie");
-  const [activeProjectTab, setActiveProjectTab] = usePersistedState("dashboard-active-project-tab", "all");
+  const [activeProjectTab, setActiveProjectTab] = usePersistedState("dashboard-active-project-tab", "all", { siteScoped: true });
   const [activeDashboardTab, setActiveDashboardTab] = usePersistedState("dashboard-active-tab", "project");
 
   const selectedProjectEpic = React.useMemo(() => {

@@ -1,3 +1,5 @@
+import { initializeSiteContext } from "./services/jiraClient.js";
+import { getSiteContext, subscribeSiteContext, getSiteRecoveryNotice, isSiteSwitching } from "./utils/siteContextStore.js";
 import React from "react";
 import { createHashRouter, Outlet, NavLink } from "react-router-dom";
 import { FiSettings } from "react-icons/fi";
@@ -6,6 +8,7 @@ import "semantic-ui-css/semantic.min.css";
 import "./AppRouter.css";
 import BackgroundJobIndicator from "./Components/BackgroundJobIndicator.jsx";
 import JiraInstanceSwitcher from "./Components/JiraInstanceSwitcher.jsx";
+import { TodosProvider } from "./context/TodosContext.jsx";
 import { EpicFiltersProvider } from "./context/EpicFiltersContext.jsx";
 
 const WorkWeekTasks = React.lazy(() => import("./Pages/WorkWeekTasks.jsx"));
@@ -30,7 +33,14 @@ const PageFallback = () => (
   </main>
 );
 
-const AppLayout = () => (
+const AppLayout = () => {
+  const context = React.useSyncExternalStore(subscribeSiteContext, getSiteContext);
+  const switching = React.useSyncExternalStore(subscribeSiteContext, isSiteSwitching);
+  const recoveryNotice = React.useSyncExternalStore(subscribeSiteContext, getSiteRecoveryNotice);
+  const [error, setError] = React.useState("");
+  React.useEffect(() => { initializeSiteContext().catch((error) => setError(error.message)); }, []);
+  if (!context) return error ? <main role="alert">{error}</main> : <PageFallback />;
+  return (
   <>
     <nav className="app-nav">
       <NavLink to="/" className="app-nav-logo">
@@ -54,17 +64,21 @@ const AppLayout = () => (
         ))}
       </ul>
     </nav>
-    <EpicFiltersProvider>
-      <React.Suspense fallback={<PageFallback />}>
-        <Outlet />
-      </React.Suspense>
-    </EpicFiltersProvider>
+    {recoveryNotice && <p role="status">{recoveryNotice}</p>}
+    <div inert={switching ? "" : undefined} aria-busy={switching}>
+      <EpicFiltersProvider key={context.generation}>
+        <React.Suspense fallback={<PageFallback />}>
+          <Outlet />
+        </React.Suspense>
+      </EpicFiltersProvider>
+    </div>
   </>
-);
+  );
+};
 
 const router = createHashRouter([
   {
-    element: <AppLayout />,
+    element: <TodosProvider><AppLayout /></TodosProvider>,
     errorElement: <Errors />,
     children: [
       { path: "/", element: <WorkWeekTasks /> },
