@@ -26,6 +26,9 @@ describe("issue metadata image routes", () => {
       ensureEnvOrRespond: () => true,
       resolveJiraUser: async () => ({}),
     });
+    app.use((error, req, res, next) => {
+      res.status(500).json({ error: "Controlled test server failure" });
+    });
     const server = await new Promise((resolve) => {
       const listener = app.listen(0, "127.0.0.1", () => resolve(listener));
     });
@@ -77,6 +80,28 @@ describe("issue metadata image routes", () => {
           .keep_note_images,
         0
       );
+    });
+  });
+
+  it("keeps the prior image downloadable when a replacement insert fails", async () => {
+    await withServer(async ({ db, baseDir, request }) => {
+      const [original] = replaceNoteImages(db, baseDir, "ABC-1", [
+        { buffer: Buffer.from("original image"), mimeType: "image/png", filename: "image.png" },
+      ]);
+      db.prepare("INSERT INTO issue_metadata (issue_key, keep_note_images) VALUES (?, 1)").run("ABC-1");
+      db.exec(`CREATE TRIGGER reject_image BEFORE INSERT ON issue_note_images
+        BEGIN SELECT RAISE(ABORT, 'controlled insert failure'); END`);
+      const form = new FormData();
+      form.append("images", new Blob(["replacement"], { type: "image/png" }), "image.png");
+
+      const response = await request("/api/jira/issue-metadata/ABC-1/images", { method: "POST", body: form });
+
+      assert.equal(response.status, 500);
+      assert.deepEqual(listNoteImages(db, "ABC-1"), [original]);
+      assert.equal(db.prepare("SELECT keep_note_images FROM issue_metadata WHERE issue_key = ?").get("ABC-1").keep_note_images, 1);
+      const imageResponse = await request(`/api/jira/issue-metadata/ABC-1/images/${original.id}`);
+      assert.equal(imageResponse.status, 200);
+      assert.equal(await imageResponse.text(), "original image");
     });
   });
 
