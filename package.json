@@ -13,6 +13,7 @@
     "check:jira-client-exports": "node scripts/check-jira-client-exports.cjs",
     "pretest": "npm rebuild better-sqlite3",
     "test": "node --test tests/**/*.test.mjs",
+    "test:team-db": "node -e \"if (!process.env.DOCKET_TEST_DATABASE_URL) { console.error('DOCKET_TEST_DATABASE_URL is required; use a disposable loopback docket_test_* database with an explicit port.'); process.exit(1); }\" && node --test --test-concurrency=1 tests/teamPriorityPostgres.test.mjs tests/teamPriorityRoutes.test.mjs tests/issueMetadataStore.test.mjs tests/issueImportPreview.test.mjs tests/taskExport.test.mjs",
     "seed:presets": "node scripts/seed-epic-presets.mjs",
     "preseed:presets": "npm run check:node && npm rebuild better-sqlite3",
     "prebuild": "npm run check:node && npm run check:jira-client-exports",

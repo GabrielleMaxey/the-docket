@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 
 const loadStore = () => import("../server/lib/teamPriorityPostgres.mjs");
 const databaseUrl = process.env.DOCKET_TEST_DATABASE_URL;
@@ -257,4 +258,29 @@ test("real tracking migration backfills only recoverable values and is repeatabl
     { issue_key: "ABC-6", has_tracking: true },
     { issue_key: "ABC-7", has_tracking: false },
   ]);
+});
+
+
+test("database integration command rejects missing dedicated fixture configuration", () => {
+  const env = { ...process.env };
+  delete env.DOCKET_TEST_DATABASE_URL;
+  const result = spawnSync("npm", ["run", "test:team-db"], { env, encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout + result.stderr, /DOCKET_TEST_DATABASE_URL is required/);
+});
+
+test("real fresh schema applies every migration once and a second run applies none", { skip: !databaseUrl }, async (t) => {
+  assertTestDatabase(databaseUrl);
+  const { Pool } = await import("pg");
+  const fs = await import("node:fs/promises");
+  const { migrateTeamDatabase } = await import("../scripts/migrate-team-db.mjs");
+  const pool = new Pool({ connectionString: databaseUrl, max: 1 });
+  await pool.query("CREATE SCHEMA docket_test_ci_migrations");
+  const scoped = new Pool({ connectionString: databaseUrl, max: 1, options: "-c search_path=docket_test_ci_migrations" });
+  t.after(async () => { await scoped.end(); await pool.query("DROP SCHEMA docket_test_ci_migrations CASCADE"); await pool.end(); });
+  const migrations = (await fs.readdir(new URL("../server/db/team/", import.meta.url))).filter(name => /^\d+-.+\.sql$/.test(name)).sort();
+  assert.ok(migrations.length > 0);
+  assert.deepEqual(await migrateTeamDatabase(scoped), { applied: migrations.length });
+  assert.deepEqual(await migrateTeamDatabase(scoped), { applied: 0 });
+  assert.deepEqual((await scoped.query("SELECT version FROM team_schema_versions ORDER BY version")).rows.map(row => row.version), migrations);
 });

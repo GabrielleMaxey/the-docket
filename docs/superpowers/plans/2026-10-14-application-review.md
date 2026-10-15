@@ -1,12 +1,14 @@
 # The Docket Application Review Implementation Plan
 
+**Implementation status (2026-10-14):** The authorized code tasks are implemented. Current verification, task dispositions, recovery guidance and remaining gates are recorded in the [integrated handoff](../2026-10-14-implementation-handoff.md). Company SonarQube and execution of PostgreSQL 16 CI remain pending; the planned checklists below are historical scope, not claims that those external gates passed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver the approved reliability, security, shared-data, import, and multi-site workbook changes without rewriting unrelated working code.
 
 **Architecture:** Five linked plans implement independently testable subsystems. Keep React/Vite, Express route registration, plain-function helpers, local SQLite, and Electron development. Add optional PostgreSQL and server-generated workbooks through focused modules, not a new application architecture.
 
-**Tech Stack:** Node >=22, React 18, Express 5, better-sqlite3, Vite, Electron, Node test runner; proposed dependencies `pg` and `exceljs` require explicit approval.
+**Tech Stack:** Node >=22, React 18, Express 5, better-sqlite3, Vite, Electron, Node test runner; approved dependencies `pg` 8.23.1 and `exceljs` 4.4.0 (with the scoped uuid 11.1.1 override).
 
 **Spec:** [Approved design](../specs/2026-10-14-application-review-design.md). Read it with every child plan. This overview is the execution order and shared contract, not an additional implementation task.
 
@@ -49,10 +51,10 @@ S1–S3 precede cross-site data work. Keep work sequential when touching shared 
 
 | Proposed package | Use | Gate |
 | --- | --- | --- |
-| `pg` | PostgreSQL connection pool, parameterized statements, explicit transactions | Ask before D1 installation; version selected after checking current registry metadata, license, Node compatibility, and advisories |
+| `pg` | PostgreSQL connection pool, parameterized statements, explicit transactions | Approved and installed: 8.23.1; compatibility and audit evidence recorded in D1 and final handoff |
 | `exceljs` | Generate and read back actual `.xlsx` workbooks with per-site sheets | Approved ExcelJS 4.4.0 and scoped exceljs -> uuid 11.1.1 override; E2 verifies resolution, compatibility, audit and readback |
 
-These are npm libraries, not packaged desktop installers. Approval to write a plan is not approval to install them. Both projects publish MIT licenses, but this is not company license clearance. Use existing tools for all other work.
+The user approved these exact npm libraries before their installation. Both projects publish MIT licenses; this is not company license clearance. No other dependency was added for cleanup.
 
 Primary references consulted for plan decisions: [node-postgres transactions](https://node-postgres.com/features/transactions), [TLS configuration](https://node-postgres.com/features/ssl), [node-postgres license](https://github.com/brianc/node-postgres/blob/master/LICENSE), [ExcelJS documentation](https://github.com/exceljs/exceljs#readme), and [ExcelJS license](https://github.com/exceljs/exceljs/blob/master/LICENSE). Documentation establishes feature fit. The user subsequently approved pg 8.23.1 (D1 installed) and ExcelJS 4.4.0 with the scoped uuid 11.1.1 override for E2; actual current audit/compatibility evidence remains part of each implementation task.
 
@@ -70,11 +72,11 @@ Primary references consulted for plan decisions: [node-postgres transactions](ht
 
 ## Preparation and finish gates
 
-- [ ] Before implementation, obtain plan review, execution-method choice, and dependency approvals when their tasks are reached. Inspect git status; preserve `.claude/`, mockups, and unrelated pre-existing September documents. Apply the worktree skill at execution time if isolation is needed, not during planning.
-- [ ] Record a fresh build/test baseline with synthetic data. The historical 373/374 test result is not a current result. Socket permissions and native SQLite ABI must be distinguished from application test failures.
-- [ ] For each task: reproduce its meaningful failing behavior, implement minimally, run the named checks, inspect its diff, and commit only its listed files. Apply required local checks; record SonarQube as unavailable here after each code change rather than substituting Ruff for JavaScript.
-- [ ] A verification step passes only when its assertions pass and its command exits zero, with no unexpected skipped tests. Installation/native/socket failures are blockers to that evidence, not passing tests. The final PostgreSQL integration run must have no skipped database cases.
-- [ ] After C4: run integrated browser/Electron and PostgreSQL tests, inspect actual workbooks, and obtain company SonarQube results before merge. If company access is unavailable, deliver verified local work with that merge gate explicitly pending. Do not deploy, merge, provision infrastructure, or upload to SharePoint.
+- [x] Plan review, execution method and exact dependency approvals were obtained; execution used the isolated worktree and preserved unrelated user files.
+- [x] Fresh synthetic baselines and final checks were recorded. The final unit run has 586 passes and 10 explicitly skipped SQL cases; the separate database run has 72 passes and zero skips.
+- [x] Focused task implementation, regression reproduction, checks and commits are recorded in the handoff. SonarQube remains unavailable; Ruff was not substituted for JavaScript.
+- [x] Final local commands exited zero; dedicated PostgreSQL integration passed all 72 cases with zero skips. Initial failures and their corrections remain documented separately.
+- [ ] Before merge, obtain company SonarQube with no new Major/Critical findings and execute the configured PostgreSQL 16 CI. Local PostgreSQL 14.1, browser/Electron smoke and actual workbook inspection are recorded in the handoff; native browser file-save completion remains a manual check. No merge, deployment, provisioning or SharePoint upload is authorized.
 
 ## Plan self-review
 

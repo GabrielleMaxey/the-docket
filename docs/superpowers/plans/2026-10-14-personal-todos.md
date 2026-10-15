@@ -1,5 +1,7 @@
 # Personal To Dos Implementation Plan
 
+**Implementation status (2026-10-14):** The authorized code tasks are implemented. Current verification, task dispositions, recovery guidance and remaining gates are recorded in the [integrated handoff](../2026-10-14-implementation-handoff.md). Company SonarQube and execution of PostgreSQL 16 CI remain pending; the planned checklists below are historical scope, not claims that those external gates passed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Preserve personal To Dos and completed history across Jira sites and prevent lost/duplicated automatic saves.

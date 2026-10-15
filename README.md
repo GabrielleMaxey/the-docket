@@ -147,6 +147,18 @@ Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
 
 ---
 
+## Pull-request validation
+
+The read-only pull-request/manual workflow runs `npm ci`, the Jira client export check, `npm test`, `npm run test:team-db`, and `npm run build` with Node from `.nvmrc`. It uses a disposable PostgreSQL 16 service with synthetic data; no `.env`, Jira credentials, company secrets or installer artifacts are required.
+
+`npm test` explicitly skips real PostgreSQL cases when `DOCKET_TEST_DATABASE_URL` is absent. `npm run test:team-db` instead fails immediately without that variable and runs all database integration files, including migration repeatability, transactional rollback, import conflicts and Team export. Database files run sequentially because they share fixture tables; the intentional race tests still exercise concurrent transactions. Use an explicitly disposable loopback database named `docket_test_*` and an explicit port; every SQL fixture validates this boundary before destructive cleanup. Never point this test command at a shared database. For example, with your own disposable service:
+
+```sh
+DOCKET_TEST_DATABASE_URL=postgresql://docket_test:synthetic_test_only@127.0.0.1:5432/docket_test_ci npm run test:team-db
+```
+
+Unit and PostgreSQL results are reported separately in CI. Company SonarQube remains a required pre-merge gate with no newly introduced Major/Critical findings; local tests and the CI workflow do not replace it. See the [implementation handoff](docs/superpowers/2026-10-14-implementation-handoff.md) for actual verification, recovery instructions and outstanding checks.
+
 ## Optional shared team data (PostgreSQL)
 
 Local SQLite works without a team database. A company database is neither provisioned nor needed for local use. To enable shared data, have the database owner provide an approved PostgreSQL database and set server-only `TEAM_PRIORITY_DATABASE_URL` (explicit user, hostname and database). Optionally set `TEAM_PRIORITY_DATABASE_CA_FILE` to an absolute PEM trust-file path. Keep credentials out of browser settings, source control and exported files.

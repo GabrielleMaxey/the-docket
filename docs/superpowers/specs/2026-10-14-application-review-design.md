@@ -2,7 +2,7 @@
 
 Date: 2026-10-14
 
-Status: Approved for implementation planning on 2026-10-14 by the user's request to proceed with the plan. Product implementation has not started; implementation plans and new dependencies require review before execution.
+Status: The user approved implementation and the exact pg/ExcelJS dependencies; the linked code tasks are implemented. See the [integrated handoff](../2026-10-14-implementation-handoff.md) for verified outcomes and deliberate deferrals. Company SonarQube and execution of PostgreSQL 16 CI remain pending before merge.
 
 ## Purpose and scope
 
@@ -12,7 +12,7 @@ Development takes place on the user's personal Mac, which can access company Jir
 
 Keep `npm run dev:all` and `npm run desktop:dev`. Remove packaged installer support, not Electron itself. Personal To Dos remain inside The Docket but become independent of Jira sites. PostgreSQL is the first shared database target; the application must remain usable without a company database connection.
 
-This specification does not authorize implementation by itself. The approved design will be followed by an implementation plan. Only throwaway import-preview mockups have been changed so far.
+Implementation proceeded under the separately approved linked plans. This specification records agreed behavior; the integrated handoff records the current implementation and validation status.
 
 ## Review findings and agreed disposition
 
@@ -239,4 +239,4 @@ Both local and shared import include all approved supported fields, with local a
 
 A fresh software-engineering reviewer checked this draft on 2026-10-14. The only material questions identified were which approved import fields are shared and how team saving relates to local saving. The user's final decisions are incorporated above: all approved fields including planning are supported, and local and team saving are equally primary options. Remaining implementation choices were judged sufficiently constrained or explicitly delegated to the builder. This is a design review, not a code review or test result.
 
-A separate fresh reviewer checked the added workbook export and its interaction with site isolation and metadata sources on 2026-10-14. No important unanswered questions remained; the source-selection, active-site preservation, and incomplete-result rules were sufficiently defined for planning. Workbook generation and visual verification have not been performed because product implementation has not started.
+A separate fresh reviewer checked the added workbook export and its interaction with site isolation and metadata sources on 2026-10-14. No important unanswered questions remained; the source-selection, active-site preservation, and incomplete-result rules were sufficiently defined for planning. Workbook generation, ExcelJS readback and actual XLSX viewer inspection were subsequently completed in E2; full-app export navigation and preview were checked in C4. Native browser saved-file completion remains a manual check.
