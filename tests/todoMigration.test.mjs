@@ -130,7 +130,7 @@ for (const reason of ["no-legacy", "legacy-empty", "dest-has-data", "copied-lega
       original.close();
     }
     if (reason === "dest-has-data") {
-      source(dir, "workweek-old-site.sqlite", [{ id: 1, text: "independent recovery" }]);
+      source(dir, "workweek-old-site.sqlite", []);
       const existing = new Database(sitePath);
       existing.exec("INSERT INTO issue_metadata (issue_key, note) VALUES ('SYN-1', 'Synthetic')");
       existing.close();
@@ -140,6 +140,11 @@ for (const reason of ["no-legacy", "legacy-empty", "dest-has-data", "copied-lega
     meta.prepare("DELETE FROM jira_instance_meta WHERE key = ?").run("legacy_db_copy_records:old-site");
     if (!fs.existsSync(legacyPath)) source(dir, "workweek.sqlite", [{ id: 1, text: "canonical" }]);
     if (!fs.existsSync(sitePath)) source(dir, "workweek-old-site.sqlite", [{ id: 1, text: "site recovery" }]);
+    if (reason === "dest-has-data") {
+      const existing = new Database(sitePath);
+      existing.exec("INSERT INTO todos (id, text) VALUES (1, 'independent recovery')");
+      existing.close();
+    }
     const result = migration.migratePersonalTodos(db, migration.listTodoSources(meta, dir));
     assert.equal(result.copied, 1);
     assert.equal(result.unresolved.find((item) => item.sourceId === "site:old-site").count, 1);

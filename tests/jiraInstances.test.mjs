@@ -98,6 +98,32 @@ describe("seedInstanceAppDbFromLegacyIfNeeded", () => {
   });
 });
 
+for (const table of ["todos", "reminders"]) {
+  it(`preserves a destination containing only ${table} before eligible legacy seeding`, () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "jira-personal-seed-"));
+    tmpDirs.push(dir);
+    const meta = openInstancesMetaDb(path.join(dir, "instances-meta.sqlite"));
+    initInstancesSchema(meta);
+    const legacy = new Database(legacyAppDbPath(dir));
+    legacy.exec("CREATE TABLE epic_presets (id INTEGER PRIMARY KEY); INSERT INTO epic_presets VALUES (1)");
+    legacy.close();
+    const dest = new Database(appDbPathForInstance(dir, "personal"));
+    dest.exec(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, text TEXT); INSERT INTO ${table} VALUES (1, 'independent original')`);
+    dest.close();
+    try {
+      const result = seedInstanceAppDbFromLegacyIfNeeded(meta, dir, "personal");
+      assert.equal(result.seeded, false);
+      const preserved = new Database(appDbPathForInstance(dir, "personal"), { readonly: true });
+      assert.equal(preserved.prepare(`SELECT text FROM ${table} WHERE id = 1`).get().text, "independent original");
+      preserved.close();
+      assert.equal(meta.prepare("SELECT value FROM jira_instance_meta WHERE key = ?").get("legacy_db_seeded:personal"), undefined);
+      assert.equal(meta.prepare("SELECT value FROM jira_instance_meta WHERE key = ?").get("legacy_db_copy_records:personal"), undefined);
+    } finally {
+      meta.close();
+    }
+  });
+}
+
 describe("paths", () => {
   it("builds legacy and instance db paths", () => {
     assert.equal(legacyAppDbPath("/data"), path.join("/data", "workweek.sqlite"));

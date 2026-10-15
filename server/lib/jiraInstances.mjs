@@ -138,7 +138,7 @@ function copySqliteDatabase(srcPath, destPath) {
 }
 
 /**
- * One-time: when an instance app DB is missing or empty of presets/notes, copy
+ * One-time: when an instance app DB has no presets, notes, or personal records, copy
  * legacy workweek.sqlite (and note-images) so existing single-site data survives
  * the first activate. Flagged in meta so we never overwrite intentional empties.
  */
@@ -166,6 +166,10 @@ export function seedInstanceAppDbFromLegacyIfNeeded(metaDb, dataDir, instanceId)
   }
 
   const destExists = fs.existsSync(destPath);
+  if (destExists && (countTableRows(destPath, "todos") > 0 || countTableRows(destPath, "reminders") > 0)) {
+    // Preserve original source IDs without an ambiguous seeded flag or copy provenance.
+    return { seeded: false, reason: "dest-has-personal-data" };
+  }
   const destPresets = destExists ? countTableRows(destPath, "epic_presets") : 0;
   const destNotes = destExists ? countTableRows(destPath, "issue_metadata") : 0;
   if (destExists && (destPresets > 0 || destNotes > 0)) {
