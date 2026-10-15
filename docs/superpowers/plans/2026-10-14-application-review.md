@@ -27,7 +27,7 @@
 
 These adversarial cases are assigned tests in the named plans rather than left implicit:
 
-1. Same Jira key on different sites, including export while a switch is requested → Security S3; Data D1; Export E1.
+1. Same Jira key across saved entries (including the same hostname), including export while a switch is requested → Security S3; Data D1; Export E1.
 2. Server commits a To Do but its response is lost → To Dos T2 retries the same client identity, not a second create.
 3. Existing local and team notes disagree → Data D3 requires destination-specific approval and conflict checking.
 4. Jira times out after accepting a write → Security S2 reports an uncertain write outcome with no automatic retry.
@@ -40,7 +40,7 @@ These adversarial cases are assigned tests in the named plans rather than left i
 | 1 | [Local security and site isolation](2026-10-14-local-security.md) | Restricted local API, environment-only token, safe requests and site switching, scoped caches, Electron controls | None |
 | 2 | [Personal To Dos](2026-10-14-personal-todos.md) | Separate local store, durable migration markers, reliable autosave across navigation | Security S3 context boundary |
 | 3 | [Team data and imports](2026-10-14-team-data-imports.md) | Optional PostgreSQL, complete metadata contract, editable approved imports, equal save choices | Security S1–S3; `pg` approval |
-| 4 | [Workbook export](2026-10-14-workbook-export.md) | Selected sites and source-aware previews; one Excel sheet per site | Security S2/S3, Data D1/D2; `exceljs` approval |
+| 4 | [Workbook export](2026-10-14-workbook-export.md) | Saved-entry source-aware previews, latest Jira comment only, separate local/Team notes; one Excel sheet per saved entry | Security S2/S3, Data D1/D2; `exceljs` approval |
 | 5 | [Cleanup and validation](2026-10-14-cleanup-validation.md) | Installer removal, safe image replacement, search fix, verified dead-code cleanup, PR checks | Final integration follows 1–4; C1–C3 may be done earlier |
 
 S1–S3 precede cross-site data work. Keep work sequential when touching shared files (`jiraProxy.mjs`, `jiraClient.js`, schema, README, package manifests). Do not run agents concurrently on these files. Prefer a focused commit per task and a review before dependent work.
@@ -50,11 +50,11 @@ S1–S3 precede cross-site data work. Keep work sequential when touching shared 
 | Proposed package | Use | Gate |
 | --- | --- | --- |
 | `pg` | PostgreSQL connection pool, parameterized statements, explicit transactions | Ask before D1 installation; version selected after checking current registry metadata, license, Node compatibility, and advisories |
-| `exceljs` | Generate and read back actual `.xlsx` workbooks with per-site sheets | Ask before E2 installation; same current-version/security/license check |
+| `exceljs` | Generate and read back actual `.xlsx` workbooks with per-site sheets | Approved ExcelJS 4.4.0 and scoped exceljs -> uuid 11.1.1 override; E2 verifies resolution, compatibility, audit and readback |
 
 These are npm libraries, not packaged desktop installers. Approval to write a plan is not approval to install them. Both projects publish MIT licenses, but this is not company license clearance. Use existing tools for all other work.
 
-Primary references consulted for plan decisions: [node-postgres transactions](https://node-postgres.com/features/transactions), [TLS configuration](https://node-postgres.com/features/ssl), [node-postgres license](https://github.com/brianc/node-postgres/blob/master/LICENSE), [ExcelJS documentation](https://github.com/exceljs/exceljs#readme), and [ExcelJS license](https://github.com/exceljs/exceljs/blob/master/LICENSE). Documentation establishes feature fit; no dependency audit or version approval has happened yet.
+Primary references consulted for plan decisions: [node-postgres transactions](https://node-postgres.com/features/transactions), [TLS configuration](https://node-postgres.com/features/ssl), [node-postgres license](https://github.com/brianc/node-postgres/blob/master/LICENSE), [ExcelJS documentation](https://github.com/exceljs/exceljs#readme), and [ExcelJS license](https://github.com/exceljs/exceljs/blob/master/LICENSE). Documentation establishes feature fit. The user subsequently approved pg 8.23.1 (D1 installed) and ExcelJS 4.4.0 with the scoped uuid 11.1.1 override for E2; actual current audit/compatibility evidence remains part of each implementation task.
 
 ## Shared contracts
 
@@ -62,9 +62,11 @@ Primary references consulted for plan decisions: [node-postgres transactions](ht
 - `X-Docket-Site` holds the instance ID or `legacy`; `X-Docket-Generation` is the server-issued generation. Missing/stale context on scoped API requests returns `409 SITE_CONTEXT_CHANGED`; health, instance registry/bootstrap, independent To Dos, and explicit export routes have their documented separate rules.
 - Metadata public names retain `note`, `priority`, `startDate`, `completeDate`, `hasOpenDecision`, `plannedStart`, `plannedFinish`, `pmOverride`, `requestor`, `openDecisionNote`, `pinnedGantt`, `keepNoteImages`; add `followUp: 'now'|'next'|null`. Image storage flags are never shared or exported as an image payload. Import supports only the field subset listed in D2.
 - `MetadataPatch` is a partial object: an absent property means preserve, never reset. `followUp:null` explicitly clears. Dates remain `YYYY-MM-DD` strings; no timezone conversions of date-only values.
-- Shared identity is `(siteHost, issueKey)`, not local instance ID. Local identity remains the site-specific SQLite database plus key.
+- Shared identity is `(siteHost, issueKey)`, not local instance ID. Local identity remains the saved-entry-specific SQLite database plus key. Export sheets/exclusions preserve instanceId even for entries sharing the same host/key.
 - Local and team writes are separate transactions. No automatic fallback, implicit synchronization, or distributed transaction.
 - `getLocalMetadata(db, issueKeys) -> Record<issueKey, Metadata>` belongs to D2 and is reused by imports and export. `getTeamMetadata({siteHost, issueKeys}) -> Promise<Record<issueKey, Metadata>>` belongs to D1.
+
+- Export rows retain selected-source `note` for D2 compatibility but display explicit `localNote`, `localNoteStatus`, `teamNote`, `latestJiraComment:{text,author,createdAt}|null` and `jiraCommentStatus`. Only one latest-created comment is requested, after filters. Team mode adds a separately labeled local note without using it to fill selected Team metadata. See [binding export contracts](2026-10-14-workbook-export.md#binding-export-contracts-2026-10-14-final-clarification) for deadlines, failed provisional search results, selected registry leases, storage limits and E2/E3 handoff.
 
 ## Preparation and finish gates
 

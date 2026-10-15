@@ -123,6 +123,7 @@ const requestJsonNow = async ( path, options = {} ) => {
     } );
   } catch ( error )
   {
+    if ( fetchOptions.signal?.aborted ) throw error;
     if ( error?.name === "TimeoutError" || error?.name === "AbortError" )
     {
       throw new Error(
@@ -1179,3 +1180,15 @@ export const uploadIssueAttachments = async ( issueKey, files, { onProgress } = 
   } ),
   } );
 };
+
+// Export identifies saved entries directly and is independent of the active-site save queue.
+export const fetchTaskExportScopes = async ( instanceId, { signal } = {} ) =>
+  requestJsonNow( `/api/task-export/sites/${ encodeURIComponent( instanceId ) }/scopes`, { signal } );
+
+export const previewTaskExport = async ( options, { signal } = {} ) =>
+  requestJsonNow( "/api/task-export/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify( options ),
+    signal,
+  } );

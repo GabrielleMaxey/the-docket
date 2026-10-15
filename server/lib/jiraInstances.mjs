@@ -35,6 +35,35 @@ export function assertAllowedJiraBaseUrl(value, allowedHosts = getAllowedJiraHos
   return parsed.origin;
 }
 
+// Registry leases protect captured saved-entry identity without acquiring active-site leases.
+const instanceOperations = new WeakMap();
+export function beginInstanceOperations(metaDb, ids) {
+  const selected = [...new Set(ids)];
+  for (const id of selected) {
+    if (!getInstanceRow(metaDb, id)?.enabled) {
+      throw Object.assign(new Error("Choose an enabled saved Jira entry"), { status: 400 });
+    }
+  }
+  let leases = instanceOperations.get(metaDb);
+  if (!leases) { leases = new Map(); instanceOperations.set(metaDb, leases); }
+  for (const id of selected) leases.set(id, (leases.get(id) || 0) + 1);
+  let released = false;
+  return { release() {
+    if (released) return;
+    released = true;
+    for (const id of selected) {
+      const remaining = leases.get(id) - 1;
+      if (remaining) leases.set(id, remaining); else leases.delete(id);
+    }
+  } };
+}
+
+const assertInstanceIdle = (metaDb, id) => {
+  if (instanceOperations.get(metaDb)?.has(id)) {
+    throw Object.assign(new Error("This saved Jira entry is being exported. Try editing or removing it after collection finishes."), { status: 409, code: "INSTANCE_IN_USE" });
+  }
+};
+
 const ACTIVE_INSTANCE_KEY = "active_instance_id";
 const legacySeedMetaKey = (instanceId) => `legacy_db_seeded:${instanceId}`;
 
@@ -304,6 +333,7 @@ export function createInstance(metaDb, input, allowedHosts = getAllowedJiraHosts
 }
 
 export function updateInstance(metaDb, id, patch, allowedHosts = getAllowedJiraHosts()) {
+  assertInstanceIdle(metaDb, id);
   if (Object.hasOwn(patch, "apiToken")) {
     throw new TypeError("Set JIRA_API_TOKEN in the server .env; submitted tokens are not accepted");
   }
@@ -334,6 +364,7 @@ export function updateInstance(metaDb, id, patch, allowedHosts = getAllowedJiraH
 }
 
 export function deleteInstance(metaDb, id) {
+  assertInstanceIdle(metaDb, id);
   metaDb.prepare("DELETE FROM jira_instances WHERE id = ?").run(id);
 
   let activeInstanceId = getActiveInstanceId(metaDb);

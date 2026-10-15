@@ -79,7 +79,7 @@ export const registerJiraInstanceRoutes = (app, { metaDb, switchSite, changeSite
     try {
       await changeSite(req.headers["x-docket-generation"], () => deleteInstance(metaDb, id).activeInstanceId);
     } catch (error) {
-      if (error.code !== "SITE_CONTEXT_CHANGED") throw error;
+      if (!["SITE_CONTEXT_CHANGED", "INSTANCE_IN_USE"].includes(error.code)) throw error;
       return res.status(409).json({ error: error.message, code: error.code });
     }
 

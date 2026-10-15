@@ -19,6 +19,7 @@ import { registerEpicWorkloadRoutes } from "./routes/epicWorkloadRoutes.mjs";
 import { registerCapacityPlanningRoutes } from "./routes/capacityPlanningRoutes.mjs";
 import { registerTeamPriorityRoutes } from "./routes/teamPriorityRoutes.mjs";
 import { registerPmAsksRoutes } from "./routes/pmAsksRoutes.mjs";
+import { registerTaskExportRoutes } from "./routes/taskExportRoutes.mjs";
 import { registerTodoRoutes } from "./routes/todoRoutes.mjs";
 import { registerAttachmentRoutes } from "./routes/attachmentRoutes.mjs";
 import { resolveJiraUser, fetchJiraMyself } from "./lib/jiraSearchHelpers.mjs";
@@ -374,6 +375,7 @@ const routeCtx = {
   getCredentials,
 };
 
+registerTaskExportRoutes(app, routeCtx);
 registerJiraInstanceRoutes(app, routeCtx);
 registerJiraCoreRoutes(app, routeCtx);
 registerJiraIssueRoutes(app, routeCtx);
