@@ -172,3 +172,105 @@ test("Now/Next checkbox events replace the active choice and unchecking clears i
   assert.equal(followUp, null);
   assert.deepEqual(inputs().map((input) => input.props.checked), [false, false]);
 });
+
+
+test("shared Load More and local planning hydration preserve both sources through local Save All", async (t) => {
+  const fs = await import("node:fs/promises");
+  const { build } = await import("esbuild");
+  const source = await fs.readFile(new URL("../src/Pages/hooks/useTaskManagerJira.js", import.meta.url), "utf8");
+  const handlers = source.slice(source.indexOf("  const handleSavePlanningAll"), source.indexOf("  const handlePinnedGanttChange"));
+  const bundled = await build({ stdin: { contents: `
+    export * from "./src/Pages/hooks/jiraJqlRunWorkflow.js";
+    export * from "./src/utils/siteContextStore.js";
+    import { saveIssueMetadata, saveTeamDate } from "./src/services/jiraClient.js";
+    import { validateMetadataPatch } from "./shared/issueMetadataFields.mjs";
+    export const configurePlanning = ({ planningMetaByKey, setPlanningMetaByKey, startDateByKey, completeDateByKey }) => {
+      const React = { useCallback: (callback) => callback };
+      ${handlers}
+      return { handleSavePlanningAll, handlePlanningFieldChange };
+    };`, resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node", define: { "import.meta.env.VITE_API_BASE": "undefined" } });
+  const actual = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`);
+  const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  t.after(() => { globalThis.fetch = originalFetch; if (originalWindow === undefined) delete globalThis.window; else globalThis.window = originalWindow; });
+  const issue = { key: "ABC-1", id: "1", fields: { summary: "Synthetic task" } };
+  const saved = { note: "saved note", priority: 3, followUp: "now", requestor: "Local owner", plannedStart: "2026-10-01", plannedFinish: "2026-10-05", hasOpenDecision: true, openDecisionNote: "Saved decision", pmOverride: "hold", startDate: "2026-09-30", completeDate: "2026-10-06" };
+  for (const localMode of ["load-more", "drill-down", "run-local", "run-shared"]) {
+    for (const sharedFirst of [true, false]) {
+      const name = `${localMode}/${sharedFirst ? "shared-first" : "local-first"}`;
+      await t.test(name, async () => {
+        const storage = new Map();
+        const browserStorage = { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) };
+        globalThis.window = { localStorage: browserStorage, sessionStorage: browserStorage, setTimeout: () => 0, clearTimeout: () => {} };
+        const context = { instanceId: name, generation: name };
+        actual.setSiteContext(context);
+        const calls = [];
+        globalThis.fetch = async (url, options) => {
+          const body = JSON.parse(options.body || "{}");
+          calls.push({ url, options, body });
+          assert.equal(options.headers["X-Docket-Site"], name);
+          let result;
+          if (url === "/api/jira/search/all") result = { issues: [issue], total: 1, loaded: 1, isComplete: true };
+          else if (url === "/api/jira/issue-metadata/bulk") result = { items: { "ABC-1": saved } };
+          else if (url === "/api/team-priority/metadata/bulk") result = { items: { "ABC-1": { followUp: "next" } } };
+          else if (url === "/api/team-priority/dates/bulk" || url === "/api/team-priority/bulk") result = { items: {} };
+          else if (url === "/api/jira/issue-metadata/ABC-1" || url === "/api/team-priority/dates/ABC-1") result = { ok: true, ...body };
+          else assert.fail(`Unexpected synthetic HTTP request: ${url}`);
+          return new Response(JSON.stringify(result));
+        };
+        let planning = {};
+        let runs = [];
+        let notes = { "ABC-1": "draft note" };
+        let priorities = { "ABC-1": 9 };
+        let starts = { "ABC-1": "2026-09-29" };
+        let completes = { "ABC-1": "2026-10-07" };
+        const setPlanningMetaByKey = (update) => { planning = update(planning); };
+        const common = { siteContext: context, jqlMaxResults: 20, clampPriority: Number, pullLatestComment: false, fieldMappingRows: [], setJqlRuns: (update) => { runs = typeof update === "function" ? update(runs) : update; }, setJqlLoading: () => {}, setJqlError: (error) => { assert.equal(error, ""); }, setShowRestoredJqlBanner: () => {}, setJiraNotes: (update) => { notes = update(notes); }, setJiraRowPriorities: (update) => { priorities = update(priorities); }, setStartDateByKey: (update) => { starts = update(starts); }, setCompleteDateByKey: (update) => { completes = update(completes); }, setPlanningMetaByKey };
+        const loadMore = async (sharedProgramId) => {
+          runs = [{ index: 0, label: "Synthetic", jql: "key = ABC-1", sharedProgramId, issues: [], total: 1, loaded: 0, loadComplete: false }];
+          await actual.loadRemainingJqlIssues({ ...common, runIndex: 0, jqlRuns: runs });
+        };
+        const hydrateLocal = async () => {
+          if (localMode === "load-more") await loadMore("");
+          else if (localMode === "drill-down") await actual.loadDrillDownIssueByKey({ ...common, issueKey: "ABC-1" });
+          else await actual.runJqlWorkflow({ ...common, jqlInputs: ["key = ABC-1"], jqlLabels: ["Synthetic"], jqlSharedProgramIds: [localMode === "run-shared" ? "team" : ""] });
+        };
+        if (sharedFirst) {
+          await loadMore("team");
+          assert.deepEqual(planning["ABC-1"], { teamFollowUp: "next" });
+          await hydrateLocal();
+        } else {
+          await hydrateLocal();
+          await loadMore("team");
+        }
+        assert.equal(planning["ABC-1"].teamFollowUp, "next");
+        assert.equal(planning["ABC-1"].followUp, "now");
+        assert.equal(planning["ABC-1"].requestor, "Local owner");
+        assert.equal(planning["ABC-1"].plannedStart, "2026-10-01");
+        assert.equal(planning["ABC-1"].plannedFinish, "2026-10-05");
+        assert.equal(notes["ABC-1"], "draft note");
+        assert.equal(priorities["ABC-1"], 9);
+        assert.equal(starts["ABC-1"], "2026-09-29");
+        assert.equal(completes["ABC-1"], "2026-10-07");
+        const configured = () => actual.configurePlanning({ planningMetaByKey: planning, setPlanningMetaByKey, startDateByKey: starts, completeDateByKey: completes });
+        await configured().handleSavePlanningAll("ABC-1");
+        const save = calls.findLast((call) => call.url === "/api/jira/issue-metadata/ABC-1");
+        assert.equal(save.body.followUp, "now");
+        assert.equal(save.body.requestor, "Local owner");
+        assert.equal(save.body.plannedStart, "2026-10-01");
+        assert.equal(save.body.plannedFinish, "2026-10-05");
+        assert.equal(save.body.hasOpenDecision, true);
+        assert.equal(Object.hasOwn(save.body, "teamFollowUp"), false);
+        configured().handlePlanningFieldChange("ABC-1", "followUp", null);
+        configured().handlePlanningFieldChange("ABC-1", "requestor", "");
+        configured().handlePlanningFieldChange("ABC-1", "hasOpenDecision", false);
+        await hydrateLocal();
+        assert.equal(planning["ABC-1"].followUp, null);
+        assert.equal(planning["ABC-1"].requestor, "");
+        assert.equal(planning["ABC-1"].hasOpenDecision, false);
+        assert.equal(planning["ABC-1"].teamFollowUp, "next");
+        assert.equal(planning["ABC-1"].plannedStart, "2026-10-01");
+      });
+    }
+  }
+});

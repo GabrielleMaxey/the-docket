@@ -112,6 +112,14 @@ const applyTeamPriorityState = async ({
   }
 };
 
+const mergePlanningMetaPreferExisting = (previous, additions) => {
+  const merged = { ...previous };
+  for (const [key, fields] of Object.entries(additions || {})) {
+    merged[key] = { ...fields, ...previous[key] };
+  }
+  return merged;
+};
+
 const PLANNING_FIELD_KEYS = ["followUp", "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
 
 const extractPlanningMeta = (item) => ({
@@ -247,7 +255,7 @@ const applyDrillDownMetadata = async ({
     setCompleteDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextCompleteDates));
   }
   if (setPlanningMetaByKey && Object.keys(nextPlanningMeta).length > 0) {
-    setPlanningMetaByKey((prev) => mergeIssueMapsPreferExisting(prev, nextPlanningMeta));
+    setPlanningMetaByKey((prev) => mergePlanningMetaPreferExisting(prev, nextPlanningMeta));
   }
 };
 
@@ -400,7 +408,7 @@ export async function runJqlWorkflow({
           setCompleteDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextCompleteDates));
         }
         if (setPlanningMetaByKey && Object.keys(nextPlanningMeta).length > 0) {
-          setPlanningMetaByKey((prev) => mergeIssueMapsPreferExisting(prev, nextPlanningMeta));
+          setPlanningMetaByKey((prev) => mergePlanningMetaPreferExisting(prev, nextPlanningMeta));
         }
       } catch (error) {
         console.error("Failed to fetch persisted issue metadata", error);
@@ -445,7 +453,7 @@ export async function runJqlWorkflow({
           setCompleteDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextCompleteDates));
         }
         if (setPlanningMetaByKey && Object.keys(nextPlanningMeta).length > 0) {
-          setPlanningMetaByKey((prev) => mergeIssueMapsPreferExisting(prev, nextPlanningMeta));
+          setPlanningMetaByKey((prev) => mergePlanningMetaPreferExisting(prev, nextPlanningMeta));
         }
       } catch (error) {
         console.error("Failed to fetch notes for team-slot issues", error);
@@ -591,7 +599,7 @@ export async function loadRemainingJqlIssues({
         setCompleteDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextCompleteDates));
       }
       if (setPlanningMetaByKey && Object.keys(nextPlanningMeta).length > 0) {
-        setPlanningMetaByKey((prev) => mergeIssueMapsPreferExisting(prev, nextPlanningMeta));
+        setPlanningMetaByKey((prev) => mergePlanningMetaPreferExisting(prev, nextPlanningMeta));
       }
     } catch (error) {
       console.error("Failed to fetch persisted issue metadata", error);
