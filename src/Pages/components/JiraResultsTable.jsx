@@ -1,6 +1,7 @@
 import { FOLLOW_UP_OPTIONS } from "../../../shared/issueMetadataFields.mjs";
 import React from "react";
 import { Button, Modal } from "semantic-ui-react";
+import CombinedOpenWork from "../CombinedOpenWork.jsx";
 import PriorityCell from "./cells/PriorityCell";
 import AssigneeCell from "./cells/AssigneeCell.jsx";
 import NoteImagesStrip from "./NoteImagesStrip.jsx";
@@ -176,6 +177,8 @@ const JiraResultsTable = ({
   handleSelectForPush,
   handlePushNote,
   onActiveTabChange,
+  combinedOpenWorkActive,
+  onCombinedOpenWorkChange,
   initialActiveRunIndex,
   prioritySourceByKey,
   jqlSharedProgramIds,
@@ -336,12 +339,9 @@ const JiraResultsTable = ({
     setPageByRunIndex((prevPages) => ({ ...prevPages, [stateKey]: 1 }));
   }, [drillDownFilters, getJqlRunsIndex, onActiveTabChange, visibleRuns]);
 
-  if (visibleRuns.length === 0) {
-    return null;
-  }
-
+  const showCombinedOpenWork = combinedOpenWorkActive || visibleRuns.length === 0;
   const safeTab = Math.min(activeTab, visibleRuns.length - 1);
-  const run = visibleRuns[safeTab];
+  const run = visibleRuns[safeTab] || {};
   const runStateKey = getRunStateKey(run, safeTab);
   const runSlotIndex = run.index ?? safeTab;
   const allLoadedIssues = run.issues || [];
@@ -381,6 +381,7 @@ const JiraResultsTable = ({
   const hasMoreToLoad = !run.isDrillDown && !run.loadComplete && jiraTotal > loadedCount;
 
   const handleTabChange = (idx, item) => {
+    onCombinedOpenWorkChange?.(false);
     setActiveTab(idx);
     if (onActiveTabChange && !item?.isPendingDrillDown) {
       const runsIdx = getJqlRunsIndex(item);
@@ -490,17 +491,17 @@ const JiraResultsTable = ({
               key={`jql-tab-${getRunStateKey(item, idx)}`}
               className={
                 "ww-jql-tab-item" +
-                (idx === safeTab ? " is-active" : "") +
+                (!showCombinedOpenWork && idx === safeTab ? " is-active" : "") +
                 (item.isDrillDown ? " is-drill-down" : "")
               }
             >
               <button
                 type="button"
                 role="tab"
-                aria-selected={idx === safeTab}
+                aria-selected={!showCombinedOpenWork && idx === safeTab}
                 className={
                   "ww-jql-tab-btn" +
-                  (idx === safeTab ? " is-active" : "") +
+                  (!showCombinedOpenWork && idx === safeTab ? " is-active" : "") +
                   (item.isDrillDown ? " is-drill-down" : "")
                 }
                 onClick={() => handleTabChange(idx, item)}
@@ -520,10 +521,21 @@ const JiraResultsTable = ({
               ) : null}
             </div>
           ))}
+          <div className={"ww-jql-tab-item" + (showCombinedOpenWork ? " is-active" : "")}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={showCombinedOpenWork}
+              className={"ww-jql-tab-btn" + (showCombinedOpenWork ? " is-active" : "")}
+              onClick={() => onCombinedOpenWorkChange?.(true)}
+            >
+              Combined Open Work
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="ww-jql-result">
+      {showCombinedOpenWork ? <CombinedOpenWork /> : <div className="ww-jql-result">
         <div className="ww-jql-result-header">
           <p className="ww-jql-title">{run.label}</p>
         </div>
@@ -1501,7 +1513,7 @@ const JiraResultsTable = ({
             />
           </div>
         )}
-      </div>
+      </div>}
       <AttachFilesModal
         open={Boolean(attachTarget)}
         issueKey={attachTarget?.key || ""}

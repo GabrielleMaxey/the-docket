@@ -277,7 +277,7 @@ Changes to selected entries, source, scope, or filters clear the preview. Retry 
 
 ### Combined Open Work
 
-Open **Combined Open Work** in the main navigation (`#/combined-open-work`) to see Jira issues assigned to the account configured for each selected saved site. Enabled saved entries are selected initially; choose the entries you want and click **Load open work**. The fixed search is `assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC, key ASC`, across all projects accessible to that account. Collection leaves the active Jira site unchanged. This view is read-only.
+Open **Task Management** and choose the **Combined Open Work** result tab beside your JQL preset tabs (`#/work-week?tab=combined-open-work`; the old `#/combined-open-work` link redirects here) to see Jira issues assigned to the account configured for each selected saved site. Enabled saved entries are selected initially; choose the entries you want and click **Load open work**. The fixed search is `assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC, key ASC`, across all projects accessible to that account. Collection leaves the active Jira site unchanged. This view is read-only.
 
 The combined table shows the saved site label and hostname, issue link, title, status, Jira priority, and due date. Saved entries remain separate even when their hostname or issue keys match. Successful rows stay visible when a peer fails; failed entries are explicitly identified rather than reported as having no work. A partial notice means the list is incomplete. **Refresh** retries the selected set, **Cancel** stops collection, and changing selection clears prior results.
 

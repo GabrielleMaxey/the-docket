@@ -59,8 +59,8 @@ export default function CombinedOpenWork() {
   const allComplete = result?.sites.every(site => site.status === "complete");
 
   return (
-    <main className="ui container combined-open-work">
-      <h1 className="ui header">Combined Open Work</h1>
+    <section className="combined-open-work" aria-labelledby="combined-open-work-heading">
+      <h2 id="combined-open-work-heading" className="ui header">Combined Open Work</h2>
       <p>Open issues assigned to the account configured for each selected Jira site. Open means the status category is not Done.</p>
       {error && <p className="ui negative message" role="alert">{error}</p>}
       {!sites && !error && <p role="status">Loading saved Jira sites…</p>}
@@ -95,6 +95,6 @@ export default function CombinedOpenWork() {
           </table>
         </div>}
       </>}
-    </main>
+    </section>
   );
 }

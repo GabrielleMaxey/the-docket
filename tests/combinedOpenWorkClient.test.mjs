@@ -152,3 +152,9 @@ test("no saved sites offers Settings, registry errors show failure, empty comple
     }
   }
 });
+
+test("combined work uses an embedded section and heading within Task Management", async t => {
+  const app = await mount(t, async url => new Response(JSON.stringify(url.endsWith("/health") ? { siteContext: { instanceId: "active", generation: "1" } } : { instances: saved })));
+  assert.equal(app.render().type, "section");
+  assert.equal(find(app.render(), node => node.type === "h2").length, 1);
+});

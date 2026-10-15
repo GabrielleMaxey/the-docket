@@ -1,8 +1,18 @@
 # Combined Open Work handoff
 
-Implemented on `codex/combined-open-work` in `/Users/gabriellemaxey/.codex/worktrees/docket-security/taskManager`, based on refactor PR34 head `110c3e4`. Product commit `47def25`; plan verification commit `71c1a34`. The normal checkout remains on its prior branch. This feature has not been pushed or merged.
+Current branch: `codex/combined-open-work-tab`. The placement correction is implemented in the same isolated worktree; see [tab placement plan](2026-10-15-combined-open-work-tab.md) and its task report under `.superpowers/sdd/2026-10-15-combined-open-work-tab/`. The feature remains unpushed and unmerged.
 
-Choose **Combined Open Work**, select saved Jira sites and click **Load open work**. Only unfinished issues assigned to the configured account on each site appear. The combined read-only table labels each saved site, keeps same-key entries separate, supports refresh/cancel, and preserves successful results when another site fails. Collection never activates another site. A deliberate active-site switch still resets the page through the existing application lifecycle.
+Original implementation history: implemented on `codex/combined-open-work` in `/Users/gabriellemaxey/.codex/worktrees/docket-security/taskManager`, based on refactor PR34 head `110c3e4`. Product commit `47def25`; plan verification commit `71c1a34`. The normal checkout remains on its prior branch. This feature has not been pushed or merged.
+
+Open **Task Management**, choose the **Combined Open Work** tab beside existing JQL result tabs, select saved Jira sites and click **Load open work**. Only unfinished issues assigned to the configured account on each site appear. The combined read-only table labels each saved site, keeps same-key entries separate, supports refresh/cancel, and preserves successful results when another site fails. Collection never activates another site. A deliberate active-site switch still resets the page through the existing application lifecycle.
+
+## Tab placement correction
+
+- Combined Open Work is available in the existing result-tab row, including when there are no configured result runs. The separate main-navigation entry is removed; old links redirect to `#/work-week?tab=combined-open-work`.
+- Combined selection uses the existing URL search parameters and never enters persisted JQL runs or changes the saved ordinary run index. Ordinary editing, filtering, load-more and drill-down handlers continue to receive ordinary runs only.
+- Single-site My Metrics, restored-result and drill-down banners are hidden while combined is selected. Leaving the combined tab unmounts the view and cancels its request; returning requires an explicit load.
+- The reusable view now renders a section with an h2 inside Task Management. Collection, API and backend behavior are unchanged.
+- Original implementation/review evidence below is historical; the earlier standalone navigation placement is superseded by this correction.
 
 ## Changed files
 
