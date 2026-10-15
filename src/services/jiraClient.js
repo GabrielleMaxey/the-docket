@@ -396,7 +396,7 @@ export const fetchLatestJiraCommentsBulk = async ( issueKeys, { siteContext } = 
   return data?.items || {};
 };
 
-const PLANNING_FIELDS = [ "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote" ];
+const PLANNING_FIELDS = [ "followUp", "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote" ];
 
 export const saveIssueMetadata = async ( { issueKey, note, priority, startDate, completeDate, ...planningFields }, { siteContext } = {} ) => {
   const body = {};

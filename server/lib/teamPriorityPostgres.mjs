@@ -2,14 +2,8 @@ import fs from "node:fs";
 import { Pool } from "pg";
 import { clampIssuePriority } from "../../shared/issuePriority.mjs";
 
-const fields = {
-  priority: "priority", followUp: "follow_up", note: "note", requestor: "requestor",
-  openDecisionNote: "open_decision_note", pmOverride: "pm_override",
-  hasOpenDecision: "has_open_decision", pinnedGantt: "pinned_gantt",
-  startDate: "start_date", completeDate: "complete_date",
-  plannedStart: "planned_start", plannedFinish: "planned_finish",
-};
-const dateFields = ["startDate", "completeDate", "plannedStart", "plannedFinish"];
+import { METADATA_COLUMNS as fields, METADATA_DATE_FIELDS as dateFields, validateMetadataPatch } from "../../shared/issueMetadataFields.mjs";
+
 const trackingFields = [...dateFields, "hasOpenDecision", "pmOverride", "requestor", "openDecisionNote"];
 const selectMetadata = Object.entries(fields).map(([field, column]) =>
   `${dateFields.includes(field) ? `to_char(${column}, 'YYYY-MM-DD')` : column} AS "${field}"`
@@ -66,6 +60,7 @@ export const closeTeamPool = async () => {
 
 export const teamDatabaseError = (error) => {
   if (["TEAM_DATABASE_UNCONFIGURED", "TEAM_DATABASE_CONFIG", "TEAM_METADATA_INVALID", "TEAM_METADATA_CONFLICT", "TEAM_SCHEMA_REQUIRED", "TEAM_DATABASE_UNAVAILABLE"].includes(error?.code)) return error;
+  if (error?.code === "40001" || error?.code === "40P01") return fail("Team metadata changed; refresh and review before saving", 409, "TEAM_METADATA_CONFLICT");
   if (["42P01", "42703", "3F000"].includes(error?.code)) return fail("Team schema unavailable — run npm run team-db:migrate", 503, "TEAM_SCHEMA_REQUIRED");
   if (["23514", "22007", "22008", "22P02", "22003", "23502"].includes(error?.code)) return fail("Invalid team metadata value", 400);
   return fail("Team database unavailable — check server configuration and run npm run team-db:migrate", 503, "TEAM_DATABASE_UNAVAILABLE");
@@ -90,21 +85,6 @@ const issueKey = (key) => {
   if (!/^[A-Z][A-Z0-9_]*-[1-9][0-9]*$/.test(value)) throw fail("Invalid issue key");
   return value;
 };
-const fieldValue = (field, value) => {
-  if (!Object.hasOwn(fields, field)) throw fail("Unsupported team metadata field");
-  if (dateFields.includes(field)) {
-    if (value === null || value === "") return null;
-    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw fail(`${field} must be YYYY-MM-DD`);
-  } else if (["hasOpenDecision", "pinnedGantt"].includes(field)) {
-    if (typeof value !== "boolean") throw fail(`${field} must be a boolean`);
-  } else if (field === "priority") {
-    if (!Number.isInteger(value)) throw fail("priority must be an integer");
-  } else if (field === "followUp") {
-    if (value !== null && !["now", "next"].includes(value)) throw fail("followUp must be now, next or null");
-  } else if (typeof value !== "string") throw fail(`${field} must be text`);
-  return value;
-};
-
 // Both readers share one query so tracking presence and values cannot race a clear.
 const readTeamMetadata = async ({ siteHost, issueKeys }, trackingOnly = false) => {
   const db = getTeamPool();
@@ -122,21 +102,26 @@ export const getTeamMetadata = (input) => readTeamMetadata(input);
 // Reused by the explicit demo migration so all imported collections commit together.
 export const writeTeamMetadataEntries = async (client, { siteHost, entries, updatedBy = "" }) => {
   const host = normalizeTeamSiteHost(siteHost);
-  if (!Array.isArray(entries)) throw fail("entries must be an array");
+  if (!Array.isArray(entries) || entries.length > 5000) throw fail("Import must contain at most 5,000 rows");
   let updated = 0;
   for (const entry of entries) {
     const key = issueKey(entry?.issueKey);
-    if (!entry.patch || typeof entry.patch !== "object" || Array.isArray(entry.patch)) throw fail("A metadata patch is required");
-    const values = Object.entries(entry.patch).map(([field, value]) => [field, fieldValue(field, value)]);
-    if (!values.length) throw fail("A metadata field is required");
-    await client.query("INSERT INTO team_issue_metadata (site_host, issue_key) VALUES ($1, $2) ON CONFLICT DO NOTHING", [host, key]);
+    const { patch, errors } = validateMetadataPatch(entry.patch);
+    if (errors.length || !Object.keys(patch).length) throw fail(errors.join("; ") || "A metadata field is required");
+    const values = Object.entries(patch);
     const { rows: [current] } = await client.query(`SELECT ${selectMetadata} FROM team_issue_metadata WHERE site_host = $1 AND issue_key = $2 FOR UPDATE`, [host, key]);
-    if (entry.expected !== undefined) {
-      if (!entry.expected || typeof entry.expected !== "object" || Array.isArray(entry.expected)) throw fail("expected must contain metadata fields");
-      for (const [field, value] of Object.entries(entry.expected)) {
-        if (current[field] !== fieldValue(field, value)) throw fail("Team metadata changed; refresh and review before saving", 409, "TEAM_METADATA_CONFLICT");
+    if (entry.expected === null && current) throw fail("Team metadata changed; refresh and review before saving", 409, "TEAM_METADATA_CONFLICT");
+    if (entry.expected !== undefined && entry.expected !== null) {
+      const expected = validateMetadataPatch(entry.expected);
+      if (expected.errors.length) throw fail(expected.errors.join("; "));
+      for (const field of Object.keys(patch)) {
+        if (!Object.hasOwn(expected.patch, field)) throw fail(`Expected value required for ${field}`);
+        if (current?.[field] !== expected.patch[field]) throw fail("Team metadata changed; refresh and review before saving", 409, "TEAM_METADATA_CONFLICT");
       }
     }
+    const dates = validateMetadataPatch({ plannedStart: current?.plannedStart || null, plannedFinish: current?.plannedFinish || null, ...Object.fromEntries(values.filter(([field]) => ["plannedStart", "plannedFinish"].includes(field))) });
+    if (dates.errors.length) throw fail(dates.errors.join("; "));
+    await client.query("INSERT INTO team_issue_metadata (site_host, issue_key) VALUES ($1, $2) ON CONFLICT DO NOTHING", [host, key]);
     const assignments = values.map(([field], index) => `${fields[field]} = $${index + 3}`);
     if (values.some(([field]) => trackingFields.includes(field))) assignments.push("has_tracking = TRUE");
     await client.query(`UPDATE team_issue_metadata SET ${assignments.join(", ")}, updated_at = CURRENT_TIMESTAMP, updated_by = $${values.length + 3} WHERE site_host = $1 AND issue_key = $2`, [host, key, ...values.map(([, value]) => value), String(updatedBy || "")]);
@@ -149,7 +134,7 @@ export const writeTeamMetadata = async (input) => {
   let client;
   try {
     client = await getTeamPool().connect();
-    await client.query("BEGIN");
+    await client.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
     const result = await writeTeamMetadataEntries(client, input);
     await client.query("COMMIT");
     return result;
@@ -188,7 +173,7 @@ export const bulkGetTeamDates = async (issueKeys, siteHost) => {
   }]));
 };
 export const putTeamDate = async ({ siteHost, issueKey: key, updatedBy, ...input }) => {
-  const patch = Object.fromEntries(Object.entries(input).filter(([field, value]) => trackingFields.includes(field) && value !== undefined));
+  const patch = Object.fromEntries(Object.entries(input).filter(([field, value]) => (trackingFields.includes(field) || field === "followUp") && value !== undefined));
   await writeTeamMetadata({ siteHost, entries: [{ issueKey: key, patch }], updatedBy });
   const row = (await getTeamMetadata({ siteHost, issueKeys: [key] }))[issueKey(key)];
   return { ok: true, deleted: false, issueKey: issueKey(key), ...patch, updatedAt: row.updatedAt, updatedBy: row.updatedBy };

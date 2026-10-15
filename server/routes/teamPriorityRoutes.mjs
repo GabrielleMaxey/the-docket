@@ -1,5 +1,6 @@
 import {
   getTeamMetadata,
+  writeTeamMetadata,
   teamDatabaseError,
   bulkGetTeamDates,
   bulkGetTeamPriorities,
@@ -14,6 +15,7 @@ import {
   seedSharedPrograms,
 } from "../lib/teamPriorityPostgres.mjs";
 import {
+  normalizeImportIssueKey,
   parseIssueMetadataCsv,
   planIssueMetadataImport,
 } from "../lib/issueMetadataImport.mjs";
@@ -81,18 +83,15 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
         return res.status(400).json({ error: parsed.error || "Invalid CSV" });
       }
 
-      const plan = planIssueMetadataImport(parsed.rows, {});
-      const result = await bulkPutTeamPriorities(
-        plan.upserts.map((item) => ({
-          issueKey: item.issueKey,
-          priority: item.priority,
-        })),
-        "csv-import",
-        getSiteContext().siteHost
-      );
+      const siteHost = getSiteContext().siteHost;
+      const issueKeys = [...new Set(parsed.rows.map((row) => normalizeImportIssueKey(row.odi)).filter((key) => /^[A-Z][A-Z0-9_]*-[1-9][0-9]*$/.test(key)))];
+      const existing = await getTeamMetadata({ siteHost, issueKeys });
+      const plan = planIssueMetadataImport(parsed.rows, existing);
+      await writeTeamMetadata({ siteHost, entries: plan.upserts, updatedBy: "csv-import" });
       return res.json({
         ok: true,
-        updatedPriorities: result.updated,
+        updatedPriorities: plan.updatedPriorities,
+        filledNotes: plan.filledNotes,
         skipped: plan.skipped,
         errors: plan.errors,
       });
@@ -202,7 +201,7 @@ export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) 
   app.put(
     "/api/team-priority/dates/:issueKey",
     withSiteOperation(withTeamDatabase("update team date tracking", async (req, res) => {
-      const fields = ["startDate", "completeDate", "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
+      const fields = ["followUp", "startDate", "completeDate", "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
       const hasAny = fields.some((f) => req.body?.[f] !== undefined);
       if (!hasAny) {
         return res.status(400).json({ error: "Provide startDate, completeDate, or a planning field" });

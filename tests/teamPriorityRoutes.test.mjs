@@ -117,3 +117,40 @@ test("browser full metadata reads retain the captured server site context", asyn
   };
   assert.equal((await client.fetchTeamMetadataBulk(["ABC-1"], { siteContext: context }))["ABC-1"].note, "from team");
 });
+
+
+test("real team CSV import preserves priority on optional edits and followUp-only rows keep no tracking provenance", { skip: !process.env.DOCKET_TEST_DATABASE_URL }, async (t) => {
+  const url = new URL(process.env.DOCKET_TEST_DATABASE_URL);
+  assert.ok(["127.0.0.1", "localhost", "[::1]"].includes(url.hostname));
+  assert.match(url.pathname, /^\/docket_test_[a-z0-9_]+$/);
+  assert.ok(url.port);
+  const store = await import("../server/lib/teamPriorityPostgres.mjs");
+  const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
+  process.env.TEAM_PRIORITY_DATABASE_URL = url.href;
+  t.after(async () => {
+    await store.getTeamPool().query("DELETE FROM team_issue_metadata WHERE site_host = 'd1-route-a.example.test'");
+    await store.closeTeamPool();
+    if (previous === undefined) delete process.env.TEAM_PRIORITY_DATABASE_URL; else process.env.TEAM_PRIORITY_DATABASE_URL = previous;
+  });
+  const { migrateTeamDatabase } = await import("../scripts/migrate-team-db.mjs");
+  await migrateTeamDatabase(store.getTeamPool());
+  await store.writeTeamMetadata({ siteHost: "d1-route-a.example.test", entries: [{ issueKey: "ABC-10", patch: { priority: 8, note: "saved", plannedStart: "2026-10-01", plannedFinish: "2026-10-05", hasOpenDecision: true } }] });
+  await withServer(async ({ request }) => {
+    const imported = await request("/api/team-priority/import-csv", "POST", { csvText: "Key,Notes,Requestor,Follow up\nABC-10,protected,Team,now" });
+    assert.equal(imported.status, 200);
+    assert.equal((await imported.json()).updatedPriorities, 0);
+    const result = await request("/api/team-priority/metadata/bulk", "POST", { issueKeys: ["ABC-10"] }).then((response) => response.json());
+    assert.equal(result.items["ABC-10"].priority, 8);
+    assert.equal(result.items["ABC-10"].note, "saved");
+    assert.equal(result.items["ABC-10"].requestor, "Team");
+    assert.equal(result.items["ABC-10"].plannedStart, "2026-10-01");
+    assert.equal(result.items["ABC-10"].hasOpenDecision, true);
+    for (const followUp of ["next", null]) {
+      assert.equal((await request("/api/team-priority/dates/ABC-11", "PUT", { followUp })).status, 200);
+      const full = await request("/api/team-priority/metadata/bulk", "POST", { issueKeys: ["ABC-11"] }).then((response) => response.json());
+      assert.equal(full.items["ABC-11"].followUp, followUp);
+      const tracking = await request("/api/team-priority/dates/bulk", "POST", { issueKeys: ["ABC-11"] }).then((response) => response.json());
+      assert.deepEqual(tracking.items, {});
+    }
+  });
+});

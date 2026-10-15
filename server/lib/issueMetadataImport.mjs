@@ -1,4 +1,5 @@
 import { clampIssuePriority } from "../../shared/issuePriority.mjs";
+import { IMPORT_FIELDS, METADATA_DATE_FIELDS, validateMetadataPatch } from "../../shared/issueMetadataFields.mjs";
 
 const ISSUE_KEY_RE = /^[A-Z][A-Z0-9]+-\d+$/i;
 const ISSUE_KEY_FIND_RE = /\b([A-Z][A-Z0-9]+-\d+)\b/i;
@@ -106,11 +107,25 @@ const parseCsvLine = (line, delimiter = ",") => {
   return cells;
 };
 
-const splitCsvLines = (text) =>
-  String(text || "")
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/)
-    .filter((line) => line.trim().length > 0);
+const splitCsvLines = (text) => {
+  const records = [];
+  let current = "";
+  let inQuotes = false;
+  const csv = String(text || "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+  for (let i = 0; i < csv.length; i += 1) {
+    const ch = csv[i];
+    if (ch === '"') {
+      if (inQuotes && csv[i + 1] === '"') { current += '""'; i += 1; continue; }
+      inQuotes = !inQuotes;
+    }
+    if (ch === "\n" && !inQuotes) {
+      if (current.trim()) records.push(current);
+      current = "";
+    } else current += ch;
+  }
+  if (current.trim()) records.push(current);
+  return records;
+};
 
 const normalizeHeader = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -193,7 +208,17 @@ export const parseIssueMetadataCsv = (csvText) => {
     const score = scoreHeaderRow(headers);
     const odiIndex = findHeaderIndex(headers, ["odi", "issue key", "issue key", "issue", "key", /^jira\s*key$/]);
     const priorityIndex = findHeaderIndex(headers, ["priority", "prio", "rank", /priorit/]);
-    if (odiIndex < 0 || priorityIndex < 0) {
+    const columns = {
+      priority: priorityIndex,
+      note: findHeaderIndex(headers.map((header) => header === "decision note" ? "" : header), ["notes", "note", "comments", "comment"]),
+      followUp: headers.findIndex((header) => ["now/next", "now / next", "follow up"].includes(header)),
+      requestor: headers.indexOf("requestor"),
+      plannedStart: headers.indexOf("planned start"),
+      plannedFinish: headers.indexOf("planned finish"),
+      startDate: headers.indexOf("actual start"),
+      openDecisionNote: headers.indexOf("decision note"),
+    };
+    if (odiIndex < 0 || !Object.values(columns).some((index) => index >= 0)) {
       continue;
     }
     if (!best || score > best.score) {
@@ -203,7 +228,8 @@ export const parseIssueMetadataCsv = (csvText) => {
         headers,
         odiIndex,
         priorityIndex,
-        notesIndex: findHeaderIndex(headers, ["notes", "note", "comments", "comment"]),
+        notesIndex: columns.note,
+        columns,
         headerLineIndex: lineIndex,
       };
     }
@@ -216,18 +242,20 @@ export const parseIssueMetadataCsv = (csvText) => {
       .join(" / ");
     return {
       ok: false,
-      error: `CSV must include issue key and Priority columns. Preview: ${preview || "(empty)"}`,
+      error: `CSV must include an issue key and at least one supported metadata column (such as Priority). Preview: ${preview || "(empty)"}`,
     };
   }
 
   const rows = [];
   for (let i = best.headerLineIndex + 1; i < lines.length; i += 1) {
     const cells = parseCsvLine(lines[i], best.delimiter);
+    if (rows.length === 5000) return { ok: false, error: "Import must contain at most 5,000 rows" };
     rows.push({
       rowNumber: i + 1,
       odi: cells[best.odiIndex] ?? "",
-      priority: cells[best.priorityIndex] ?? "",
+      priority: best.priorityIndex >= 0 ? cells[best.priorityIndex] ?? "" : "",
       notes: best.notesIndex >= 0 ? cells[best.notesIndex] ?? "" : "",
+      ...Object.fromEntries(Object.entries(best.columns).filter(([field, index]) => !["priority", "note"].includes(field) && index >= 0).map(([field, index]) => [field, cells[index] ?? ""])),
     });
   }
 
@@ -237,61 +265,65 @@ export const parseIssueMetadataCsv = (csvText) => {
     delimiter: best.delimiter,
     headers: best.headers,
     headerLineIndex: best.headerLineIndex,
+    ignoredHeaders: best.headers.filter((_header, index) => index !== best.odiIndex && !Object.values(best.columns).includes(index)),
   };
 };
 
-export const planIssueMetadataImport = (rows, existingByKey = {}) => {
+export const planIssueMetadataImport = (rows, existingByKey = {}, { replaceNote = false } = {}) => {
   const upserts = [];
   const errors = [];
   let updatedPriorities = 0;
   let filledNotes = 0;
   let skipped = 0;
-
-  for (const row of rows || []) {
-    const issueKey = normalizeImportIssueKey(row.odi);
-    const priorityRaw = String(row.priority || "").trim();
-
-    if (!priorityRaw || isSectionLabel(priorityRaw)) {
-      skipped += 1;
-      continue;
-    }
-
-    if (!issueKey || !ISSUE_KEY_RE.test(issueKey)) {
-      skipped += 1;
-      errors.push({
-        row: row.rowNumber,
-        reason: `Missing or invalid issue key (${String(row.odi || "").slice(0, 40) || "empty"})`,
-      });
-      continue;
-    }
-
-    const priority = parseImportPriority(row.priority);
-    if (priority == null) {
-      skipped += 1;
-      errors.push({
-        row: row.rowNumber,
-        reason: `Invalid priority (${priorityRaw.slice(0, 40)}; need a number rank or P1–P20)`,
-      });
-      continue;
-    }
-
-    const existing = existingByKey[issueKey] || {};
-    const existingNote = String(existing.note || "");
-    const csvNote = String(row.notes || "").trim();
-    const shouldFillNote = !existingNote.trim() && Boolean(csvNote);
-    const nextNote = shouldFillNote ? csvNote : existingNote;
-
-    upserts.push({
-      issueKey,
-      priority,
-      note: nextNote,
-      filledNote: shouldFillNote,
-    });
-    updatedPriorities += 1;
-    if (shouldFillNote) {
-      filledNotes += 1;
-    }
+  if (!Array.isArray(rows) || rows.length > 5000) return { upserts, updatedPriorities, filledNotes, skipped, errors: [{ reason: "Import must contain at most 5,000 rows" }] };
+  const keyCounts = new Map();
+  for (const row of rows) {
+    if (row.selected === false) continue;
+    const key = normalizeImportIssueKey(row.issueKey ?? row.odi);
+    keyCounts.set(key, (keyCounts.get(key) || 0) + 1);
   }
-
+  for (const row of rows) {
+    if (row.selected === false) { skipped += 1; continue; }
+    const issueKey = normalizeImportIssueKey(row.issueKey ?? row.odi);
+    const priorityRaw = String(row.patch?.priority ?? row.priority ?? "").trim();
+    if (isSectionLabel(priorityRaw)) { skipped += 1; continue; }
+    const proposed = row.patch && typeof row.patch === "object" && !Array.isArray(row.patch) ? { ...row.patch } : {};
+    const rowErrors = [];
+    if (row.patch !== undefined && (!row.patch || typeof row.patch !== "object" || Array.isArray(row.patch))) rowErrors.push("A metadata patch object is required");
+    if ((row.patch && Object.hasOwn(proposed, "priority")) || (!row.patch && priorityRaw)) {
+      const priority = row.patch && proposed.priority === 0 ? 0 : parseImportPriority(priorityRaw);
+      if (priority === null) rowErrors.push(`Invalid priority (${priorityRaw.slice(0, 40)}; need a number rank or P1–P20)`);
+      else proposed.priority = priority;
+    }
+    const existing = existingByKey[issueKey];
+    for (const field of IMPORT_FIELDS.filter((field) => field !== "priority")) {
+      if (row.patch) continue;
+      const raw = field === "note" ? row.notes ?? row.note : row[field];
+      const value = typeof raw === "string" ? raw.trim() : raw;
+      // Empty imported cells preserve the destination; only an explicit UI patch clears.
+      if (value === undefined || value === null || value === "") continue;
+      if (field === "note" && String(existing?.note || "").trim() && !(row.replaceNote === true || (row.replaceNote === undefined && replaceNote))) continue;
+      proposed[field] = value;
+    }
+    if (Object.hasOwn(proposed, "note") && String(existing?.note || "").trim() && !(row.replaceNote === true || (row.replaceNote === undefined && replaceNote))) delete proposed.note;
+    if (!Object.keys(proposed).length && !rowErrors.length) { skipped += 1; continue; }
+    if (!ISSUE_KEY_RE.test(issueKey)) rowErrors.push(`Missing or invalid issue key (${String(row.odi || "").slice(0, 40) || "empty"})`);
+    if (keyCounts.get(issueKey) > 1) rowErrors.push(`Duplicate issue key (${issueKey})`);
+    const validated = validateMetadataPatch(proposed, { importOnly: true });
+    rowErrors.push(...validated.errors);
+    const dates = validateMetadataPatch({ plannedStart: existing?.plannedStart || null, plannedFinish: existing?.plannedFinish || null, ...Object.fromEntries(Object.entries(validated.patch).filter(([field]) => ["plannedStart", "plannedFinish"].includes(field))) });
+    rowErrors.push(...dates.errors);
+    if (rowErrors.length) {
+      skipped += 1;
+      errors.push({ row: row.rowNumber, issueKey, reason: [...new Set(rowErrors)].join("; "), errors: [...new Set(rowErrors)] });
+      continue;
+    }
+    const patch = validated.patch;
+    const expected = existing ? Object.fromEntries(Object.keys(patch).map((field) => [field, existing[field] ?? (field === "followUp" || METADATA_DATE_FIELDS.includes(field) ? null : field === "priority" ? 0 : "")])) : null;
+    const filledNote = Object.hasOwn(patch, "note") && !String(existing?.note || "").trim();
+    upserts.push({ ...(row.rowId !== undefined ? { rowId: row.rowId } : {}), issueKey, priority: patch.priority ?? existing?.priority ?? 0, note: patch.note ?? existing?.note ?? "", filledNote, patch, expected, validation: { errors: [] } });
+    if (Object.hasOwn(patch, "priority")) updatedPriorities += 1;
+    if (filledNote) filledNotes += 1;
+  }
   return { upserts, updatedPriorities, filledNotes, skipped, errors };
 };

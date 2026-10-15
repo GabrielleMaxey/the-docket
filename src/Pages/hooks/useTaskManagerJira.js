@@ -1,3 +1,4 @@
+import { validateMetadataPatch } from "../../../shared/issueMetadataFields.mjs";
 import { getSiteContext, siteStorageKey, readSiteStorage } from "../../utils/siteContextStore.js";
 import React from "react";
 import {
@@ -1022,6 +1023,7 @@ export const useTaskManagerJira = () => {
     const sharedProgramId = String(options.sharedProgramId || "").trim();
     const meta = planningMetaByKey[issueKey] || {};
     const patch = {
+      followUp: (sharedProgramId ? meta.teamFollowUp : meta.followUp) ?? null,
       plannedStart: meta.plannedStart || "",
       plannedFinish: meta.plannedFinish || "",
       requestor: meta.requestor || "",
@@ -1031,6 +1033,8 @@ export const useTaskManagerJira = () => {
       startDate: startDateByKey[issueKey] || "",
       completeDate: completeDateByKey[issueKey] || "",
     };
+    const { errors } = validateMetadataPatch(patch);
+    if (errors.length) throw new Error(errors.join("; "));
     if (sharedProgramId) {
       return saveTeamDate({ issueKey, ...patch });
     }
@@ -1039,11 +1043,13 @@ export const useTaskManagerJira = () => {
 
   const handlePlanningFieldChange = (issueKey, field, value, options = {}) => {
     const sharedProgramId = String(options.sharedProgramId || "").trim();
+    const { patch, errors } = validateMetadataPatch({ [field]: value });
+    if (errors.length) { console.error("Invalid planning field", errors.join("; ")); return; }
+    const stateField = sharedProgramId && field === "followUp" ? "teamFollowUp" : field;
     setPlanningMetaByKey((prev) => ({
       ...prev,
-      [issueKey]: { ...(prev[issueKey] || {}), [field]: value },
+      [issueKey]: { ...(prev[issueKey] || {}), [stateField]: patch[field] },
     }));
-    const patch = { [field]: value };
     if (sharedProgramId) {
       saveTeamDate({ issueKey, ...patch }).catch((error) => {
         console.error(`Failed to persist team ${field}`, issueKey, error);

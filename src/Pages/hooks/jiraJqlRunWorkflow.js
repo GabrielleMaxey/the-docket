@@ -6,6 +6,7 @@ import {
   fetchLatestJiraCommentsBulk,
   fetchTeamPriorityBulk,
   fetchTeamDatesBulk,
+  fetchTeamMetadataBulk,
 } from "../../services/jiraClient";
 import { enrichRunWithParentDoneDates } from "../../utils/jiraIssueDoneDates.js";
 import { getConfiguredJqlSlotIndexes } from "../../utils/workWeekStorage.js";
@@ -111,9 +112,10 @@ const applyTeamPriorityState = async ({
   }
 };
 
-const PLANNING_FIELD_KEYS = ["hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
+const PLANNING_FIELD_KEYS = ["followUp", "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
 
 const extractPlanningMeta = (item) => ({
+  ...(Object.hasOwn(item || {}, "followUp") ? { followUp: item.followUp } : {}),
   hasOpenDecision: Boolean(item?.hasOpenDecision),
   plannedStart: String(item?.plannedStart || ""),
   plannedFinish: String(item?.plannedFinish || ""),
@@ -124,10 +126,10 @@ const extractPlanningMeta = (item) => ({
 });
 
 const hasPlanningData = (item) =>
-  item && PLANNING_FIELD_KEYS.some((f) => item[f] !== undefined && item[f] !== "" && item[f] !== false);
+  item && PLANNING_FIELD_KEYS.some((f) => item[f] != null && item[f] !== "" && item[f] !== false);
 
 const applyTeamDateState = async ({ siteContext, issueKeys, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }) => {
-  if (!setStartDateByKey && !setCompleteDateByKey) {
+  if (!setStartDateByKey && !setCompleteDateByKey && !setPlanningMetaByKey) {
     return;
   }
   const keys = dedupeIssueKeys(issueKeys);
@@ -136,7 +138,8 @@ const applyTeamDateState = async ({ siteContext, issueKeys, setStartDateByKey, s
   }
 
   try {
-    const teamItems = await fetchTeamDatesBulk(keys, { siteContext });
+    const [teamItems, metadata] = await Promise.all([fetchTeamDatesBulk(keys, { siteContext }), fetchTeamMetadataBulk(keys, { siteContext })]);
+    if (siteContext?.generation !== getSiteContext()?.generation) return;
     const teamStartDates = {};
     const teamCompleteDates = {};
     const teamPlanningMeta = {};
@@ -151,8 +154,14 @@ const applyTeamDateState = async ({ siteContext, issueKeys, setStartDateByKey, s
     if (setCompleteDateByKey && Object.keys(teamCompleteDates).length > 0) {
       setCompleteDateByKey((prev) => ({ ...prev, ...teamCompleteDates }));
     }
-    if (setPlanningMetaByKey && Object.keys(teamPlanningMeta).length > 0) {
-      setPlanningMetaByKey((prev) => ({ ...prev, ...teamPlanningMeta }));
+    if (setPlanningMetaByKey) {
+      setPlanningMetaByKey((prev) => {
+        const next = { ...prev };
+        for (const [key, item] of Object.entries(teamPlanningMeta)) next[key] = { ...prev[key], ...item };
+        // Keep the shared selection separate so the same issue can also appear in a local run.
+        for (const key of keys) next[key] = { ...next[key], teamFollowUp: metadata?.[key]?.followUp ?? null };
+        return next;
+      });
     }
   } catch (error) {
     console.error("Failed to fetch team dates", error);

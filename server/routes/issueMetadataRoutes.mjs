@@ -1,3 +1,4 @@
+import { getLocalMetadata, writeLocalMetadata } from "../lib/issueMetadataStore.mjs";
 import { finished } from "node:stream/promises";
 // Issue mutations (comment, status, assignee) and SQLite note/priority metadata.
 
@@ -58,29 +59,6 @@ const handleNoteImageUploadError = (err, _req, res, next) => {
 
   return res.status(400).json({ error: err.message || NOTE_IMAGE_BAD_MIME_MESSAGE });
 };
-
-const ISSUE_METADATA_SELECT_COLUMNS =
-  "issue_key, note, priority, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note";
-
-const upsertIssueMetadata = (db, payload) =>
-  db
-    .prepare(`
-    INSERT INTO issue_metadata (issue_key, note, priority, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note, updated_at)
-    VALUES (@issueKey, @note, @priority, @startDate, @completeDate, @hasOpenDecision, @plannedStart, @plannedFinish, @pmOverride, @requestor, @openDecisionNote, CURRENT_TIMESTAMP)
-    ON CONFLICT(issue_key) DO UPDATE SET
-      note = excluded.note,
-      priority = excluded.priority,
-      start_date = excluded.start_date,
-      complete_date = excluded.complete_date,
-      has_open_decision = excluded.has_open_decision,
-      planned_start = excluded.planned_start,
-      planned_finish = excluded.planned_finish,
-      pm_override = excluded.pm_override,
-      requestor = excluded.requestor,
-      open_decision_note = excluded.open_decision_note,
-      updated_at = CURRENT_TIMESTAMP
-  `)
-    .run(payload);
 
 const setKeepNoteImages = (db, payload) =>
   db
@@ -349,33 +327,7 @@ export const registerIssueMetadataRoutes = (
       return res.json({ items: {} });
     }
 
-    const db = getDb();
-    const placeholders = issueKeys.map(() => "?").join(",");
-    const rows = db
-      .prepare(
-        `SELECT issue_key, note, priority, keep_note_images, start_date, complete_date, has_open_decision, planned_start, planned_finish, pm_override, requestor, open_decision_note, pinned_gantt FROM issue_metadata WHERE issue_key IN (${placeholders})`
-      )
-      .all(...issueKeys);
-
-    const items = rows.reduce((acc, row) => {
-      const keepNoteImages = Boolean(row.keep_note_images);
-      acc[row.issue_key] = {
-        note: String(row.note || ""),
-        priority: clampIssuePriority(row.priority),
-        keepNoteImages,
-        images: keepNoteImages ? listNoteImages(db, row.issue_key) : [],
-        startDate: String(row.start_date || ""),
-        completeDate: String(row.complete_date || ""),
-        hasOpenDecision: Boolean(row.has_open_decision),
-        plannedStart: String(row.planned_start || ""),
-        plannedFinish: String(row.planned_finish || ""),
-        pmOverride: String(row.pm_override || ""),
-        requestor: String(row.requestor || ""),
-        openDecisionNote: String(row.open_decision_note || ""),
-        pinnedGantt: Boolean(row.pinned_gantt),
-      };
-      return acc;
-    }, {});
+    const items = getLocalMetadata(getDb(), issueKeys);
 
     return res.json({ items });
   }));
@@ -432,42 +384,10 @@ export const registerIssueMetadataRoutes = (
         ),
       ];
 
-      const existingByKey = {};
-      if (issueKeys.length > 0) {
-        const placeholders = issueKeys.map(() => "?").join(",");
-        const existingRows = db
-          .prepare(
-            `SELECT issue_key, note, priority, start_date, complete_date FROM issue_metadata WHERE issue_key IN (${placeholders})`
-          )
-          .all(...issueKeys);
-        for (const row of existingRows) {
-          existingByKey[row.issue_key] = {
-            note: String(row.note || ""),
-            priority: clampIssuePriority(row.priority),
-            startDate: String(row.start_date || ""),
-            completeDate: String(row.complete_date || ""),
-          };
-        }
-      }
-
+      const existingByKey = getLocalMetadata(db, issueKeys.filter((key) => /^[A-Z][A-Z0-9_]*-[1-9][0-9]*$/.test(key)));
       const plan = planIssueMetadataImport(parsed.rows, existingByKey);
-      const apply = db.transaction((upserts) => {
-        for (const item of upserts) {
-          upsertIssueMetadata(db, {
-            issueKey: item.issueKey,
-            note: item.note,
-            priority: item.priority,
-            startDate: existingByKey[item.issueKey]?.startDate || "",
-            completeDate: existingByKey[item.issueKey]?.completeDate || "",
-          });
-        }
-      });
-      apply(plan.upserts);
-
-      const items = {};
-      for (const item of plan.upserts) {
-        items[item.issueKey] = { priority: item.priority, note: item.note };
-      }
+      writeLocalMetadata(db, plan.upserts);
+      const items = getLocalMetadata(db, plan.upserts.map((item) => item.issueKey));
 
       return res.json({
         ok: true,
@@ -479,8 +399,8 @@ export const registerIssueMetadataRoutes = (
       });
     } catch (error) {
       log.error("issue metadata import failed", error instanceof Error ? error.message : error);
-      return res.status(500).json({
-        error: "Failed to import issue metadata",
+      return res.status(error.status || 500).json({
+        error: error.status ? error.message : "Failed to import issue metadata",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
@@ -569,81 +489,18 @@ export const registerIssueMetadataRoutes = (
     }
 
     const db = getDb();
-    const current =
-      db.prepare(`SELECT ${ISSUE_METADATA_SELECT_COLUMNS} FROM issue_metadata WHERE issue_key = ?`).get(issueKey) || {};
-    const hasNote = typeof req.body?.note === "string";
-    const hasPriority = req.body?.priority !== undefined;
-    const hasStartDate = typeof req.body?.startDate === "string";
-    const hasCompleteDate = typeof req.body?.completeDate === "string";
-    const hasOpenDecision = req.body?.hasOpenDecision !== undefined;
-    const hasPlannedStart = typeof req.body?.plannedStart === "string";
-    const hasPlannedFinish = typeof req.body?.plannedFinish === "string";
-    const hasPmOverride = typeof req.body?.pmOverride === "string";
-    const hasRequestor = typeof req.body?.requestor === "string";
-    const hasOpenDecisionNote = typeof req.body?.openDecisionNote === "string";
-
-    if (!hasNote && !hasPriority && !hasStartDate && !hasCompleteDate &&
-        !hasOpenDecision && !hasPlannedStart && !hasPlannedFinish && !hasPmOverride && !hasRequestor && !hasOpenDecisionNote) {
-      return res.status(400).json({ error: "Provide note, priority, startDate, completeDate, or a planning field" });
+    const patch = { ...req.body };
+    if (Object.hasOwn(patch, "priority")) patch.priority = clampIssuePriority(patch.priority);
+    for (const field of ["startDate", "completeDate", "plannedStart", "plannedFinish", "pmOverride", "requestor"]) {
+      if (typeof patch[field] === "string") patch[field] = patch[field].trim();
     }
-
-    const nextNote = hasNote ? String(req.body.note) : String(current.note || "");
-    const nextPriority = hasPriority
-      ? clampIssuePriority(req.body.priority)
-      : clampIssuePriority(current.priority);
-    const nextStartDate = hasStartDate
-      ? String(req.body.startDate).trim()
-      : String(current.start_date || "");
-    const nextCompleteDate = hasCompleteDate
-      ? String(req.body.completeDate).trim()
-      : String(current.complete_date || "");
-    const nextHasOpenDecision = hasOpenDecision
-      ? (req.body.hasOpenDecision ? 1 : 0)
-      : (current.has_open_decision || 0);
-    const nextPlannedStart = hasPlannedStart
-      ? String(req.body.plannedStart).trim()
-      : String(current.planned_start || "");
-    const nextPlannedFinish = hasPlannedFinish
-      ? String(req.body.plannedFinish).trim()
-      : String(current.planned_finish || "");
-    const nextPmOverride = hasPmOverride
-      ? String(req.body.pmOverride).trim()
-      : String(current.pm_override || "");
-    const nextRequestor = hasRequestor
-      ? String(req.body.requestor).trim()
-      : String(current.requestor || "");
-    const nextOpenDecisionNote = hasOpenDecisionNote
-      ? String(req.body.openDecisionNote)
-      : String(current.open_decision_note || "");
-
-    upsertIssueMetadata(db, {
-      issueKey,
-      note: nextNote,
-      priority: nextPriority,
-      startDate: nextStartDate,
-      completeDate: nextCompleteDate,
-      hasOpenDecision: nextHasOpenDecision,
-      plannedStart: nextPlannedStart,
-      plannedFinish: nextPlannedFinish,
-      pmOverride: nextPmOverride,
-      requestor: nextRequestor,
-      openDecisionNote: nextOpenDecisionNote,
-    });
-
-    return res.json({
-      ok: true,
-      issueKey,
-      note: nextNote,
-      priority: nextPriority,
-      startDate: nextStartDate,
-      completeDate: nextCompleteDate,
-      hasOpenDecision: Boolean(nextHasOpenDecision),
-      plannedStart: nextPlannedStart,
-      plannedFinish: nextPlannedFinish,
-      pmOverride: nextPmOverride,
-      requestor: nextRequestor,
-      openDecisionNote: nextOpenDecisionNote,
-    });
+    try {
+      writeLocalMetadata(db, [{ issueKey, patch }]);
+      return res.json({ ok: true, issueKey, ...getLocalMetadata(db, [issueKey])[issueKey.toUpperCase()] });
+    } catch (error) {
+      if (error.status) return res.status(error.status).json({ error: error.message });
+      throw error;
+    }
   }));
 
   // Pushes a date-valued Jira field (Due date or MRD) directly to Jira — respects
