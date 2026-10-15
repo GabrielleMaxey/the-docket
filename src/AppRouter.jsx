@@ -12,6 +12,7 @@ import { TodosProvider } from "./context/TodosContext.jsx";
 import { EpicFiltersProvider } from "./context/EpicFiltersContext.jsx";
 
 const WorkWeekTasks = React.lazy(() => import("./Pages/WorkWeekTasks.jsx"));
+const CombinedOpenWork = React.lazy(() => import("./Pages/CombinedOpenWork.jsx"));
 const Dashboard = React.lazy(() => import("./Pages/Dashboard.jsx"));
 const Chat = React.lazy(() => import("./Pages/Chat.jsx"));
 const ReportArchive = React.lazy(() => import("./Pages/ReportArchive.jsx"));
@@ -20,6 +21,7 @@ const Settings = React.lazy(() => import("./Pages/Settings.jsx"));
 
 const NAV_LINKS = [
   { to: "/work-week", label: "Task Management" },
+  { to: "/combined-open-work", label: "Combined Open Work" },
   { to: "/dashboard", label: "Metrics" },
   { to: "/project-managers", label: "Project Managers" },
   { to: "/reports", label: "Past Reports" },
@@ -83,6 +85,7 @@ const router = createHashRouter([
     children: [
       { path: "/", element: <WorkWeekTasks /> },
       { path: "/work-week", element: <WorkWeekTasks /> },
+      { path: "/combined-open-work", element: <CombinedOpenWork /> },
       { path: "/dashboard", element: <Dashboard /> },
       { path: "/project-managers", element: <ProjectManagers /> },
       { path: "/reports", element: <ReportArchive /> },
