@@ -52,8 +52,8 @@ const withTeamMongo = (label, handler) => async (req, res) => {
   }
 };
 
-export const registerTeamPriorityRoutes = (app, { getDb, resolveCurrentJiraUser }) => {
-  app.get("/api/team-priority/health", async (_req, res) => {
+export const registerTeamPriorityRoutes = (app, { withSiteOperation = (handler) => handler, getDb, resolveCurrentJiraUser }) => {
+  app.get("/api/team-priority/health", withSiteOperation(async (_req, res) => {
     const status = await pingTeamPriorityMongo();
     return res.json({
       ok: status.connected === true,
@@ -61,19 +61,19 @@ export const registerTeamPriorityRoutes = (app, { getDb, resolveCurrentJiraUser 
       connected: status.connected === true,
       ...(status.error ? { error: status.error } : {}),
     });
-  });
+  }));
 
   app.post(
     "/api/team-priority/seed",
-    withTeamMongo("seed shared programs", async (_req, res) => {
+    withSiteOperation(withTeamMongo("seed shared programs", async (_req, res) => {
       const programs = await seedSharedPrograms();
       return res.json({ ok: true, programs });
-    })
+    }))
   );
 
   app.post(
     "/api/team-priority/import-csv",
-    withTeamMongo("import team priorities to Atlas", async (req, res) => {
+    withSiteOperation(withTeamMongo("import team priorities to Atlas", async (req, res) => {
       const csvText = String(req.body?.csvText || "");
       if (!csvText.trim()) {
         return res.status(400).json({ error: "Missing csvText" });
@@ -98,12 +98,12 @@ export const registerTeamPriorityRoutes = (app, { getDb, resolveCurrentJiraUser 
         skipped: plan.skipped,
         errors: plan.errors,
       });
-    })
+    }))
   );
 
   app.post(
     "/api/team-priority/sync-local",
-    withTeamMongo("sync local priorities to Atlas", async (_req, res) => {
+    withSiteOperation(withTeamMongo("sync local priorities to Atlas", async (_req, res) => {
       const db = getDb();
       if (!db) {
         return res.status(500).json({ error: "Local database unavailable" });
@@ -125,12 +125,12 @@ export const registerTeamPriorityRoutes = (app, { getDb, resolveCurrentJiraUser 
         updatedPriorities: result.updated,
         scanned: rows.length,
       });
-    })
+    }))
   );
 
   app.post(
     "/api/team-priority/pull-to-local",
-    withTeamMongo("pull Atlas priorities to local", async (_req, res) => {
+    withSiteOperation(withTeamMongo("pull Atlas priorities to local", async (_req, res) => {
       const db = getDb();
       if (!db) {
         return res.status(500).json({ error: "Local database unavailable" });
@@ -155,10 +155,10 @@ export const registerTeamPriorityRoutes = (app, { getDb, resolveCurrentJiraUser 
         ok: true,
         updatedPriorities: entries.length,
       });
-    })
+    }))
   );
 
-  app.get("/api/shared-programs", async (_req, res) => {
+  app.get("/api/shared-programs", withSiteOperation(async (_req, res) => {
     if (!isTeamPriorityMongoConfigured()) {
       return res.json({ items: [] });
     }
@@ -172,20 +172,20 @@ export const registerTeamPriorityRoutes = (app, { getDb, resolveCurrentJiraUser 
         message: errorMessage(error),
       });
     }
-  });
+  }));
 
   app.post(
     "/api/team-priority/bulk",
-    withTeamMongo("fetch team priorities", async (req, res) => {
+    withSiteOperation(withTeamMongo("fetch team priorities", async (req, res) => {
       const issueKeys = Array.isArray(req.body?.issueKeys) ? req.body.issueKeys : [];
       const items = await bulkGetTeamPriorities(issueKeys);
       return res.json({ items });
-    })
+    }))
   );
 
   app.put(
     "/api/team-priority/:issueKey",
-    withTeamMongo("update team priority", async (req, res) => {
+    withSiteOperation(withTeamMongo("update team priority", async (req, res) => {
       const updatedBy = await resolveUpdatedBy(resolveCurrentJiraUser);
 
       const result = await putTeamPriority({
@@ -194,21 +194,21 @@ export const registerTeamPriorityRoutes = (app, { getDb, resolveCurrentJiraUser 
         updatedBy,
       });
       return res.json(result);
-    })
+    }))
   );
 
   app.post(
     "/api/team-priority/dates/bulk",
-    withTeamMongo("fetch team dates", async (req, res) => {
+    withSiteOperation(withTeamMongo("fetch team dates", async (req, res) => {
       const issueKeys = Array.isArray(req.body?.issueKeys) ? req.body.issueKeys : [];
       const items = await bulkGetTeamDates(issueKeys);
       return res.json({ items });
-    })
+    }))
   );
 
   app.put(
     "/api/team-priority/dates/:issueKey",
-    withTeamMongo("update team date tracking", async (req, res) => {
+    withSiteOperation(withTeamMongo("update team date tracking", async (req, res) => {
       const fields = ["startDate", "completeDate", "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote"];
       const hasAny = fields.some((f) => req.body?.[f] !== undefined);
       if (!hasAny) {
@@ -223,15 +223,15 @@ export const registerTeamPriorityRoutes = (app, { getDb, resolveCurrentJiraUser 
       }
       const result = await putTeamDate({ issueKey: req.params.issueKey, ...patch, updatedBy });
       return res.json(result);
-    })
+    }))
   );
 
   // Explicit, deliberate clear — never triggered just by blanking a date field.
   app.delete(
     "/api/team-priority/dates/:issueKey",
-    withTeamMongo("clear team date tracking", async (req, res) => {
+    withSiteOperation(withTeamMongo("clear team date tracking", async (req, res) => {
       const result = await deleteTeamDate({ issueKey: req.params.issueKey });
       return res.json(result);
-    })
+    }))
   );
 };

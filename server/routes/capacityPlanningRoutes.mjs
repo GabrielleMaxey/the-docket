@@ -8,11 +8,11 @@ import { chunkValues } from "../../shared/jiraBatch.mjs";
 
 const log = createLogger("capacity-planning");
 
-export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
+export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handler) => handler, getDb, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
   // On-demand only (hover-triggered on the frontend) — a single-issue changelog
   // fetch, not part of the bulk Gantt load. Bulk-fetching changelogs for every
   // issue would bloat every Gantt load; this stays cheap by only firing per bar.
-  app.get("/api/project-managers/gantt/status-history/:issueKey", async (req, res) => {
+  app.get("/api/project-managers/gantt/status-history/:issueKey", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) return;
 
     const issueKey = String(req.params.issueKey || "").trim();
@@ -73,9 +73,9 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/project-managers/capacity", async (req, res) => {
+  app.get("/api/project-managers/capacity", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -116,9 +116,9 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/project-managers/gantt", async (req, res) => {
+  app.get("/api/project-managers/gantt", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) return;
 
     const slug = String(req.query?.slug || "").trim();
@@ -240,5 +240,5 @@ export const registerCapacityPlanningRoutes = (app, { getDb, jiraRequest, runJir
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 };

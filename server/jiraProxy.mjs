@@ -1,3 +1,4 @@
+import { createSiteOperationState } from "./lib/siteOperationState.mjs";
 import express from "express";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
@@ -180,6 +181,7 @@ const openAppDbForCurrent = () => {
         /* ignore */
       }
     }
+    runtime.credentials = Object.freeze({ ...creds });
     runtime.dbPath = nextPath;
     runtime.db = new Database(nextPath);
     runtime.db.pragma("journal_mode = WAL");
@@ -200,11 +202,19 @@ const openAppDbForCurrent = () => {
 
 openAppDbForCurrent();
 
-const getDb = () => runtime.db;
+const siteOperations = createSiteOperationState({
+  snapshot: runtime,
+  activate: (id) => {
+    setActiveInstanceId(metaDb, id);
+    openAppDbForCurrent();
+    return runtime;
+  },
+});
+const getDb = () => siteOperations.getSnapshot().db;
 
 // ─── Shared helpers (passed into route modules) ───────────────────────────────
 
-const getCredentials = () => resolveJiraCredentials(metaDb, process.env);
+const getCredentials = () => siteOperations.getSnapshot().credentials;
 
 const getMissingEnv = () => {
   const c = getCredentials();
@@ -224,12 +234,6 @@ const ensureEnvOrRespond = (res) => {
   return true;
 };
 
-const activateInstance = (id) => {
-  setActiveInstanceId(metaDb, id);
-  openAppDbForCurrent();
-  const { mode, instanceId, displayName, baseUrl } = getCredentials();
-  return { mode, instanceId, displayName, baseUrl };
-};
 
 const jiraRequest = async (options) => {
   const result = await requestJira({ ...options, credentials: getCredentials() });
@@ -323,6 +327,7 @@ app.get("/api/health", (_req, res) => {
     version: PROXY_VERSION,
     jiraBaseUrl: c.baseUrl || "",
     jiraInstanceId: c.instanceId,
+    siteContext: siteOperations.getSiteContext(),
     jiraInstanceName: c.displayName || "",
     legacyMode: c.mode === "legacy",
     searchEndpoint: JIRA_SEARCH_JQL_PATH,
@@ -344,9 +349,9 @@ const routeCtx = {
   // Distinct from resolveJiraUser (a by-query search) — this resolves the
   // currently authenticated Jira account, for attributing writes like team priority.
   resolveCurrentJiraUser: () => fetchJiraMyself({ jiraRequest }),
-  getNoteImagesDir: () => runtime.noteImagesDir,
+  getNoteImagesDir: () => siteOperations.getSnapshot().noteImagesDir,
   metaDb,
-  activateInstance,
+  ...siteOperations,
   getCredentials,
 };
 

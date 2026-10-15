@@ -1,3 +1,4 @@
+import { getSiteContext, siteStorageKey, readSiteStorage } from "../../../utils/siteContextStore.js";
 import React from "react";
 import { Button, Message } from "semantic-ui-react";
 import {
@@ -8,9 +9,9 @@ import {
 import { WORK_WEEK_STORAGE_KEYS } from "../../../utils/workWeekStorage.js";
 import SettingsSection from "./SettingsSection";
 
-const readJsonObject = (key) => {
+const readJsonObject = (key, instanceId) => {
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = readSiteStorage(window.localStorage, key, instanceId);
     if (!raw) {
       return {};
     }
@@ -21,13 +22,13 @@ const readJsonObject = (key) => {
   }
 };
 
-const applyImportToLocalStorage = (items) => {
+const applyImportToLocalStorage = (items, instanceId) => {
   if (!items || typeof items !== "object") {
     return;
   }
 
-  const nextPriorities = { ...readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraRowPriorities) };
-  const nextNotes = { ...readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraNotes) };
+  const nextPriorities = { ...readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraRowPriorities, instanceId) };
+  const nextNotes = { ...readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraNotes, instanceId) };
 
   Object.entries(items).forEach(([issueKey, value]) => {
     if (!issueKey || !value || typeof value !== "object") {
@@ -44,14 +45,15 @@ const applyImportToLocalStorage = (items) => {
     }
   });
 
-  window.localStorage.setItem(
-    WORK_WEEK_STORAGE_KEYS.jiraRowPriorities,
+  window.localStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jiraRowPriorities, instanceId),
     JSON.stringify(nextPriorities)
   );
-  window.localStorage.setItem(WORK_WEEK_STORAGE_KEYS.jiraNotes, JSON.stringify(nextNotes));
+  window.localStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jiraNotes, instanceId), JSON.stringify(nextNotes));
 };
 
 const TeamPriorityImportSection = () => {
+  const siteContext = React.useRef(getSiteContext()).current;
+  const instanceId = siteContext?.instanceId;
   const inputRef = React.useRef(null);
   const [fileName, setFileName] = React.useState("");
   const [loading, setLoading] = React.useState(false);
@@ -104,7 +106,7 @@ const TeamPriorityImportSection = () => {
     try {
       const csvText = await file.text();
       if (target === "atlas") {
-        const data = await importTeamPriorityCsv(csvText);
+        const data = await importTeamPriorityCsv(csvText, { siteContext });
         setResult({
           ok: data.ok,
           updatedPriorities: data.updatedPriorities,
@@ -120,8 +122,8 @@ const TeamPriorityImportSection = () => {
         return;
       }
 
-      const data = await importIssueMetadataCsv(csvText);
-      applyImportToLocalStorage(data.items);
+      const data = await importIssueMetadataCsv(csvText, { siteContext });
+      applyImportToLocalStorage(data.items, instanceId);
       setResult({ ...data, target: "local" });
       if (!data.updatedPriorities) {
         const skipHints =

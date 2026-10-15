@@ -72,6 +72,8 @@ Site switching waits for running Jira operations and pending site-specific saves
 
 A failed save must remain visible and retryable; it must not be counted as successfully drained. Do not clear it just to allow a switch. The precise busy-state presentation is left to the builder using existing UI patterns. Independent To Dos do not block Jira site switching.
 
+Saved Jira sites keep their canonical hostname. Reject edits that change it, with guidance to add a separate saved site; preserve the existing ID, database, and browser cache. Normalize same-host pasted links before comparison and continue allowing name/email edits. This policy was explicitly confirmed by the user during S3 implementation.
+
 For legacy unscoped browser data, migrate only when source-site identity can be established. Do not assign ambiguous data to whichever site happens to be active; retain it for explicit recovery. Add an ambiguity comment where the migration cannot infer origin safely.
 
 Combined Open Work dashboards across different saved Jira sites are deferred. The workbook export described below is the approved exception: users may collect tasks from multiple selected saved sites for a download. Preserve source identities, and do not introduce general multi-site background jobs or a combined dashboard as part of export.

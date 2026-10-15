@@ -1,3 +1,4 @@
+import { getSiteContext, siteStorageKey, readSiteStorage } from "./siteContextStore.js";
 import {
   getIssueStatusName,
   getIssueTypeName,
@@ -24,13 +25,13 @@ const truncateText = (value, max = MAX_ARTIFACT_CHARS) => {
   return `${text.slice(0, max)}\n…[truncated]`;
 };
 
-const readJsonArray = (key) => {
+const readJsonArray = (key, instanceId = getSiteContext()?.instanceId) => {
   if (typeof window === "undefined") {
     return [];
   }
 
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = readSiteStorage(window.localStorage, key, instanceId);
     if (!raw) {
       return [];
     }
@@ -42,12 +43,12 @@ const readJsonArray = (key) => {
   }
 };
 
-export const loadChatSessionArtifacts = () =>
-  readJsonArray(CHAT_SESSION_ARTIFACTS_KEY).filter(
+export const loadChatSessionArtifacts = (instanceId = getSiteContext()?.instanceId) =>
+  readJsonArray(CHAT_SESSION_ARTIFACTS_KEY, instanceId).filter(
     (item) => item && typeof item === "object" && String(item.content || "").trim()
   );
 
-export const saveChatSessionArtifact = ({ type, label, content, meta = {} }) => {
+export const saveChatSessionArtifact = ({ type, label, content, meta = {} }, instanceId = getSiteContext()?.instanceId) => {
   if (typeof window === "undefined") {
     return;
   }
@@ -65,11 +66,11 @@ export const saveChatSessionArtifact = ({ type, label, content, meta = {} }) => 
     meta: meta && typeof meta === "object" ? meta : {},
   };
 
-  const previous = loadChatSessionArtifacts();
+  const previous = loadChatSessionArtifacts(instanceId);
   const next = [artifact, ...previous].slice(0, MAX_STORED_ARTIFACTS);
 
   try {
-    window.localStorage.setItem(CHAT_SESSION_ARTIFACTS_KEY, JSON.stringify(next));
+    window.localStorage.setItem(siteStorageKey(CHAT_SESSION_ARTIFACTS_KEY, instanceId), JSON.stringify(next));
   } catch (error) {
     console.warn("Could not persist chat session artifact.", error);
   }

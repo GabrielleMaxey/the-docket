@@ -28,7 +28,7 @@ const resolveMaxMb = () => {
   return Number.isFinite(value) && value > 0 ? value : ATTACHMENT_DEFAULT_MAX_MB;
 };
 
-export const registerAttachmentRoutes = (app, { jiraRequest, jiraMultipartRequest, ensureEnvOrRespond }) => {
+export const registerAttachmentRoutes = (app, { withSiteOperation = (handler) => handler, jiraRequest, jiraMultipartRequest, ensureEnvOrRespond }) => {
   const maxMb = resolveMaxMb();
   const uploadDir = path.join(os.tmpdir(), "taskmanager-attachments");
   mkdirSync(uploadDir, { recursive: true });
@@ -65,11 +65,11 @@ export const registerAttachmentRoutes = (app, { jiraRequest, jiraMultipartReques
     return res.status(400).json({ error: err.message || ATTACHMENT_BAD_TYPE_MESSAGE });
   };
 
-  app.get("/api/jira/attachment-limits", (_req, res) => {
+  app.get("/api/jira/attachment-limits", withSiteOperation((_req, res) => {
     res.json({ maxMb, maxCount: ATTACHMENT_MAX_COUNT });
-  });
+  }));
 
-  app.get("/api/jira/issues/:issueKey/attachments", async (req, res) => {
+  app.get("/api/jira/issues/:issueKey/attachments", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) return;
     const issueKey = String(req.params.issueKey || "").trim();
     if (!ISSUE_KEY_RE.test(issueKey)) {
@@ -85,13 +85,13 @@ export const registerAttachmentRoutes = (app, { jiraRequest, jiraMultipartReques
       log.error("list attachments failed", error instanceof Error ? error.message : error);
       return res.status(500).json({ error: "Could not load attachments from Jira" });
     }
-  });
+  }));
 
   app.post(
     "/api/jira/issues/:issueKey/attachments",
     upload.array("files", ATTACHMENT_MAX_COUNT),
     handleUploadError,
-    async (req, res) => {
+    withSiteOperation(async (req, res) => {
       const files = req.files || [];
       try {
         if (!ensureEnvOrRespond(res)) return;
@@ -125,6 +125,6 @@ export const registerAttachmentRoutes = (app, { jiraRequest, jiraMultipartReques
       } finally {
         await removeTempFiles(files);
       }
-    }
+    })
   );
 };

@@ -1,3 +1,4 @@
+import { getSiteContext, siteStorageKey } from "./siteContextStore.js";
 const jobs = new Map();
 const listeners = new Set();
 
@@ -18,6 +19,7 @@ const notify = () => {
 };
 
 const scheduleClear = (id, job) => {
+  if (job.siteSave && job.status !== "done") return;
   const delay =
     job.status === "error" || job.status === "cancelled" || job.status === "timeout"
       ? 10000
@@ -31,7 +33,7 @@ const scheduleClear = (id, job) => {
   }, delay);
 };
 
-export const getBackgroundJob = (id) => jobs.get(id) || null;
+export const getBackgroundJob = (id) => jobs.get(id.startsWith("docket:site:") ? id : siteStorageKey(id)) || null;
 
 export const getActiveBackgroundJobs = () => [...jobs.values()];
 
@@ -45,7 +47,7 @@ export const subscribeBackgroundJobs = (listener) => {
 };
 
 export const cancelBackgroundJob = (id) => {
-  const job = jobs.get(id);
+  const job = getBackgroundJob(id);
   if (!job || job.status !== "running") {
     return false;
   }
@@ -57,15 +59,18 @@ export const cancelBackgroundJob = (id) => {
 /**
  * Run async work that survives React route unmounts. Reuses the in-flight promise when the same id is already running.
  */
-export const runBackgroundJob = (id, { label, scope, run, timeoutMs = 0 }) => {
+export const runBackgroundJob = (id, { label, scope, run, timeoutMs = 0, instanceId = getSiteContext()?.instanceId, siteSave = false, queue = false }) => {
+  id = siteStorageKey(id, instanceId);
   const existing = jobs.get(id);
-  if (existing?.status === "running" && existing.promise) {
+  if (!queue && existing?.status === "running" && existing.promise) {
     return existing.promise;
   }
 
   const abortController = new AbortController();
   const job = {
     id,
+    instanceId: instanceId || null,
+    siteSave,
     label: label || id,
     scope: scope || "all",
     status: "running",
@@ -97,7 +102,10 @@ export const runBackgroundJob = (id, { label, scope, run, timeoutMs = 0 }) => {
   }
 
   const promise = Promise.resolve()
-    .then(() => run(abortController.signal))
+    .then(async () => {
+      if (queue && existing?.status === "running") await existing.promise.catch(() => {});
+      return run(abortController.signal);
+    })
     .then((result) => {
       clearJobTimeout();
       if (abortController.signal.aborted) {
@@ -135,4 +143,15 @@ export const runBackgroundJob = (id, { label, scope, run, timeoutMs = 0 }) => {
   jobs.set(id, job);
   notify();
   return promise;
+};
+
+export const waitForSiteSaves = async (instanceId) => {
+  while (true) {
+    const relevant = [...jobs.values()].filter((job) => job.instanceId === (instanceId || null));
+    const failed = relevant.find((job) => job.siteSave && ["error", "cancelled", "timeout"].includes(job.status));
+    if (failed) throw new Error(failed.error || "A site save failed. Keep your drafts and retry before switching.");
+    const running = relevant.filter((job) => job.status === "running");
+    if (!running.length) return;
+    await Promise.all(running.map((job) => job.promise));
+  }
 };

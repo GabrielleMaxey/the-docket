@@ -1,3 +1,4 @@
+import { getSiteContext } from "../../utils/siteContextStore.js";
 import React from "react";
 import { Link } from "react-router-dom";
 import { Button, Checkbox, Form } from "semantic-ui-react";
@@ -105,6 +106,7 @@ const USER_GOALS_SETTINGS_KEY = "work_week_report_user_goals";
 const COMPANY_GOALS_SETTINGS_KEY = "work_week_report_company_goals";
 
 const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
+  const instanceId = React.useRef(getSiteContext()?.instanceId).current;
   const runKey = getWorkWeekRunKey(run);
   const jobId = workWeekProjectReportJobId(runKey);
   const persisted = loadWorkWeekProjectReport(runKey);
@@ -327,13 +329,13 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
           report: result,
           runLabel: scopeLabel,
           jql: scopeJql,
-        });
+        }, instanceId);
         saveChatSessionArtifact({
           type: "work_week_project_report",
           label: result.label || scopeLabel,
           content: result.report,
           meta: { jql: scopeJql },
-        });
+        }, instanceId);
         return result;
       },
     })

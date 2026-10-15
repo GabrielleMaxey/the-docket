@@ -298,6 +298,9 @@ export function updateInstance(metaDb, id, patch, allowedHosts = getAllowedJiraH
   const displayName =
     patch.displayName !== undefined ? trimOrEmpty(patch.displayName) : row.display_name;
   const baseUrl = assertAllowedJiraBaseUrl(patch.baseUrl !== undefined ? patch.baseUrl : row.base_url, allowedHosts);
+  if (new URL(baseUrl).hostname !== new URL(row.base_url).hostname) {
+    throw new TypeError("Add a separate saved Jira site for a different hostname. This site's data stays with its original hostname.");
+  }
   const email = patch.email !== undefined ? trimOrEmpty(patch.email) : row.email;
   const enabled = patch.enabled !== undefined ? (patch.enabled ? 1 : 0) : row.enabled;
   const now = new Date().toISOString();

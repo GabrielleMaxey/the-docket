@@ -1,14 +1,15 @@
+import { getSiteContext, siteStorageKey, readSiteStorage } from "./siteContextStore.js";
 import { WORK_WEEK_STORAGE_KEYS } from "./workWeekStorage.js";
 
 export const isDrillDownRun = (run) => run?.isDrillDown === true;
 
-const loadDismissedDrillDownIds = () => {
+const loadDismissedDrillDownIds = (instanceId = getSiteContext()?.instanceId) => {
   if (typeof window === "undefined") {
     return new Set();
   }
 
   try {
-    const raw = window.sessionStorage.getItem(WORK_WEEK_STORAGE_KEYS.dismissedDrillDownIds);
+    const raw = readSiteStorage(window.sessionStorage, WORK_WEEK_STORAGE_KEYS.dismissedDrillDownIds, instanceId);
     if (!raw) {
       return new Set();
     }
@@ -24,18 +25,17 @@ const loadDismissedDrillDownIds = () => {
   }
 };
 
-const persistDismissedDrillDownIds = (ids) => {
+const persistDismissedDrillDownIds = (ids, instanceId = getSiteContext()?.instanceId) => {
   if (typeof window === "undefined") {
     return;
   }
 
   try {
     if (ids.size === 0) {
-      window.sessionStorage.removeItem(WORK_WEEK_STORAGE_KEYS.dismissedDrillDownIds);
+      window.sessionStorage.removeItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.dismissedDrillDownIds, instanceId));
       return;
     }
-    window.sessionStorage.setItem(
-      WORK_WEEK_STORAGE_KEYS.dismissedDrillDownIds,
+    window.sessionStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.dismissedDrillDownIds, instanceId),
       JSON.stringify([...ids])
     );
   } catch (error) {
@@ -43,27 +43,27 @@ const persistDismissedDrillDownIds = (ids) => {
   }
 };
 
-export const isDrillDownDismissed = (drillDownId) => {
+export const isDrillDownDismissed = (drillDownId, instanceId = getSiteContext()?.instanceId) => {
   const id = String(drillDownId || "").trim();
   if (!id) {
     return false;
   }
-  return loadDismissedDrillDownIds().has(id);
+  return loadDismissedDrillDownIds(instanceId).has(id);
 };
 
-export const dismissDrillDownId = (drillDownId) => {
+export const dismissDrillDownId = (drillDownId, instanceId = getSiteContext()?.instanceId) => {
   const id = String(drillDownId || "").trim();
   if (!id) {
     return;
   }
 
-  const dismissed = loadDismissedDrillDownIds();
+  const dismissed = loadDismissedDrillDownIds(instanceId);
   dismissed.add(id);
-  persistDismissedDrillDownIds(dismissed);
+  persistDismissedDrillDownIds(dismissed, instanceId);
 };
 
-const filterDismissedDrillDownRuns = (runs) =>
-  (runs || []).filter((run) => !isDrillDownDismissed(run.drillDownId));
+const filterDismissedDrillDownRuns = (runs, instanceId = getSiteContext()?.instanceId) =>
+  (runs || []).filter((run) => !isDrillDownDismissed(run.drillDownId, instanceId));
 
 export const partitionJqlRuns = (runs) => {
   const drillDown = [];
@@ -87,7 +87,7 @@ export const drillDownJqlRuns = (runs) => (runs || []).filter(isDrillDownRun);
 const isValidStoredRun = (run) =>
   Boolean(run && typeof run === "object" && Array.isArray(run.issues));
 
-export const persistJqlRunsToStorage = (jqlRuns) => {
+export const persistJqlRunsToStorage = (jqlRuns, instanceId = getSiteContext()?.instanceId) => {
   if (typeof window === "undefined") {
     return;
   }
@@ -96,22 +96,22 @@ export const persistJqlRunsToStorage = (jqlRuns) => {
 
   try {
     if (savable.length === 0) {
-      window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jqlRuns);
+      window.localStorage.removeItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jqlRuns, instanceId));
       return;
     }
-    window.localStorage.setItem(WORK_WEEK_STORAGE_KEYS.jqlRuns, JSON.stringify(savable));
+    window.localStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jqlRuns, instanceId), JSON.stringify(savable));
   } catch (error) {
     console.warn("Could not persist JQL results to localStorage.", error);
   }
 };
 
-export const loadDrillDownRunsFromSessionStorage = () => {
+export const loadDrillDownRunsFromSessionStorage = (instanceId = getSiteContext()?.instanceId) => {
   if (typeof window === "undefined") {
     return [];
   }
 
   try {
-    const raw = window.sessionStorage.getItem(WORK_WEEK_STORAGE_KEYS.drillDownRuns);
+    const raw = readSiteStorage(window.sessionStorage, WORK_WEEK_STORAGE_KEYS.drillDownRuns, instanceId);
     if (!raw) {
       return [];
     }
@@ -122,26 +122,26 @@ export const loadDrillDownRunsFromSessionStorage = () => {
     }
 
     return filterDismissedDrillDownRuns(
-      parsed.filter((run) => isValidStoredRun(run) && isDrillDownRun(run))
+      parsed.filter((run) => isValidStoredRun(run) && isDrillDownRun(run)), instanceId
     );
   } catch {
     return [];
   }
 };
 
-export const persistDrillDownRunsToSessionStorage = (jqlRuns) => {
+export const persistDrillDownRunsToSessionStorage = (jqlRuns, instanceId = getSiteContext()?.instanceId) => {
   if (typeof window === "undefined") {
     return;
   }
 
-  const drillDown = filterDismissedDrillDownRuns(drillDownJqlRuns(jqlRuns));
+  const drillDown = filterDismissedDrillDownRuns(drillDownJqlRuns(jqlRuns), instanceId);
 
   try {
     if (drillDown.length === 0) {
-      window.sessionStorage.removeItem(WORK_WEEK_STORAGE_KEYS.drillDownRuns);
+      window.sessionStorage.removeItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.drillDownRuns, instanceId));
       return;
     }
-    window.sessionStorage.setItem(WORK_WEEK_STORAGE_KEYS.drillDownRuns, JSON.stringify(drillDown));
+    window.sessionStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.drillDownRuns, instanceId), JSON.stringify(drillDown));
   } catch (error) {
     console.warn("Could not persist drill-down JQL results to sessionStorage.", error);
   }

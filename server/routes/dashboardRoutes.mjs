@@ -150,15 +150,15 @@ const readSettings = (db) => {
 
 export const registerDashboardRoutes = (
   app,
-  { getDb, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest }
+  { withSiteOperation = (handler) => handler, getDb, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest }
 ) => {
-  app.get("/api/dashboard/metrics", (_req, res) => {
+  app.get("/api/dashboard/metrics", withSiteOperation((_req, res) => {
     const db = getDb();
     const snapshot = loadLatestDashboardSnapshot(db, createSnapshotStmts(db));
     return res.json({ snapshot });
-  });
+  }));
 
-  app.post("/api/dashboard/refresh", async (req, res) => {
+  app.post("/api/dashboard/refresh", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -195,5 +195,5 @@ export const registerDashboardRoutes = (
         message: detail,
       });
     }
-  });
+  }));
 };

@@ -103,15 +103,9 @@ const JiraInstancesSection = () => {
         return;
       }
 
-      const wasEmpty = instances.length === 0;
       await createJiraInstance(form);
       setFlash("Jira site added.");
       setModalOpen(false);
-      if (wasEmpty) {
-        // First site auto-activates server-side and seeds local data from legacy DB.
-        window.location.reload();
-        return;
-      }
       await loadInstances();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save Jira site");
@@ -124,7 +118,7 @@ const JiraInstancesSection = () => {
     setError("");
     try {
       await activateJiraInstance(id);
-      window.location.reload();
+      await loadInstances();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to activate Jira site");
     }
@@ -135,10 +129,6 @@ const JiraInstancesSection = () => {
     setError("");
     try {
       await deleteJiraInstance(instance.id);
-      if (instance.id === activeInstanceId) {
-        window.location.reload();
-        return;
-      }
       setFlash("Jira site removed.");
       await loadInstances();
     } catch (err) {
@@ -154,7 +144,7 @@ const JiraInstancesSection = () => {
   return (
     <SettingsSection
       title="Jira sites"
-      description="Manage multiple Jira sites and switch which one the app talks to. Notes, dates, and presets are stored per site — switching reloads the app. The first time you activate a site, existing single-site local data is copied into that site's database."
+      description="Manage multiple Jira sites and switch which one the app talks to. Notes, dates, and presets are stored per site — switching waits for pending saves. The first time you activate a site, existing single-site local data is copied into that site's database."
     >
       {error ? <Message negative size="small" content={error} /> : null}
       {legacyMode ? (
@@ -217,9 +207,11 @@ const JiraInstancesSection = () => {
             <Form.Input
               label="Site URL"
               placeholder="https://lumen.atlassian.net"
+              readOnly={Boolean(editingId)}
               value={form.baseUrl}
               onChange={(_e, { value }) => handleFormChange("baseUrl", value)}
             />
+            {editingId && <p>Add a separate saved site to use a different Jira hostname.</p>}
             <Form.Input
               label="Email"
               placeholder="you@acme.com"

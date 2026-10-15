@@ -89,7 +89,7 @@ const WorkWeekTasks = () => {
   const drillDownBannerRef = React.useRef(null);
   const [generatedSharedProgramJqlBySlot, setGeneratedSharedProgramJqlBySlot] = usePersistedState(
     WORK_WEEK_STORAGE_KEYS.generatedSharedProgramJqlBySlot,
-    {}
+    {}, { siteScoped: true }
   );
 
   const navigate = useNavigate();
@@ -167,7 +167,7 @@ const WorkWeekTasks = () => {
   const [activeRunIndex, setActiveRunIndex] = usePersistedState(
     WORK_WEEK_STORAGE_KEYS.activeRunIndex,
     0,
-    { sanitize: (parsed) => (Number.isFinite(Number(parsed)) ? Number(parsed) : 0) }
+    { siteScoped: true, sanitize: (parsed) => (Number.isFinite(Number(parsed)) ? Number(parsed) : 0) }
   );
 
   const activeRun = React.useMemo(() => {

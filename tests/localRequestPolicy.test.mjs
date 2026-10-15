@@ -1,3 +1,4 @@
+import { createSiteOperationState } from "../server/lib/siteOperationState.mjs";
 import { it } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
@@ -67,12 +68,14 @@ async function withRoutes(t, env = { JIRA_API_TOKEN: "environment-secret" }) {
   const row = instances.createInstance(db, { displayName: "Fixture", baseUrl: "https://lumen.atlassian.net", email: "fixture@example.test" });
   const app = express();
   app.use(express.json());
-  registerJiraInstanceRoutes(app, { metaDb: db, env, getCredentials: () => ({ mode: "instance" }), activateInstance: () => ({ instanceId: row.id }) });
+  const snapshot = { credentials: { mode: "instance", instanceId: row.id, baseUrl: row.baseUrl } };
+  const state = createSiteOperationState({ snapshot, activate: () => snapshot });
+  registerJiraInstanceRoutes(app, { metaDb: db, env, getCredentials: () => snapshot.credentials, ...state });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   t.after(async () => { globalThis.fetch = nativeFetch; await new Promise((resolve) => server.close(resolve)); db.close(); });
-  const request = (url, body, method = "POST") => nativeFetch(`http://127.0.0.1:${server.address().port}${url}`, { method, headers: { "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
-  return { db, row, request };
+  const request = (url, body, method = "POST") => nativeFetch(`http://127.0.0.1:${server.address().port}${url}`, { method, headers: { "Content-Type": "application/json", "X-Docket-Generation": state.getSiteContext().generation, "X-Docket-Site": row.id }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  return { db, row, request, state };
 }
 
 it("does not expose or persist tokens", async (t) => {
@@ -173,4 +176,30 @@ it("does not clear recovery data when saved settings change during verification"
   };
   assert.equal((await request(`/api/jira/instances/${row.id}/test`, {})).status, 200);
   assert.equal(db.prepare("SELECT api_token FROM jira_instances WHERE id = ?").get(row.id).api_token, "recovery-fixture");
+});
+
+it("allows both site context headers through browser preflight", () => {
+  const headers = {};
+  localRequestPolicy({ apiPort: 8787, allowedOrigins: ["http://localhost:5173"] })(
+    { method: "OPTIONS", headers: { host: "localhost:8787", origin: "http://localhost:5173" } },
+    { setHeader(key, value) { headers[key] = value; }, sendStatus() {} },
+    () => assert.fail("preflight should stop")
+  );
+  assert.match(headers["Access-Control-Allow-Headers"], /X-Docket-Site/);
+  assert.match(headers["Access-Control-Allow-Headers"], /X-Docket-Generation/);
+});
+
+it("rejects changing a saved hostname without changing its identity or data snapshot", async (t) => {
+  const { db, row, request, state } = await withRoutes(t);
+  const before = state.getSiteContext();
+  const active = state.getSnapshot();
+  const response = await request(`/api/jira/instances/${row.id}`, { baseUrl: "https://lumen-nm.atlassian.net" }, "PATCH");
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /separate.*site/i);
+  assert.deepEqual(state.getSiteContext(), before);
+  assert.equal(state.getSnapshot(), active);
+  assert.equal(db.prepare("SELECT base_url FROM jira_instances WHERE id = ?").get(row.id).base_url, "https://lumen.atlassian.net");
+  const sameHost = await request(`/api/jira/instances/${row.id}`, { baseUrl: "https://lumen.atlassian.net/browse/SAME-1", displayName: "Renamed", email: "new@example.test" }, "PATCH");
+  assert.equal(sameHost.status, 200);
+  assert.equal((await sameHost.json()).baseUrl, "https://lumen.atlassian.net");
 });

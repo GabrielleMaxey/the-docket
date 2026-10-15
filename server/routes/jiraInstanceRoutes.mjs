@@ -14,9 +14,10 @@ import { createLogger } from "../lib/logger.mjs";
 
 const log = createLogger("jira-instances");
 
-export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getCredentials, env = process.env }) => {
+export const registerJiraInstanceRoutes = (app, { metaDb, switchSite, changeSite, getSiteContext, getCredentials, env = process.env }) => {
   const allowedHosts = getAllowedJiraHosts(env);
   const listPayload = () => ({
+    siteContext: getSiteContext(),
     instances: listInstances(metaDb),
     activeInstanceId: getActiveInstanceId(metaDb),
     legacyMode: getCredentials().mode === "legacy",
@@ -26,7 +27,7 @@ export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getC
     res.json(listPayload());
   });
 
-  app.post("/api/jira/instances", (req, res) => {
+  app.post("/api/jira/instances", async (req, res) => {
     const { displayName, baseUrl, email } = req.body || {};
     if (Object.hasOwn(req.body || {}, "apiToken")) {
       return res.status(400).json({ error: "Set JIRA_API_TOKEN in the server .env; submitted tokens are not accepted" });
@@ -36,53 +37,57 @@ export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getC
     }
 
     try {
-      const instance = createInstance(metaDb, { displayName, baseUrl, email }, allowedHosts);
-      // First site: activate immediately so local data seeds from legacy and the UI isn't stuck in limbo.
-      if (listInstances(metaDb).length === 1 && !getActiveInstanceId(metaDb)) {
-        activateInstance(instance.id);
-      }
+      let instance;
+      await changeSite(req.headers["x-docket-generation"], () => {
+        instance = createInstance(metaDb, { displayName, baseUrl, email }, allowedHosts);
+        return getActiveInstanceId(metaDb) || instance.id;
+      });
       log.info(`created Jira instance ${instance.id} "${instance.displayName}"`);
-      return res.status(201).json(instance);
+      return res.status(201).json({ ...instance, siteContext: getSiteContext() });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return res.status(400).json({ error: message });
+      return res.status(error.status || 400).json({ error: message, ...(error.code ? { code: error.code } : {}) });
     }
   });
 
-  app.patch("/api/jira/instances/:id", (req, res) => {
+  app.patch("/api/jira/instances/:id", async (req, res) => {
     const id = req.params.id;
     if (!listInstances(metaDb).some((instance) => instance.id === id)) {
       return res.status(404).json({ error: "Jira instance not found" });
     }
 
     try {
-      const instance = updateInstance(metaDb, id, req.body || {}, allowedHosts);
+      let instance;
+      await changeSite(req.headers["x-docket-generation"], () => {
+        instance = updateInstance(metaDb, id, req.body || {}, allowedHosts);
+        return getActiveInstanceId(metaDb);
+      });
       log.info(`updated Jira instance ${id}`);
-      return res.json(instance);
+      return res.json({ ...instance, siteContext: getSiteContext() });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return res.status(400).json({ error: message });
+      return res.status(error.status || 400).json({ error: message, ...(error.code ? { code: error.code } : {}) });
     }
   });
 
-  app.delete("/api/jira/instances/:id", (req, res) => {
+  app.delete("/api/jira/instances/:id", async (req, res) => {
     const id = req.params.id;
     if (!listInstances(metaDb).some((instance) => instance.id === id)) {
       return res.status(404).json({ error: "Jira instance not found" });
     }
 
-    const wasActive = getActiveInstanceId(metaDb) === id;
-    const { activeInstanceId } = deleteInstance(metaDb, id);
-    if (wasActive) {
-      // Reopen the app DB against whatever deleteInstance chose (another instance, or null → legacy).
-      activateInstance(activeInstanceId);
+    try {
+      await changeSite(req.headers["x-docket-generation"], () => deleteInstance(metaDb, id).activeInstanceId);
+    } catch (error) {
+      if (error.code !== "SITE_CONTEXT_CHANGED") throw error;
+      return res.status(409).json({ error: error.message, code: error.code });
     }
 
     log.info(`deleted Jira instance ${id}`);
     return res.json({ ok: true, ...listPayload() });
   });
 
-  app.post("/api/jira/instances/:id/activate", (req, res) => {
+  app.post("/api/jira/instances/:id/activate", async (req, res) => {
     const id = req.params.id;
     const instance = listInstances(metaDb).find((item) => item.id === id);
     if (!instance) {
@@ -93,10 +98,12 @@ export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getC
     }
 
     try {
-      const creds = activateInstance(id);
+      const siteContext = await switchSite(id, req.headers["x-docket-generation"]);
+      const creds = getCredentials();
       log.info(`activated Jira instance ${id}`);
       res.json({
         ok: true,
+        siteContext,
         activeInstanceId: creds.instanceId,
         jiraBaseUrl: creds.baseUrl,
         displayName: creds.displayName,
@@ -104,7 +111,7 @@ export const registerJiraInstanceRoutes = (app, { metaDb, activateInstance, getC
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      res.status(400).json({ error: message });
+      res.status(error.status || 400).json({ error: message, ...(error.code ? { code: error.code } : {}) });
     }
   });
 

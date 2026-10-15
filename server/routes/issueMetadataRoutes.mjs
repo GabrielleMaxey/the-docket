@@ -1,3 +1,4 @@
+import { finished } from "node:stream/promises";
 // Issue mutations (comment, status, assignee) and SQLite note/priority metadata.
 
 import fs from "fs";
@@ -94,7 +95,7 @@ const setKeepNoteImages = (db, payload) =>
 
 export const registerIssueMetadataRoutes = (
   app,
-  { getDb, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, getNoteImagesDir }
+  { withSiteOperation = (handler) => handler, getDb, jiraRequest, jiraMultipartRequest, resolveJiraAttachmentMediaId, ensureEnvOrRespond, resolveJiraUser, getNoteImagesDir }
 ) => {
   const isUnassignAssigneeRequest = (value) => {
     const normalized = String(value || "").trim().toLowerCase();
@@ -105,7 +106,7 @@ export const registerIssueMetadataRoutes = (
     "/api/jira/issues/:issueKey/comment",
     uploadNoteImages.array("images", NOTE_IMAGE_MAX_COUNT),
     handleNoteImageUploadError,
-    async (req, res) => {
+    withSiteOperation(async (req, res) => {
       if (!ensureEnvOrRespond(res)) {
         return;
       }
@@ -155,10 +156,10 @@ export const registerIssueMetadataRoutes = (
           message: error instanceof Error ? error.message : "Unknown error",
         });
       }
-    }
+    })
   );
 
-  app.post("/api/jira/issues/:issueKey/status", async (req, res) => {
+  app.post("/api/jira/issues/:issueKey/status", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -232,9 +233,9 @@ export const registerIssueMetadataRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.post("/api/jira/issues/:issueKey/assignee", async (req, res) => {
+  app.post("/api/jira/issues/:issueKey/assignee", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -309,9 +310,9 @@ export const registerIssueMetadataRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.post("/api/jira/issues/comments/latest/bulk", async (req, res) => {
+  app.post("/api/jira/issues/comments/latest/bulk", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -335,9 +336,9 @@ export const registerIssueMetadataRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.post("/api/jira/issue-metadata/bulk", (req, res) => {
+  app.post("/api/jira/issue-metadata/bulk", withSiteOperation((req, res) => {
     const issueKeys = Array.isArray(req.body?.issueKeys)
       ? req.body.issueKeys
           .map((key) => String(key || "").trim())
@@ -377,9 +378,9 @@ export const registerIssueMetadataRoutes = (
     }, {});
 
     return res.json({ items });
-  });
+  }));
 
-  app.get("/api/jira/issue-metadata/recent-notes", (req, res) => {
+  app.get("/api/jira/issue-metadata/recent-notes", withSiteOperation((req, res) => {
     const since = String(req.query?.since || "").trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
       return res.status(400).json({ error: "Query param 'since' must be a YYYY-MM-DD date." });
@@ -394,9 +395,9 @@ export const registerIssueMetadataRoutes = (
       .all(`${since} 00:00:00`);
 
     return res.json({ issueKeys: rows.map((row) => row.issue_key) });
-  });
+  }));
 
-  app.patch("/api/jira/issue-metadata/:issueKey/pin-gantt", (req, res) => {
+  app.patch("/api/jira/issue-metadata/:issueKey/pin-gantt", withSiteOperation((req, res) => {
     const issueKey = String(req.params.issueKey || "").trim().toUpperCase();
     if (!issueKey) return res.status(400).json({ error: "Missing issue key" });
     const pinned = Boolean(req.body?.pinned);
@@ -408,9 +409,9 @@ export const registerIssueMetadataRoutes = (
         updated_at = CURRENT_TIMESTAMP
     `).run(issueKey, pinned ? 1 : 0);
     return res.json({ ok: true, pinnedGantt: pinned });
-  });
+  }));
 
-  app.post("/api/jira/issue-metadata/import", (req, res) => {
+  app.post("/api/jira/issue-metadata/import", withSiteOperation((req, res) => {
     const csvText = String(req.body?.csvText || "");
     if (!csvText.trim()) {
       return res.status(400).json({ error: "Missing csvText" });
@@ -483,9 +484,9 @@ export const registerIssueMetadataRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/jira/issue-metadata/:issueKey/images/:id", (req, res) => {
+  app.get("/api/jira/issue-metadata/:issueKey/images/:id", withSiteOperation(async (req, res) => {
     const issueKey = String(req.params.issueKey || "").trim();
     const id = Number(req.params.id);
 
@@ -511,14 +512,18 @@ export const registerIssueMetadataRoutes = (
       res.removeHeader("Content-Length");
       res.status(404).json({ error: "Image not found" });
     });
+    res.once("close", () => stream.destroy());
     stream.pipe(res);
-  });
+    await finished(stream).catch((error) => {
+      if (error.code !== "ERR_STREAM_PREMATURE_CLOSE" && error.code !== "ENOENT") throw error;
+    });
+  }));
 
   app.post(
     "/api/jira/issue-metadata/:issueKey/images",
     uploadNoteImages.array("images", NOTE_IMAGE_MAX_COUNT),
     handleNoteImageUploadError,
-    (req, res) => {
+    withSiteOperation((req, res) => {
       const issueKey = String(req.params.issueKey || "").trim();
       if (!issueKey) {
         return res.status(400).json({ error: "Missing issue key" });
@@ -540,10 +545,10 @@ export const registerIssueMetadataRoutes = (
 
       log.info(`kept ${images.length} note image(s) on this machine for ${issueKey}`);
       return res.json({ ok: true, issueKey, images });
-    }
+    })
   );
 
-  app.delete("/api/jira/issue-metadata/:issueKey/images", (req, res) => {
+  app.delete("/api/jira/issue-metadata/:issueKey/images", withSiteOperation((req, res) => {
     const issueKey = String(req.params.issueKey || "").trim();
     if (!issueKey) {
       return res.status(400).json({ error: "Missing issue key" });
@@ -555,9 +560,9 @@ export const registerIssueMetadataRoutes = (
 
     log.info(`deleted kept note images for ${issueKey}`);
     return res.json({ ok: true, issueKey });
-  });
+  }));
 
-  app.put("/api/jira/issue-metadata/:issueKey", (req, res) => {
+  app.put("/api/jira/issue-metadata/:issueKey", withSiteOperation((req, res) => {
     const issueKey = String(req.params.issueKey || "").trim();
     if (!issueKey) {
       return res.status(400).json({ error: "Missing issue key" });
@@ -639,11 +644,11 @@ export const registerIssueMetadataRoutes = (
       requestor: nextRequestor,
       openDecisionNote: nextOpenDecisionNote,
     });
-  });
+  }));
 
   // Pushes a date-valued Jira field (Due date or MRD) directly to Jira — respects
   // Settings → field mappings so a remapped MRD field ID is honored, not hardcoded.
-  app.post("/api/jira/issues/:issueKey/date-field", async (req, res) => {
+  app.post("/api/jira/issues/:issueKey/date-field", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -692,5 +697,5 @@ export const registerIssueMetadataRoutes = (
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 };

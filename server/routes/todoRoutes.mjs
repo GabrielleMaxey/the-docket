@@ -34,8 +34,8 @@ const migrateReminders = (db) => {
   run();
 };
 
-export const registerTodoRoutes = (app, { getDb }) => {
-  app.get("/api/todos", (_req, res) => {
+export const registerTodoRoutes = (app, { withSiteOperation = (handler) => handler, getDb }) => {
+  app.get("/api/todos", withSiteOperation((_req, res) => {
     try {
       const db = getDb();
       migrateReminders(db);
@@ -51,9 +51,9 @@ export const registerTodoRoutes = (app, { getDb }) => {
       log.error("GET /api/todos failed", err.message);
       return res.status(500).json({ error: "Failed to load to dos" });
     }
-  });
+  }));
 
-  app.get("/api/todos/completed", (req, res) => {
+  app.get("/api/todos/completed", withSiteOperation((req, res) => {
     try {
       const db = getDb();
       const days = Math.max(0, Math.min(3650, Math.floor(Number(req.query?.days) || 90)));
@@ -66,9 +66,9 @@ export const registerTodoRoutes = (app, { getDb }) => {
       log.error("GET /api/todos/completed failed", err.message);
       return res.status(500).json({ error: "Failed to load completed to dos" });
     }
-  });
+  }));
 
-  app.delete("/api/todos/completed", (_req, res) => {
+  app.delete("/api/todos/completed", withSiteOperation((_req, res) => {
     try {
       const db = getDb();
       const info = db.prepare(`DELETE FROM todos WHERE done = 1`).run();
@@ -77,9 +77,9 @@ export const registerTodoRoutes = (app, { getDb }) => {
       log.error("DELETE /api/todos/completed failed", err.message);
       return res.status(500).json({ error: "Failed to clear completed to dos" });
     }
-  });
+  }));
 
-  app.post("/api/todos", (req, res) => {
+  app.post("/api/todos", withSiteOperation((req, res) => {
     try {
       const db = getDb();
       if (db.prepare(`SELECT COUNT(*) as n FROM todos WHERE done = 0`).get().n >= MAX_TODOS) {
@@ -103,9 +103,9 @@ export const registerTodoRoutes = (app, { getDb }) => {
       log.error("POST /api/todos failed", err.message);
       return res.status(500).json({ error: "Failed to create to do" });
     }
-  });
+  }));
 
-  app.put("/api/todos/:id", (req, res) => {
+  app.put("/api/todos/:id", withSiteOperation((req, res) => {
     try {
       const db = getDb();
       const id = Number(req.params.id);
@@ -132,9 +132,9 @@ export const registerTodoRoutes = (app, { getDb }) => {
       log.error("PUT /api/todos/:id failed", err.message);
       return res.status(500).json({ error: "Failed to update to do" });
     }
-  });
+  }));
 
-  app.delete("/api/todos/:id", (req, res) => {
+  app.delete("/api/todos/:id", withSiteOperation((req, res) => {
     try {
       const db = getDb();
       const id = Number(req.params.id);
@@ -147,5 +147,5 @@ export const registerTodoRoutes = (app, { getDb }) => {
       log.error("DELETE /api/todos/:id failed", err.message);
       return res.status(500).json({ error: "Failed to delete to do" });
     }
-  });
+  }));
 };

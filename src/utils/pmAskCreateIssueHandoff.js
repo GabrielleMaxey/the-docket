@@ -1,3 +1,4 @@
+import { siteStorageKey, readSiteStorage } from "./siteContextStore.js";
 export const PM_ASK_CREATE_ISSUE_HANDOFF_KEY = "pmAskCreateIssueHandoff";
 
 export function writePmAskCreateIssueHandoff({ askId, title, note }) {
@@ -5,8 +6,7 @@ export function writePmAskCreateIssueHandoff({ askId, title, note }) {
     return;
   }
 
-  window.sessionStorage.setItem(
-    PM_ASK_CREATE_ISSUE_HANDOFF_KEY,
+  window.sessionStorage.setItem(siteStorageKey(PM_ASK_CREATE_ISSUE_HANDOFF_KEY),
     JSON.stringify({
       askId,
       title: String(title || ""),
@@ -21,8 +21,8 @@ export function consumePmAskCreateIssueHandoff() {
     return null;
   }
 
-  const raw = window.sessionStorage.getItem(PM_ASK_CREATE_ISSUE_HANDOFF_KEY);
-  window.sessionStorage.removeItem(PM_ASK_CREATE_ISSUE_HANDOFF_KEY);
+  const raw = readSiteStorage(window.sessionStorage, PM_ASK_CREATE_ISSUE_HANDOFF_KEY);
+  window.sessionStorage.removeItem(siteStorageKey(PM_ASK_CREATE_ISSUE_HANDOFF_KEY));
   if (!raw) {
     return null;
   }

@@ -1,3 +1,5 @@
+import { getSiteContext, setSiteContext, isSiteSwitching, setSiteSwitching } from "../utils/siteContextStore.js";
+import { runBackgroundJob, waitForSiteSaves } from "../utils/backgroundJobStore.js";
 import { buildApiUrl } from "./apiBase.js";
 import { getLocalTimestampPayload } from "../utils/localTimestamp.js";
 import { getPreferredAiPath } from "./aiPathPreference.js";
@@ -65,17 +67,58 @@ const extractJiraErrorMessage = ( data, status ) => {
   return `Jira request failed with status ${ status }`;
 };
 
+let initializingSite;
+export const initializeSiteContext = async () => {
+  if ( getSiteContext() ) return getSiteContext();
+  initializingSite ??= requestJsonNow( "/api/health" ).then( ( data ) => {
+    if ( !data.siteContext ) throw new Error( "Restart the local API to initialize the Jira site context." );
+    setSiteContext( data.siteContext );
+    return data.siteContext;
+  } ).finally( () => { initializingSite = null; } );
+  return initializingSite;
+};
+
+const siteHeaders = ( context ) => context ? {
+  "X-Docket-Site": context.instanceId || "legacy",
+  "X-Docket-Generation": context.generation,
+} : {};
+
 const requestJson = async ( path, options = {} ) => {
-  const { timeoutMs, ...fetchOptions } = options;
+  if ( path === "/api/health" ) return requestJsonNow( path, options );
+  const context = options.siteContext || await initializeSiteContext();
+  const method = options.method || "GET";
+  const registryMutation = path.startsWith( "/api/jira/instances" ) && method !== "GET" && !path.endsWith( "/test" );
+  if ( registryMutation ) {
+    if ( isSiteSwitching() ) throw new Error( "A Jira site change is already in progress." );
+    setSiteSwitching( true );
+    try {
+      await waitForSiteSaves( context.instanceId );
+      const data = await requestJsonNow( path, { ...options, siteContext: context } );
+      if ( data.siteContext ) setSiteContext( data.siteContext );
+      return data;
+    } finally {
+      setSiteSwitching( false );
+    }
+  }
+  const run = () => requestJsonNow( path, { ...options, siteContext: context } );
+  const isSave = ["PUT", "PATCH", "DELETE"].includes( method ) || ( method === "POST" && !/\/(search|resolve-bulk|bulk|parent-candidates|generate-description|generate|refresh|project|gantt-summary|week|test|scope-jql|run)(\/all)?$/.test( path ) );
+  return isSave ? runBackgroundJob( `site-save:${method}:${path}`, {
+    instanceId: context.instanceId, siteSave: true, queue: true, label: "Saving Jira changes", run,
+  } ) : run();
+};
+
+const requestJsonNow = async ( path, options = {} ) => {
+  const { timeoutMs, siteContext, ...fetchOptions } = options;
   let response;
   try
   {
     response = await fetch( buildApiUrl( path ), {
+      ...fetchOptions,
       headers: {
+        ...siteHeaders( siteContext ),
         Accept: "application/json",
         ...( fetchOptions.headers || {} ),
       },
-      ...fetchOptions,
       ...( timeoutMs ? { signal: AbortSignal.timeout( timeoutMs ) } : {} ),
     } );
   } catch ( error )
@@ -263,7 +306,8 @@ export const deleteKeptNoteImages = async ( issueKey ) => {
 
 export const fetchKeptNoteImageBlob = async ( issueKey, imageId ) => {
   const response = await fetch(
-    buildApiUrl( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }/images/${ encodeURIComponent( imageId ) }` )
+    buildApiUrl( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }/images/${ encodeURIComponent( imageId ) }` ),
+    { headers: siteHeaders( await initializeSiteContext() ) }
   );
   if ( !response.ok )
   {
@@ -348,7 +392,7 @@ export const fetchLatestJiraCommentsBulk = async ( issueKeys ) => {
 
 const PLANNING_FIELDS = [ "hasOpenDecision", "plannedStart", "plannedFinish", "pmOverride", "requestor", "openDecisionNote" ];
 
-export const saveIssueMetadata = async ( { issueKey, note, priority, startDate, completeDate, ...planningFields } ) => {
+export const saveIssueMetadata = async ( { issueKey, note, priority, startDate, completeDate, ...planningFields }, { siteContext } = {} ) => {
   const body = {};
   if ( typeof note === "string" ) body.note = note;
   if ( priority !== undefined ) body.priority = priority;
@@ -360,6 +404,7 @@ export const saveIssueMetadata = async ( { issueKey, note, priority, startDate, 
   }
 
   return requestJson( `/api/jira/issue-metadata/${ encodeURIComponent( issueKey ) }`, {
+    siteContext,
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -379,8 +424,9 @@ export const updateJiraIssueDateField = async ( { issueKey, role, value } ) => {
   } );
 };
 
-export const importIssueMetadataCsv = async ( csvText ) => {
+export const importIssueMetadataCsv = async ( csvText, { siteContext } = {} ) => {
   const data = await requestJson( "/api/jira/issue-metadata/import", {
+    siteContext,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -404,8 +450,9 @@ export const seedTeamPriorityPrograms = async () => {
   return requestJson( "/api/team-priority/seed", { method: "POST" } );
 };
 
-export const importTeamPriorityCsv = async ( csvText ) => {
+export const importTeamPriorityCsv = async ( csvText, { siteContext } = {} ) => {
   const data = await requestJson( "/api/team-priority/import-csv", {
+    siteContext,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -474,7 +521,7 @@ export const fetchTeamDatesBulk = async ( issueKeys ) => {
   return data?.items || {};
 };
 
-export const saveTeamDate = async ( { issueKey, startDate, completeDate, ...planningFields } ) => {
+export const saveTeamDate = async ( { issueKey, startDate, completeDate, ...planningFields }, { siteContext } = {} ) => {
   const body = {};
   if ( typeof startDate === "string" ) body.startDate = startDate;
   if ( typeof completeDate === "string" ) body.completeDate = completeDate;
@@ -615,8 +662,9 @@ export const fetchReminders = async () => {
   return data?.items || [];
 };
 
-export const saveReminders = async ( reminders ) => {
+export const saveReminders = async ( reminders, { siteContext } = {} ) => {
   const data = await requestJson( "/api/reminders", {
+    siteContext,
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -1083,14 +1131,17 @@ export const fetchIssueAttachments = async ( issueKey ) =>
  * @param {{ onProgress?: (fraction: number) => void }} [options]
  * @returns {Promise<{ issueKey: string, uploaded: object[], failed: {filename: string, error: string}[] }>}
  */
-export const uploadIssueAttachments = ( issueKey, files, { onProgress } = {} ) =>
-  new Promise( ( resolve, reject ) => {
+export const uploadIssueAttachments = async ( issueKey, files, { onProgress } = {} ) => {
+  const context = await initializeSiteContext();
+  return runBackgroundJob( `site-save:attachments:${issueKey}`, {
+    instanceId: context.instanceId, siteSave: true, queue: true, label: "Uploading attachments", run: () => new Promise( ( resolve, reject ) => {
     const formData = new FormData();
     ( files || [] ).forEach( ( file ) => formData.append( "files", file, file.name ) );
 
     const xhr = new XMLHttpRequest();
     xhr.open( "POST", buildApiUrl( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/attachments` ) );
     xhr.setRequestHeader( "Accept", "application/json" );
+    Object.entries( siteHeaders( context ) ).forEach( ( [key, value] ) => xhr.setRequestHeader( key, value ) );
     if ( onProgress )
     {
       xhr.upload.onprogress = ( event ) =>
@@ -1120,4 +1171,6 @@ export const uploadIssueAttachments = ( issueKey, files, { onProgress } = {} ) =
       reject( error );
     };
     xhr.send( formData );
+  } ),
   } );
+};
