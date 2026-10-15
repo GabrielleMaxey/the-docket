@@ -340,13 +340,3 @@ For browser mode, stop the desktop workflow and run `npm run dev:all`; its API s
 | Desktop (dev) | Vite at `localhost:5173`; proxy spawned by Electron; repo `data/` + `.env` |
 | Browser dev (`dev:all`) | Vite proxies `/api/*` to `localhost:8787` via `vite.config.js` |
 | Browser production | Set **App URL** in Settings → Past due rules to `http://localhost:8787` |
-
----
-
-## Secrets in CI
-
-For the GitHub Actions desktop packaging workflow, inject the same `.env` variables as repository secrets:
-- `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`
-- `ANTHROPIC_API_KEY` (or the appropriate provider key)
-
-These are injected at build time by the workflow and never stored in the repo.
