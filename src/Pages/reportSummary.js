@@ -43,4 +43,3 @@ export const buildSummaryFromIssues = (issues, jiraRowPriorities, dueDateContext
       })),
   };
 };
-
