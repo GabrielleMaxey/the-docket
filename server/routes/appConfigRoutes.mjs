@@ -25,6 +25,17 @@ const JQL_PRESET_KEY = "JQL";
 const REMINDER_SLOT_COUNT = 4;
 const REMINDER_TEXT_MAX_LENGTH = 500;
 
+const createSettingsStatements = ( db ) => ({
+  listSettingsStmt: db.prepare( "SELECT key, value FROM app_settings" ),
+  upsertSettingStmt: db.prepare( `
+    INSERT INTO app_settings (key, value, updated_at)
+    VALUES (@key, @value, CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET
+      value = excluded.value,
+      updated_at = CURRENT_TIMESTAMP
+  `),
+});
+
 const createStatements = ( db ) => {
   const upsertReminderStmt = db.prepare( `
     INSERT INTO reminders (slot_index, text, done, updated_at)
@@ -73,14 +84,7 @@ const createStatements = ( db ) => {
         updated_at = CURRENT_TIMESTAMP
     `),
 
-    listSettingsStmt: db.prepare( "SELECT key, value FROM app_settings" ),
-    upsertSettingStmt: db.prepare( `
-      INSERT INTO app_settings (key, value, updated_at)
-      VALUES (@key, @value, CURRENT_TIMESTAMP)
-      ON CONFLICT(key) DO UPDATE SET
-        value = excluded.value,
-        updated_at = CURRENT_TIMESTAMP
-    `),
+    ...createSettingsStatements( db ),
 
     listRemindersStmt: db.prepare(
       "SELECT slot_index, text, done FROM reminders ORDER BY slot_index ASC"
@@ -781,17 +785,22 @@ export const registerAppConfigRoutes = ( app, context ) => {
 
   app.get( "/api/settings", withSiteOperation(( _req, res ) => {
     const { getDb } = getRequestOperationContext( _req, context );
-    return res.json( { settings: readSettingsMap( createStatements( getDb() ) ) } );
+    return res.json( { settings: readSettingsMap( createSettingsStatements( getDb() ) ) } );
   }) );
 
   app.put( "/api/settings", withSiteOperation(( req, res ) => {
+    const { getDb } = getRequestOperationContext( req, context );
     const settings = req.body?.settings;
     if ( !settings || typeof settings !== "object" )
     {
       return res.status( 400 ).json( { error: "Provide settings object" } );
     }
 
-    const stmts = createStatements( getDb() );
+    if (req.docketReportScope === "combined-work" && Object.keys(settings).some(key =>
+      !["work_week_report_user_goals", "work_week_report_company_goals"].includes(key))) {
+      return res.status(400).json({ error: "Combined Work settings only support report goals." });
+    }
+    const stmts = createSettingsStatements( getDb() );
     for ( const [ key, value ] of Object.entries( settings ) )
     {
       const normalizedKey = String( key ).trim();

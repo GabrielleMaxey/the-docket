@@ -18,13 +18,13 @@ export const setSiteContext = (next) => {
   listeners.forEach((listener) => listener());
 };
 export const siteStorageKey = (key, instanceId = context?.instanceId) =>
-  `docket:site:${instanceId || "legacy"}:${key}`;
+  instanceId?.kind === "combined-work" ? `docket:combined-work:${key}` : `docket:site:${instanceId || "legacy"}:${key}`;
 export const getSiteRecoveryNotice = () => recoveryNotice;
 
 export const readSiteStorage = (storage, key, instanceId = context?.instanceId) => {
   const scopedKey = siteStorageKey(key, instanceId);
   const scoped = storage.getItem(scopedKey);
-  if (scoped !== null) return scoped;
+  if (scoped !== null || instanceId?.kind === "combined-work") return scoped;
   const original = storage.getItem(key);
   if (original === null) return null;
   // The actual legacy formats store notes, reports and issue keys without source

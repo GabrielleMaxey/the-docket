@@ -1,3 +1,4 @@
+import { openCombinedWorkStore, createCombinedWorkOperations } from "./lib/combinedWorkStore.mjs";
 import { createSiteOperationState } from "./lib/siteOperationState.mjs";
 import express from "express";
 import dotenv from "dotenv";
@@ -160,6 +161,7 @@ if (hasExplicitInstanceEnv) {
 }
 
 const todoDb = openTodoDatabase(dbDir);
+const combinedWorkDb = openCombinedWorkStore(dbDir);
 let todoMigrationStatus = { unresolved: [] };
 
 const runtime = {
@@ -239,6 +241,10 @@ const { getMissingEnv } = activeRouteContext;
 const savedSiteOperations = createSavedSiteOperations({ metaDb, dataDir: dbDir,
   withSiteOperation: siteOperations.withSiteOperation,
 });
+const combinedWorkOperations = createCombinedWorkOperations({ getCombinedWorkDb: () => combinedWorkDb,
+  withSiteOperation: savedSiteOperations.withSavedSiteOperation, metaDb,
+});
+app.use(combinedWorkOperations.rejectUnsupportedCombinedWorkOperation);
 // Explicit saved headers must never reach an unrelated endpoint using the active site.
 app.use(savedSiteOperations.rejectUnsupportedSavedSiteOperation);
 
@@ -268,7 +274,8 @@ const routeCtx = {
   ...siteOperations,
   dataDir: dbDir,
   metaDb,
-  withSiteOperation: savedSiteOperations.withSavedSiteOperation,
+  getCombinedWorkDb: () => combinedWorkDb,
+  withSiteOperation: combinedWorkOperations.withCombinedWorkOperation,
 };
 
 registerTaskExportRoutes(app, routeCtx);

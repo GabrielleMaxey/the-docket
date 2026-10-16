@@ -209,7 +209,7 @@ test("combined metrics render with their own preferences and never mount active-
   t.after(app.unmount);
   const metrics = { issues: [issue()], total: 1, open: 1, closed: 0, overdue: 0, inProgress: 1, entryCount: 2, incomplete: true };
   const tree = app.render("metrics", () => app.Metrics({ run: { issues: [issue()] }, scope: "combined-work", combinedMetrics: metrics }));
-  assert.equal(find(tree, node => node.type?.name === "ProjectReportPanel").length, 0);
+  assert.equal(find(tree, node => node.type?.name === "ProjectReportPanel" && node.props.scope === "combined-work").length, 1);
   assert.equal(tree.props.storageKey, "docket:combined-work:my-metrics-open");
   const numbers = app.render("numbers", () => app.Numbers({ run: metrics, scope: "combined-work", combinedMetrics: metrics }));
   assert.match(text(numbers), /2\s+saved-entry rows/);

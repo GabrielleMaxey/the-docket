@@ -91,6 +91,8 @@ test("same-key local and shared followUp edits and Save All preserve their own s
   const bundled = await build({ stdin: { contents: `import { validateMetadataPatch } from "../../../shared/issueMetadataFields.mjs";
     export const configure = ({ saveTeamDate, saveIssueMetadata, setPlanningMetaByKey, planningMetaByKey, startDateByKey = {}, completeDateByKey = {} }) => {
       const React = { useCallback: (callback) => callback };
+      const hydrationReady = true, combined = false, siteContext = undefined;
+      const teamPlanningMetaByKey = {}, teamStartDateByKey = {}, teamCompleteDateByKey = {};
       ${handlers}
       return { handleSavePlanningAll, handlePlanningFieldChange };
     };`, resolveDir: new URL("../src/Pages/hooks/", import.meta.url).pathname }, bundle: true, write: false, format: "esm", platform: "node" });
@@ -155,19 +157,20 @@ test("Now/Next checkbox events replace the active choice and unchecking clears i
   const bundled = await build({ stdin: { contents: `import React from "react"; import { FOLLOW_UP_OPTIONS } from "../../../shared/issueMetadataFields.mjs";
     export const render = ({ followUp, handlePlanningFieldChange, sharedProgramId = "team" }) => {
       const issueKey = "ABC-1";
-      const isClosedOrResolved = false;
+      const combinedRun = null, disableEditing = false, forceTeam = false;
+      const issue = { key: issueKey };
       return (${fragment});
     };`, loader: "jsx", resolveDir: new URL("../src/Pages/components/", import.meta.url).pathname }, bundle: true, write: false, format: "esm", platform: "node" });
   const actual = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`);
   let followUp = "now";
   const changes = [];
   const render = () => actual.render({ followUp, handlePlanningFieldChange: (...args) => { changes.push(args); followUp = args[2]; } });
-  const inputs = () => render().props.children[1].map((label) => label.props.children[0]);
+  const inputs = () => render().props.children.flat().filter(child => child?.type === "label").map((label) => label.props.children[0]);
   assert.deepEqual(inputs().map((input) => input.props.checked), [true, false]);
   inputs()[1].props.onChange({ target: { checked: true } });
   assert.equal(followUp, "next");
   assert.deepEqual(inputs().map((input) => input.props.checked), [false, true]);
-  assert.deepEqual(changes[0], ["ABC-1", "followUp", "next", { sharedProgramId: "team" }]);
+  assert.deepEqual(changes[0], ["ABC-1", "followUp", "next", { sharedProgramId: "team", forceTeam: false }]);
   inputs()[1].props.onChange({ target: { checked: false } });
   assert.equal(followUp, null);
   assert.deepEqual(inputs().map((input) => input.props.checked), [false, false]);
@@ -186,6 +189,8 @@ test("shared Load More and local planning hydration preserve both sources throug
     import { validateMetadataPatch } from "./shared/issueMetadataFields.mjs";
     export const configurePlanning = ({ planningMetaByKey, setPlanningMetaByKey, startDateByKey, completeDateByKey }) => {
       const React = { useCallback: (callback) => callback };
+      const hydrationReady = true, combined = false, siteContext = undefined;
+      const teamPlanningMetaByKey = {}, teamStartDateByKey = {}, teamCompleteDateByKey = {};
       ${handlers}
       return { handleSavePlanningAll, handlePlanningFieldChange };
     };`, resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node", define: { "import.meta.env.VITE_API_BASE": "undefined" } });

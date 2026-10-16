@@ -310,8 +310,8 @@ export const registerIssueMetadataRoutes = (
     }
 
     try {
-      const { items } = await fetchLatestCommentTextBulk({ issueKeys, jiraRequest });
-      return res.json({ items });
+      const result = await fetchLatestCommentTextBulk({ issueKeys, jiraRequest });
+      return res.json(result);
     } catch (error) {
       return res.status(500).json({
         error: "Failed to fetch latest Jira comments",

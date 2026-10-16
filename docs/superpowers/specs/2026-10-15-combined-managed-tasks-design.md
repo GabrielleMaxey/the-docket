@@ -43,3 +43,8 @@ Test duplicate keys across sites and duplicate saved entries, independent field 
 
 ## Builder check and approval
 The independent builder check identified duplicate counting and goal ownership as the remaining product choices. The user accepted the recommended once-per-actual-task counting and one set of Combined Work goals. One mixed editable table and full report generation were explicitly confirmed earlier. No product question remains open.
+
+
+## Implementation and verification handoff
+
+The managed editor, hydration readiness boundary, unique workload metrics, full combined report controls, shared combined goals, and dedicated combined archive are implemented. The report request scope is explicit and incompatible with active/saved headers; source history retains captured revisions. See `../plans/2026-10-15-combined-managed-tasks-handoff.md` for changed files/lines and verification evidence. Final whole-branch review and the outstanding browser checks remain controller-owned; Sonar and real PostgreSQL verification limitations are explicit.

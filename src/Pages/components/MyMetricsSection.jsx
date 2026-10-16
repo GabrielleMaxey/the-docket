@@ -10,7 +10,7 @@ const isIssueOpen = (issue) => {
   return !/(closed|resolved|done)/.test(status);
 };
 
-const MyMetricsSection = ({ run, jiraRowPriorities, jqlRuns, scope, combinedMetrics }) => {
+const MyMetricsSection = ({ run, jiraRowPriorities, jqlRuns, scope, combinedMetrics, combinedSites }) => {
   const totalOpen = React.useMemo(() => {
     if (combinedMetrics) return combinedMetrics.open;
     let sum = 0;
@@ -29,7 +29,7 @@ const MyMetricsSection = ({ run, jiraRowPriorities, jqlRuns, scope, combinedMetr
       <div key={`run-summary-${run.index}`} className="ww-run-summary">
         <div className="ww-run-summary-label">{run.label || `Run ${(run.index || 0) + 1}`}</div>
         <JqlRunMetrics run={run} jiraRowPriorities={jiraRowPriorities} scope={scope} combinedMetrics={combinedMetrics} />
-        {scope !== "combined-work" && <ProjectReportPanel run={run} jiraRowPriorities={jiraRowPriorities} jqlRuns={jqlRuns} />}
+        <ProjectReportPanel run={run} jiraRowPriorities={jiraRowPriorities} jqlRuns={jqlRuns} scope={scope} combinedSites={combinedSites} />
       </div>
     </CollapsibleSection>
   );
