@@ -810,3 +810,78 @@ test("cancelled ordinary restored-row hydration does not unlock editing after it
   finishLocal(); await turn(); await turn();
   assert.equal(render().hydrationReady, false);
 });
+
+
+test("note feedback delays busy text, cancels fast-save timers, and shows failures immediately", async t => {
+  installBrowser(t);
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const app = await bundle('export { default as Note } from "./src/Components/NoteFormattedField.jsx"; export * from "react";', [hooksPlugin]);
+  t.after(app.unmount);
+  let saveState = { loading: true, error: "", success: "" };
+  const render = () => app.render("note", () => app.Note({ value: "draft", saveState }));
+  assert.doesNotMatch(text(render()), /Saving/);
+  t.mock.timers.tick(749);
+  assert.doesNotMatch(text(render()), /Saving/);
+  t.mock.timers.tick(1);
+  assert.match(text(render()), /Saving/);
+  saveState = { loading: false, error: "", success: "Saved locally" };
+  assert.match(text(render()), /Saved locally/);
+  saveState = { loading: true, error: "", success: "" };
+  render();
+  t.mock.timers.tick(100);
+  saveState = { loading: false, error: "", success: "Saved locally" };
+  render();
+  t.mock.timers.tick(1000);
+  assert.doesNotMatch(text(render()), /Saving/);
+  saveState = { loading: false, error: "Could not save note", success: "" };
+  assert.equal(find(render(), node => node.props.role === "alert").length, 1);
+  assert.match(text(render()), /Could not save note/);
+});
+
+test("note autosaves stay out of navigation while other background work remains visible", async t => {
+  installBrowser(t);
+  const app = await bundle('export { default as Indicator } from "./src/Components/BackgroundJobIndicator.jsx"; export * from "react"; export * from "./src/utils/backgroundJobStore.js";', [hooksPlugin]);
+  t.after(app.unmount);
+  const render = () => app.render("indicator", () => app.Indicator());
+  assert.ok(render(), "status area remains mounted when idle");
+  let finishNote, finishReport;
+  const note = app.runBackgroundJob("note-autosave:ABC-1", { instanceId: "a", siteSave: true, label: "Saving note", run: () => new Promise(resolve => { finishNote = resolve; }) });
+  const report = app.runBackgroundJob("report", { instanceId: "a", label: "Generating report", run: () => new Promise(resolve => { finishReport = resolve; }) });
+  await turn();
+  const output = text(render());
+  assert.doesNotMatch(output, /Saving note/);
+  assert.match(output, /Generating report/);
+  assert.equal(app.getActiveBackgroundJobs().filter(job => job.siteSave && job.status === "running").length, 1, "quiet save is still tracked");
+  finishNote(); finishReport();
+  await Promise.all([note, report]);
+  assert.ok(render(), "status area remains mounted after completion");
+});
+
+test("autosave reports pending and confirmed results beside the source note, including retry", async t => {
+  installBrowser(t);
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const app = await bundle('export * from "./src/Pages/hooks/useTaskManagerJira.js"; export * from "react"; export * from "./src/utils/backgroundJobStore.js";', [hooksPlugin]);
+  t.after(app.unmount);
+  globalThis.fetch = async () => new Response('{"items":{}}');
+  const context = source("note-feedback");
+  const run = { instanceId: context.instanceId, sourceContext: context, issues: [issue()], fieldMappings: [], status: "complete" };
+  const render = () => app.render("editor", () => app.useTaskManagerJira({ siteContext: context, combinedRun: run }));
+  render(); await turn(); await turn();
+  let finishSave;
+  globalThis.fetch = async () => new Promise(resolve => { finishSave = resolve; });
+  render().handleNoteChange("ABC-1", "draft");
+  assert.equal(render().saveState["ABC-1"]?.loading, true);
+  await turn(); t.mock.timers.tick(350); await turn();
+  finishSave(new Response('{"error":"Database unavailable"}', { status: 503 }));
+  await turn(); await turn();
+  assert.match(render().saveState["ABC-1"].error, /Database unavailable/);
+  assert.equal(render().jiraNotes["ABC-1"], "draft");
+  globalThis.fetch = async () => new Response('{}');
+  render().handleNoteChange("ABC-1", "retry draft");
+  assert.equal(render().saveState["ABC-1"].loading, true);
+  assert.match(render().saveState["ABC-1"].error, /Database unavailable/, "failure stays visible until retry succeeds");
+  await turn(); t.mock.timers.tick(350); await turn(); await turn();
+  assert.equal(render().saveState["ABC-1"].loading, false);
+  assert.equal(render().saveState["ABC-1"].error, "");
+  assert.match(render().saveState["ABC-1"].success, /Saved/);
+});

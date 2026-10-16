@@ -2695,7 +2695,24 @@
   flex-shrink: 0;
 }
 
-.ww-export-launch { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+.ww-export-launch { display: flex; justify-content: flex-start; margin: 1rem 0; }
+.work-week-page .ww-download-tasks-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid #054d78;
+  border-radius: 6px;
+  color: #054d78;
+  background: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.work-week-page .ww-download-tasks-btn:hover { background: #eef7fc; }
+.work-week-page .ww-download-tasks-btn:focus-visible { outline: 2px solid #054d78; outline-offset: 3px; }
+.ww-note-save-status { min-height: 1.5em; margin-top: 0.25rem; font-size: 0.75rem; line-height: 1.5; color: #526277; }
+.ww-note-save-status--error { color: #9f3a38; }
 .ww-task-export-modal .ww-export-entry { border: 1px solid #c8d3df; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
 .ww-task-export-modal .ww-export-controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
 .ww-task-export-modal .ww-export-controls label { display: flex; flex-direction: column; gap: .4rem; }

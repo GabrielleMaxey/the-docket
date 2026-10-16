@@ -16,9 +16,18 @@ const NoteFormattedField = ({
   title,
   disabled = false,
   modal = false,
+  saveState,
 }) => {
   const [editing, setEditing] = React.useState(false);
   const textareaRef = React.useRef(null);
+  const [showSaving, setShowSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    setShowSaving(false);
+    if (!saveState?.loading) return;
+    const timer = window.setTimeout(() => setShowSaving(true), 750);
+    return () => window.clearTimeout(timer);
+  }, [saveState?.loading]);
   const html = React.useMemo(() => noteMarkdownToHtml(value), [value]);
   const showPreview = !editing && Boolean(String(value || "").trim()) && Boolean(html);
 
@@ -34,33 +43,29 @@ const NoteFormattedField = ({
     if (!disabled) setEditing(true);
   };
 
-  if (showPreview) {
-    return (
+  const field = showPreview ? (
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      className={`ww-note-formatted-preview${modal ? " ww-note-formatted-preview--modal" : ""}${
+        className ? ` ${className}` : ""
+      }`}
+      onClick={startEditing}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          startEditing();
+        }
+      }}
+      title={title || "Click to edit notes"}
+      aria-label={title || "Formatted notes preview. Activate to edit."}
+    >
       <div
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        className={`ww-note-formatted-preview${modal ? " ww-note-formatted-preview--modal" : ""}${
-          className ? ` ${className}` : ""
-        }`}
-        onClick={startEditing}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            startEditing();
-          }
-        }}
-        title={title || "Click to edit notes"}
-        aria-label={title || "Formatted notes preview. Activate to edit."}
-      >
-        <div
-          className="ww-note-formatted-body"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      </div>
-    );
-  }
-
-  return (
+        className="ww-note-formatted-body"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </div>
+  ) : (
     <textarea
       ref={textareaRef}
       className={className}
@@ -72,6 +77,24 @@ const NoteFormattedField = ({
       title={title}
       disabled={disabled}
     />
+  );
+
+  let saveMessage = saveState?.success || "";
+  if (saveState?.loading) saveMessage = showSaving ? "Saving…" : "";
+
+  return (
+    <>
+      {field}
+      {saveState && (
+        <div
+          className={`ww-note-save-status${saveState.error ? " ww-note-save-status--error" : ""}`}
+          role={saveState.error ? "alert" : "status"}
+          aria-live={saveState.error ? "assertive" : "polite"}
+        >
+          {saveState.error || saveMessage}
+        </div>
+      )}
+    </>
   );
 };
 

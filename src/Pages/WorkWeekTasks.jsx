@@ -1,4 +1,5 @@
 import React from "react";
+import { FiDownload } from "react-icons/fi";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, Container, Divider } from "semantic-ui-react";
 import "./workWeekTaskElements.css";
@@ -506,7 +507,6 @@ const WorkWeekTasks = () => {
     <>
       <Container fluid className="work-week-page">
         <TaskManagerHeaderPanel
-          onDownloadTasks={() => setTaskExportOpen(true)}
           showJokeTicker={showJokeTicker}
           showUpcomingDueBanner={showUpcomingDueBanner}
           onShowJokeTickerChange={handleShowJokeTickerChange}
@@ -676,6 +676,12 @@ const WorkWeekTasks = () => {
           drillDownPending={drillDownPending}
         />
 
+        <div className="ww-export-launch">
+          <button type="button" className="ww-download-tasks-btn" onClick={() => setTaskExportOpen(true)}>
+            <FiDownload aria-hidden="true" />
+            Download tasks
+          </button>
+        </div>
       </Container>
       <Divider />
 

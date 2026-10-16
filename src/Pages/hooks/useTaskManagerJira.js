@@ -623,6 +623,7 @@ export const useTaskManagerJira = ({ siteContext: explicitSiteContext, combinedR
 
   const scheduleNoteAutosave = React.useCallback((issueKey) => {
     if (pendingNoteSavesRef.current.has(issueKey)) return;
+    setSaveState((prev) => ({ ...prev, [issueKey]: { ...prev[issueKey], loading: true, success: "" } }));
     const delay = new Promise((resolve) => window.setTimeout(resolve, NOTE_AUTOSAVE_DELAY_MS));
     const pending = runBackgroundJob(`note-autosave:${issueKey}`, {
       instanceId, siteSave: true, queue: true, label: "Saving note",
@@ -636,7 +637,9 @@ export const useTaskManagerJira = ({ siteContext: explicitSiteContext, combinedR
       },
     });
     pendingNoteSavesRef.current.set(issueKey, pending);
-    pending.catch((error) => {
+    pending.then(() => {
+      setSaveState((prev) => ({ ...prev, [issueKey]: { loading: false, error: "", success: "Saved locally" } }));
+    }, (error) => {
       setSaveState((prev) => ({ ...prev, [issueKey]: { loading: false, error: errorMessage(error, "Failed to save note"), success: "" } }));
     }).finally(() => { pendingNoteSavesRef.current.delete(issueKey); });
   }, [instanceId, siteContext]);
