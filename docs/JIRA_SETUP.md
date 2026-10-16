@@ -1,6 +1,6 @@
 # Jira Setup
 
-Credentials never leave this machine. The Express proxy (`server/jiraProxy.mjs`) handles all Jira REST calls; the browser only talks to the proxy.
+The Express proxy (`server/jiraProxy.mjs`) reads server-side credentials and authenticates Jira REST calls. The browser calls the proxy without receiving the Jira API token. Chat and report generation send selected context to the configured AI provider.
 
 ---
 
@@ -60,7 +60,33 @@ Optional env vars (see `.env.example`):
 
 Hard cap: **5** sites total. Settings stores site URLs and emails, not new API tokens. Keep `JIRA_API_TOKEN` in the server environment; list/get instance APIs never return tokens.
 
-**In the app:** **Settings → Jira sites** — add, edit, remove, **Set active**, and **Test connection** (modal). **Header → Site** dropdown switches the active site when two or more are registered; the page reloads so presets, notes, and metrics match that site’s local data. With only legacy `.env` credentials, the header shows **Jira** (link/tooltip points you to Settings to add more sites).
+**In the app:** **Settings → Jira sites** — add, edit, remove, **Set active**, and **Test connection** (modal). **Header → Site** dropdown switches the active site when two or more are registered; site-scoped pages reload their data so presets, notes, and metrics match that saved entry. With only legacy `.env` credentials, the header shows **Jira** (link/tooltip points you to Settings to add more sites).
+
+### Combined Open Work setup
+
+Combined Open Work uses enabled saved Jira entries, including when you normally use only one site. Add entries in **Settings → Jira sites**, test their connections, then open **Task Management → Combined Open Work**, select the entries and click **Load open work**. The active Jira site stays unchanged. **Managed tasks** supports source-bound editing; **List** provides an overview. My Metrics, report goals, and the **Past Reports → Combined Work** archive use a separate Combined Work scope. See the [user guide](./END_USER_GUIDE.md#combined-open-work).
+
+### Optional team database (PostgreSQL)
+
+Local work does not require a company database. **Settings → Team data → Use team DB** defaults to off even if a URL is configured. The switch is app-wide, persisted across site changes and server restarts.
+
+1. Have the database owner provide an approved PostgreSQL database and credentials. Set server-only `TEAM_PRIORITY_DATABASE_URL` with an explicit user, hostname, and database. If required, set `TEAM_PRIORITY_DATABASE_CA_FILE` to an absolute PEM trust-file path.
+2. Export that environment for the migration command, then run `npm run team-db:migrate`. The migration CLI does **not** load `.env`; the API does load its normal project `.env`. Migrations are explicit and do not run at API startup.
+3. Restart the API using your normal browser or desktop workflow after changing its environment.
+4. Open **Settings → Team data**, select **Use team DB**, and click **Refresh status**. Confirm **Connected to the team database.** before Team saves, imports, or exports.
+
+Remote PostgreSQL requires verified TLS; optional CA and URL restrictions, backup guidance, and explicit old-demo import steps are in [README → Optional shared team data](../README.md#optional-shared-team-data-postgresql). Do not place database credentials in browser settings or commit them.
+
+The warning **Team data not configured — set TEAM_PRIORITY_DATABASE_URL** appears only after a successful check confirms enabled + unconfigured. Off, loading, failed checks, and configured-but-disconnected states are distinct. A missing schema requires the migration command. Turning Team off keeps local work and Team drafts; explicit Team actions are blocked without switching their destination to Local. Work already dispatched may finish. Refresh other browser tabs to see the current preference.
+
+![Team DB opt-in and status](./images/mockup-team-db-settings.png)
+*Documentation mockup — synthetic data; simplified layout.*
+
+### Local data and recovery
+
+Saved-entry notes, presets, and ordinary archives use `data/workweek-<instanceId>.sqlite`; legacy single-site data uses `data/workweek.sqlite`. The registry and Team preference use `data/instances-meta.sqlite`, personal To Dos use `data/personal-todos.sqlite`, and Combined Work goals/archive use `data/docket-combined.sqlite`. Keep those distinct stores when planning a backup; the [developer guide](./DEVELOPER_GUIDE.md#local-stores-and-request-context) describes their scope.
+
+An **Older browser data has an unknown Jira site** banner means original unscoped browser records were preserved without being assigned to a site. **Dismiss** acknowledges the notice in this browser without deleting or importing records; if browser storage is blocked it lasts for the session. Do not infer ownership from an issue key alone. Personal To Do migration has a separate recovery notice for ambiguous source records.
 
 ### Chat & AI (explicit opt-in)
 
@@ -160,7 +186,7 @@ With a registered active site, `legacyMode` is `false`, `jiraInstanceId` is set,
 npm run seed:presets -- --all
 ```
 
-See [pilot-presets.md](./pilot-presets.md) for interactive selection and catalog editing.
+The [preset catalog](../presets/pilot-presets.json) supplies the entries; see the [seeding script](../scripts/seed-epic-presets.mjs) for selection options.
 
 **Manual setup:**
 
