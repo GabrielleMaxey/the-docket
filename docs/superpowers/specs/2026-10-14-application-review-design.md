@@ -8,7 +8,7 @@ Status: The user approved implementation and the exact pg/ExcelJS dependencies; 
 
 Improve The Docket's reliability, local security, data separation, and maintainability while preserving its existing browser and Electron development workflows. This is a set of focused changes to the existing React/Vite, Express, and SQLite application, plus replacement of the optional MongoDB team demo with PostgreSQL support.
 
-Development takes place on the user's personal Mac, which can access company Jira. Regular use is intended for company-managed computers. Users supply their own personal Jira API credentials. The same token is used across their approved company Jira sites.
+Regular use is intended for company-managed computers. Users supply their own personal Jira API credentials. The same token is used across their approved company Jira sites.
 
 Keep `npm run dev:all` and `npm run desktop:dev`. Remove packaged installer support, not Electron itself. Personal To Dos remain inside The Docket but become independent of Jira sites. PostgreSQL is the first shared database target; the application must remain usable without a company database connection.
 
