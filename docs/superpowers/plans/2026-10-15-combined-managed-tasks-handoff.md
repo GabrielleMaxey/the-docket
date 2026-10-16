@@ -1,5 +1,22 @@
 # Combined managed work — durable implementation handoff
 
+
+## Current status — 2026-10-16
+
+Implementation complete on `codex/managed-combined-work`; reviewed product commit `31a8634`. All four final review findings are addressed, with no new Critical/Important breakage identified. The branch has not been pushed or merged for this enhancement.
+
+**Final verification:** 675 passed, 0 failed, 10 existing disposable PostgreSQL tests skipped (685 total); production build and client export checks passed. Earlier failures below are historical and superseded by these final results. Live Jira/AI/company SQL were not used. Attachment upload, assignee write, archive switching and goal persistence after source changes lack complete browser verification; automated coverage is recorded below. Sonar source upload was blocked by automatic approval review; no Sonar quality-gate claim is made.
+
+To test, open this checkout rather than switching another checkout to its already-checked-out branch:
+
+```sh
+cd /Users/gabriellemaxey/.codex/worktrees/combined-managed-work/taskManager
+nvm use 22
+npm run dev:all
+```
+
+Provide your local environment configuration in this checkout first; no secrets were copied. Dependencies are already installed here. Stop any conflicting development server yourself or use a free configured port. For Electron, use `npm run desktop:dev` instead. In Task Management, select Combined Work, choose saved Jira entries, and use Managed tasks or List; My Metrics is expanded by default. A company database is optional; Team saving stays disabled when unconfigured.
+
 Scope: all feature changes since base `2dd4081`, across Tasks1–3 on `codex/managed-combined-work`. Work took place only in `/Users/gabriellemaxey/.codex/worktrees/combined-managed-work/taskManager`, using Node22.23.1 and its independent dependencies. The user's desktop checkout/process/native binary, real Jira data/services and company SQL were not used.
 
 ## Behavior and interfaces
@@ -14,7 +31,7 @@ Scope: all feature changes since base `2dd4081`, across Tasks1–3 on `codex/man
 
 ## Verification evidence and limitations
 
-Task1 commits `0d6441a` / `0196319`: final focused 107 passed/3 PostgreSQL skips; saved-header CORS follow-up22 passed. Task2 commits `12469b6` / `f1e2294`: focused156 passed/3 skips; readiness follow-up88 passed. Their detailed local reports remain under `.superpowers/sdd/2026-10-15-combined-managed-tasks/` as `task-1-report.md` and `task-2-report.md`; this durable file contains the cross-task interface/file inventory rather than depending on ignored scratch alone.
+Task1 commits `0d6441a` / `0196319`: final focused 107 passed/3 PostgreSQL skips; saved-header CORS follow-up22 passed. Task2 commits `12469b6` / `f1e2294`: focused156 passed/3 skips; readiness follow-up88 passed. This durable file preserves the cross-task interfaces, verification evidence, review outcomes and complete changed-file inventory; generated task scratch is removed after handoff.
 
 Task3 test-first evidence:
 - `/tmp/managed-task3-server-red.log`:0/4, missing dedicated store/scope/CORS. `/tmp/managed-task3-server-green.log`:4/4.
@@ -125,4 +142,33 @@ Changed anchors for this wave (supersede older anchors above where shifted):
 - `tests/issueMetadataFields.test.mjs:91,188`: existing extracted-handler fixtures include the real persistence helper; assertions unchanged.
 - `docs/superpowers/plans/2026-10-15-combined-managed-tasks-handoff.md`: revised readiness contract and this verification/file inventory.
 
-No live Jira/AI/company DB/.env/data operations or browser attempts occurred in this wave. The10 SQL skips, previous incomplete browser checks and blocked Sonar source upload remain limitations, not passes. No Sonar retry or Ruff substitution was performed. Detailed RED/repair/GREEN evidence and commit are recorded in `.superpowers/sdd/2026-10-15-combined-managed-tasks/final-fix-report.md`; controller owns the final scoped rereview.
+No live Jira/AI/company DB/.env/data operations or browser attempts occurred in this wave. The10 SQL skips, previous incomplete browser checks and blocked Sonar source upload remain limitations, not passes. No Sonar retry or Ruff substitution was performed. Final scoped rereview confirmed all four fixes; the durable verdict follows. Generated review scratch is removed after handoff.
+
+## Final scoped review verdict
+
+- **P1 Optional unconfigured Team store** — ADDRESSED. `src/Pages/hooks/jiraJqlRunWorkflow.js:265` skips Team hydration only for explicit `configured:false`; `src/Pages/hooks/useTaskManagerJira.js:750` shares the health promise and retains rejected required reads as readiness failures. Team stays disabled without configured/healthy status. `src/Pages/combinedWorkReports.js:61,77` applies the same optional-store distinction while recording failed health/metadata reads as coverage notices.
+- **P1 Archive scope isolation** — ADDRESSED. `src/Pages/ReportArchive.jsx:617,625` gives Combined and ordinary panels distinct mounted identities. Old read/delete/reload callbacks retain their old state/context; overlapping IDs cannot transfer through the reused panel state. Regression covers delayed ordinary deletion/reload/detail and subsequent Combined deletion.
+- **P2 Duplicate confirmed Team consistency** — ADDRESSED. `src/Pages/CombinedOpenWork.jsx:29` publishes by hostname/real key; `src/Pages/components/CombinedSiteEditor.jsx:14` reconciles duplicate models. `src/Pages/hooks/useTaskManagerJira.js:298,312` protects fields with pending/failed tokens and publishes only successful writes; only the matching operation clears its token. Team planning, priority and date controls autosave directly on change, so tokens exist before the first asynchronous suspension, including before a later Save All. Local notes/planning remain separate; ordinary saves return directly through the existing save operation. Priority, dates, planning and explicit clear use the helper at `:814,1005,1026,1046,1133,1148`. Regressions cover different-host isolation, Local preservation, full-save retention, pending/failed edits and clears.
+- **P3 Direct report failure/pending identity** — ADDRESSED. `src/Pages/components/ProjectReportPanel.jsx:145,318` resets pending on report identity changes and guards direct rejection/finalization by captured job identity. Existing attached callbacks retain their origin guards. The same-mounted Combined selection regression verifies an old rejection neither displays its error nor clears the new generation's pending state.
+- **New Critical/Important breakage in fix diff** — None identified.
+- **Out-of-scope observations** — None raised.
+- **Checks** — Reviewed supplied fix package `48ee5d2..31a8634`, brief, previous four findings and implementation report; recovered only the truncated middle of the initial diff output. Targeted unchanged-code reads verified actual Team input/autosave paths, health client behavior, shared save construction and report identity. Read existing log summaries: focused 39 passed/0 failed; full 675 passed/0 failed/10 PostgreSQL skips; production build passed. No tests, browser, live services, Sonar retry, Git mutation or additional reviewers.
+- **Fix round** — All four original findings addressed; no new Critical/Important breakage identified. Existing SQL/live-service/browser/Sonar limitations remain as reported.
+
+## Rulings I made
+
+1. Use a new native-managed checkout rather than the existing linked worktree — the latter hosts the user's running Electron/Vite, so isolation now requires another checkout — if wrong, there is an extra local checkout to manage, with no runtime interruption.
+
+2. Carry saved-site context in dedicated headers on an explicit endpoint allowlist, retaining the existing active-site guard — reuse existing handlers without temporarily switching global state — if wrong, context plumbing needs redesign before release.
+
+3. Reuse per-site editor models behind composite UI identities in one mixed table — avoids rewriting all editing logic while preserving source isolation — if wrong, model composition requires refactoring and parity regression tests.
+
+4. Use a dedicated docket-combined.sqlite with shared goal/report schemas — keeps combined archives separate from ordinary site ownership — if wrong, combined data requires a local migration; ordinary archives stay intact.
+
+5. Combined rows choose Local or Team database explicitly, default Local, while ordinary rows keep their shared-program destination — a combined assigned-work query has no program ownership, and a program picker would imply an assignment it does not make — if wrong, users must select Team for each relevant row or revise the default; local data remains separate.
+
+6. Gate the affected saved-source editor until its initial required metadata/ownership/mapping reads succeed, retaining visible rows and independent healthy sources — the reused editor assumes these fields are known and granular save permissions would add another ownership layer — if wrong, safe individual controls remain unavailable until a source refresh succeeds; a narrower readiness gate would be needed.
+
+7. Exempt only a positively confirmed unconfigured optional Team store from combined hydration requirements — Local/Jira work must function before a company DB exists, while configured or unknown Team failures retain ownership safeguards — if wrong, a mistaken health classification could choose the wrong priority owner, so real unconfigured and configured-failure contracts need regression coverage.
+
+8. Leave the final review's five declined categories outside this change (expected logger noise; cross-device Team concurrency; pre-existing rapid assignee/detail selection races; ordinary goals autosave/image-download timing; arbitrary combined JQL/task creation/no-longer-assigned history) — no additional introduced defect was established for the first four and the last is explicitly outside approved scope — if wrong, existing noise/concurrency/race/goal-image limitations remain and excluded features require a separate follow-up.
