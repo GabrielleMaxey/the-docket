@@ -2,7 +2,7 @@ import { createLogger } from "../lib/logger.mjs";
 import { fetchCapacityWorkloads } from "../lib/capacityPlanning.mjs";
 import { mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildFieldMappingsMap } from "../lib/epicFilterJql.mjs";
-import { listSharedPrograms, bulkGetTeamDates, isTeamPriorityConfigured } from "../lib/teamPriorityPostgres.mjs";
+import { listSharedPrograms, bulkGetTeamDates, isTeamPriorityConfigured, getTeamPrioritySettings } from "../lib/teamPriorityPostgres.mjs";
 import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
 import { chunkValues } from "../../shared/jiraBatch.mjs";
 
@@ -187,7 +187,7 @@ export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handl
 
       // Team dates (if configured)
       const teamDatesByKey =
-        isTeamPriorityConfigured() && issueKeys.length > 0
+        getTeamPrioritySettings().enabled && isTeamPriorityConfigured() && issueKeys.length > 0
           ? await bulkGetTeamDates(issueKeys, getSiteContext().siteHost)
           : {};
 

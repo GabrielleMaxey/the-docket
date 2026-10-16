@@ -1,3 +1,4 @@
+import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 import os from "node:os";
 import path from "node:path";
 import { mkdirSync } from "node:fs";
@@ -28,7 +29,8 @@ const resolveMaxMb = () => {
   return Number.isFinite(value) && value > 0 ? value : ATTACHMENT_DEFAULT_MAX_MB;
 };
 
-export const registerAttachmentRoutes = (app, { withSiteOperation = (handler) => handler, jiraRequest, jiraMultipartRequest, ensureEnvOrRespond }) => {
+export const registerAttachmentRoutes = (app, context) => {
+  const { withSiteOperation = (handler) => handler } = context;
   const maxMb = resolveMaxMb();
   const uploadDir = path.join(os.tmpdir(), "taskmanager-attachments");
   mkdirSync(uploadDir, { recursive: true });
@@ -66,6 +68,7 @@ export const registerAttachmentRoutes = (app, { withSiteOperation = (handler) =>
   }));
 
   app.get("/api/jira/issues/:issueKey/attachments", withSiteOperation(async (req, res) => {
+    const { jiraRequest, ensureEnvOrRespond } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) return;
     const issueKey = String(req.params.issueKey || "").trim();
     if (!ISSUE_KEY_RE.test(issueKey)) {
@@ -86,6 +89,7 @@ export const registerAttachmentRoutes = (app, { withSiteOperation = (handler) =>
   app.post(
     "/api/jira/issues/:issueKey/attachments",
     withSiteOperation(async (req, res) => {
+      const { jiraMultipartRequest, ensureEnvOrRespond } = getRequestOperationContext(req, context);
       try {
         const uploadError = await new Promise((resolve) => {
           upload.array("files", ATTACHMENT_MAX_COUNT)(req, res, resolve);

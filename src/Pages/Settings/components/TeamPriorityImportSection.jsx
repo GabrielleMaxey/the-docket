@@ -1,7 +1,7 @@
 import React from "react";
 import { Button, Message } from "semantic-ui-react";
 import { getSiteContext, siteStorageKey, readSiteStorage } from "../../../utils/siteContextStore.js";
-import { fetchTeamPriorityHealth, previewIssueMetadataImport } from "../../../services/jiraClient.js";
+import { fetchTeamPriorityHealth, getTeamPriorityHealthSnapshot, subscribeTeamPriorityHealth, previewIssueMetadataImport } from "../../../services/jiraClient.js";
 import { WORK_WEEK_STORAGE_KEYS } from "../../../utils/workWeekStorage.js";
 import SettingsSection from "./SettingsSection";
 import IssueImportPreview from "./IssueImportPreview";
@@ -23,7 +23,8 @@ const TeamPriorityImportSection = () => {
   const [sourceChanged, setSourceChanged] = React.useState(false);
   const [preview, setPreview] = React.useState(null);
   const [error, setError] = React.useState("");
-  const [health, setHealth] = React.useState(null);
+  const [health, setHealth] = React.useState(getTeamPriorityHealthSnapshot);
+  React.useEffect(() => subscribeTeamPriorityHealth(() => setHealth(getTeamPriorityHealthSnapshot())), []);
   React.useEffect(() => {
     let cancelled = false;
     fetchTeamPriorityHealth({ siteContext }).then(value => { if (!cancelled) setHealth(value); }).catch(() => { if (!cancelled) setHealth({ error: "Team database is unavailable. Check Team data below." }); });
@@ -66,7 +67,7 @@ const TeamPriorityImportSection = () => {
     <p>Choose a CSV UTF-8 file with an issue key (ODI or Key) and supported metadata columns. Priority, Notes, Now / Next, Requestor, planned dates, Actual start and Decision note are supported. Unknown columns are reported and ignored.</p>
     <div className="issue-import-actions"><input ref={inputRef} type="file" accept=".csv,text/csv,.txt" aria-label="Metadata CSV" onChange={event => { setFileName(event.target.files?.[0]?.name || ""); setSourceChanged(true); setError(""); }} /><Button type="button" primary disabled={loading || !fileName} loading={loading} onClick={load}>Preview CSV</Button><span>{fileName}</span></div>
     {error ? <Message negative role="alert">{error}</Message> : null}
-    {preview ? <IssueImportPreview key={preview.previewId} initialPreview={preview} sourceChanged={sourceChanged} siteContext={siteContext} teamAvailable={Boolean(health?.configured && health?.connected)} teamReason={health?.error || (health?.configured ? "Team database is unavailable. Check Team data below." : "Team database is not configured. Local saving is available.")} onPreview={id => { previousId.current = id; }} onLocalSaved={updateLocalCaches} /> : null}
+    {preview ? <IssueImportPreview key={preview.previewId} initialPreview={preview} sourceChanged={sourceChanged} siteContext={siteContext} teamAvailable={Boolean(health?.enabled && health?.configured && health?.connected)} teamReason={health?.error || (!health ? "Checking Team availability…" : !health.enabled ? "Team database is off. Local saving is available." : health.configured === false ? "Team data not configured — set TEAM_PRIORITY_DATABASE_URL" : "Team database is unavailable. Check Team data below.")} onPreview={id => { previousId.current = id; }} onLocalSaved={updateLocalCaches} /> : null}
   </SettingsSection>;
 };
 export default TeamPriorityImportSection;

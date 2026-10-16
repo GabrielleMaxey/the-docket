@@ -121,6 +121,7 @@ const WorkWeekTasks = () => {
   );
 
   const {
+    teamEnabled, hydrationReady,
     jqlCount, jqlInputs, jqlLabels, jqlSharedProgramIds, jqlLoading, jqlRuns,
     showRestoredJqlBanner, jqlError, jqlMaxResults, pullLatestComment, assigneeRefreshNotice,
     jiraNotes, jiraRowPriorities, prioritySourceByKey, selectedForPush,
@@ -151,6 +152,7 @@ const WorkWeekTasks = () => {
 
   React.useEffect(() => {
     let cancelled = false;
+    if (!teamEnabled) { setSharedPrograms([]); setSharedProgramsError(""); return; }
     fetchSharedPrograms()
       .then((items) => {
         if (!cancelled) {
@@ -167,7 +169,7 @@ const WorkWeekTasks = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [teamEnabled]);
 
   React.useEffect(() => {
     const handoff = consumePmAskCreateIssueHandoff();
@@ -620,6 +622,8 @@ const WorkWeekTasks = () => {
         ) : null}
 
         <JiraResultsTable
+          teamEnabled={teamEnabled}
+          hydrationReady={hydrationReady}
           jqlRuns={jqlRuns} selectedForPush={selectedForPush}
           lastPushedJiraNoteByKey={lastPushedJiraNoteByKey}
           pushState={pushState} saveState={saveState}

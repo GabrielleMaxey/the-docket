@@ -1,3 +1,4 @@
+import { openCombinedWorkStore, createCombinedWorkOperations } from "./lib/combinedWorkStore.mjs";
 import { createSiteOperationState } from "./lib/siteOperationState.mjs";
 import express from "express";
 import dotenv from "dotenv";
@@ -17,21 +18,16 @@ import { registerJiraIssueRoutes } from "./routes/jiraIssueRoutes.mjs";
 import { registerIssueMetadataRoutes } from "./routes/issueMetadataRoutes.mjs";
 import { registerEpicWorkloadRoutes } from "./routes/epicWorkloadRoutes.mjs";
 import { registerCapacityPlanningRoutes } from "./routes/capacityPlanningRoutes.mjs";
+import { initializeTeamPrioritySettings } from "./lib/teamPriorityPostgres.mjs";
 import { registerTeamPriorityRoutes } from "./routes/teamPriorityRoutes.mjs";
 import { registerPmAsksRoutes } from "./routes/pmAsksRoutes.mjs";
 import { registerTaskExportRoutes } from "./routes/taskExportRoutes.mjs";
 import { registerCombinedOpenWorkRoutes } from "./routes/combinedOpenWorkRoutes.mjs";
 import { registerTodoRoutes } from "./routes/todoRoutes.mjs";
 import { registerAttachmentRoutes } from "./routes/attachmentRoutes.mjs";
-import { resolveJiraUser, fetchJiraMyself } from "./lib/jiraSearchHelpers.mjs";
-import { getJiraSearchFields } from "./lib/jiraSearchFields.mjs";
 import { createLogger } from "./lib/logger.mjs";
-import {
-  hasOnlyWorkfrontJiraErrors,
-  sanitizeJiraErrorData,
-} from "../shared/jiraErrorUtils.mjs";
-import { extractMediaIdFromUrl } from "./lib/jiraNoteComment.mjs";
-import { requestJira } from "./lib/jiraTransport.mjs";
+import { createJiraRouteContext } from "./lib/jiraRouteContext.mjs";
+import { createSavedSiteOperations } from "./lib/savedSiteOperations.mjs";
 import {
   openInstancesMetaDb,
   initInstancesSchema,
@@ -154,6 +150,7 @@ fs.mkdirSync(dbDir, { recursive: true });
 
 const metaDb = openInstancesMetaDb(path.join(dbDir, "instances-meta.sqlite"));
 initInstancesSchema(metaDb);
+initializeTeamPrioritySettings(metaDb);
 
 // Only auto-seed when an explicit multi-instance env var is present. Bare legacy
 // JIRA_BASE_URL/EMAIL/API_TOKEN alone must keep the registry empty so existing
@@ -166,6 +163,7 @@ if (hasExplicitInstanceEnv) {
 }
 
 const todoDb = openTodoDatabase(dbDir);
+const combinedWorkDb = openCombinedWorkStore(dbDir);
 let todoMigrationStatus = { unresolved: [] };
 
 const runtime = {
@@ -237,110 +235,20 @@ const getDb = () => siteOperations.getSnapshot().db;
 
 const getCredentials = () => siteOperations.getSnapshot().credentials;
 
-const getMissingEnv = () => {
-  const c = getCredentials();
-  const missing = [];
-  if (!c.baseUrl) missing.push(c.mode === "legacy" ? "JIRA_BASE_URL" : "instance.baseUrl");
-  if (!c.email) missing.push(c.mode === "legacy" ? "JIRA_EMAIL" : "instance.email");
-  if (!c.apiToken) missing.push("JIRA_API_TOKEN");
-  return missing;
-};
-
-const ensureEnvOrRespond = (res) => {
-  const configurationError = getCredentials().configurationError;
-  if (configurationError) {
-    res.status(400).json({ error: configurationError });
-    return false;
-  }
-  const missing = getMissingEnv();
-  if (missing.length > 0) {
-    res.status(500).json({ error: "Missing required Jira environment variables", missing });
-    return false;
-  }
-  return true;
-};
-
-
-const jiraRequest = async (options) => {
-  const result = await requestJira({ ...options, credentials: getCredentials() });
-  const { method = "GET" } = options;
-  if (!result.ok) {
-    const sanitized = sanitizeJiraErrorData(result.data);
-    if (hasOnlyWorkfrontJiraErrors(result.data)) {
-      log.warn(`${method} Jira request → ${result.status} (Workfront sync error suppressed)`);
-      return { ok: true, status: result.status, data: sanitized || {}, workfrontSuppressed: true };
-    }
-    log.error(`${method} Jira request → ${result.status}`);
-    return { ...result, data: sanitized || {} };
-  }
-  log.debug(`${method} Jira request → ${result.status}`);
-  return result;
-};
-
-const jiraMultipartRequest = async (options) => {
-  const result = await requestJira({ method: "POST", ...options, credentials: getCredentials() });
-  if (!result.ok) {
-    log.error(`Jira upload → ${result.status}`);
-    return { ...result, data: sanitizeJiraErrorData(result.data) || {} };
-  }
-  log.debug(`Jira upload → ${result.status}`);
-  return result;
-};
-
-const resolveJiraAttachmentMediaId = async (attachmentId) => {
-  const id = String(attachmentId || "").trim();
-  if (!id) return "";
-  const result = await requestJira({
-    credentials: getCredentials(),
-    pathWithQuery: `/rest/api/3/attachment/content/${encodeURIComponent(id)}`,
-    responseMode: "redirect",
-  });
-  return extractMediaIdFromUrl(result.location || "");
-};
-
-const runJiraSearchRequest = async (input, legacyOptions = {}) => {
-  const payload =
-    typeof input === "string"
-      ? { jql: input, ...(legacyOptions || {}) }
-      : (input || {});
-
-  const {
-    jql,
-    maxResults = 200,
-    fields,
-    nextPageToken,
-    res,
-  } = payload;
-
-  if (res && !ensureEnvOrRespond(res)) {
-    return null;
-  }
-
-  const requestBody = {
-    jql,
-    maxResults,
-    fields: fields || getJiraSearchFields(getDb()),
-    ...(nextPageToken ? { nextPageToken } : {}),
-  };
-
-  const result = await jiraRequest({
-    method: "POST",
-    pathWithQuery: JIRA_SEARCH_JQL_PATH,
-    body: requestBody,
-  });
-
-  // Legacy inline handlers expect auto-response behavior and plain data.
-  if (res) {
-    if (!result.ok) {
-      res.status(result.status).json(result.data);
-      return null;
-    }
-    return result.data;
-  }
-
-  // Route modules and helpers expect a normalized { ok, status, data } object.
-  return result;
-};
+const activeRouteContext = createJiraRouteContext({ getCredentials, getDb,
+  getNoteImagesDir: () => siteOperations.getSnapshot().noteImagesDir,
+  getSiteContext: siteOperations.getSiteContext,
+});
+const { getMissingEnv } = activeRouteContext;
+const savedSiteOperations = createSavedSiteOperations({ metaDb, dataDir: dbDir,
+  withSiteOperation: siteOperations.withSiteOperation,
+});
+const combinedWorkOperations = createCombinedWorkOperations({ getCombinedWorkDb: () => combinedWorkDb,
+  withSiteOperation: savedSiteOperations.withSavedSiteOperation, metaDb,
+});
+app.use(combinedWorkOperations.rejectUnsupportedCombinedWorkOperation);
+// Explicit saved headers must never reach an unrelated endpoint using the active site.
+app.use(savedSiteOperations.rejectUnsupportedSavedSiteOperation);
 
 // ─── Health ───────────────────────────────────────────────────────────────────
 
@@ -364,21 +272,12 @@ app.get("/api/health", (_req, res) => {
 // ─── Mount all route modules ──────────────────────────────────────────────────
 
 const routeCtx = {
-  getDb,
-  dataDir: dbDir,
-  jiraRequest,
-  jiraMultipartRequest,
-  resolveJiraAttachmentMediaId,
-  ensureEnvOrRespond,
-  runJiraSearchRequest,
-  resolveJiraUser,
-  // Distinct from resolveJiraUser (a by-query search) — this resolves the
-  // currently authenticated Jira account, for attributing writes like team priority.
-  resolveCurrentJiraUser: () => fetchJiraMyself({ jiraRequest }),
-  getNoteImagesDir: () => siteOperations.getSnapshot().noteImagesDir,
-  metaDb,
+  ...activeRouteContext,
   ...siteOperations,
-  getCredentials,
+  dataDir: dbDir,
+  metaDb,
+  getCombinedWorkDb: () => combinedWorkDb,
+  withSiteOperation: combinedWorkOperations.withCombinedWorkOperation,
 };
 
 registerTaskExportRoutes(app, routeCtx);

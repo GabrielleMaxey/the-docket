@@ -238,6 +238,7 @@ export const fetchLatestCommentTextBulk = async ({
   }
 
   const items = {};
+  const errors = {};
 
   for (const chunk of chunkArray(uniqueKeys, chunkSize)) {
     const settled = await Promise.allSettled(
@@ -246,7 +247,8 @@ export const fetchLatestCommentTextBulk = async ({
 
     const failed = settled.find((result) => result.status === "rejected");
     if (failed) throw failed.reason;
-    settled.forEach(({ value: { issueKey, text, author, created } }) => {
+    settled.forEach(({ value: { issueKey, text, author, created, error } }) => {
+      if (error) errors[issueKey] = "Latest comment unavailable.";
       if (text) {
         const entry = { text, author: author || "", created: created || "" };
         items[issueKey] = entry;
@@ -258,5 +260,5 @@ export const fetchLatestCommentTextBulk = async ({
     });
   }
 
-  return { items };
+  return { items, ...(Object.keys(errors).length ? { errors } : {}) };
 };

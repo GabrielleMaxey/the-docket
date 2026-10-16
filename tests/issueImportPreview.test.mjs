@@ -1,3 +1,4 @@
+import { enableTeamDatabase } from "./teamSettingsFixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
@@ -65,7 +66,8 @@ test("one row conflict saves nothing", () => fixture(async ({ post, db }) => {
 
 test("team failure never falls back", () => fixture(async ({ post, db }) => {
   const failed = await post("/preview", { destination: "team", rows: [row()] });
-  assert.equal(failed.status, 503);
+  assert.equal(failed.status, 403);
+  assert.equal(failed.body.code, "TEAM_DATABASE_DISABLED");
   assert.equal(db.prepare("SELECT count(*) AS n FROM issue_metadata").get().n, 0);
 }));
 
@@ -146,7 +148,7 @@ test("editable review invalidates approval, uses exclusive Now/Next, and retains
     build.onResolve({ filter: /^react$/ }, () => ({ path: "hooks", namespace: "fixture" }));
     build.onResolve({ filter: /siteContextStore\.js$/ }, () => ({ path: "context", namespace: "fixture" }));
     build.onResolve({ filter: /services\/jiraClient\.js$/ }, () => ({ path: "services", namespace: "fixture" }));
-    build.onLoad({ filter: /.*/, namespace: "fixture" }, ({ path }) => ({ contents: path === "context" ? 'export const getSiteContext = () => ({ instanceId: "synthetic", siteHost: "synthetic.example", generation: "g1" }); export const subscribeSiteContext = () => () => {};' : path === "hooks" ? "export default globalThis.d3Hooks;" : "export const previewIssueMetadataImport = (...args) => globalThis.d3Services.previewIssueMetadataImport(...args); export const commitIssueMetadataImport = (...args) => globalThis.d3Services.commitIssueMetadataImport(...args);" }));
+    build.onLoad({ filter: /.*/, namespace: "fixture" }, ({ path }) => ({ contents: path === "context" ? 'export const getSiteContext = () => ({ instanceId: "synthetic", siteHost: "synthetic.example", generation: "g1" }); export const subscribeSiteContext = () => () => {};' : path === "hooks" ? "export default globalThis.d3Hooks;" : "export const assertTeamPriorityEnabled = () => {}; export const previewIssueMetadataImport = (...args) => globalThis.d3Services.previewIssueMetadataImport(...args); export const commitIssueMetadataImport = (...args) => globalThis.d3Services.commitIssueMetadataImport(...args);" }));
   } }] });
   const mod = { exports: {} };
   new Function("require", "module", "exports", bundle.outputFiles[0].text)(createRequire(import.meta.url), mod, mod.exports);
@@ -206,6 +208,7 @@ test("real SQL: team destination rereads a different note and a conflict saves n
   assert.match(url.pathname, /^\/docket_test_[a-z0-9_]+$/);
   assert.ok(url.port);
   const store = await import("../server/lib/teamPriorityPostgres.mjs");
+  enableTeamDatabase(t);
   const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
   process.env.TEAM_PRIORITY_DATABASE_URL = url.href;
   const siteHost = context.siteHost;
@@ -266,7 +269,7 @@ const withActualPreviewEditor = async ({ patch, local = {}, team = {} }, run) =>
     build.onResolve({ filter: /^react$/ }, () => ({ path: "hooks", namespace: "fixture" }));
     build.onResolve({ filter: /siteContextStore\.js$/ }, () => ({ path: "context", namespace: "fixture" }));
     build.onResolve({ filter: /services\/jiraClient\.js$/ }, () => ({ path: "services", namespace: "fixture" }));
-    build.onLoad({ filter: /.*/, namespace: "fixture" }, ({ path }) => ({ contents: path === "context" ? 'export const getSiteContext = () => ({ instanceId: "synthetic", generation: "g1" }); export const subscribeSiteContext = () => () => {};' : path === "hooks" ? "export default globalThis.d3Hooks;" : "export const previewIssueMetadataImport = (...args) => globalThis.d3Services.previewIssueMetadataImport(...args); export const commitIssueMetadataImport = (...args) => globalThis.d3Services.commitIssueMetadataImport(...args);" }));
+    build.onLoad({ filter: /.*/, namespace: "fixture" }, ({ path }) => ({ contents: path === "context" ? 'export const getSiteContext = () => ({ instanceId: "synthetic", generation: "g1" }); export const subscribeSiteContext = () => () => {};' : path === "hooks" ? "export default globalThis.d3Hooks;" : "export const assertTeamPriorityEnabled = () => {}; export const previewIssueMetadataImport = (...args) => globalThis.d3Services.previewIssueMetadataImport(...args); export const commitIssueMetadataImport = (...args) => globalThis.d3Services.commitIssueMetadataImport(...args);" }));
   } }] });
   const mod = { exports: {} };
   new Function("require", "module", "exports", bundled.outputFiles[0].text)(createRequire(import.meta.url), mod, mod.exports);

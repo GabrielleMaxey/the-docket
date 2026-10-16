@@ -19,6 +19,8 @@ const matchesAssigneeQuery = (value, query) => {
 
 const AssigneeCell = ({
   issueKey,
+  displayIssueKey = issueKey,
+  siteContext,
   assignee,
   isClosedOrResolved,
   draftValue,
@@ -52,7 +54,7 @@ const AssigneeCell = ({
     setSearchError("");
 
     debounceRef.current = setTimeout(() => {
-      searchJiraUsers(query)
+      searchJiraUsers(query, { siteContext })
         .then((items) => {
           setJiraSuggestions(Array.isArray(items) ? items : []);
           setSearchError("");
@@ -65,7 +67,7 @@ const AssigneeCell = ({
     }, 300);
 
     return () => clearTimeout(debounceRef.current);
-  }, [query, showSuggestions]);
+  }, [query, showSuggestions, siteContext]);
 
   const localSuggestions = React.useMemo(() => {
     if (query.length < 2) {
@@ -154,7 +156,7 @@ const AssigneeCell = ({
             onKeyDown={handleKeyDown}
             placeholder="Display name, email, or username"
             disabled={isClosedOrResolved}
-            aria-label={`Assignee for ${issueKey}`}
+            aria-label={`Assignee for ${displayIssueKey}`}
             aria-expanded={openSuggestions}
             aria-controls={`assignee-suggestions-${issueKey}`}
             autoComplete="off"

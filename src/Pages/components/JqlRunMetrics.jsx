@@ -45,31 +45,34 @@ const CapacityRow = ({ label, current, limit, onLimitChange, limitTitle }) => {
   );
 };
 
-const JqlRunMetrics = ({ run }) => {
+const JqlRunMetrics = ({ run, scope, combinedMetrics }) => {
+  const combined = scope === "combined-work";
+  const preferenceKey = (key) => combined ? `docket:combined-work:${key}` : siteStorageKey(key, instanceId);
+  const readPreference = (key) => combined ? localStorage.getItem(preferenceKey(key)) : readSiteStorage(localStorage, key, instanceId);
   const instanceId = React.useRef(getSiteContext()?.instanceId).current;
   const [maxCapacity, setMaxCapacity] = React.useState(() => {
-    const v = parseInt(readSiteStorage(localStorage, "ic-max-capacity", instanceId), 10);
+    const v = parseInt(readPreference("ic-max-capacity"), 10);
     return v > 0 ? v : CAPACITY_DEFAULT;
   });
   const [wipLimit, setWipLimit] = React.useState(() => {
-    const v = parseInt(readSiteStorage(localStorage, "ic-wip-limit", instanceId), 10);
+    const v = parseInt(readPreference("ic-wip-limit"), 10);
     return v > 0 ? v : WIP_DEFAULT;
   });
 
   const handleCapacityChange = (e) => {
     const n = Math.max(1, parseInt(e.target.value, 10) || 1);
     setMaxCapacity(n);
-    localStorage.setItem(siteStorageKey("ic-max-capacity", instanceId), String(n));
+    localStorage.setItem(preferenceKey("ic-max-capacity"), String(n));
   };
   const handleWipChange = (e) => {
     const n = Math.max(1, parseInt(e.target.value, 10) || 1);
     setWipLimit(n);
-    localStorage.setItem(siteStorageKey("ic-wip-limit", instanceId), String(n));
+    localStorage.setItem(preferenceKey("ic-wip-limit"), String(n));
   };
 
-  const issues = run.issues || [];
+  const issues = combinedMetrics?.issues || run.issues || [];
   const total = issues.length;
-  const openIssues = issues.filter(isIssueOpen);
+  const openIssues = issues.filter((issue) => combined ? issue.fields?.status?.statusCategory?.key !== "done" : isIssueOpen(issue));
   const open = openIssues.length;
   const closed = total - open;
   const overdue = openIssues.filter((i) => i.isOverdue).length;
@@ -77,7 +80,7 @@ const JqlRunMetrics = ({ run }) => {
   const counts = Object.fromEntries(WORKLOAD_SEGMENTS.map((s) => [s.key, 0]));
   for (const issue of openIssues) {
     const s = String(issue.fields?.status?.name || issue.status || "").toLowerCase();
-    const seg = WORKLOAD_SEGMENTS.find((seg) => seg.test(s));
+    const seg = combined && issue.fields?.status?.statusCategory?.key === "indeterminate" ? WORKLOAD_SEGMENTS[0] : (combined ? WORKLOAD_SEGMENTS.slice(1) : WORKLOAD_SEGMENTS).find((seg) => seg.test(s));
     if (seg) counts[seg.key]++;
   }
 
@@ -85,6 +88,8 @@ const JqlRunMetrics = ({ run }) => {
 
   return (
     <div className="ww-run-metrics">
+      {combinedMetrics?.incomplete && <p role="alert">Combined coverage is incomplete. Failed or partial sources are listed below.</p>}
+      {combinedMetrics && combinedMetrics.entryCount !== total && <p>{combinedMetrics.entryCount} saved-entry rows · {total} distinct eligible Jira tasks</p>}
       <div className="ww-run-metrics-chips">
         <span className="ww-run-metric-chip">{total} total</span>
         <span className="ww-run-metric-chip">{open} open</span>
