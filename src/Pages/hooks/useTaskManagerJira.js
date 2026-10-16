@@ -290,6 +290,7 @@ export const useTaskManagerJira = ({ siteContext: explicitSiteContext, combinedR
   const [assigneeRefreshNotice, flashJqlRefreshNotice] = useFlash(5000);
   const [fieldMappingRows, setFieldMappingRows] = React.useState(combinedRun?.fieldMappings || []);
   const [teamAvailable, setTeamAvailable] = React.useState(false);
+  const [hydrationReady, setHydrationReady] = React.useState(!combined);
   const [teamPlanningMetaByKey, setTeamPlanningMetaByKey] = React.useState({});
   const [teamStartDateByKey, setTeamStartDateByKey] = React.useState({});
   const [teamCompleteDateByKey, setTeamCompleteDateByKey] = React.useState({});
@@ -719,18 +720,22 @@ export const useTaskManagerJira = ({ siteContext: explicitSiteContext, combinedR
     if (!combined) return;
     let cancelled = false;
     const issueKeys = (combinedRun.issues || []).map((issue) => issue.key);
-    Promise.all([
+    Promise.allSettled([
       hydrateCombinedRun({ siteContext, issueKeys, clampPriority, setJiraNotes, setJiraRowPriorities,
         setPrioritySourceByKey, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey,
         hydrateNoteImages: hydrateKeptNoteImages, setTeamPlanningMetaByKey, setTeamStartDateByKey, setTeamCompleteDateByKey }),
-      enrichRunWithParentDoneDates(combinedRun, combinedRun.fieldMappings, { siteContext }),
+      enrichRunWithParentDoneDates(combinedRun, combinedRun.fieldMappings, { siteContext, propagateErrors: true }).then((enriched) => {
+        if (!cancelled) setJqlRuns((runs) => runs.map((run) => ({ ...enriched, issues: run.issues })));
+      }),
       fetchTeamPriorityHealth({ siteContext }),
-    ]).then(([, enriched, health]) => {
+    ]).then((outcomes) => {
       if (cancelled) return;
-      setJqlRuns((runs) => runs.map((run) => ({ ...enriched, issues: run.issues })));
-      setTeamAvailable(Boolean(health?.configured && health?.ok));
-    }).catch((error) => {
-      if (!cancelled) setJqlError(errorMessage(error, "Could not load source metadata."));
+      const failures = outcomes.filter((outcome) => outcome.status === "rejected");
+      const ready = failures.length === 0;
+      setHydrationReady(ready);
+      const health = outcomes[2].value;
+      setTeamAvailable(ready && Boolean(health?.configured && health?.ok));
+      if (!ready) setJqlError(`Source metadata or inherited dates could not load. Editing is unavailable; refresh to retry. ${failures.map((outcome) => errorMessage(outcome.reason, "Read failed.")).join(" ")}`);
     });
     return () => { cancelled = true; };
   }, [combinedRun, siteContext]);
@@ -763,6 +768,7 @@ export const useTaskManagerJira = ({ siteContext: explicitSiteContext, combinedR
   };
 
   const handleRowPriorityChange = (issueKey, value, options = {}) => {
+    if (!hydrationReady) return;
     const priority = clampPriority(value);
     const sharedProgramId = String(options.sharedProgramId || "").trim();
     const alreadyTeam =
@@ -1078,6 +1084,7 @@ export const useTaskManagerJira = ({ siteContext: explicitSiteContext, combinedR
   }, []);
 
   const handleSavePlanningAll = React.useCallback(async (issueKey, options = {}) => {
+    if (!hydrationReady) return;
     const sharedProgramId = String(options.sharedProgramId || "").trim();
     const meta = (combined && options.forceTeam ? teamPlanningMetaByKey : planningMetaByKey)[issueKey] || {};
     const patch = {
@@ -1097,7 +1104,7 @@ export const useTaskManagerJira = ({ siteContext: explicitSiteContext, combinedR
       return saveTeamDate({ issueKey, ...patch }, { siteContext });
     }
     return saveIssueMetadata({ issueKey, ...patch }, { siteContext });
-  }, [planningMetaByKey, startDateByKey, completeDateByKey, teamPlanningMetaByKey, teamStartDateByKey, teamCompleteDateByKey]);
+  }, [hydrationReady, planningMetaByKey, startDateByKey, completeDateByKey, teamPlanningMetaByKey, teamStartDateByKey, teamCompleteDateByKey]);
 
   const handlePlanningFieldChange = (issueKey, field, value, options = {}) => {
     const sharedProgramId = String(options.sharedProgramId || "").trim();
@@ -1399,6 +1406,7 @@ export const useTaskManagerJira = ({ siteContext: explicitSiteContext, combinedR
   return {
     reconcileIssue,
     teamAvailable,
+    hydrationReady,
     teamPlanningMetaByKey,
     teamStartDateByKey,
     teamCompleteDateByKey,

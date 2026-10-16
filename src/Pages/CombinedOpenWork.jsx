@@ -99,7 +99,7 @@ export default function CombinedOpenWork() {
   const table = buildCombinedTableModel(editableSites, models);
   const metricSites = (result?.sites || []).map((site) => {
     const model = models[site.instanceId];
-    return { ...site, ...model?.jqlRuns[0], hydrationError: model?.jqlError,
+    return { ...site, ...model?.jqlRuns[0], hydrationError: model?.jqlError, hydrationReady: model?.hydrationReady ?? false,
       jiraNotes: model?.jiraNotes || {}, jiraRowPriorities: model?.jiraRowPriorities || {},
       planningMetaByKey: model?.planningMetaByKey || {}, startDateByKey: model?.startDateByKey || {},
       completeDateByKey: model?.completeDateByKey || {}, teamPlanningMetaByKey: model?.teamPlanningMetaByKey || {},
@@ -139,6 +139,7 @@ export default function CombinedOpenWork() {
             <button type="button" className="ui button" aria-pressed={mode === "list"} onClick={() => setMode("list")}>List</button>
           </div>
           {saving && <p role="status">Saving source changes. Wait for the result before refreshing or changing sites.</p>}
+          {metricSites.filter((site) => site.sourceContext && !site.hydrationReady && !site.hydrationError).map((site) => <p key={site.instanceId} role="status">{site.displayName}: Loading source metadata and inherited dates before editing…</p>)}
           {metricSites.filter((site) => site.hydrationError).map((site) => <p key={site.instanceId} role="alert" className="ui warning message">{site.displayName}: {site.hydrationError}</p>)}
           <fieldset disabled={loading} hidden={mode !== "managed"} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             {Object.keys(models).length > 0 ? <JiraResultsTable {...table} statusOptions={STATUS_OPTIONS} /> : <p role="status">Loading saved source metadata…</p>}

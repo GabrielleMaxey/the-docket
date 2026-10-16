@@ -57,7 +57,7 @@ export const getMostRecentDoneDateForIssue = (issue, mrdFieldId, parentDateByKey
   return null;
 };
 
-export const buildParentMostRecentDoneDateMap = async (issues, mrdFieldId, { siteContext = getSiteContext() } = {}) => {
+export const buildParentMostRecentDoneDateMap = async (issues, mrdFieldId, { siteContext = getSiteContext(), propagateErrors = false } = {}) => {
   if (!mrdFieldId || !Array.isArray(issues) || issues.length === 0) {
     return {};
   }
@@ -147,6 +147,7 @@ export const buildParentMostRecentDoneDateMap = async (issues, mrdFieldId, { sit
 
     return map;
   } catch (error) {
+    if (propagateErrors) throw error;
     console.warn("Failed to load parent epic Most Recent Done Date values", error);
     return {};
   }
@@ -172,15 +173,15 @@ export const getEffectiveDueDateForIssue = (
   return getMostRecentDoneDateForIssue(issue, mrdFieldId, parentMostRecentDoneDateByKey);
 };
 
-export const enrichRunWithParentDoneDates = async (run, fieldMappingRows, { siteContext = getSiteContext() } = {}) => {
+export const enrichRunWithParentDoneDates = async (run, fieldMappingRows, { siteContext = getSiteContext(), propagateErrors = false } = {}) => {
   const mappingsByRole = resolveFieldMappingRows(fieldMappingRows);
   const mrdFieldId = resolveMappedFieldId(mappingsByRole, "most_recent_done_date");
   const iddFieldId = resolveMappedFieldId(mappingsByRole, "initial_done_date");
   const dueFieldId = resolveMappedFieldId(mappingsByRole, "due_date") || "duedate";
 
   const [parentMostRecentDoneDateByKey, parentIddByKey] = await Promise.all([
-    buildParentMostRecentDoneDateMap(run.issues || [], mrdFieldId, { siteContext }),
-    buildParentMostRecentDoneDateMap(run.issues || [], iddFieldId, { siteContext }),
+    buildParentMostRecentDoneDateMap(run.issues || [], mrdFieldId, { siteContext, propagateErrors }),
+    buildParentMostRecentDoneDateMap(run.issues || [], iddFieldId, { siteContext, propagateErrors }),
   ]);
 
   return {

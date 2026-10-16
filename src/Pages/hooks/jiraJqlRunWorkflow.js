@@ -76,6 +76,7 @@ const dedupeIssueKeys = (issueKeys) => [
 ];
 
 const applyTeamPriorityState = async ({
+  propagateErrors = false,
   siteContext,
   issueKeys,
   clampPriority,
@@ -108,6 +109,7 @@ const applyTeamPriorityState = async ({
       setPrioritySourceByKey((prev) => ({ ...prev, ...teamSource }));
     }
   } catch (error) {
+    if (propagateErrors) throw error;
     console.error("Failed to fetch team priorities", error);
   }
 };
@@ -136,7 +138,7 @@ const extractPlanningMeta = (item) => ({
 const hasPlanningData = (item) =>
   item && PLANNING_FIELD_KEYS.some((f) => item[f] != null && item[f] !== "" && item[f] !== false);
 
-const applyTeamDateState = async ({ siteContext, issueKeys, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }) => {
+const applyTeamDateState = async ({ propagateErrors = false, siteContext, issueKeys, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }) => {
   if (!setStartDateByKey && !setCompleteDateByKey && !setPlanningMetaByKey) {
     return;
   }
@@ -172,6 +174,7 @@ const applyTeamDateState = async ({ siteContext, issueKeys, setStartDateByKey, s
       });
     }
   } catch (error) {
+    if (propagateErrors) throw error;
     console.error("Failed to fetch team dates", error);
   }
 };
@@ -261,8 +264,8 @@ const applyDrillDownMetadata = async ({
 
 export async function hydrateCombinedRun(options) {
   await applyDrillDownMetadata({ ...options, pullLatestComment: false });
-  await applyTeamPriorityState(options);
-  await applyTeamDateState({ ...options,
+  await applyTeamPriorityState({ ...options, propagateErrors: true });
+  await applyTeamDateState({ ...options, propagateErrors: true,
     setPlanningMetaByKey: options.setTeamPlanningMetaByKey,
     setStartDateByKey: options.setTeamStartDateByKey,
     setCompleteDateByKey: options.setTeamCompleteDateByKey,

@@ -26,7 +26,7 @@ export const buildCombinedMetrics = (sites) => {
     closed: issues.length - openIssues.length,
     overdue: openIssues.filter((issue) => issue.isOverdue).length,
     inProgress: openIssues.filter((issue) => issue.fields?.status?.statusCategory?.key === "indeterminate").length,
-    incomplete: (sites || []).some((site) => site.status !== "complete" || !Array.isArray(site.issues) || site.hydrationError),
+    incomplete: (sites || []).some((site) => site.status !== "complete" || !Array.isArray(site.issues) || site.hydrationError || site.hydrationReady === false),
   };
 };
 
@@ -59,7 +59,7 @@ export const buildCombinedTableModel = (sites, models) => {
     for (const issue of sourceRun?.issues || []) {
       const key = combinedRowKey(site.instanceId, issue.key);
       rows.set(key, { model, issue });
-      issues.push({ ...issue, sourceContext: site.sourceContext, sourceRun, teamAvailable: model.teamAvailable });
+      issues.push({ ...issue, sourceContext: site.sourceContext, sourceRun, teamAvailable: model.teamAvailable, hydrationReady: model.hydrationReady });
       for (const field of COMBINED_STATE_FIELDS) adapter[field][key] = model[field]?.[issue.key];
       if (model.collapsedRowKeys.has(issue.key)) adapter.collapsedRowKeys.add(key);
       if (model.expandedPlanningKey === issue.key) adapter.expandedPlanningKeys.add(key);
@@ -68,13 +68,14 @@ export const buildCombinedTableModel = (sites, models) => {
   for (const action of ROW_ACTIONS) {
     adapter[action] = (key, ...args) => {
       const row = rows.get(key);
+      if (row?.model.hydrationReady === false) return;
       return row?.model[action](row.issue.key, ...args);
     };
   }
   for (const action of ["handleSelectAll", "handlePushSelected"]) {
     adapter[action] = (selectedIssues, ...args) => Promise.all((sites || []).map((site) => {
       const selected = selectedIssues.filter((issue) => issue.sourceContext.instanceId === site.instanceId);
-      return selected.length ? models[site.instanceId][action](selected, ...args) : undefined;
+      return selected.length && models[site.instanceId]?.hydrationReady !== false ? models[site.instanceId][action](selected, ...args) : undefined;
     }));
   }
   for (const action of ["handleExpandAllRows", "handleCollapseAllRows"]) {

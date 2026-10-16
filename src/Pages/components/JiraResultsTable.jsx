@@ -846,7 +846,7 @@ const JiraResultsTable = ({
                     const save = saveState[issueKey] || { loading: false, error: "", success: "" };
                     const rowUpdate = rowUpdateState[issueKey] || { loading: false, error: "", success: "" };
                     const isClosedOrResolved = combinedRun ? issue.fields?.status?.statusCategory?.key === "done" : isClosedLikeStatus(status);
-                    const disableEditing = isClosedOrResolved && !combinedRun;
+                    const disableEditing = combinedRun ? issue.hydrationReady === false : isClosedOrResolved;
                     const noteDraft =
                       jiraNotes[issueKey] ||
                       jiraNotes[String(issueKey || "").toUpperCase()] ||
@@ -1308,7 +1308,7 @@ const JiraResultsTable = ({
                                   <div className="ww-planning-field">
                                     <span className="ww-planning-label">Now / Next</span>
                                     {combinedRun && <label>Planning destination
-                                    <select aria-label={`Planning destination for ${issue.key} on ${issue.sourceContext.displayName}`} value={forceTeam ? "team" : "local"}
+                                    <select disabled={disableEditing} aria-label={`Planning destination for ${issue.key} on ${issue.sourceContext.displayName}`} value={forceTeam ? "team" : "local"}
                                       onChange={(event) => setPlanningDestinationByKey((prev) => ({ ...prev, [issueKey]: event.target.value }))}>
                                       <option value="local">Local</option><option value="team" disabled={!issue.teamAvailable}>Team database</option>
                                     </select>
@@ -1423,9 +1423,10 @@ const JiraResultsTable = ({
                                   </div>
 
                                   <label className="ww-planning-field">
-                                    <span className="ww-planning-label" title="Include this issue in the Pinned Issues view on the Gantt chart">Pin to Gantt</span>
+                                    <span className="ww-planning-label" title="Include this issue in the Pinned Issues view on the Gantt chart">{combinedRun ? "Pin to Gantt (local)" : "Pin to Gantt"}</span>
                                     <input
                                       type="checkbox"
+                                      disabled={Boolean(combinedRun) && disableEditing}
                                       checked={Boolean(planningMetaByKey[issueKey]?.pinnedGantt)}
                                       onChange={(e) => handlePinnedGanttChange && handlePinnedGanttChange(issueKey, e.target.checked)}
                                     />
@@ -1451,7 +1452,7 @@ const JiraResultsTable = ({
                                   <button
                                     type="button"
                                     className="ww-planning-save-btn"
-                                    disabled={planSaveStatus[issueKey] === "saving"}
+                                    disabled={(Boolean(combinedRun) && disableEditing) || planSaveStatus[issueKey] === "saving"}
                                     onClick={() => triggerPlanSave(issueKey, sharedProgramId, forceTeam)}
                                   >
                                     {planSaveStatus[issueKey] === "saving" ? "Saving…" : "Save to database"}

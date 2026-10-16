@@ -354,3 +354,118 @@ test("nested assignee search, attachment loading and parent date enrichment use 
   }
   assert.ok(calls.every(call => call.options.headers["X-Docket-Site"] === undefined));
 });
+
+for (const delayedPath of ["/issue-metadata/bulk", "/team-priority/bulk", "/dates/bulk", "/metadata/bulk", "/search"]) {
+  test(`combined source waits for ${delayedPath} before edits without blocking a ready source`, async t => {
+    installBrowser(t);
+    const app = await bundle('export * from "./src/Pages/hooks/useTaskManagerJira.js"; export * from "./src/Pages/combinedWorkModel.js"; export { default as Table } from "./src/Pages/components/JiraResultsTable.jsx"; export * from "react";', [hooksPlugin]);
+    t.after(app.unmount);
+    const writes = [];
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    globalThis.fetch = async (url, options) => {
+      const id = options.headers["X-Docket-Saved-Site"];
+      if (["PUT", "PATCH", "DELETE"].includes(options.method)) writes.push({ url, options });
+      if (id === "a" && url.endsWith(delayedPath)) await pending;
+      const data = url.endsWith("/health") ? { configured: true, ok: true }
+        : url.endsWith("/search") ? { issues: [{ key: "PARENT-1", fields: { custom_mrd: "2026-11-01" } }] }
+        : { items: { "ABC-1": url.endsWith("/team-priority/bulk") ? { priority: 3 } : { priority: 1, plannedStart: "2026-11-02", note: "Stored" } } };
+      return new Response(JSON.stringify(data));
+    };
+    const sites = ["a", "b"].map(id => ({ instanceId: id, sourceContext: source(id), status: "complete", issues: [issue({ parent: { key: "PARENT-1" } })], fieldMappings: [{ role: "most_recent_done_date", fieldId: "custom_mrd" }] }));
+    let models;
+    const render = () => {
+      models = Object.fromEntries(sites.map(site => [site.instanceId, app.render(site.instanceId, () => app.useTaskManagerJira({ siteContext: site.sourceContext, combinedRun: site }))]));
+      return app.buildCombinedTableModel(sites, models);
+    };
+    render(); await turn(); await turn();
+    let table = render();
+    const a = app.combinedRowKey("a", "ABC-1"), b = app.combinedRowKey("b", "ABC-1");
+    models.a.handleRowPriorityChange("ABC-1", 2);
+    await models.a.handleSavePlanningAll("ABC-1", { forceTeam: true });
+    table.handleNoteChange(a, "too early");
+    await table.handleSavePlanningAll(a);
+    assert.equal(writes.length, 0, "pending reads cannot cause wrong-destination or blank writes");
+    assert.equal(models.a.hydrationReady, false);
+    assert.equal(models.b.hydrationReady, true);
+    const pendingMetrics = app.buildCombinedMetrics(sites.map(site => ({ ...site, hydrationReady: models[site.instanceId].hydrationReady })));
+    assert.equal(pendingMetrics.total, 2, "metadata readiness does not remove known Jira issues");
+    assert.equal(pendingMetrics.incomplete, true);
+    const tree = app.render("table", () => app.Table({ ...table, statusOptions: [], expandedPlanningKeys: new Set([a, b]) }));
+    assert.deepEqual(Object.fromEntries(find(tree, node => node.type?.name === "PriorityCell").map(node => [node.props.issueKey, node.props.isClosedOrResolved])), { [a]: true, [b]: false });
+    assert.deepEqual(find(tree, node => node.props.className === "ww-planning-save-btn").map(node => node.props.disabled).sort(), [false, true]);
+    assert.match(text(tree), /Pin to Gantt \(local\)/);
+    table.handleRowPriorityChange(b, 2);
+    await turn();
+    assert.equal(writes.length, 1);
+    assert.match(writes[0].url, /team-priority\/ABC-1$/);
+    release(); await turn(); await turn();
+    table = render();
+    assert.equal(models.a.hydrationReady, true);
+    assert.equal(table.jiraRowPriorities[a], 3);
+    assert.equal(table.jiraNotes[a], "Stored");
+    table.handleStatusDraftChange(a, "Draft status after loading");
+    table.handleRowPriorityChange(a, 2);
+    await render().handleSavePlanningAll(a, { forceTeam: true });
+    await turn(); table = render();
+    assert.equal(table.statusDrafts[a], "Draft status after loading");
+    assert.equal(table.jiraRowPriorities[a], 2);
+    assert.equal(JSON.parse(writes.at(-1).options.body).plannedStart, "2026-11-02");
+  });
+}
+
+for (const failedPath of ["/issue-metadata/bulk", "/team-priority/bulk", "/dates/bulk", "/metadata/bulk", "/search", "/health"]) {
+  test(`combined source exposes failed ${failedPath} and cannot clear unknown metadata`, async t => {
+    installBrowser(t);
+    const app = await bundle('export * from "./src/Pages/hooks/useTaskManagerJira.js"; export * from "./src/Pages/combinedWorkModel.js"; export { default as Page } from "./src/Pages/CombinedOpenWork.jsx"; export * from "react";', [hooksPlugin]);
+    t.after(app.unmount);
+    const writes = [];
+    const site = { id: "a", instanceId: "a", enabled: true, displayName: "A", baseUrl: source("a").baseUrl, sourceContext: source("a"), status: "complete", loaded: 1, rows: [], issues: [issue({ parent: { key: "PARENT-1" } })], fieldMappings: [{ role: "most_recent_done_date", fieldId: "custom_mrd" }, { role: "due_date", fieldId: "custom_due" }] };
+    globalThis.fetch = async (url, options = {}) => {
+      if (["PUT", "PATCH", "DELETE"].includes(options.method)) writes.push(url);
+      if (url === "/api/health") return new Response(JSON.stringify({ siteContext: { instanceId: "active", generation: 1 } }));
+      if (url.endsWith(failedPath)) return new Response(JSON.stringify({ error: `Unavailable ${failedPath}` }), { status: 503 });
+      return new Response(JSON.stringify(url.endsWith("instances") ? { instances: [site] }
+        : url.endsWith("combined-open-work") ? { sites: [site], fetchedAt: "now" }
+        : url.endsWith("/health") ? { configured: true, ok: true }
+        : url.endsWith("/search") ? { issues: [] } : { items: {} }));
+    };
+    const render = () => app.render("model", () => app.useTaskManagerJira({ siteContext: site.sourceContext, combinedRun: site }));
+    render(); await turn(); await turn();
+    const model = render();
+    model.handleRowPriorityChange("ABC-1", 2);
+    await model.handleSavePlanningAll("ABC-1", { forceTeam: true });
+    assert.equal(writes.length, 0);
+    assert.equal(model.hydrationReady, false);
+    assert.equal(model.teamAvailable, false);
+    assert.match(model.jqlError, /Unavailable/);
+    const metrics = app.buildCombinedMetrics([{ ...site, hydrationError: model.jqlError }]);
+    assert.equal(metrics.incomplete, true);
+    assert.equal(metrics.total, 1);
+    assert.equal(metrics.open, 1);
+    if (failedPath !== "/search") assert.equal(model.jqlRuns[0].dueFieldId, "custom_due", "mapping enrichment is independent of metadata/health failures");
+    const renderPage = () => app.render("page", () => app.Page());
+    renderPage(); await turn();
+    await find(renderPage(), node => node.type === "button" && text(node) === "Load open work")[0].props.onClick();
+    const editor = find(renderPage(), node => node.type?.name === "CombinedSiteEditor")[0];
+    editor.props.onModel("a", model);
+    assert.ok(find(renderPage(), node => node.props.role === "alert").some(node => /Unavailable/.test(text(node))), "failure is visible at source level");
+  });
+}
+
+
+test("ordinary parent-date reads retain their existing fallback while combined reads reject", async t => {
+  installBrowser(t);
+  const app = await bundle('export * from "./src/utils/jiraIssueDoneDates.js";');
+  globalThis.fetch = async () => new Response('{"error":"Parent dates unavailable"}', { status: 503 });
+  const warnings = [];
+  t.mock.method(console, "warn", (...args) => warnings.push(args));
+  const run = { issues: [issue({ parent: { key: "PARENT-1" } })] };
+  const mappings = [{ role: "most_recent_done_date", fieldId: "custom_mrd" }];
+  const ordinary = await app.enrichRunWithParentDoneDates(run, mappings, { siteContext: { instanceId: "active", generation: 1 } });
+  assert.deepEqual(ordinary.parentMostRecentDoneDateByKey, {});
+  assert.equal(ordinary.mrdFieldId, "custom_mrd");
+  assert.equal(warnings.length, 2);
+  await assert.rejects(app.enrichRunWithParentDoneDates(run, mappings, { siteContext: source("a"), propagateErrors: true }), /Parent dates unavailable/);
+  assert.equal(warnings.length, 2, "combined failure propagates without duplicate logging");
+});
