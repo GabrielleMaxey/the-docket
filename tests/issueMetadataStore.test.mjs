@@ -1,3 +1,4 @@
+import { enableTeamDatabase } from "./teamSettingsFixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import Database from "better-sqlite3";
@@ -55,6 +56,7 @@ test("real PostgreSQL validates partial dates, atomic stale batches, absent rows
   assert.match(url.pathname, /^\/docket_test_[a-z0-9_]+$/);
   assert.ok(url.port);
   const store = await import("../server/lib/teamPriorityPostgres.mjs");
+  enableTeamDatabase(t);
   const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
   process.env.TEAM_PRIORITY_DATABASE_URL = url.href;
   const siteHost = "d2-store.example.test";

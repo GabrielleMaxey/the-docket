@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 
+import { enableTeamDatabase } from "./teamSettingsFixture.mjs";
+
 const loadStore = () => import("../server/lib/teamPriorityPostgres.mjs");
 const databaseUrl = process.env.DOCKET_TEST_DATABASE_URL;
 
@@ -12,12 +14,13 @@ const assertTestDatabase = (url) => {
   assert.ok(parsed.port, "test database needs an explicit port");
 };
 
-test("unconfigured startup remains local and team status is unavailable", async () => {
+test("unconfigured startup remains local and team status is unavailable", async (t) => {
+  enableTeamDatabase(t);
   const store = await loadStore();
   const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
   delete process.env.TEAM_PRIORITY_DATABASE_URL;
   try {
-    assert.deepEqual(await store.getTeamStatus(), { configured: false, connected: false });
+    assert.deepEqual(await store.getTeamStatus(), { enabled: true, configured: false, connected: false });
     await assert.rejects(store.getTeamMetadata({ siteHost: "a.example.test", issueKeys: ["ABC-1"] }), /not configured/i);
   } finally {
     if (previous === undefined) delete process.env.TEAM_PRIORITY_DATABASE_URL;
@@ -26,7 +29,8 @@ test("unconfigured startup remains local and team status is unavailable", async 
   }
 });
 
-test("connection failures never expose database credentials or internal server errors", async () => {
+test("connection failures never expose database credentials or internal server errors", async (t) => {
+  enableTeamDatabase(t);
   const store = await loadStore();
   const { Pool } = await import("pg");
   const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
@@ -65,6 +69,7 @@ test("remote databases require verified TLS and CA settings cannot be replaced b
 
 test("real PostgreSQL preserves site identity, full fields, partial clears and transactional rollback", { skip: !databaseUrl }, async (t) => {
   assertTestDatabase(databaseUrl);
+  enableTeamDatabase(t);
   const store = await loadStore();
   const { Pool } = await import("pg");
   const pool = new Pool({ connectionString: databaseUrl, max: 1 });
@@ -106,7 +111,8 @@ test("real PostgreSQL preserves site identity, full fields, partial clears and t
 });
 
 
-test("missing schema is visibly unavailable with migration guidance", async () => {
+test("missing schema is visibly unavailable with migration guidance", async (t) => {
+  enableTeamDatabase(t);
   const store = await loadStore();
   const { Pool } = await import("pg");
   const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
@@ -164,6 +170,7 @@ test("real demo migration rejects unknown sites before connecting and rolls back
 
 test("real compatibility dates preserve child inheritance source and explicit shared false until deliberate deletion", { skip: !databaseUrl }, async (t) => {
   assertTestDatabase(databaseUrl);
+  enableTeamDatabase(t);
   const store = await loadStore();
   const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
   process.env.TEAM_PRIORITY_DATABASE_URL = databaseUrl;

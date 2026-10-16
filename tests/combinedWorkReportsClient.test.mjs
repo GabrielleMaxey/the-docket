@@ -237,7 +237,7 @@ test("ordinary reattachment keeps latest callbacks and original result", async t
 for (const configured of [false,true]) test(`history handles Team configured=${configured} without inventing optional failures`, async t => {
   install(t); const api=await reports(); let teamReads=0;
   globalThis.fetch=async url => {
-    if(url.endsWith("/team-priority/health")) return new Response(JSON.stringify({configured,ok:false,connected:false}));
+    if(url.endsWith("/team-priority/health")) return new Response(JSON.stringify({enabled:true,configured,ok:false,connected:false}));
     if(url.includes("team-priority")) { teamReads++; return new Response('{"error":"Team data not configured — set TEAM_PRIORITY_DATABASE_URL"}',{status:503}); }
     return new Response(JSON.stringify(url.includes("search/all") ? {issues:[issue()],isComplete:true} : url.includes("recent-notes") ? {issueKeys:[]} : url.includes("field-mappings") ? {items:[]} : {items:{}}));
   };

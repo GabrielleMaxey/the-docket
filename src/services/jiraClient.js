@@ -67,6 +67,22 @@ const extractJiraErrorMessage = ( data, status ) => {
   return `Jira request failed with status ${ status }`;
 };
 
+let teamHealth = null;
+let teamSettingsRevision = 0;
+const teamHealthListeners = new Set();
+export const getTeamPriorityHealthSnapshot = () => teamHealth;
+export const subscribeTeamPriorityHealth = (listener) => {
+  teamHealthListeners.add(listener);
+  return () => teamHealthListeners.delete(listener);
+};
+const publishTeamHealth = (health) => {
+  teamHealth = health;
+  teamHealthListeners.forEach(listener => listener());
+};
+export const assertTeamPriorityEnabled = () => {
+  if (teamHealth?.enabled === false) throw Object.assign(new Error("Team database is disabled. Enable Use team DB in Settings."), { status: 403, code: "TEAM_DATABASE_DISABLED" });
+};
+
 let initializingSite;
 export const initializeSiteContext = async () => {
   if ( getSiteContext() ) return getSiteContext();
@@ -117,6 +133,7 @@ const requestJson = async ( path, options = {} ) => {
 };
 
 const requestJsonNow = async ( path, options = {} ) => {
+  if ((path.startsWith("/api/team-priority/") && !["/api/team-priority/health", "/api/team-priority/settings"].includes(path)) || path === "/api/shared-programs") assertTeamPriorityEnabled();
   const { timeoutMs, siteContext, ...fetchOptions } = options;
   let response;
   try
@@ -471,8 +488,20 @@ export const commitIssueMetadataImport = ( previewId, { siteContext } = {} ) =>
     body: JSON.stringify( { previewId } ),
   } );
 
-export const fetchTeamPriorityHealth = async ( { siteContext } = {} ) => {
-  return requestJson( "/api/team-priority/health", { siteContext } );
+export const fetchTeamPriorityHealth = async ( { siteContext, signal } = {} ) => {
+  const revision = teamSettingsRevision;
+  const health = await requestJson( "/api/team-priority/health", { siteContext, signal } );
+  if (revision === teamSettingsRevision) publishTeamHealth(health);
+  return revision === teamSettingsRevision ? health : teamHealth;
+};
+
+export const saveTeamPrioritySettings = async ( { enabled } ) => {
+  const result = await requestJson("/api/team-priority/settings", {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }),
+  });
+  teamSettingsRevision += 1;
+  publishTeamHealth({ ...teamHealth, enabled: result.enabled, connected: false, ok: false });
+  return result;
 };
 
 export const seedTeamPriorityPrograms = async () => {
@@ -498,6 +527,8 @@ export const pullTeamPrioritiesToLocal = async () => {
 };
 
 export const fetchSharedPrograms = async ( { siteContext } = {} ) => {
+  const health = teamHealth || await fetchTeamPriorityHealth({ siteContext });
+  if (health?.enabled !== true) return [];
   const data = await requestJson( "/api/shared-programs", { siteContext } );
   return data?.items || [];
 };

@@ -232,7 +232,7 @@ test("real mixed editor actions route every family to its source, preserve local
     if (url.endsWith("/issue-metadata/bulk")) return new Response(JSON.stringify({ items: { "ABC-1": { note: `local-${id}`, plannedStart: "2026-10-01", followUp: "now" } } }));
     if (url.endsWith("/dates/bulk")) return new Response(JSON.stringify({ items: { "ABC-1": { plannedStart: "2026-12-01", startDate: "2026-12-02" } } }));
     if (url.endsWith("/metadata/bulk")) return new Response(JSON.stringify({ items: { "ABC-1": { followUp: "next" } } }));
-    if (url.endsWith("/health")) return new Response('{"configured":true,"ok":true}');
+    if (url.endsWith("/health")) return new Response('{"enabled":true,"configured":true,"connected":true,"ok":true}');
     if (url.endsWith("/search")) return new Response(JSON.stringify({ issues: [updatedIssue] }));
     if (rejectB && id === "b" && url.endsWith("/comment")) return new Response('{"error":"Stale B","code":"SAVED_SITE_CONTEXT_CHANGED"}', { status: 409 });
     return new Response('{"items":{},"ok":true,"accountId":"other","resolvedAssignee":"Other"}');
@@ -367,7 +367,7 @@ for (const delayedPath of ["/issue-metadata/bulk", "/team-priority/bulk", "/date
       const id = options.headers["X-Docket-Saved-Site"];
       if (["PUT", "PATCH", "DELETE"].includes(options.method)) writes.push({ url, options });
       if (id === "a" && url.endsWith(delayedPath)) await pending;
-      const data = url.endsWith("/health") ? { configured: true, ok: true }
+      const data = url.endsWith("/health") ? { enabled: true, configured: true, connected: true, ok: true }
         : url.endsWith("/search") ? { issues: [{ key: "PARENT-1", fields: { custom_mrd: "2026-11-01" } }] }
         : { items: { "ABC-1": url.endsWith("/team-priority/bulk") ? { priority: 3 } : { priority: 1, plannedStart: "2026-11-02", note: "Stored" } } };
       return new Response(JSON.stringify(data));
@@ -427,7 +427,7 @@ for (const failedPath of ["/issue-metadata/bulk", "/team-priority/bulk", "/dates
       if (url.endsWith(failedPath)) return new Response(JSON.stringify({ error: `Unavailable ${failedPath}` }), { status: 503 });
       return new Response(JSON.stringify(url.endsWith("instances") ? { instances: [site] }
         : url.endsWith("combined-open-work") ? { sites: [site], fetchedAt: "now" }
-        : url.endsWith("/health") ? { configured: true, ok: true }
+        : url.endsWith("/health") ? { enabled: true, configured: true, connected: true, ok: true }
         : url.endsWith("/search") ? { issues: [] } : { items: {} }));
     };
     const render = () => app.render("model", () => app.useTaskManagerJira({ siteContext: site.sourceContext, combinedRun: site }));
@@ -477,7 +477,7 @@ for (const configured of [false, true]) test(`Team configured=${configured} pres
   t.after(app.unmount);
   const writes = [], teamReads = [];
   globalThis.fetch = async (url, options) => {
-    if (url.endsWith("/health")) return new Response(JSON.stringify({ configured, ok: false, connected: false }));
+    if (url.endsWith("/health")) return new Response(JSON.stringify({ enabled: true, configured, ok: false, connected: false }));
     if (url.includes("team-priority")) { teamReads.push(url); return new Response('{"error":"Team data not configured — set TEAM_PRIORITY_DATABASE_URL"}', { status: 503 }); }
     if (options.method === "PUT" || url.endsWith("/status")) writes.push(url);
     return new Response(JSON.stringify(url.endsWith("/search") ? { issues: [issue()] } : { items: { "ABC-1": { note: "Local note", plannedStart: "2026-10-01" } } }));
@@ -520,7 +520,7 @@ test("duplicate Team confirmations reconcile shared fields without replacing Loc
       return new Response('{"ok":true}');
     }
     const data = url === "/api/health" ? {siteContext:{instanceId:"active",generation:1}} : url.endsWith("instances") ? {instances:sites} : url.endsWith("combined-open-work") ? {sites,fetchedAt:"now"}
-      : url.endsWith("/health") ? {configured:true,ok:true}
+      : url.endsWith("/health") ? {enabled:true,configured:true,connected:true,ok:true}
       : url.endsWith("/issue-metadata/bulk") ? {items:{"ABC-1":{note:`local-${id}`,plannedStart:"2026-10-01"}}}
       : url.endsWith("/dates/bulk") ? {items:{"ABC-1":{plannedStart:"2026-11-01",startDate:"2026-11-02",completeDate:"2026-11-03"}}}
       : url.endsWith("/team-priority/bulk") ? {items:{"ABC-1":{priority:3}}} : {items:{}};
@@ -577,4 +577,124 @@ test("duplicate Team confirmations reconcile shared fields without replacing Loc
   assert.equal(table.teamPlanningMetaByKey[b].plannedFinish, "2027-01-01");
   assert.equal(table.planningMetaByKey[b].plannedStart, "2026-10-01");
   assert.equal(table.teamStartDateByKey[other],"2026-11-02");
+});
+
+
+test("Team setting distinguishes loading, off, unconfigured and disconnected and saves the checkbox", async t => {
+  installBrowser(t);
+  const app = await bundle('export {default as TeamSettings} from "./src/Pages/Settings/components/TeamPriorityDemoSection.jsx"; export * from "./src/services/jiraClient.js"; export * from "./src/utils/siteContextStore.js"; export * from "react";', [hooksPlugin]);
+  t.after(app.unmount);
+  app.setSiteContext({ instanceId: "a", generation: 1 });
+  let health = { enabled: false, configured: false, connected: false, ok: false };
+  let healthFailed = false;
+  const writes = [];
+  globalThis.fetch = async (url, options) => {
+    if (healthFailed && url.endsWith("health")) return new Response('{"error":"Health unavailable"}', { status: 503 });
+    if (options.method === "PUT") { writes.push(JSON.parse(options.body)); health = { ...health, enabled: writes.at(-1).enabled }; return new Response(JSON.stringify({ enabled: health.enabled })); }
+    return new Response(JSON.stringify(url.endsWith("health") ? health : { items: [] }));
+  };
+  const render = () => app.render("setting", () => app.TeamSettings());
+  const warning = "Team data not configured — set TEAM_PRIORITY_DATABASE_URL";
+  assert.ok(!text(render()).includes(warning));
+  await turn(); await turn();
+  const toggle = find(render(), node => node.type === "input" && node.props.type === "checkbox")[0];
+  assert.ok(toggle, "Use team DB checkbox is present");
+  assert.equal(toggle.props.checked, false);
+  assert.ok(!text(render()).includes(warning));
+  await toggle.props.onChange({ target: { checked: true } }); await turn();
+  assert.deepEqual(writes, [{ enabled: true }]);
+  assert.ok(text(render()).includes(warning));
+  healthFailed = true;
+  await find(render(), node => text(node) === "Refresh status")[0].props.onClick(); await turn();
+  assert.ok(!text(render()).includes(warning), "A failed refresh must not show stale missing configuration");
+  healthFailed = false;
+  health = { enabled: true, configured: true, connected: false, ok: false, error: "Connection unavailable" };
+  await find(render(), node => text(node) === "Refresh status")[0].props.onClick(); await turn();
+  assert.ok(!text(render()).includes(warning));
+  assert.match(text(render()), /Connection unavailable/);
+});
+
+test("disabling Team retains explicit Team drafts and restores Local values in a mounted saved editor", async t => {
+  installBrowser(t);
+  t.mock.method(console, "error", () => {});
+  const app = await bundle('export * from "./src/Pages/hooks/useTaskManagerJira.js"; export * from "./src/services/jiraClient.js"; export * from "react"; export * from "./src/utils/siteContextStore.js";', [hooksPlugin]);
+  t.after(app.unmount);
+  app.setSiteContext({ instanceId: "active", generation: 1 });
+  let enabled = true;
+  const writes = [];
+  globalThis.fetch = async (url, options) => {
+    if (url.endsWith("/settings")) { enabled = JSON.parse(options.body).enabled; return new Response(JSON.stringify({ enabled })); }
+    if (url.endsWith("/health")) return new Response(JSON.stringify({ enabled, configured: true, connected: enabled, ok: enabled }));
+    if (options.method === "PUT") { writes.push({ url, body: JSON.parse(options.body) }); return new Response('{"error":"Save unavailable"}', { status: 503 }); }
+    if (url.endsWith("/issue-metadata/bulk")) return new Response('{"items":{"ABC-1":{"priority":2,"plannedStart":"2026-10-01","followUp":"now"}}}');
+    if (url.includes("team-priority")) return new Response('{"items":{"ABC-1":{"priority":9,"plannedStart":"2026-10-09","followUp":"next"}}}');
+    return new Response('{"items":{}}');
+  };
+  const run = { sourceContext: source("a"), instanceId: "a", issues: [issue()], fieldMappings: [], status: "complete" };
+  const render = () => app.render("editor", () => app.useTaskManagerJira({ siteContext: run.sourceContext, combinedRun: run }));
+  render(); await turn(); await turn();
+  assert.equal(render().jiraRowPriorities["ABC-1"], 9);
+  render().handlePlanningFieldChange("ABC-1", "requestor", "unsaved team draft", { forceTeam: true });
+  await turn();
+  assert.equal(typeof app.saveTeamPrioritySettings, "function");
+  await app.saveTeamPrioritySettings({ enabled: false }); await turn();
+  assert.equal(render().teamAvailable, false);
+  assert.equal(render().jiraRowPriorities["ABC-1"], 2);
+  assert.equal(render().teamPlanningMetaByKey["ABC-1"].requestor, "unsaved team draft");
+  const before = writes.length;
+  await assert.rejects(render().handleSavePlanningAll("ABC-1", { forceTeam: true }), /disabled/i);
+  assert.equal(writes.length, before);
+});
+
+
+for (const initiallyEnabled of [false, true]) test(`shared-program cached rows hydrate enabled=${initiallyEnabled} and preserve ambiguous browser originals`, async t => {
+  let enabled = initiallyEnabled;
+  const storage = installBrowser(t);
+  const prefix = "docket:site:active:";
+  storage.set(prefix + "workWeekTasksJiraPreferences", JSON.stringify({ jqlCount: 1, jqlInputs: ["project = ABC"], jqlLabels: ["Shared"], jqlSharedProgramIds: ["program"] }));
+  storage.set(prefix + "workWeekTasksJiraLastJqlRuns", JSON.stringify([{ index: 0, jql: "project = ABC", label: "Shared", sharedProgramId: "program", issues: [issue()] }]));
+  storage.set(prefix + "workWeekTasksJiraRowPriorities", '{"ABC-1":9}');
+  storage.set(prefix + "workWeekTasksPlanningMetaByKey", '{"ABC-1":{"plannedStart":"2026-10-09","requestor":"uncertain cached draft"}}');
+  const app = await bundle('export * from "./src/Pages/hooks/useTaskManagerJira.js"; export * from "./src/services/jiraClient.js"; export * from "./src/utils/siteContextStore.js"; export * from "react";', [hooksPlugin]);
+  t.after(app.unmount);
+  app.setSiteContext({ instanceId: "active", generation: 1 });
+  const writes = [];
+  globalThis.fetch = async (url, options) => {
+    if (url.endsWith("/settings")) { enabled = JSON.parse(options.body).enabled; return new Response(JSON.stringify({ enabled })); }
+    if (url.endsWith("/health")) return new Response(JSON.stringify({ enabled, configured: true, connected: enabled, ok: enabled }));
+    if (url.includes("team-priority")) return new Response('{"items":{"ABC-1":{"priority":9,"plannedStart":"2026-10-09","followUp":"next"}}}');
+    if (options.method === "PUT") { writes.push({ url, body: JSON.parse(options.body) }); return new Response('{"ok":true}'); }
+    if (url.endsWith("/issue-metadata/bulk")) return new Response('{"items":{"ABC-1":{"priority":2,"plannedStart":"2026-10-01","followUp":"now"}}}');
+    return new Response('{"items":{},"mappings":[]}');
+  };
+  const render = () => app.render("ordinary", () => app.useTaskManagerJira());
+  render(); await turn(); await turn();
+  assert.equal(render().jiraRowPriorities["ABC-1"], initiallyEnabled ? 9 : 2);
+  await app.saveTeamPrioritySettings({ enabled: false }); await turn();
+  assert.equal(render().jiraRowPriorities["ABC-1"], 2);
+  assert.equal(render().planningMetaByKey["ABC-1"].plannedStart, "2026-10-01");
+  assert.equal(render().prioritySourceByKey["ABC-1"], undefined);
+  render().handleRowPriorityChange("ABC-1", 3);
+  await turn(); render();
+  assert.equal(writes.at(-1).url, "/api/jira/issue-metadata/ABC-1");
+  assert.equal(writes.at(-1).body.priority, 3);
+  assert.equal(storage.get(prefix + "workWeekTasksJiraRowPriorities"), '{"ABC-1":9}');
+  assert.equal(JSON.parse(storage.get(prefix + "workWeekTasksPlanningMetaByKey"))["ABC-1"].requestor, "uncertain cached draft");
+});
+
+test("ordinary shared-program rows send Local ownership while Team is disabled", async t => {
+  installBrowser(t);
+  const app = await bundle('export { default as Table } from "./src/Pages/components/JiraResultsTable.jsx"; export * from "react";', [hooksPlugin]);
+  t.after(app.unmount);
+  const edits = [];
+  const props = { teamEnabled: false, jqlRuns: [{ index: 0, label: "Shared", jql: "project = ABC", sharedProgramId: "program", issues: [issue()], loadComplete: true }], jqlSharedProgramIds: ["program"],
+    isClosedLikeStatus: () => false, clampPriority: Number, getPriorityClass: () => "", getPriorityRowClass: () => "", formatDate: String,
+    statusOptions: [], collapsedRowKeys: new Set(), expandedPlanningKeys: new Set(["ABC-1"]), jiraRowPriorities: {"ABC-1":2}, selectedForPush: {}, pushState: {}, saveState: {}, rowUpdateState: {}, statusDrafts: {}, iddDrafts: {}, dueDateDrafts: {}, mrdDrafts: {}, startDateByKey: {}, completeDateByKey: {}, planningMetaByKey: {"ABC-1":{followUp:"now",teamFollowUp:"next"}}, assigneeDrafts: {}, noteImagesByKey: {}, noteImageErrorsByKey: {}, keepNoteImagesByKey: {}, noteImageKeepPendingByKey: {}, lastPushedJiraNoteByKey: {}, jiraNotes: {},
+    handlePlanningFieldChange: (...args) => edits.push(args), handleSavePlanningAll: async () => {},
+  };
+  const tree = app.render("table", () => app.Table(props));
+  const now = find(tree, node => node.props["aria-label"] === "Now for ABC-1")[0];
+  assert.equal(now.props.checked, true);
+  now.props.onChange({ target: { checked: false } });
+  assert.equal(edits[0][3].sharedProgramId, "");
 });

@@ -188,6 +188,8 @@ const JiraResultsTable = ({
   initialActiveRunIndex,
   prioritySourceByKey,
   jqlSharedProgramIds,
+  teamEnabled = false,
+  hydrationReady = true,
   onLoadRemaining,
   onClearDrillDownRun,
   onClearDrillDownFilter,
@@ -846,7 +848,7 @@ const JiraResultsTable = ({
                     const save = saveState[issueKey] || { loading: false, error: "", success: "" };
                     const rowUpdate = rowUpdateState[issueKey] || { loading: false, error: "", success: "" };
                     const isClosedOrResolved = combinedRun ? issue.fields?.status?.statusCategory?.key === "done" : isClosedLikeStatus(status);
-                    const disableEditing = combinedRun ? issue.hydrationReady === false : isClosedOrResolved;
+                    const disableEditing = combinedRun ? issue.hydrationReady === false || (forceTeam && !issue.teamAvailable) : !hydrationReady || isClosedOrResolved;
                     const noteDraft =
                       jiraNotes[issueKey] ||
                       jiraNotes[String(issueKey || "").toUpperCase()] ||
@@ -862,9 +864,9 @@ const JiraResultsTable = ({
                     const isExpandedPlanning = expandedPlanningKeys ? expandedPlanningKeys.has(issueKey) : expandedPlanningKey === issueKey;
                     const planningMeta = (forceTeam ? teamPlanningMetaByKey : planningMetaByKey)?.[issueKey] || {};
                     const summary = issue.fields?.summary || "No summary";
-                    const sharedProgramId = String(
+                    const sharedProgramId = teamEnabled ? String(
                       run.sharedProgramId || jqlSharedProgramIds?.[runSlotIndex] || ""
-                    ).trim();
+                    ).trim() : "";
                     const followUp = (sharedProgramId || forceTeam) ? planningMeta.teamFollowUp : planningMeta.followUp;
                     const hasAnyTracking = planningDatesStart?.[issueKey] || planningDatesComplete?.[issueKey] ||
                       planningMeta.plannedStart || planningMeta.plannedFinish || planningMeta.pmOverride ||
@@ -1308,7 +1310,7 @@ const JiraResultsTable = ({
                                   <div className="ww-planning-field">
                                     <span className="ww-planning-label">Now / Next</span>
                                     {combinedRun && <label>Planning destination
-                                    <select disabled={disableEditing} aria-label={`Planning destination for ${issue.key} on ${issue.sourceContext.displayName}`} value={forceTeam ? "team" : "local"}
+                                    <select disabled={issue.hydrationReady === false} aria-label={`Planning destination for ${issue.key} on ${issue.sourceContext.displayName}`} value={forceTeam ? "team" : "local"}
                                       onChange={(event) => setPlanningDestinationByKey((prev) => ({ ...prev, [issueKey]: event.target.value }))}>
                                       <option value="local">Local</option><option value="team" disabled={!issue.teamAvailable}>Team database</option>
                                     </select>

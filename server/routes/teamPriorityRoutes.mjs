@@ -1,6 +1,7 @@
 import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 import {
   getTeamMetadata,
+  initializeTeamPrioritySettings, getTeamPrioritySettings, saveTeamPrioritySettings, assertTeamPriorityEnabled,
   teamDatabaseError,
   bulkGetTeamDates,
   bulkGetTeamPriorities,
@@ -34,10 +35,9 @@ const resolveUpdatedBy = async (resolveCurrentJiraUser) => {
 };
 
 const withTeamDatabase = (label, handler) => async (req, res) => {
-  if (!isTeamPriorityConfigured()) {
-    return notConfigured(res);
-  }
   try {
+    assertTeamPriorityEnabled();
+    if (!isTeamPriorityConfigured()) return notConfigured(res);
     return await handler(req, res);
   } catch (error) {
     const safe = teamDatabaseError(error);
@@ -47,11 +47,18 @@ const withTeamDatabase = (label, handler) => async (req, res) => {
 };
 
 export const registerTeamPriorityRoutes = (app, context) => {
+  if (context.metaDb) initializeTeamPrioritySettings(context.metaDb);
   const { withSiteOperation = (handler) => handler, getDb, getSiteContext } = context;
+  app.get("/api/team-priority/settings", withSiteOperation((_req, res) => res.json(getTeamPrioritySettings())));
+  app.put("/api/team-priority/settings", withSiteOperation((req, res) => {
+    if (typeof req.body?.enabled !== "boolean") return res.status(400).json({ error: "enabled must be a boolean" });
+    return res.json(saveTeamPrioritySettings(req.body));
+  }));
   app.get("/api/team-priority/health", withSiteOperation(async (_req, res) => {
     const status = await getTeamStatus();
     return res.json({
       ok: status.connected === true,
+      enabled: status.enabled === true,
       configured: status.configured === true,
       connected: status.connected === true,
       ...(status.error ? { error: status.error } : {}),

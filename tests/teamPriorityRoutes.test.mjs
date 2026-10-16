@@ -5,15 +5,19 @@ import { registerTeamPriorityRoutes } from "../server/routes/teamPriorityRoutes.
 import { registerIssueMetadataRoutes } from "../server/routes/issueMetadataRoutes.mjs";
 import { createSiteOperationState } from "../server/lib/siteOperationState.mjs";
 
+import { enableTeamDatabase } from "./teamSettingsFixture.mjs";
+
 const withServer = async (run) => {
+  const cleanups = [];
+  const metaDb = enableTeamDatabase({ after: callback => cleanups.push(callback) });
   const state = createSiteOperationState({ snapshot: { credentials: { instanceId: "a", baseUrl: "https://d1-route-a.example.test" } }, activate: async (id) => ({ credentials: { instanceId: id, baseUrl: `https://d1-route-${id}.example.test` } }) });
   const app = express();
   app.use(express.json());
-  registerTeamPriorityRoutes(app, { ...state, getDb: () => null, resolveCurrentJiraUser: async () => ({ displayName: "Synthetic user" }) });
+  registerTeamPriorityRoutes(app, { ...state, metaDb, getDb: () => null, resolveCurrentJiraUser: async () => ({ displayName: "Synthetic user" }) });
   registerIssueMetadataRoutes(app, { ...state, getDb: () => null });
   const server = await new Promise((resolve) => { const listener = app.listen(0, "127.0.0.1", () => resolve(listener)); });
   const request = (url, method = "GET", body = {}, context = state.getSiteContext()) => fetch(`http://127.0.0.1:${server.address().port}${url}`, { method, headers: { "Content-Type": "application/json", "X-Docket-Site": context.instanceId, "X-Docket-Generation": context.generation }, ...(method === "GET" ? {} : { body: JSON.stringify(body) }) });
-  try { await run({ state, request }); } finally { await new Promise((resolve) => server.close(resolve)); }
+  try { await run({ state, request }); } finally { await new Promise((resolve) => server.close(resolve)); cleanups.forEach(callback => callback()); }
 };
 
 test("unconfigured team endpoints return 503 with setup guidance and health keeps its public shape", async () => {
@@ -21,7 +25,7 @@ test("unconfigured team endpoints return 503 with setup guidance and health keep
   delete process.env.TEAM_PRIORITY_DATABASE_URL;
   try {
     await withServer(async ({ request }) => {
-      assert.deepEqual(await request("/api/team-priority/health").then((res) => res.json()), { ok: false, configured: false, connected: false });
+      assert.deepEqual(await request("/api/team-priority/health").then((res) => res.json()), { ok: false, enabled: true, configured: false, connected: false });
       for (const [url, method] of [["/api/team-priority/metadata/bulk", "POST"], ["/api/team-priority/bulk", "POST"], ["/api/shared-programs", "GET"]]) {
         const response = await request(url, method, { issueKeys: ["ABC-1"] });
         assert.equal(response.status, 503);
@@ -47,6 +51,7 @@ test("real PostgreSQL routes scope reads/writes to server site and preserve comp
   const errors = [];
   t.mock.method(console, "error", (...parts) => { errors.push(parts.join(" ")); });
   const store = await import("../server/lib/teamPriorityPostgres.mjs");
+  enableTeamDatabase(t);
   const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
   process.env.TEAM_PRIORITY_DATABASE_URL = url.href;
   t.after(async () => { await store.closeTeamPool(); if (previous === undefined) delete process.env.TEAM_PRIORITY_DATABASE_URL; else process.env.TEAM_PRIORITY_DATABASE_URL = previous; });
@@ -127,6 +132,7 @@ test("real team CSV import preserves priority on optional edits and followUp-onl
   assert.match(url.pathname, /^\/docket_test_[a-z0-9_]+$/);
   assert.ok(url.port);
   const store = await import("../server/lib/teamPriorityPostgres.mjs");
+  enableTeamDatabase(t);
   const previous = process.env.TEAM_PRIORITY_DATABASE_URL;
   process.env.TEAM_PRIORITY_DATABASE_URL = url.href;
   t.after(async () => {

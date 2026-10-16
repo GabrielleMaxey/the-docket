@@ -36,7 +36,7 @@ const setup = (t, transport) => {
 const routes = (register, f) => {
   const registered = new Map();
   const app = Object.fromEntries(["get", "post", "put", "patch", "delete"].map(method => [method, (url, ...handlers) => registered.set(`${method.toUpperCase()} ${url}`, handlers.at(-1))]));
-  register(app, { withSiteOperation: f.service.withSavedSiteOperation, getDb: () => f.activeDb, getSiteContext: f.active.getSiteContext });
+  register(app, { metaDb: f.metaDb, withSiteOperation: f.service.withSavedSiteOperation, getDb: () => f.activeDb, getSiteContext: f.active.getSiteContext });
   return registered;
 };
 
@@ -163,6 +163,7 @@ test("Team metadata reads and writes retain hostname and actor through the SQL b
   const query = async (statement, params) => { sql.push({ statement, params }); return { rows: statement.startsWith("SELECT") && params?.[1] ? [{ issue_key: "ABC-1", priority: 3, updatedAt: "2026-10-15", updatedBy: "b actor" }] : [] }; };
   const pool = getTeamPool(); t.mock.method(pool, "query", query); t.mock.method(pool, "connect", async () => ({ query, release() {} }));
   const f = setup(t, async () => ({ ok: true, status: 200, data: { accountId: "b-user", displayName: "b actor" } }));
+  f.metaDb.prepare("INSERT INTO jira_instance_meta (key,value) VALUES ('use_team_db','true')").run();
   const handlers = routes(registerTeamPriorityRoutes, f);
   for (const [method, template, url, body] of [
     ["POST", "/api/team-priority/metadata/bulk", "/api/team-priority/metadata/bulk", { issueKeys: ["ABC-1"] }],

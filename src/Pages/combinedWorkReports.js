@@ -73,7 +73,7 @@ export const loadCombinedReportHistory = async ({ sites, months, signal }) => {
     const [enriched, localMetadata, teamMetadata] = await Promise.all([
       read("Parent dates", () => enrichRunWithParentDoneDates({ issues: allIssues }, mappings, { siteContext, signal, propagateErrors: true }), {}),
       allIssues.length ? read("Local notes/planning", () => fetchIssueMetadataBulk([...issues.keys()], { siteContext, signal }), {}) : {},
-      allIssues.length && teamHealth?.configured !== false ? read("Team planning", () => fetchTeamMetadataBulk([...issues.keys()], { siteContext, signal }), {}) : {},
+      allIssues.length && teamHealth?.enabled === true && teamHealth?.configured === true ? read("Team planning", () => fetchTeamMetadataBulk([...issues.keys()], { siteContext, signal }), {}) : {},
     ]);
     signal?.throwIfAborted();
     return { ...site, ...enriched, issues: allIssues,

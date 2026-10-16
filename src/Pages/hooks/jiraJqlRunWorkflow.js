@@ -5,6 +5,7 @@ import {
   fetchJiraSearchAll,
   fetchLatestJiraCommentsBulk,
   fetchTeamPriorityBulk,
+  fetchTeamPriorityHealth, getTeamPriorityHealthSnapshot,
   fetchTeamDatesBulk,
   fetchTeamMetadataBulk,
 } from "../../services/jiraClient";
@@ -89,7 +90,9 @@ const applyTeamPriorityState = async ({
   }
 
   try {
+    if (getTeamPriorityHealthSnapshot()?.enabled !== true) return;
     const teamItems = await fetchTeamPriorityBulk(keys, { siteContext });
+    if (getTeamPriorityHealthSnapshot()?.enabled !== true) return;
     const teamPriorities = {};
     const teamSource = {};
     Object.entries(teamItems || {}).forEach(([issueKey, item]) => {
@@ -148,7 +151,9 @@ const applyTeamDateState = async ({ propagateErrors = false, siteContext, issueK
   }
 
   try {
+    if (getTeamPriorityHealthSnapshot()?.enabled !== true) return;
     const [teamItems, metadata] = await Promise.all([fetchTeamDatesBulk(keys, { siteContext }), fetchTeamMetadataBulk(keys, { siteContext })]);
+    if (getTeamPriorityHealthSnapshot()?.enabled !== true) return;
     if (siteContext?.kind !== "saved-site" && siteContext?.generation !== getSiteContext()?.generation) return;
     const teamStartDates = {};
     const teamCompleteDates = {};
@@ -265,8 +270,8 @@ const applyDrillDownMetadata = async ({
 export async function hydrateCombinedRun(options) {
   await applyDrillDownMetadata({ ...options, pullLatestComment: false });
   const health = await options.teamHealth;
-  if (health?.configured === false) return;
-  await applyTeamPriorityState({ ...options, propagateErrors: true });
+  if (health?.enabled !== true || health?.configured === false) return;
+  await applyTeamPriorityState({ ...options, setJiraRowPriorities: options.setTeamRowPriorities || options.setJiraRowPriorities, propagateErrors: true });
   await applyTeamDateState({ ...options, propagateErrors: true,
     setPlanningMetaByKey: options.setTeamPlanningMetaByKey,
     setStartDateByKey: options.setTeamStartDateByKey,
@@ -289,6 +294,7 @@ export async function runJqlWorkflow({
   setJiraNotes,
   setJiraRowPriorities,
   setPrioritySourceByKey,
+  setTeamRowPriorities, setTeamPlanningMetaByKey, setTeamStartDateByKey, setTeamCompleteDateByKey,
   setStartDateByKey,
   setCompleteDateByKey,
   setPlanningMetaByKey,
@@ -344,33 +350,26 @@ export async function runJqlWorkflow({
       })
     );
 
+    const health = await fetchTeamPriorityHealth({ siteContext });
     const teamIssueKeys = new Set();
     const localIssueKeys = new Set();
     runResults.forEach((run) => {
       const keys = (run.issues || [])
         .map((issue) => String(issue.key || "").trim().toUpperCase())
         .filter(Boolean);
-      if (run.sharedProgramId) {
+      if (health.enabled === true && run.sharedProgramId) {
         keys.forEach((key) => teamIssueKeys.add(key));
       } else {
         keys.forEach((key) => localIssueKeys.add(key));
       }
     });
 
-    // Prefer team mode when an issue appears in both a team and local slot.
-    localIssueKeys.forEach((key) => {
-      if (teamIssueKeys.has(key)) {
-        localIssueKeys.delete(key);
-      }
-    });
-
-    const localKeys = [...localIssueKeys];
-    const teamKeys = [...teamIssueKeys];
+    const localKeys = [...new Set([...localIssueKeys, ...teamIssueKeys])];
 
     if (pullLatestComment) {
       await applyLatestCommentNotes({
         siteContext,
-        issueKeys: [...localKeys, ...teamKeys],
+        issueKeys: localKeys,
         setJiraNotes,
       });
     }
@@ -430,61 +429,16 @@ export async function runJqlWorkflow({
       }
     }
 
-    if (teamIssueKeys.size > 0) {
-      try {
-        const persisted = await fetchIssueMetadataBulk([...teamIssueKeys], { siteContext });
-        const nextNotes = {};
-        const nextStartDates = {};
-        const nextCompleteDates = {};
-        const nextPlanningMeta = {};
-        [...teamIssueKeys].forEach((issueKey) => {
-          const item = persisted?.[issueKey];
-          if (!item) {
-            return;
-          }
-          if (!pullLatestComment && typeof item.note === "string") {
-            nextNotes[issueKey] = item.note;
-          }
-          if (typeof item.startDate === "string" && item.startDate) {
-            nextStartDates[issueKey] = item.startDate;
-          }
-          if (typeof item.completeDate === "string" && item.completeDate) {
-            nextCompleteDates[issueKey] = item.completeDate;
-          }
-          if (hasPlanningData(item)) {
-            nextPlanningMeta[issueKey] = extractPlanningMeta(item);
-          }
-          if (hydrateNoteImages) {
-            hydrateNoteImages(issueKey, { keepNoteImages: item.keepNoteImages, images: item.images });
-          }
-        });
-        if (!pullLatestComment && Object.keys(nextNotes).length > 0) {
-          setJiraNotes((prev) => mergeIssueMapsPreferExisting(prev, nextNotes));
-        }
-        if (setStartDateByKey && Object.keys(nextStartDates).length > 0) {
-          setStartDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextStartDates));
-        }
-        if (setCompleteDateByKey && Object.keys(nextCompleteDates).length > 0) {
-          setCompleteDateByKey((prev) => mergeIssueMapsPreferExisting(prev, nextCompleteDates));
-        }
-        if (setPlanningMetaByKey && Object.keys(nextPlanningMeta).length > 0) {
-          setPlanningMetaByKey((prev) => mergePlanningMetaPreferExisting(prev, nextPlanningMeta));
-        }
-      } catch (error) {
-        console.error("Failed to fetch notes for team-slot issues", error);
-      }
-    }
-
     // Independent endpoints, disjoint state — no reason to serialize them.
     await Promise.all([
       applyTeamPriorityState({
         siteContext,
         issueKeys: [...teamIssueKeys],
         clampPriority,
-        setJiraRowPriorities,
+        setJiraRowPriorities: setTeamRowPriorities || setJiraRowPriorities,
         setPrioritySourceByKey,
       }),
-      applyTeamDateState({ siteContext, issueKeys: [...teamIssueKeys], setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }),
+      applyTeamDateState({ siteContext, issueKeys: [...teamIssueKeys], setStartDateByKey: setTeamStartDateByKey || setStartDateByKey, setCompleteDateByKey: setTeamCompleteDateByKey || setCompleteDateByKey, setPlanningMetaByKey: setTeamPlanningMetaByKey || setPlanningMetaByKey }),
     ]);
 
     const enrichedRuns = await Promise.all(
@@ -514,6 +468,7 @@ export async function loadRemainingJqlIssues({
   setJqlLoading,
   setJiraRowPriorities,
   setPrioritySourceByKey,
+  setTeamRowPriorities, setTeamPlanningMetaByKey, setTeamStartDateByKey, setTeamCompleteDateByKey,
   setJiraNotes,
   setStartDateByKey,
   setCompleteDateByKey,
@@ -562,21 +517,18 @@ export async function loadRemainingJqlIssues({
       return;
     }
 
-    if (sharedProgramId) {
-      if (pullLatestComment) {
-        await applyLatestCommentNotes({ siteContext, issueKeys, setJiraNotes });
-      }
+    const health = await fetchTeamPriorityHealth({ siteContext });
+    if (sharedProgramId && health.enabled === true) {
       await Promise.all([
         applyTeamPriorityState({
           siteContext,
           issueKeys,
           clampPriority,
-          setJiraRowPriorities,
+          setJiraRowPriorities: setTeamRowPriorities || setJiraRowPriorities,
           setPrioritySourceByKey,
         }),
-        applyTeamDateState({ siteContext, issueKeys, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey }),
+        applyTeamDateState({ siteContext, issueKeys, setStartDateByKey: setTeamStartDateByKey || setStartDateByKey, setCompleteDateByKey: setTeamCompleteDateByKey || setCompleteDateByKey, setPlanningMetaByKey: setTeamPlanningMetaByKey || setPlanningMetaByKey }),
       ]);
-      return;
     }
 
     if (pullLatestComment) {

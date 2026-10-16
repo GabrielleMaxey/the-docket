@@ -1,5 +1,5 @@
 import { initializeSiteContext } from "./services/jiraClient.js";
-import { getSiteContext, subscribeSiteContext, getSiteRecoveryNotice, isSiteSwitching } from "./utils/siteContextStore.js";
+import { getSiteContext, subscribeSiteContext, getSiteRecoveryNotice, dismissSiteRecoveryNotice, isSiteSwitching } from "./utils/siteContextStore.js";
 import React from "react";
 import { createHashRouter, Outlet, NavLink, Navigate } from "react-router-dom";
 import { FiSettings } from "react-icons/fi";
@@ -64,7 +64,7 @@ const AppLayout = () => {
         ))}
       </ul>
     </nav>
-    {recoveryNotice && <p role="status">{recoveryNotice}</p>}
+    {recoveryNotice && <p role="status">{recoveryNotice} <button type="button" onClick={() => dismissSiteRecoveryNotice()}>Dismiss</button></p>}
     <div inert={switching ? "" : undefined} aria-busy={switching}>
       <EpicFiltersProvider key={context.generation}>
         <React.Suspense fallback={<PageFallback />}>

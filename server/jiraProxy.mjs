@@ -18,6 +18,7 @@ import { registerJiraIssueRoutes } from "./routes/jiraIssueRoutes.mjs";
 import { registerIssueMetadataRoutes } from "./routes/issueMetadataRoutes.mjs";
 import { registerEpicWorkloadRoutes } from "./routes/epicWorkloadRoutes.mjs";
 import { registerCapacityPlanningRoutes } from "./routes/capacityPlanningRoutes.mjs";
+import { initializeTeamPrioritySettings } from "./lib/teamPriorityPostgres.mjs";
 import { registerTeamPriorityRoutes } from "./routes/teamPriorityRoutes.mjs";
 import { registerPmAsksRoutes } from "./routes/pmAsksRoutes.mjs";
 import { registerTaskExportRoutes } from "./routes/taskExportRoutes.mjs";
@@ -149,6 +150,7 @@ fs.mkdirSync(dbDir, { recursive: true });
 
 const metaDb = openInstancesMetaDb(path.join(dbDir, "instances-meta.sqlite"));
 initInstancesSchema(metaDb);
+initializeTeamPrioritySettings(metaDb);
 
 // Only auto-seed when an explicit multi-instance env var is present. Bare legacy
 // JIRA_BASE_URL/EMAIL/API_TOKEN alone must keep the registry empty so existing
