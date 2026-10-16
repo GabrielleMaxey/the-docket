@@ -490,9 +490,14 @@ export const commitIssueMetadataImport = ( previewId, { siteContext } = {} ) =>
 
 export const fetchTeamPriorityHealth = async ( { siteContext, signal } = {} ) => {
   const revision = teamSettingsRevision;
-  const health = await requestJson( "/api/team-priority/health", { siteContext, signal } );
-  if (revision === teamSettingsRevision) publishTeamHealth(health);
-  return revision === teamSettingsRevision ? health : teamHealth;
+  try {
+    const health = await requestJson( "/api/team-priority/health", { siteContext, signal } );
+    if (revision === teamSettingsRevision) publishTeamHealth(health);
+    return revision === teamSettingsRevision ? health : teamHealth;
+  } catch (error) {
+    if (revision === teamSettingsRevision) publishTeamHealth(null);
+    throw error;
+  }
 };
 
 export const saveTeamPrioritySettings = async ( { enabled } ) => {

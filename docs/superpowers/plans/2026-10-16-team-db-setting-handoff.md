@@ -80,3 +80,27 @@ Line starts below refer to this final implementation; multiple numbers identify 
 | `tests/teamSettingsFixture.mjs` | 1 | Synthetic SQLite opt-in fixture for tests that intentionally exercise enabled Team behavior. |
 | `docs/superpowers/plans/2026-10-16-team-db-setting-handoff.md` | 1 | Durable behavior, verification, limitations and inventory handoff. |
 | `.superpowers/sdd/2026-10-16-team-db-setting/task-1-report.md` | 1 | Implementer report (local SDD artifact). |
+
+
+## Review round 1 — optional Team health and Local work
+
+Addressed Important P1 against base `2875b1d`. The two ordinary workflow health requests are optional: transport/server failure returns unknown availability and allows Local metadata hydration and Jira result publication. The health client clears a previously connected snapshot only when its settings revision is still current. An old request cannot replace a newer toggle. HTTP errors below 500 and cancellation are not converted into optional availability; the existing outer load-more handler additionally rethrows `SITE_CONTEXT_CHANGED` and `SAVED_SITE_CONTEXT_CHANGED`. Combined unknown-ownership readiness was not changed. Minor expected logger noise was deferred as requested.
+
+Changed regions:
+
+- `src/Pages/hooks/jiraJqlRunWorkflow.js:282`: reused optional-health reader; call sites at 361 and 528; explicit context-code rethrow at 583.
+- `src/services/jiraClient.js:491`: failed current health clears stale availability and still rejects its caller.
+- `tests/combinedManagedWork.test.mjs:702`: actual workflow/client regressions for Local query and Load More, health 503, previous connected state, and both captured-context error codes. They assert Local values/results survive optional failure, no Team bulk read occurs, and context failures reject before Local metadata access.
+- This handoff and `.superpowers/sdd/2026-10-16-team-db-setting/task-1-report.md`: review-fix evidence.
+
+Exact commands used Node22 via `PATH=/Users/gabriellemaxey/.nvm/versions/node/v22.23.1/bin:$PATH`:
+
+| Command | Result | Output |
+| --- | --- | --- |
+| `node --test --test-name-pattern='keeps Local results when optional Team health fails' tests/combinedManagedWork.test.mjs` | RED: 2 tests, 0 pass, 2 fail (health rejection / absent Local hydration) | `/private/tmp/team-setting-round1-red.log` |
+| `node --test tests/combinedManagedWork.test.mjs tests/issueMetadataFields.test.mjs tests/combinedWorkReportsClient.test.mjs tests/siteContextStore.test.mjs tests/teamPriorityRoutes.test.mjs` | GREEN: 78 tests, 76 pass, 0 fail, 2 PostgreSQL fixture skips | `/private/tmp/team-setting-round1-affected.log` |
+| `npm test` | 697 tests, 687 pass, 0 fail, 10 PostgreSQL fixture skips, 0 cancelled | `/private/tmp/team-setting-round1-full.log` |
+| `npm run build` | Passed, including prebuild checks; Vite built in 441 ms | `/private/tmp/team-setting-round1-build.log` |
+| `git diff --check` | Passed | No output |
+
+No further scan, live-service access, dependencies, browser flow, push, merge, or unrelated changes. Earlier environment/scan limitations still apply.

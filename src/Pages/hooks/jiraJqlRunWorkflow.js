@@ -279,6 +279,14 @@ export async function hydrateCombinedRun(options) {
   });
 }
 
+const fetchOptionalTeamHealth = async (siteContext) => {
+  try { return await fetchTeamPriorityHealth({ siteContext }); }
+  catch (error) {
+    if ((error.status && error.status < 500) || error.name === "AbortError") throw error;
+    return null;
+  }
+};
+
 export async function runJqlWorkflow({
   siteContext = getSiteContext(),
   jqlInputs,
@@ -350,14 +358,14 @@ export async function runJqlWorkflow({
       })
     );
 
-    const health = await fetchTeamPriorityHealth({ siteContext });
+    const health = await fetchOptionalTeamHealth(siteContext);
     const teamIssueKeys = new Set();
     const localIssueKeys = new Set();
     runResults.forEach((run) => {
       const keys = (run.issues || [])
         .map((issue) => String(issue.key || "").trim().toUpperCase())
         .filter(Boolean);
-      if (health.enabled === true && run.sharedProgramId) {
+      if (health?.enabled === true && run.sharedProgramId) {
         keys.forEach((key) => teamIssueKeys.add(key));
       } else {
         keys.forEach((key) => localIssueKeys.add(key));
@@ -517,8 +525,8 @@ export async function loadRemainingJqlIssues({
       return;
     }
 
-    const health = await fetchTeamPriorityHealth({ siteContext });
-    if (sharedProgramId && health.enabled === true) {
+    const health = await fetchOptionalTeamHealth(siteContext);
+    if (sharedProgramId && health?.enabled === true) {
       await Promise.all([
         applyTeamPriorityState({
           siteContext,
@@ -572,6 +580,7 @@ export async function loadRemainingJqlIssues({
       console.error("Failed to fetch persisted issue metadata", error);
     }
   } catch (error) {
+    if (["SITE_CONTEXT_CHANGED", "SAVED_SITE_CONTEXT_CHANGED"].includes(error.code)) throw error;
     console.error("Failed to load remaining JQL issues", error);
   } finally {
     setJqlLoading(false);

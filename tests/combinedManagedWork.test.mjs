@@ -698,3 +698,47 @@ test("ordinary shared-program rows send Local ownership while Team is disabled",
   now.props.onChange({ target: { checked: false } });
   assert.equal(edits[0][3].sharedProgramId, "");
 });
+
+for (const workflow of ["query", "load-more"]) test(`${workflow} keeps Local results when optional Team health fails and rejects stale site context`, async t => {
+  installBrowser(t);
+  const app = await bundle('export * from "./src/Pages/hooks/jiraJqlRunWorkflow.js"; export * from "./src/services/jiraClient.js"; export * from "./src/utils/siteContextStore.js";');
+  const siteContext = { instanceId: "active", generation: 1 };
+  app.setSiteContext(siteContext);
+  for (const code of [null, "SITE_CONTEXT_CHANGED", "SAVED_SITE_CONTEXT_CHANGED"]) {
+    const calls = [];
+    let healthFailed = false;
+    globalThis.fetch = async (url, options) => {
+      calls.push(url);
+      assert.equal(options.headers["X-Docket-Site"], "active");
+      assert.equal(options.headers["X-Docket-Generation"], 1);
+      if (url.endsWith("/health")) return new Response(JSON.stringify(healthFailed
+        ? { error: "Synthetic health unavailable", ...(code ? { code } : {}) }
+        : { enabled: true, configured: true, connected: true, ok: true }), { status: healthFailed ? code ? 409 : 503 : 200 });
+      if (url.includes("/search/")) return new Response(JSON.stringify({ issues: [issue()], total: 1, loaded: 1, isComplete: true }));
+      if (url.endsWith("/issue-metadata/bulk")) return new Response('{"items":{"ABC-1":{"priority":4,"followUp":"now","requestor":"Local owner"}}}');
+      assert.fail(`Unexpected endpoint: ${url}`);
+    };
+    await app.fetchTeamPriorityHealth({ siteContext });
+    healthFailed = true;
+    let runs = [{ index: 0, label: "Local", jql: "project = ABC", issues: [], loadComplete: false }];
+    let priorities = {}, planning = {};
+    const noop = () => {};
+    const options = { siteContext, runIndex: 0, jqlRuns: runs, jqlInputs: ["project = ABC"], jqlLabels: ["Local"], jqlSharedProgramIds: [""], jqlMaxResults: 10, fieldMappingRows: [], clampPriority: Number,
+      setJqlRuns: update => { runs = update(runs); }, setJiraRowPriorities: update => { priorities = update(priorities); }, setPlanningMetaByKey: update => { planning = update(planning); },
+      setJqlLoading: noop, setJqlError: noop, setShowRestoredJqlBanner: noop, setJiraNotes: noop,
+    };
+    const result = workflow === "query" ? app.runJqlWorkflow(options) : app.loadRemainingJqlIssues(options);
+    if (code) {
+      await assert.rejects(result, error => error.code === code);
+      assert.equal(calls.includes("/api/jira/issue-metadata/bulk"), false);
+    } else {
+      await result;
+      assert.equal(runs[0].issues[0].key, "ABC-1");
+      assert.equal(priorities["ABC-1"], 4);
+      assert.equal(planning["ABC-1"].followUp, "now");
+      assert.equal(planning["ABC-1"].requestor, "Local owner");
+    }
+    assert.equal(app.getTeamPriorityHealthSnapshot(), null);
+    assert.equal(calls.some(url => /team-priority.*bulk/.test(url)), false);
+  }
+});
