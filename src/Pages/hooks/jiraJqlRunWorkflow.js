@@ -147,7 +147,7 @@ const applyTeamDateState = async ({ siteContext, issueKeys, setStartDateByKey, s
 
   try {
     const [teamItems, metadata] = await Promise.all([fetchTeamDatesBulk(keys, { siteContext }), fetchTeamMetadataBulk(keys, { siteContext })]);
-    if (siteContext?.generation !== getSiteContext()?.generation) return;
+    if (siteContext?.kind !== "saved-site" && siteContext?.generation !== getSiteContext()?.generation) return;
     const teamStartDates = {};
     const teamCompleteDates = {};
     const teamPlanningMeta = {};
@@ -188,14 +188,14 @@ const applyDrillDownMetadata = async ({
   setPlanningMetaByKey,
   hydrateNoteImages,
 }) => {
-  if (siteContext?.generation !== getSiteContext()?.generation || issueKeys.length === 0) {
+  if ((siteContext?.kind !== "saved-site" && siteContext?.generation !== getSiteContext()?.generation) || issueKeys.length === 0) {
     return;
   }
 
   if (pullLatestComment) {
     try {
       const latestComments = await fetchLatestJiraCommentsBulk(issueKeys, { siteContext });
-      if (siteContext?.generation !== getSiteContext()?.generation) return;
+      if (siteContext?.kind !== "saved-site" && siteContext?.generation !== getSiteContext()?.generation) return;
       const commentNotes = {};
       issueKeys.forEach((key) => {
         const { text } = readCommentEntry(lookupCommentEntry(latestComments, key));
@@ -212,7 +212,7 @@ const applyDrillDownMetadata = async ({
   }
 
   const persisted = await fetchIssueMetadataBulk(issueKeys, { siteContext });
-  if (siteContext?.generation !== getSiteContext()?.generation) return;
+  if (siteContext?.kind !== "saved-site" && siteContext?.generation !== getSiteContext()?.generation) return;
   const nextNotes = {};
   const nextPriorities = {};
   const nextStartDates = {};
@@ -235,7 +235,7 @@ const applyDrillDownMetadata = async ({
     if (typeof item.completeDate === "string" && item.completeDate) {
       nextCompleteDates[key] = item.completeDate;
     }
-    if (hasPlanningData(item)) {
+    if (hasPlanningData(item) || item.pinnedGantt) {
       nextPlanningMeta[key] = extractPlanningMeta(item);
     }
     if (hydrateNoteImages) {
@@ -258,6 +258,16 @@ const applyDrillDownMetadata = async ({
     setPlanningMetaByKey((prev) => mergePlanningMetaPreferExisting(prev, nextPlanningMeta));
   }
 };
+
+export async function hydrateCombinedRun(options) {
+  await applyDrillDownMetadata({ ...options, pullLatestComment: false });
+  await applyTeamPriorityState(options);
+  await applyTeamDateState({ ...options,
+    setPlanningMetaByKey: options.setTeamPlanningMetaByKey,
+    setStartDateByKey: options.setTeamStartDateByKey,
+    setCompleteDateByKey: options.setTeamCompleteDateByKey,
+  });
+}
 
 export async function runJqlWorkflow({
   siteContext = getSiteContext(),

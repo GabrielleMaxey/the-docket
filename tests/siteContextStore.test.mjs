@@ -3,7 +3,7 @@ import { test } from "node:test";
 import * as store from "../src/utils/siteContextStore.js";
 import * as jobs from "../src/utils/backgroundJobStore.js";
 
-globalThis.window = { setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms); timer.unref(); return timer; }, clearTimeout };
+globalThis.window = { dispatchEvent: () => true, setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms); timer.unref(); return timer; }, clearTimeout };
 
 test("identical keys in two sites remain isolated and captured identity stays stable", () => {
   store.setSiteContext({ instanceId: "a", generation: "1" });
