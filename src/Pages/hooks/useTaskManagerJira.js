@@ -30,7 +30,7 @@ import {
   JIRA_UNASSIGNED_ASSIGNEE,
   isJiraUnassignValue,
 } from "../../services/jiraClient";
-import { hydrateCombinedRun, runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey, loadDrillDownIssuesByAssignee, loadDrillDownByJql } from "./jiraJqlRunWorkflow.js";
+import { fetchOptionalTeamHealth, hydrateCombinedRun, runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey, loadDrillDownIssuesByAssignee, loadDrillDownByJql } from "./jiraJqlRunWorkflow.js";
 import {
   dismissDrillDownId,
   drillDownJqlRuns,
@@ -781,7 +781,7 @@ export const useTaskManagerJira = ({ siteContext: explicitSiteContext, combinedR
   React.useEffect(() => {
     if (combined) return;
     let cancelled = false;
-    const teamHealth = fetchTeamPriorityHealth({ siteContext });
+    const teamHealth = fetchOptionalTeamHealth(siteContext);
     hydrateCombinedRun({ siteContext, teamHealth, issueKeys: [...ambiguousCache.keys], clampPriority,
       setJiraNotes, setJiraRowPriorities, setPrioritySourceByKey, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey,
       setTeamRowPriorities, setTeamPlanningMetaByKey, setTeamStartDateByKey, setTeamCompleteDateByKey,

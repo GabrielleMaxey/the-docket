@@ -28,7 +28,14 @@ test("Team defaults off, settings persist in app metadata, and disabled direct c
   } finally { store.initializeTeamPrioritySettings(null); db.close(); }
 });
 
-test("settings validate booleans, disabled health makes no connection, and import obeys the switch", async () => {
+test("settings validate booleans, disabled health makes no connection, and import obeys the switch", async (t) => {
+  const errors = [];
+  const originalError = console.error;
+  t.mock.method(console, "error", (...parts) => {
+    const message = parts.join(" ");
+    if (message.includes("[team-priority]")) errors.push(message.replace(/^.*\[team-priority\] /, ""));
+    else originalError(...parts);
+  });
   const db = new Database(":memory:"); initInstancesSchema(db);
   const app = express(); app.use(express.json());
   registerTeamPriorityRoutes(app, { metaDb: db });
@@ -50,6 +57,10 @@ test("settings validate booleans, disabled health makes no connection, and impor
       assert.equal(response.status, 403);
       assert.equal((await response.json()).code, "TEAM_DATABASE_DISABLED");
     }
+    assert.deepEqual(errors, [
+      "update team priority failed Team database is disabled. Enable Use team DB in Settings.",
+      "list shared programs failed Team database is disabled. Enable Use team DB in Settings.",
+    ]);
     delete process.env.TEAM_PRIORITY_DATABASE_URL;
     assert.deepEqual(await request("/api/team-priority/settings", "PUT", { enabled: true }).then(r => r.json()), { enabled: true });
     const health = await request("/api/team-priority/health").then(r => r.json());

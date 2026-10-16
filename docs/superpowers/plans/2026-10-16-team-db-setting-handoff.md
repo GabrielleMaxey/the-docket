@@ -104,3 +104,30 @@ Exact commands used Node22 via `PATH=/Users/gabriellemaxey/.nvm/versions/node/v2
 | `git diff --check` | Passed | No output |
 
 No further scan, live-service access, dependencies, browser flow, push, merge, or unrelated changes. Earlier environment/scan limitations still apply.
+
+
+## Final grouped fix wave — ordinary restored readiness and expected logger output
+
+Addressed final-review Important P1 and Minor P3 together against base `577c024`. Ordinary restored shared rows now use the same optional-health reader as ordinary query/load-more. Successful authoritative Local hydration establishes readiness after optional Team health transport/server failure, and remains ready when a subsequent health refresh reports Team off. Unknown Team health remains unavailable. Both captured-context error codes keep the ordinary editor locked; unmount cancellation cannot later unlock it. The Combined mount effect and its conservative readiness policy were not changed.
+
+The disabled-route test now captures only the `team-priority` logger during that test, asserts exactly the two safe denial messages, and retains its 403/`TEAM_DATABASE_DISABLED` response checks. Other logger output is forwarded; extra or altered Team messages fail the assertion. Final full-suite output contains zero leaked expected disabled-route messages.
+
+Changed regions:
+
+- `src/Pages/hooks/jiraJqlRunWorkflow.js:282`: export the existing optional-health reader for reuse; classification unchanged.
+- `src/Pages/hooks/useTaskManagerJira.js:33,784`: import and use that reader only in ordinary restored-row mount hydration.
+- `tests/combinedManagedWork.test.mjs:746,794`: mounted health503/off-recovery/Local-write cases, both context-change codes, and unmount-cancellation regression.
+- `tests/teamDbSetting.test.mjs:31`: scoped expected-log capture and exact assertions.
+- This handoff and `.superpowers/sdd/2026-10-16-team-db-setting/task-1-report.md`: grouped final-fix evidence.
+
+Commands all selected Node22 using `PATH=/Users/gabriellemaxey/.nvm/versions/node/v22.23.1/bin:$PATH`:
+
+| Command | Result | Output |
+| --- | --- | --- |
+| `node --test --test-name-pattern='ordinary Local readiness\|cancelled ordinary restored' tests/combinedManagedWork.test.mjs` | RED: 4 tests, 3 pass, 1 fail; health503 left readiness false after authoritative Local priority loaded | `/private/tmp/team-setting-final-wave-red.log` |
+| `node --test tests/combinedManagedWork.test.mjs tests/teamDbSetting.test.mjs tests/issueMetadataFields.test.mjs tests/siteContextStore.test.mjs` | GREEN: 64 tests, 64 pass, 0 fail, 0 skipped | `/private/tmp/team-setting-final-wave-affected.log` |
+| `npm test` | 701 tests, 691 pass, 0 fail, 10 disposable-PostgreSQL fixture skips, 0 cancelled | `/private/tmp/team-setting-final-wave-full.log` |
+| `npm run build` | Passed including prebuild checks; Vite built in 507 ms | `/private/tmp/team-setting-final-wave-build.log` |
+| `git diff --check` | Passed | No output |
+
+This was the single final grouped fix wave; full tests/build ran once after its code was ready. No unrelated changes, new dependencies, real services, secrets, browser smoke, Sonar retry, push, or merge. Previously documented environment limitations remain unchanged. Scoped independent review follows this commit.

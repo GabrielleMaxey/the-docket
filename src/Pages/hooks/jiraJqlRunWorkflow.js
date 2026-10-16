@@ -279,7 +279,7 @@ export async function hydrateCombinedRun(options) {
   });
 }
 
-const fetchOptionalTeamHealth = async (siteContext) => {
+export const fetchOptionalTeamHealth = async (siteContext) => {
   try { return await fetchTeamPriorityHealth({ siteContext }); }
   catch (error) {
     if ((error.status && error.status < 500) || error.name === "AbortError") throw error;

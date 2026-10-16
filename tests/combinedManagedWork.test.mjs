@@ -742,3 +742,71 @@ for (const workflow of ["query", "load-more"]) test(`${workflow} keeps Local res
     assert.equal(calls.some(url => /team-priority.*bulk/.test(url)), false);
   }
 });
+
+for (const failureCode of [null, "SITE_CONTEXT_CHANGED", "SAVED_SITE_CONTEXT_CHANGED"]) test(`restored ordinary Local readiness survives optional health failure and off recovery, context=${failureCode}`, async t => {
+  const storage = installBrowser(t);
+  const prefix = "docket:site:active:";
+  storage.set(prefix + "workWeekTasksJiraLastJqlRuns", JSON.stringify([{ index: 0, label: "Shared", jql: "project = ABC", sharedProgramId: "program", issues: [issue()] }]));
+  storage.set(prefix + "workWeekTasksJiraRowPriorities", '{"ABC-1":9}');
+  const app = await bundle('export * from "./src/Pages/hooks/useTaskManagerJira.js"; export * from "./src/services/jiraClient.js"; export * from "./src/utils/siteContextStore.js"; export * from "react";', [hooksPlugin]);
+  t.after(app.unmount);
+  app.setSiteContext({ instanceId: "active", generation: 1 });
+  let recovered = false;
+  const writes = [], teamReads = [];
+  globalThis.fetch = async (url, options) => {
+    assert.equal(options.headers["X-Docket-Site"], "active");
+    assert.equal(options.headers["X-Docket-Generation"], 1);
+    if (url.endsWith("/team-priority/health")) return new Response(JSON.stringify(recovered
+      ? { enabled: false, configured: true, connected: false, ok: false }
+      : { error: "Synthetic health failure", ...(failureCode ? { code: failureCode } : {}) }), { status: recovered ? 200 : failureCode ? 409 : 503 });
+    if (url.includes("team-priority")) { teamReads.push(url); assert.fail(`Unexpected Team access: ${url}`); }
+    if (options.method === "PUT") { writes.push({ url, body: JSON.parse(options.body) }); return new Response('{"ok":true}'); }
+    if (url.endsWith("/issue-metadata/bulk")) return new Response('{"items":{"ABC-1":{"priority":2,"followUp":"now"}}}');
+    return new Response('{"items":{},"mappings":[]}');
+  };
+  const render = () => app.render("ordinary", () => app.useTaskManagerJira());
+  assert.equal(render().hydrationReady, false);
+  await turn(); await turn();
+  assert.equal(render().jiraRowPriorities["ABC-1"], 2);
+  assert.equal(render().hydrationReady, !failureCode);
+  assert.equal(render().teamAvailable, false);
+  render().handleRowPriorityChange("ABC-1", 3);
+  await turn();
+  if (failureCode) {
+    assert.equal(writes.length, 0);
+    assert.match(render().jqlError, /Synthetic health failure/);
+  } else {
+    assert.equal(writes.at(-1).url, "/api/jira/issue-metadata/ABC-1");
+    assert.equal(writes.at(-1).body.priority, 3);
+  }
+  recovered = true;
+  await app.fetchTeamPriorityHealth(); await turn();
+  assert.equal(render().hydrationReady, !failureCode);
+  assert.equal(render().teamEnabled, false);
+  assert.equal(render().teamAvailable, false);
+  render().handleRowPriorityChange("ABC-1", 4);
+  await turn();
+  assert.equal(writes.length, failureCode ? 0 : 2);
+  assert.deepEqual(teamReads, []);
+  assert.equal(storage.get(prefix + "workWeekTasksJiraRowPriorities"), '{"ABC-1":9}');
+});
+
+test("cancelled ordinary restored-row hydration does not unlock editing after its Local read completes", async t => {
+  const storage = installBrowser(t);
+  storage.set("docket:site:active:workWeekTasksJiraLastJqlRuns", JSON.stringify([{ index: 0, label: "Shared", jql: "project = ABC", sharedProgramId: "program", issues: [issue()] }]));
+  const app = await bundle('export * from "./src/Pages/hooks/useTaskManagerJira.js"; export * from "./src/utils/siteContextStore.js"; export * from "react";', [hooksPlugin]);
+  app.setSiteContext({ instanceId: "active", generation: 1 });
+  let finishLocal;
+  const local = new Promise(resolve => { finishLocal = resolve; });
+  globalThis.fetch = async url => {
+    if (url.endsWith("/team-priority/health")) return new Response('{"enabled":false,"configured":false,"connected":false,"ok":false}');
+    if (url.endsWith("/issue-metadata/bulk")) { await local; return new Response('{"items":{"ABC-1":{"priority":2}}}'); }
+    return new Response('{"items":{},"mappings":[]}');
+  };
+  const render = () => app.render("ordinary", () => app.useTaskManagerJira());
+  assert.equal(render().hydrationReady, false);
+  await turn();
+  app.unmount();
+  finishLocal(); await turn(); await turn();
+  assert.equal(render().hydrationReady, false);
+});
