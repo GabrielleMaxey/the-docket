@@ -1,3 +1,4 @@
+import { createSiteOperationState } from "./lib/siteOperationState.mjs";
 import express from "express";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
@@ -5,6 +6,7 @@ import path from "path";
 import fs from "fs";
 import Database from "better-sqlite3";
 import { initDatabase } from "./db/schema.mjs";
+import { openTodoDatabase, migratePersonalTodos, listTodoSources } from "./db/todoDatabase.mjs";
 import { registerAppConfigRoutes } from "./routes/appConfigRoutes.mjs";
 import { registerDashboardRoutes } from "./routes/dashboardRoutes.mjs";
 import { registerReportRoutes } from "./routes/reportRoutes.mjs";
@@ -17,6 +19,8 @@ import { registerEpicWorkloadRoutes } from "./routes/epicWorkloadRoutes.mjs";
 import { registerCapacityPlanningRoutes } from "./routes/capacityPlanningRoutes.mjs";
 import { registerTeamPriorityRoutes } from "./routes/teamPriorityRoutes.mjs";
 import { registerPmAsksRoutes } from "./routes/pmAsksRoutes.mjs";
+import { registerTaskExportRoutes } from "./routes/taskExportRoutes.mjs";
+import { registerCombinedOpenWorkRoutes } from "./routes/combinedOpenWorkRoutes.mjs";
 import { registerTodoRoutes } from "./routes/todoRoutes.mjs";
 import { registerAttachmentRoutes } from "./routes/attachmentRoutes.mjs";
 import { resolveJiraUser, fetchJiraMyself } from "./lib/jiraSearchHelpers.mjs";
@@ -27,7 +31,7 @@ import {
   sanitizeJiraErrorData,
 } from "../shared/jiraErrorUtils.mjs";
 import { extractMediaIdFromUrl } from "./lib/jiraNoteComment.mjs";
-import { parseJiraResponse } from "./lib/jiraResponse.mjs";
+import { requestJira } from "./lib/jiraTransport.mjs";
 import {
   openInstancesMetaDb,
   initInstancesSchema,
@@ -40,6 +44,8 @@ import {
   setActiveInstanceId,
   MAX_JIRA_INSTANCES,
 } from "./lib/jiraInstances.mjs";
+
+import { localRequestPolicy } from "./lib/localRequestPolicy.mjs";
 
 const log = createLogger("server");
 
@@ -60,18 +66,25 @@ loadEnvFiles();
 const app = express();
 const port = Number(process.env.API_PORT || 8787);
 
-// Electron dev loads the UI from localhost:5173 while the API runs on :8787 — allow that cross-origin traffic.
-app.use((req, res, next) => {
-  const origin = String(req.headers.origin || "").trim();
-  if (origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
-    res.setHeader("Vary", "Origin");
-  }
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
+app.use(localRequestPolicy({
+  apiPort: port,
+  allowedOrigins: [
+    "http://localhost:5173", "http://127.0.0.1:5173",
+    `http://localhost:${port}`, `http://127.0.0.1:${port}`,
+    ...String(process.env.DOCKET_ALLOWED_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean),
+  ],
+}));
+
+app.use((_req, res, next) => {
+  res.setHeader("Content-Security-Policy", [
+    "default-src 'self'", "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' blob: data:", "media-src 'self' blob: data:",
+    "connect-src 'self' https://icanhazdadjoke.com https://v2.jokeapi.dev",
+    "frame-src 'self' blob:", "object-src 'none'", "base-uri 'none'",
+    "form-action 'self'", "frame-ancestors 'none'",
+  ].join("; "));
   next();
 });
 
@@ -152,6 +165,9 @@ if (hasExplicitInstanceEnv) {
   seedInstancesFromEnv(metaDb, process.env);
 }
 
+const todoDb = openTodoDatabase(dbDir);
+let todoMigrationStatus = { unresolved: [] };
+
 const runtime = {
   db: null,
   noteImagesDir: null,
@@ -184,9 +200,12 @@ const openAppDbForCurrent = () => {
         /* ignore */
       }
     }
+    runtime.credentials = Object.freeze({ ...creds });
     runtime.dbPath = nextPath;
     runtime.db = new Database(nextPath);
     runtime.db.pragma("journal_mode = WAL");
+    // Inspect the original schema before initDatabase can erase reminder-conversion evidence.
+    todoMigrationStatus = migratePersonalTodos(todoDb, listTodoSources(metaDb, dbDir));
     initDatabase(runtime.db);
     runtime.noteImagesDir = noteImagesDirFor(dbDir, creds.mode === "instance" ? creds.instanceId : null);
     fs.mkdirSync(runtime.noteImagesDir, { recursive: true });
@@ -204,22 +223,35 @@ const openAppDbForCurrent = () => {
 
 openAppDbForCurrent();
 
-const getDb = () => runtime.db;
+const siteOperations = createSiteOperationState({
+  snapshot: runtime,
+  activate: (id) => {
+    setActiveInstanceId(metaDb, id);
+    openAppDbForCurrent();
+    return runtime;
+  },
+});
+const getDb = () => siteOperations.getSnapshot().db;
 
 // ─── Shared helpers (passed into route modules) ───────────────────────────────
 
-const getCredentials = () => resolveJiraCredentials(metaDb, process.env);
+const getCredentials = () => siteOperations.getSnapshot().credentials;
 
 const getMissingEnv = () => {
   const c = getCredentials();
   const missing = [];
   if (!c.baseUrl) missing.push(c.mode === "legacy" ? "JIRA_BASE_URL" : "instance.baseUrl");
   if (!c.email) missing.push(c.mode === "legacy" ? "JIRA_EMAIL" : "instance.email");
-  if (!c.apiToken) missing.push(c.mode === "legacy" ? "JIRA_API_TOKEN" : "instance.apiToken");
+  if (!c.apiToken) missing.push("JIRA_API_TOKEN");
   return missing;
 };
 
 const ensureEnvOrRespond = (res) => {
+  const configurationError = getCredentials().configurationError;
+  if (configurationError) {
+    res.status(400).json({ error: configurationError });
+    return false;
+  }
   const missing = getMissingEnv();
   if (missing.length > 0) {
     res.status(500).json({ error: "Missing required Jira environment variables", missing });
@@ -228,95 +260,42 @@ const ensureEnvOrRespond = (res) => {
   return true;
 };
 
-const getAuthHeader = () => {
-  const c = getCredentials();
-  return `Basic ${Buffer.from(`${c.email}:${c.apiToken}`).toString("base64")}`;
-};
 
-const activateInstance = (id) => {
-  setActiveInstanceId(metaDb, id);
-  openAppDbForCurrent();
-  const { mode, instanceId, displayName, baseUrl } = getCredentials();
-  return { mode, instanceId, displayName, baseUrl };
-};
-
-const jiraRequest = async ({ method = "GET", pathWithQuery, body }) => {
-  const target = `${getCredentials().baseUrl}${pathWithQuery}`;
-  const response = await fetch(target, {
-    method,
-    headers: {
-      Accept: "application/json",
-      "Accept-Language": "en-US,en;q=0.9",
-      Authorization: getAuthHeader(),
-      ...(body ? { "Content-Type": "application/json" } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-
-  const data = await parseJiraResponse(response);
-
-  if (!response.ok) {
-    const sanitized = sanitizeJiraErrorData(data);
-    if (hasOnlyWorkfrontJiraErrors(data)) {
-      log.warn(`${method} ${target} → ${response.status} (Workfront sync error suppressed)`);
-      return { ok: true, status: response.status, data: sanitized || {}, workfrontSuppressed: true };
+const jiraRequest = async (options) => {
+  const result = await requestJira({ ...options, credentials: getCredentials() });
+  const { method = "GET" } = options;
+  if (!result.ok) {
+    const sanitized = sanitizeJiraErrorData(result.data);
+    if (hasOnlyWorkfrontJiraErrors(result.data)) {
+      log.warn(`${method} Jira request → ${result.status} (Workfront sync error suppressed)`);
+      return { ok: true, status: result.status, data: sanitized || {}, workfrontSuppressed: true };
     }
-
-    const detail = sanitized?.errors || sanitized?.errorMessages || sanitized?.message;
-    log.error(`${method} ${target} → ${response.status}`, detail ? JSON.stringify(detail) : "");
-    return { ok: false, status: response.status, data: sanitized || {} };
+    log.error(`${method} Jira request → ${result.status}`);
+    return { ...result, data: sanitized || {} };
   }
-  log.debug(`${method} ${target} → ${response.status}`);
-  return { ok: true, status: response.status, data };
+  log.debug(`${method} Jira request → ${result.status}`);
+  return result;
 };
 
-// Jira uploads need X-Atlassian-Token: no-check; omit Content-Type so fetch sets the multipart boundary.
-const jiraMultipartRequest = async ({ method = "POST", pathWithQuery, formData }) => {
-  const target = `${getCredentials().baseUrl}${pathWithQuery}`;
-  const response = await fetch(target, {
-    method,
-    headers: {
-      Accept: "application/json",
-      Authorization: getAuthHeader(),
-      "X-Atlassian-Token": "no-check",
-    },
-    body: formData,
-  });
-
-  const data = await parseJiraResponse(response);
-
-  if (!response.ok) {
-    const sanitized = sanitizeJiraErrorData(data);
-    log.error(`${method} ${target} → ${response.status}`);
-    return { ok: false, status: response.status, data: sanitized || {} };
+const jiraMultipartRequest = async (options) => {
+  const result = await requestJira({ method: "POST", ...options, credentials: getCredentials() });
+  if (!result.ok) {
+    log.error(`Jira upload → ${result.status}`);
+    return { ...result, data: sanitizeJiraErrorData(result.data) || {} };
   }
-  log.debug(`${method} ${target} → ${response.status}`);
-  return { ok: true, status: response.status, data };
+  log.debug(`Jira upload → ${result.status}`);
+  return result;
 };
 
 const resolveJiraAttachmentMediaId = async (attachmentId) => {
   const id = String(attachmentId || "").trim();
-  if (!id) {
-    return "";
-  }
-
-  const target = `${getCredentials().baseUrl}/rest/api/3/attachment/content/${encodeURIComponent(id)}`;
-  const response = await fetch(target, {
-    method: "GET",
-    headers: {
-      Accept: "*/*",
-      Authorization: getAuthHeader(),
-    },
-    redirect: "manual",
+  if (!id) return "";
+  const result = await requestJira({
+    credentials: getCredentials(),
+    pathWithQuery: `/rest/api/3/attachment/content/${encodeURIComponent(id)}`,
+    responseMode: "redirect",
   });
-
-  const location = response.headers.get("location") || "";
-  const fromLocation = extractMediaIdFromUrl(location);
-  if (fromLocation) {
-    return fromLocation;
-  }
-
-  return extractMediaIdFromUrl(response.url);
+  return extractMediaIdFromUrl(result.location || "");
 };
 
 const runJiraSearchRequest = async (input, legacyOptions = {}) => {
@@ -374,6 +353,7 @@ app.get("/api/health", (_req, res) => {
     version: PROXY_VERSION,
     jiraBaseUrl: c.baseUrl || "",
     jiraInstanceId: c.instanceId,
+    siteContext: siteOperations.getSiteContext(),
     jiraInstanceName: c.displayName || "",
     legacyMode: c.mode === "legacy",
     searchEndpoint: JIRA_SEARCH_JQL_PATH,
@@ -395,12 +375,14 @@ const routeCtx = {
   // Distinct from resolveJiraUser (a by-query search) — this resolves the
   // currently authenticated Jira account, for attributing writes like team priority.
   resolveCurrentJiraUser: () => fetchJiraMyself({ jiraRequest }),
-  getNoteImagesDir: () => runtime.noteImagesDir,
+  getNoteImagesDir: () => siteOperations.getSnapshot().noteImagesDir,
   metaDb,
-  activateInstance,
+  ...siteOperations,
   getCredentials,
 };
 
+registerTaskExportRoutes(app, routeCtx);
+registerCombinedOpenWorkRoutes(app, routeCtx);
 registerJiraInstanceRoutes(app, routeCtx);
 registerJiraCoreRoutes(app, routeCtx);
 registerJiraIssueRoutes(app, routeCtx);
@@ -409,7 +391,7 @@ registerEpicWorkloadRoutes(app, routeCtx);
 registerCapacityPlanningRoutes(app, routeCtx);
 registerTeamPriorityRoutes(app, routeCtx);
 registerPmAsksRoutes(app, routeCtx);
-registerTodoRoutes(app, routeCtx);
+registerTodoRoutes(app, { getDb: () => todoDb, getMigrationStatus: () => todoMigrationStatus });
 registerAttachmentRoutes(app, routeCtx);
 registerAppConfigRoutes(app, routeCtx);
 registerDashboardRoutes(app, routeCtx);
@@ -436,8 +418,8 @@ if (fs.existsSync(distDir)) {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-const server = app.listen(port, () => {
-  log.info(`Jira proxy listening on http://localhost:${port}`);
+const server = app.listen(port, "127.0.0.1", () => {
+  log.info(`Jira proxy listening on http://127.0.0.1:${port}`);
   log.info(`Database: ${runtime.dbPath}`);
   const missing = getMissingEnv();
   if (missing.length > 0) {

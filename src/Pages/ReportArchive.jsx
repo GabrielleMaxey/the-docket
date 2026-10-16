@@ -542,6 +542,7 @@ const COMPLETED_RANGE_OPTIONS = [
 
 const CompletedTodosPanel = () => {
   const [items, setItems] = React.useState([]);
+  const [unresolved, setUnresolved] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   const [days, setDays] = React.useState(90);
@@ -550,12 +551,15 @@ const CompletedTodosPanel = () => {
     setLoading(true);
     setError("");
     fetchCompletedTodos(days)
-      .then(({ items: fetched }) => { setItems(fetched); setLoading(false); })
+      .then(({ items: fetched, migration }) => { setItems(fetched); setUnresolved(migration?.unresolved || []); setLoading(false); })
       .catch(() => { setError("Could not load completed to dos."); setLoading(false); });
   }, [days]);
 
   return (
     <>
+      {unresolved.length > 0 && (
+        <Message warning size="small">Some older To Dos need recovery review. Their original local records are preserved. {unresolved.map((item) => `${item.sourceId}: ${item.count} ${item.sourceTable}`).join("; ")}</Message>
+      )}
       <div className="report-completed-filter">
         {COMPLETED_RANGE_OPTIONS.map((opt) => (
           <button
@@ -592,7 +596,7 @@ const CompletedTodosPanel = () => {
                 <Table.Cell>P{item.priority}</Table.Cell>
                 <Table.Cell>{item.dueDate ? formatDate(item.dueDate + "T00:00:00") : "—"}</Table.Cell>
                 <Table.Cell>{item.createdAt ? formatDate(item.createdAt) : "—"}</Table.Cell>
-                <Table.Cell>{item.completedAt ? formatDate(item.completedAt + "T00:00:00") : "—"}</Table.Cell>
+                <Table.Cell>{item.completedAt ? formatDate(item.completedAt + "T00:00:00") : "Date unknown"}</Table.Cell>
               </Table.Row>
             ))}
           </Table.Body>

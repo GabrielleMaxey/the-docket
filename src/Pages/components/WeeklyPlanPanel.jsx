@@ -1,3 +1,4 @@
+import { getSiteContext } from "../../utils/siteContextStore.js";
 import React from "react";
 import { Button } from "semantic-ui-react";
 import CollapsibleSection from "../../Components/CollapsibleSection";
@@ -52,6 +53,7 @@ const buildWeekPlanContext = ({ fixedCommitments, additionalContext, coworkFilen
 };
 
 const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
+  const instanceId = React.useRef(getSiteContext()?.instanceId).current;
   const persistedPlan = loadWeekPlanState();
 
   const [planPending, setPlanPending] = React.useState(false);
@@ -175,7 +177,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
           fixedCommitments,
           additionalContext,
           selectedCoworkFilename: coworkFilename,
-        });
+        }, instanceId);
         saveChatSessionArtifact({
           type: "week_plan",
           label: "Week plan",
@@ -185,7 +187,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
             capacityHours: Number(capacityHours) || 40,
             ...(coworkFilename ? { coworkFilename } : {}),
           },
-        });
+        }, instanceId);
         return result;
       },
     })

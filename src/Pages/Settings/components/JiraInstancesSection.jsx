@@ -14,7 +14,7 @@ import { useFlash } from "../../hooks/useFlash.js";
 // Mirrors MAX_JIRA_INSTANCES in server/lib/jiraInstances.mjs.
 const MAX_JIRA_INSTANCES = 5;
 
-const EMPTY_FORM = { displayName: "", baseUrl: "", email: "", apiToken: "" };
+const EMPTY_FORM = { displayName: "", baseUrl: "", email: "" };
 
 const JiraInstancesSection = () => {
   const [instances, setInstances] = React.useState([]);
@@ -54,7 +54,7 @@ const JiraInstancesSection = () => {
 
   const openEditModal = (instance) => {
     setEditingId(instance.id);
-    setForm({ displayName: instance.displayName, baseUrl: instance.baseUrl, email: instance.email, apiToken: "" });
+    setForm({ displayName: instance.displayName, baseUrl: instance.baseUrl, email: instance.email });
     setTestStatus(null);
     setTestMessage("");
     setError("");
@@ -77,7 +77,6 @@ const JiraInstancesSection = () => {
       const data = await testJiraInstance(editingId || "new", {
         baseUrl: form.baseUrl,
         email: form.email,
-        apiToken: form.apiToken,
       });
       setTestMessage(`✓ Connected as ${data?.displayName || "unknown user"}`);
       setTestStatus("ok");
@@ -93,15 +92,10 @@ const JiraInstancesSection = () => {
       setError("Name, site URL, and email are required.");
       return;
     }
-    if (!editingId && !form.apiToken.trim()) {
-      setError("API token is required.");
-      return;
-    }
     setSaving(true);
     try {
       if (editingId) {
         const patch = { displayName: form.displayName, baseUrl: form.baseUrl, email: form.email };
-        if (form.apiToken.trim()) patch.apiToken = form.apiToken;
         await updateJiraInstance(editingId, patch);
         setFlash("Jira site updated.");
         setModalOpen(false);
@@ -109,15 +103,9 @@ const JiraInstancesSection = () => {
         return;
       }
 
-      const wasEmpty = instances.length === 0;
       await createJiraInstance(form);
       setFlash("Jira site added.");
       setModalOpen(false);
-      if (wasEmpty) {
-        // First site auto-activates server-side and seeds local data from legacy DB.
-        window.location.reload();
-        return;
-      }
       await loadInstances();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save Jira site");
@@ -130,7 +118,7 @@ const JiraInstancesSection = () => {
     setError("");
     try {
       await activateJiraInstance(id);
-      window.location.reload();
+      await loadInstances();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to activate Jira site");
     }
@@ -141,10 +129,6 @@ const JiraInstancesSection = () => {
     setError("");
     try {
       await deleteJiraInstance(instance.id);
-      if (instance.id === activeInstanceId) {
-        window.location.reload();
-        return;
-      }
       setFlash("Jira site removed.");
       await loadInstances();
     } catch (err) {
@@ -155,18 +139,17 @@ const JiraInstancesSection = () => {
   const testDisabled =
     testStatus === "loading" ||
     !form.baseUrl.trim() ||
-    !form.email.trim() ||
-    (!editingId && !form.apiToken.trim());
+    !form.email.trim();
 
   return (
     <SettingsSection
       title="Jira sites"
-      description="Manage multiple Jira sites and switch which one the app talks to. Notes, dates, and presets are stored per site — switching reloads the app. The first time you activate a site, existing single-site local data is copied into that site's database."
+      description="Manage multiple Jira sites and switch which one the app talks to. Notes, dates, and presets are stored per site — switching waits for pending saves. The first time you activate a site, existing single-site local data is copied into that site's database."
     >
       {error ? <Message negative size="small" content={error} /> : null}
       {legacyMode ? (
         <Message info size="small">
-          Using the <code>.env</code> credentials — add a Jira site below to switch to the instance registry.
+          Using the <code>.env</code> site settings. The API token always comes from the server environment.
         </Message>
       ) : null}
       <Table celled compact>
@@ -223,23 +206,21 @@ const JiraInstancesSection = () => {
             />
             <Form.Input
               label="Site URL"
-              placeholder="https://acme.atlassian.net"
+              placeholder="https://lumen.atlassian.net"
+              readOnly={Boolean(editingId)}
               value={form.baseUrl}
               onChange={(_e, { value }) => handleFormChange("baseUrl", value)}
             />
+            {editingId && <p>Add a separate saved site to use a different Jira hostname.</p>}
             <Form.Input
               label="Email"
               placeholder="you@acme.com"
               value={form.email}
               onChange={(_e, { value }) => handleFormChange("email", value)}
             />
-            <Form.Input
-              label={editingId ? "API token (leave blank to keep current)" : "API token"}
-              type="password"
-              placeholder={editingId ? "••••••••" : "Jira API token"}
-              value={form.apiToken}
-              onChange={(_e, { value }) => handleFormChange("apiToken", value)}
-            />
+            <Message info size="small">
+              Set JIRA_API_TOKEN in the server .env and restart the app. Test the saved site's connection to retire any previously saved token.
+            </Message>
           </Form>
           <Button
             type="button"

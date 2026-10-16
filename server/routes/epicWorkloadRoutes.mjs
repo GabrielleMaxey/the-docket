@@ -26,8 +26,8 @@ const loadMappingsByRole = (db) => {
   return buildFieldMappingsMap(rows);
 };
 
-export const registerEpicWorkloadRoutes = (app, { getDb, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
-  app.get("/api/jira/epics/search", async (req, res) => {
+export const registerEpicWorkloadRoutes = (app, { withSiteOperation = (handler) => handler, getDb, jiraRequest, runJiraSearchRequest, ensureEnvOrRespond }) => {
+  app.get("/api/jira/epics/search", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -53,9 +53,9 @@ export const registerEpicWorkloadRoutes = (app, { getDb, jiraRequest, runJiraSea
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/jira/epics/:epicKey/workload", async (req, res) => {
+  app.get("/api/jira/epics/:epicKey/workload", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -150,5 +150,5 @@ export const registerEpicWorkloadRoutes = (app, { getDb, jiraRequest, runJiraSea
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 };

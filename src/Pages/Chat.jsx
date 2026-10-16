@@ -12,7 +12,6 @@ import EpicFilterPanel from "./components/EpicFilterPanel";
 import EpicEvaluationPanel from "./components/EpicEvaluationPanel";
 import { useEpicFilters } from "../context/EpicFiltersContext.jsx";
 import { fetchChatStatus, fetchDashboardMetrics, saveAdHocReport, sendChatMessage, signOutChat, startChatOAuth } from "../services/jiraClient";
-import { buildApiUrl } from "../services/apiBase";
 import { buildChatSessionContext } from "../utils/chatSessionContext";
 import "./chat.css";
 
@@ -259,10 +258,8 @@ const Chat = () => {
           <Message warning size="small">
             Chat is not ready. Set <code>CHAT_PROVIDER</code> and the matching API key in <code>.env</code> on
             the proxy host (for example <code>anthropic</code> + <code>ANTHROPIC_API_KEY</code>, or{" "}
-            <code>rovo</code> with Atlassian OAuth). Status:{" "}
-            <a href={buildApiUrl("/api/chat/status")} target="_blank" rel="noreferrer">
-              /api/chat/status
-            </a>
+            <code>rovo</code> with Atlassian OAuth).{" "}
+            <Button size="small" basic onClick={loadStatus}>Refresh status</Button>
           </Message>
         ) : null}
       </Segment>

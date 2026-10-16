@@ -109,10 +109,14 @@ export const loadCreateFieldOptions = async ({
   isSubtask = false,
   jiraRequest,
 }) => {
-  const [projectComponents, createMeta] = await Promise.all([
+  const settled = await Promise.allSettled([
     loadProjectComponents({ projectKey, jiraRequest }),
     loadProjectCreateMeta({ projectKey, jiraRequest }),
   ]);
+
+  const failed = settled.find((result) => result.status === "rejected");
+  if (failed) throw failed.reason;
+  const [projectComponents, createMeta] = settled.map((result) => result.value);
 
   const componentNames = uniqueSortedLabels(
     (projectComponents || []).map((item) => item?.name),

@@ -20,7 +20,7 @@ const readApiBaseFromArgv = () => {
   return base || null;
 };
 
-const apiPort = readApiPortFromArgv() || process.env.API_PORT || "8787";
+const apiPort = readApiPortFromArgv() || "8787";
 const apiBaseUrl = readApiBaseFromArgv() || `http://127.0.0.1:${apiPort}`;
 
 contextBridge.exposeInMainWorld("desktop", {

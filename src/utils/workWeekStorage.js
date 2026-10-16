@@ -1,3 +1,5 @@
+// These logical names are scoped by siteContextStore at the storage boundary.
+// Existing unscoped records do not contain a source-site identity.
 export const WORK_WEEK_STORAGE_KEYS = {
   chatSessionArtifacts: "taskManagerChatSessionArtifacts",
   jiraPreferences: "workWeekTasksJiraPreferences",

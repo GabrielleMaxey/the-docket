@@ -1,3 +1,5 @@
+import { validateMetadataPatch } from "../../../shared/issueMetadataFields.mjs";
+import { getSiteContext, siteStorageKey, readSiteStorage } from "../../utils/siteContextStore.js";
 import React from "react";
 import {
   DEFAULT_JQL_COUNT,
@@ -100,7 +102,7 @@ const loadStoredPreferences = () => {
   }
 
   try {
-    const raw = window.localStorage.getItem(WORK_WEEK_STORAGE_KEYS.jiraPreferences);
+    const raw = readSiteStorage(window.localStorage, WORK_WEEK_STORAGE_KEYS.jiraPreferences);
     if (!raw) {
       return getDefaultStoredPreferences();
     }
@@ -117,7 +119,7 @@ const readJsonObject = (storageKey) => {
   }
 
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = readSiteStorage(window.localStorage, storageKey);
     if (!raw) {
       return {};
     }
@@ -143,7 +145,7 @@ const loadStoredJqlRuns = () => {
   }
 
   try {
-    const raw = window.localStorage.getItem(WORK_WEEK_STORAGE_KEYS.jqlRuns);
+    const raw = readSiteStorage(window.localStorage, WORK_WEEK_STORAGE_KEYS.jqlRuns);
     if (!raw) {
       return [];
     }
@@ -232,6 +234,8 @@ const formatJqlRefreshNotice = ({ unsavedAssigneeCount, pullLatestComment }) => 
 const NOTE_AUTOSAVE_DELAY_MS = 350;
 
 export const useTaskManagerJira = () => {
+  const siteContext = React.useRef(getSiteContext()).current;
+  const instanceId = siteContext?.instanceId;
   const stored = loadStoredPreferences();
   const storedNotes = readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraNotes);
   const storedRowPriorities = readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraRowPriorities);
@@ -288,8 +292,7 @@ export const useTaskManagerJira = () => {
   const hydratedNoteImageKeysRef = React.useRef(new Set());
   const pendingNoteImageKeepSyncKeysRef = React.useRef(new Set());
   const latestNoteDraftsRef = React.useRef(storedNotes);
-  const noteAutosaveTimersRef = React.useRef({});
-  const noteAutosaveInFlightRef = React.useRef({});
+  const pendingNoteSavesRef = React.useRef(new Map());
 
   React.useEffect(() => {
     noteImagesRef.current = noteImagesByKey;
@@ -318,9 +321,6 @@ export const useTaskManagerJira = () => {
 
   React.useEffect(
     () => () => {
-      Object.values(noteAutosaveTimersRef.current).forEach((timerId) => {
-        window.clearTimeout(timerId);
-      });
       Object.values(noteImagesRef.current)
         .flat()
         .forEach((image) => URL.revokeObjectURL(image.previewUrl));
@@ -349,7 +349,7 @@ export const useTaskManagerJira = () => {
     }
 
     const seq = ++enrichSeqRef.current;
-    Promise.all(regular.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows))).then(
+    Promise.all(regular.map((run) => enrichRunWithParentDoneDates(run, fieldMappingRows, { siteContext }))).then(
       (enrichedRegular) => {
         if (seq !== enrichSeqRef.current) {
           return;
@@ -371,8 +371,7 @@ export const useTaskManagerJira = () => {
       return;
     }
 
-    window.localStorage.setItem(
-      WORK_WEEK_STORAGE_KEYS.jiraPreferences,
+    window.localStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jiraPreferences, instanceId),
       JSON.stringify({
         jqlCount,
         jqlInputs,
@@ -381,13 +380,11 @@ export const useTaskManagerJira = () => {
         pullLatestComment,
       })
     );
-    window.localStorage.setItem(WORK_WEEK_STORAGE_KEYS.jiraNotes, JSON.stringify(jiraNotes));
-    window.localStorage.setItem(
-      WORK_WEEK_STORAGE_KEYS.jiraRowPriorities,
+    window.localStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jiraNotes, instanceId), JSON.stringify(jiraNotes));
+    window.localStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jiraRowPriorities, instanceId),
       JSON.stringify(jiraRowPriorities)
     );
-    window.localStorage.setItem(
-      WORK_WEEK_STORAGE_KEYS.planningMetaByKey,
+    window.localStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.planningMetaByKey, instanceId),
       JSON.stringify(planningMetaByKey)
     );
   }, [
@@ -419,16 +416,16 @@ export const useTaskManagerJira = () => {
 
     const savable = savableJqlRuns(jqlRuns).filter(isConfiguredJqlRun);
     if (savable.length === 0) {
-      window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jqlRuns);
+      window.localStorage.removeItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jqlRuns, instanceId));
     } else {
       try {
-        window.localStorage.setItem(WORK_WEEK_STORAGE_KEYS.jqlRuns, JSON.stringify(savable));
+        window.localStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jqlRuns, instanceId), JSON.stringify(savable));
       } catch (error) {
         console.warn("Could not persist JQL results to localStorage (size or quota).", error);
       }
     }
 
-    persistDrillDownRunsToSessionStorage(jqlRuns);
+    persistDrillDownRunsToSessionStorage(jqlRuns, instanceId);
   }, [jqlRuns]);
 
   const handleJqlChange = (index, value) => {
@@ -454,8 +451,8 @@ export const useTaskManagerJira = () => {
     setLastPushedJiraNoteByKey({});
 
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jiraPreferences);
-      window.localStorage.removeItem(WORK_WEEK_STORAGE_KEYS.jqlRuns);
+      window.localStorage.removeItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jiraPreferences, instanceId));
+      window.localStorage.removeItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jqlRuns, instanceId));
       // Do not remove header reminders (stored in the local db, see WorkWeekTasks.jsx) or
       // notes/priorities — reset is JQL prefs + cached runs only.
     }
@@ -554,7 +551,10 @@ export const useTaskManagerJira = () => {
     }));
 
     try {
-      await saveIssueMetadata({ issueKey, note, priority });
+      await runBackgroundJob(`note-autosave:${issueKey}`, {
+        instanceId, siteSave: true, queue: true, label: "Saving note",
+        run: () => saveIssueMetadata({ issueKey, note, priority }, { siteContext }),
+      });
       setSaveState((prev) => ({
         ...prev,
         [issueKey]: { loading: false, error: "", success: "Saved to DB." },
@@ -571,41 +571,25 @@ export const useTaskManagerJira = () => {
     }
   };
 
-  const persistLatestNote = React.useCallback((issueKey) => {
-    if (noteAutosaveInFlightRef.current[issueKey]) {
-      return;
-    }
-
-    const noteAtStart = String(latestNoteDraftsRef.current[issueKey] || "");
-    noteAutosaveInFlightRef.current[issueKey] = true;
-
-    saveIssueMetadata({ issueKey, note: noteAtStart })
-      .catch((error) => {
-        console.error("Failed to persist note", issueKey, error);
-      })
-      .finally(() => {
-        delete noteAutosaveInFlightRef.current[issueKey];
-        if (String(latestNoteDraftsRef.current[issueKey] || "") !== noteAtStart) {
-          persistLatestNote(issueKey);
-        }
-      });
-  }, []);
-
-  const scheduleNoteAutosave = React.useCallback(
-    (issueKey) => {
-      if (typeof window === "undefined") {
-        persistLatestNote(issueKey);
-        return;
-      }
-
-      window.clearTimeout(noteAutosaveTimersRef.current[issueKey]);
-      noteAutosaveTimersRef.current[issueKey] = window.setTimeout(() => {
-        delete noteAutosaveTimersRef.current[issueKey];
-        persistLatestNote(issueKey);
-      }, NOTE_AUTOSAVE_DELAY_MS);
-    },
-    [persistLatestNote]
-  );
+  const scheduleNoteAutosave = React.useCallback((issueKey) => {
+    if (pendingNoteSavesRef.current.has(issueKey)) return;
+    const delay = new Promise((resolve) => window.setTimeout(resolve, NOTE_AUTOSAVE_DELAY_MS));
+    const pending = runBackgroundJob(`note-autosave:${issueKey}`, {
+      instanceId, siteSave: true, queue: true, label: "Saving note",
+      run: async () => {
+        await delay;
+        let savedNote;
+        do {
+          savedNote = String(latestNoteDraftsRef.current[issueKey] || "");
+          await saveIssueMetadata({ issueKey, note: savedNote }, { siteContext });
+        } while (String(latestNoteDraftsRef.current[issueKey] || "") !== savedNote);
+      },
+    });
+    pendingNoteSavesRef.current.set(issueKey, pending);
+    pending.catch((error) => {
+      setSaveState((prev) => ({ ...prev, [issueKey]: { loading: false, error: errorMessage(error, "Failed to save note"), success: "" } }));
+    }).finally(() => { pendingNoteSavesRef.current.delete(issueKey); });
+  }, [instanceId, siteContext]);
 
   const handleNoteChange = (issueKey, note) => {
     latestNoteDraftsRef.current = patchIssueKeyed(latestNoteDraftsRef.current, issueKey, note);
@@ -699,7 +683,7 @@ export const useTaskManagerJira = () => {
 
     Promise.all(
       images.map(async (image) => {
-        const blob = await fetchKeptNoteImageBlob(issueKey, image.id);
+        const blob = await fetchKeptNoteImageBlob(issueKey, image.id, { siteContext });
         const file = new File([blob], image.filename, { type: image.mimeType });
         return {
           localId: crypto.randomUUID(),
@@ -1043,6 +1027,7 @@ export const useTaskManagerJira = () => {
     const sharedProgramId = String(options.sharedProgramId || "").trim();
     const meta = planningMetaByKey[issueKey] || {};
     const patch = {
+      followUp: (sharedProgramId ? meta.teamFollowUp : meta.followUp) ?? null,
       plannedStart: meta.plannedStart || "",
       plannedFinish: meta.plannedFinish || "",
       requestor: meta.requestor || "",
@@ -1052,6 +1037,8 @@ export const useTaskManagerJira = () => {
       startDate: startDateByKey[issueKey] || "",
       completeDate: completeDateByKey[issueKey] || "",
     };
+    const { errors } = validateMetadataPatch(patch);
+    if (errors.length) throw new Error(errors.join("; "));
     if (sharedProgramId) {
       return saveTeamDate({ issueKey, ...patch });
     }
@@ -1060,11 +1047,13 @@ export const useTaskManagerJira = () => {
 
   const handlePlanningFieldChange = (issueKey, field, value, options = {}) => {
     const sharedProgramId = String(options.sharedProgramId || "").trim();
+    const { patch, errors } = validateMetadataPatch({ [field]: value });
+    if (errors.length) { console.error("Invalid planning field", errors.join("; ")); return; }
+    const stateField = sharedProgramId && field === "followUp" ? "teamFollowUp" : field;
     setPlanningMetaByKey((prev) => ({
       ...prev,
-      [issueKey]: { ...(prev[issueKey] || {}), [field]: value },
+      [issueKey]: { ...(prev[issueKey] || {}), [stateField]: patch[field] },
     }));
-    const patch = { [field]: value };
     if (sharedProgramId) {
       saveTeamDate({ issueKey, ...patch }).catch((error) => {
         console.error(`Failed to persist team ${field}`, issueKey, error);
@@ -1166,6 +1155,7 @@ export const useTaskManagerJira = () => {
       label: "Running JQL",
       run: () =>
         runJqlWorkflow({
+          siteContext,
           jqlInputs: nextJqlInputs,
           jqlLabels: nextJqlLabels,
           jqlSharedProgramIds: nextSharedProgramIds,
@@ -1200,6 +1190,7 @@ export const useTaskManagerJira = () => {
       label: "Loading JQL results",
       run: () =>
         loadRemainingJqlIssues({
+          siteContext,
           runIndex,
           jqlRuns,
           jqlMaxResults,
@@ -1229,6 +1220,7 @@ export const useTaskManagerJira = () => {
 
       const fetchSeq = ++drillDownFetchSeqRef.current;
       return loadDrillDownIssueByKey({
+        siteContext,
         issueKey,
         pullLatestComment,
         clampPriority,
@@ -1243,7 +1235,7 @@ export const useTaskManagerJira = () => {
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
-        isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
+        isStale: () => fetchSeq !== drillDownFetchSeqRef.current || siteContext?.generation !== getSiteContext()?.generation,
       });
     },
     [pullLatestComment, clampPriority, fieldMappingRows]
@@ -1260,6 +1252,7 @@ export const useTaskManagerJira = () => {
 
       const fetchSeq = ++drillDownFetchSeqRef.current;
       return loadDrillDownIssuesByAssignee({
+        siteContext,
         assigneeName,
         epicPresetId,
         jqlMaxResults,
@@ -1276,7 +1269,7 @@ export const useTaskManagerJira = () => {
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
-        isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
+        isStale: () => fetchSeq !== drillDownFetchSeqRef.current || siteContext?.generation !== getSiteContext()?.generation,
       });
     },
     [jqlMaxResults, pullLatestComment, clampPriority, fieldMappingRows]
@@ -1291,6 +1284,7 @@ export const useTaskManagerJira = () => {
 
       const fetchSeq = ++drillDownFetchSeqRef.current;
       return loadDrillDownByJql({
+        siteContext,
         jql: query,
         label,
         jqlMaxResults,
@@ -1307,7 +1301,7 @@ export const useTaskManagerJira = () => {
         setJqlError,
         hydrateNoteImages: hydrateKeptNoteImages,
         fieldMappingRows,
-        isStale: () => fetchSeq !== drillDownFetchSeqRef.current,
+        isStale: () => fetchSeq !== drillDownFetchSeqRef.current || siteContext?.generation !== getSiteContext()?.generation,
       });
     },
     [jqlMaxResults, pullLatestComment, clampPriority, fieldMappingRows]
@@ -1320,8 +1314,8 @@ export const useTaskManagerJira = () => {
       if (next.length === prev.length) {
         return prev;
       }
-      persistJqlRunsToStorage(next);
-      persistDrillDownRunsToSessionStorage(next);
+      persistJqlRunsToStorage(next, instanceId);
+      persistDrillDownRunsToSessionStorage(next, instanceId);
       return next;
     });
   }, []);
@@ -1340,8 +1334,8 @@ export const useTaskManagerJira = () => {
       if (next.length === prev.length) {
         return prev;
       }
-      persistJqlRunsToStorage(next);
-      persistDrillDownRunsToSessionStorage(drillDownJqlRuns(next));
+      persistJqlRunsToStorage(next, instanceId);
+      persistDrillDownRunsToSessionStorage(drillDownJqlRuns(next), instanceId);
       return next;
     });
   }, []);

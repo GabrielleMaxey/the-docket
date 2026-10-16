@@ -255,8 +255,8 @@ const createStatements = (db) => ({
   ),
 });
 
-export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
-  app.post("/api/report/generate", async (req, res) => {
+export const registerReportRoutes = (app, { withSiteOperation = (handler) => handler, getDb, dataDir, jiraRequest }) => {
+  app.post("/api/report/generate", withSiteOperation(async (req, res) => {
     const db = getDb();
     const {
       getLatestSnapshotStmt,
@@ -476,10 +476,10 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
         error: error instanceof Error ? error.message : "Unable to generate report.",
       });
     }
-  });
+  }));
 
   // ─── Per-project report (WorkWeek task manager) ───────────────────────────
-  app.post("/api/report/project", async (req, res) => {
+  app.post("/api/report/project", withSiteOperation(async (req, res) => {
     const db = getDb();
     const label = String(req.body?.label || "Project").trim();
     const jql = String(req.body?.jql || "").trim();
@@ -601,10 +601,10 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
         error: error instanceof Error ? error.message : "Unable to generate report.",
       });
     }
-  });
+  }));
 
   // ─── Gantt SharePoint AI summary ─────────────────────────────────────────────
-  app.post("/api/report/gantt-summary", async (req, res) => {
+  app.post("/api/report/gantt-summary", withSiteOperation(async (req, res) => {
     const mode = String(req.body?.mode || "generate").trim();
     if (mode !== "generate" && mode !== "refine") {
       return res.status(400).json({ error: "mode must be 'generate' or 'refine'" });
@@ -663,10 +663,10 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
       log.error("gantt summary generation failed", error instanceof Error ? error.message : error);
       return res.status(500).json({ error: error instanceof Error ? error.message : "Unable to generate summary." });
     }
-  });
+  }));
 
   // ─── Weekly plan (WorkWeek task manager) ──────────────────────────────────
-  app.post("/api/plan/week", async (req, res) => {
+  app.post("/api/plan/week", withSiteOperation(async (req, res) => {
     const db = getDb();
     const projects = Array.isArray(req.body?.projects) ? req.body.projects : [];
     const focusStyle = String(req.body?.focusStyle || "balance").trim();
@@ -722,9 +722,9 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
         error: error instanceof Error ? error.message : "Unable to generate report.",
       });
     }
-  });
+  }));
 
-  app.get("/api/reports/weekly-digest", (_req, res) => {
+  app.get("/api/reports/weekly-digest", withSiteOperation((_req, res) => {
     try {
       const digest = loadWeeklyDigestFromDb(getDb());
       if (!digest) {
@@ -740,9 +740,9 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/reports/cowork-files", (_req, res) => {
+  app.get("/api/reports/cowork-files", withSiteOperation((_req, res) => {
     try {
       const items = listCoworkWeeklyPlans(dataDir);
       return res.json({ items });
@@ -753,9 +753,9 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/reports/cowork-files/:filename", (req, res) => {
+  app.get("/api/reports/cowork-files/:filename", withSiteOperation((req, res) => {
     try {
       const result = readCoworkWeeklyPlan(dataDir, req.params.filename);
       if (!result.ok) {
@@ -769,9 +769,9 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/reports/archive", (req, res) => {
+  app.get("/api/reports/archive", withSiteOperation((req, res) => {
     const source = String(req.query?.source || "").trim();
     const limit = Math.min(200, Math.max(1, Number(req.query?.limit) || 100));
 
@@ -785,9 +785,9 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.post("/api/reports/archive", (req, res) => {
+  app.post("/api/reports/archive", withSiteOperation((req, res) => {
     const content = String(req.body?.content || "").trim();
     if (!content) {
       return res.status(400).json({ error: "Missing report content" });
@@ -855,9 +855,9 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.get("/api/reports/archive/:id", (req, res) => {
+  app.get("/api/reports/archive/:id", withSiteOperation((req, res) => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id) || id <= 0) {
       return res.status(400).json({ error: "Invalid report id" });
@@ -876,9 +876,9 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
-  app.delete("/api/reports/archive/:id", (req, res) => {
+  app.delete("/api/reports/archive/:id", withSiteOperation((req, res) => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id) || id <= 0) {
       return res.status(400).json({ error: "Invalid report id" });
@@ -897,10 +897,10 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 
   // Require source so an empty filter cannot delete every archived report.
-  app.delete("/api/reports/archive", (req, res) => {
+  app.delete("/api/reports/archive", withSiteOperation((req, res) => {
     const source = String(req.query?.source || "").trim();
     if (!Object.values(REPORT_SOURCES).includes(source)) {
       return res.status(400).json({
@@ -918,5 +918,5 @@ export const registerReportRoutes = (app, { getDb, dataDir, jiraRequest }) => {
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }));
 };
