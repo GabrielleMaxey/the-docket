@@ -13,7 +13,32 @@ const DEFAULT_APP_SETTINGS = {
   proxy_url: "",
 };
 
+export const initReportStorage = (db) => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS generated_reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL,
+      report_type TEXT NOT NULL,
+      label TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL DEFAULT '',
+      meta_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_generated_reports_source_created
+      ON generated_reports (source, created_at);
+
+  `);
+};
+
 export const initDatabase = (db) => {
+  initReportStorage(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS issue_metadata (
       issue_key TEXT PRIMARY KEY,
@@ -38,12 +63,6 @@ export const initDatabase = (db) => {
       role TEXT PRIMARY KEY,
       field_id TEXT NOT NULL DEFAULT '',
       field_name TEXT NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -133,19 +152,6 @@ export const initDatabase = (db) => {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-
-    CREATE TABLE IF NOT EXISTS generated_reports (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      source TEXT NOT NULL,
-      report_type TEXT NOT NULL,
-      label TEXT NOT NULL DEFAULT '',
-      content TEXT NOT NULL DEFAULT '',
-      meta_json TEXT NOT NULL DEFAULT '{}',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_generated_reports_source_created
-      ON generated_reports (source, created_at);
 
     CREATE TABLE IF NOT EXISTS issue_note_images (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

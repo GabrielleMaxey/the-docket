@@ -11,8 +11,8 @@ export const BACKGROUND_JOB_IDS = {
   WORK_WEEK_WEEK_PLAN: "work-week-week-plan",
 };
 
-export const workWeekProjectReportJobId = (runKey) =>
-  `work-week-project-report:${String(runKey || "0")}`;
+export const workWeekProjectReportJobId = (runKey, siteContext) =>
+  `${siteContext?.kind === "combined-work" ? "docket:combined-work:" : ""}work-week-project-report:${String(runKey || "0")}`;
 
 const notify = () => {
   const snapshot = getActiveBackgroundJobs();
@@ -34,7 +34,7 @@ const scheduleClear = (id, job) => {
   }, delay);
 };
 
-export const getBackgroundJob = (id) => jobs.get(id.startsWith("docket:site:") ? id : siteStorageKey(id)) || null;
+export const getBackgroundJob = (id) => jobs.get((id.startsWith("docket:site:") || id.startsWith("docket:combined-work:")) ? id : siteStorageKey(id)) || null;
 
 export const getActiveBackgroundJobs = () => [...jobs.values()];
 
@@ -60,8 +60,10 @@ export const cancelBackgroundJob = (id) => {
 /**
  * Run async work that survives React route unmounts. Reuses the in-flight promise when the same id is already running.
  */
-export const runBackgroundJob = (id, { label, scope, run, timeoutMs = 0, instanceId = getSiteContext()?.instanceId, siteSave = false, queue = false }) => {
-  id = siteStorageKey(id, instanceId);
+export const runBackgroundJob = (id, { label, scope, run, timeoutMs = 0, instanceId = getSiteContext()?.instanceId, siteContext, siteSave = false, queue = false }) => {
+  const combined = siteContext?.kind === "combined-work" || id.startsWith("docket:combined-work:");
+  if (combined) instanceId = null;
+  id = id.startsWith("docket:combined-work:") ? id : siteStorageKey(id, combined ? { kind: "combined-work" } : instanceId);
   const existing = jobs.get(id);
   if (!queue && existing?.status === "running" && existing.promise) {
     return existing.promise;

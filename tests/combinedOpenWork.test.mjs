@@ -182,3 +182,40 @@ test("HTTP disconnect aborts upstream and sends no late response while leases aw
   assert.equal(req.listenerCount("aborted"), 0);
   assert.equal(res.listenerCount("close"), 0);
 });
+
+test("rich HTTP collection captures source revisions, Jira issues and each saved entry's fields without changing notes", async t => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { initDatabase } = await import("../server/db/schema.mjs");
+  const f = fixture(t);
+  const dataDir = mkdtempSync(join(tmpdir(), "combined-rich-"));
+  t.after(() => rmSync(dataDir, { recursive: true, force: true }));
+  for (const [index, site] of f.saved.slice(0, 2).entries()) {
+    const db = new Database(instances.appDbPathForInstance(dataDir, site.id)); initDatabase(db);
+    db.prepare("UPDATE jira_field_mappings SET field_id = ? WHERE role = 'due_date'").run(`customfield_${index + 11}`);
+    db.prepare("INSERT INTO issue_metadata (issue_key, note) VALUES ('ABC-1', ?)").run(`draft-${index}`); db.close();
+  }
+  const calls = [];
+  const app = express(); app.use(express.json());
+  registerCombinedOpenWorkRoutes(app, { ...f.context, dataDir, requestJira: async options => { calls.push(options); return page([issue(), issue()]); } });
+  const server = app.listen(0, "127.0.0.1"); await once(server, "listening"); t.after(() => server.close());
+  const res = await fetch(`http://127.0.0.1:${server.address().port}/api/combined-open-work`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instanceIds: f.saved.slice(0, 2).map(s => s.id) }) });
+  const result = await res.json();
+  assert.equal(res.status, 200);
+  for (const [index, site] of result.sites.entries()) {
+    assert.equal(site.sourceContext?.kind, "saved-site");
+    assert.equal(site.sourceContext.instanceId, f.saved[index].id);
+    assert.match(site.sourceContext.revision, /^[a-f0-9]{64}$/);
+    assert.equal(site.issues.length, 1);
+    assert.equal(site.issues[0].fields.assignee.emailAddress, "private");
+    assert.equal(site.fieldMappings.find(m => m.role === "due_date").fieldId, `customfield_${index + 11}`);
+    const fields = calls.find(c => c.credentials.email.startsWith(index === 0 ? "A" : "B")).body.fields;
+    for (const field of ["assignee", "parent", "priority", `customfield_${index + 11}`]) assert.ok(fields.includes(field));
+    assert.ok(!fields.includes(`customfield_${index === 0 ? 12 : 11}`));
+    const db = new Database(instances.appDbPathForInstance(dataDir, site.instanceId));
+    assert.equal(db.prepare("SELECT note FROM issue_metadata WHERE issue_key = 'ABC-1'").get().note, `draft-${index}`); db.close();
+  }
+  assert.equal(instances.getActiveInstanceId(f.metaDb), f.saved[2].id);
+  assert.doesNotMatch(JSON.stringify(result.sites.map(site => site.sourceContext)), /synthetic|example.test/);
+});

@@ -2,7 +2,7 @@ import React from "react";
 import { Button, Message } from "semantic-ui-react";
 import { IMPORT_FIELDS } from "../../../../shared/issueMetadataFields.mjs";
 import { getSiteContext, subscribeSiteContext } from "../../../utils/siteContextStore.js";
-import { previewIssueMetadataImport, commitIssueMetadataImport } from "../../../services/jiraClient.js";
+import { previewIssueMetadataImport, commitIssueMetadataImport, assertTeamPriorityEnabled } from "../../../services/jiraClient.js";
 
 const labels = { priority: "Priority", note: "Note", followUp: "Now / Next", requestor: "Requestor", plannedStart: "Planned start", plannedFinish: "Planned finish", startDate: "Actual start", openDecisionNote: "Decision note" };
 const display = (value) => value === null || value === undefined || value === "" ? "Unset" : String(value);
@@ -31,6 +31,7 @@ const IssueImportPreview = ({ initialPreview, teamAvailable, teamReason, siteCon
     pending.current = true;
     setBusy(true); setApproved(false); setReviewed(false); setMessage(""); setSaved(false);
     try {
+      if (destination === "team") assertTeamPriorityEnabled();
       const next = await previewIssueMetadataImport({ destination, rows, ...(previousId.current ? { supersedesPreviewId: previousId.current } : {}) }, { siteContext });
       if (getSiteContext()?.generation !== siteContext.generation) return;
       previousId.current = next.previewId;
@@ -48,6 +49,7 @@ const IssueImportPreview = ({ initialPreview, teamAvailable, teamReason, siteCon
     if (saved) return;
     pending.current = true; setBusy(true); setMessage("");
     try {
+      if (destination === "team") assertTeamPriorityEnabled();
       const result = await commitIssueMetadataImport(preview.previewId, { siteContext });
       setSaved(true); setApproved(false); previousId.current = null; onPreview(null);
       setMessage(`${result.duplicate ? "Already saved" : "Saved"} ${result.updated} ${result.updated === 1 ? "row" : "rows"} ${result.destination === "team" ? "to team" : "locally"}. Re-run your task query to load them.`);

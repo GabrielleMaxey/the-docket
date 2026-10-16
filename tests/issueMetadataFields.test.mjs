@@ -24,8 +24,8 @@ test("task workflow hydrates followUp-only shared rows and clear without replaci
   const { build } = await import("esbuild");
   const source = await fs.readFile(new URL("../src/Pages/hooks/jiraJqlRunWorkflow.js", import.meta.url), "utf8");
   const calls = [];
-  const services = ["fetchEpicPresetScopeJql", "fetchIssueMetadataBulk", "fetchJiraSearchAll", "fetchLatestJiraCommentsBulk", "fetchTeamPriorityBulk", "fetchTeamDatesBulk", "fetchTeamMetadataBulk"];
-  const bundled = await build({ stdin: { contents: 'import { getSiteContext } from "../../utils/siteContextStore.js"; import { fetchTeamDatesBulk, fetchTeamMetadataBulk } from "../../services/jiraClient";\n' + source.slice(source.indexOf("const dedupeIssueKeys"), source.indexOf("const applyTeamPriorityState")) + source.slice(source.indexOf("const PLANNING_FIELD_KEYS"), source.indexOf("const applyDrillDownMetadata")) + "\nexport { applyTeamDateState, hasPlanningData };", resolveDir: new URL("../src/Pages/hooks/", import.meta.url).pathname, sourcefile: "workflow.js" }, bundle: true, write: false, format: "esm", platform: "node", plugins: [{ name: "synthetic-services", setup(build) {
+  const services = ["fetchEpicPresetScopeJql", "fetchIssueMetadataBulk", "fetchJiraSearchAll", "fetchLatestJiraCommentsBulk", "fetchTeamPriorityBulk", "fetchTeamDatesBulk", "fetchTeamMetadataBulk", "getTeamPriorityHealthSnapshot"];
+  const bundled = await build({ stdin: { contents: 'import { getSiteContext } from "../../utils/siteContextStore.js"; import { fetchTeamDatesBulk, fetchTeamMetadataBulk, getTeamPriorityHealthSnapshot } from "../../services/jiraClient";\n' + source.slice(source.indexOf("const dedupeIssueKeys"), source.indexOf("const applyTeamPriorityState")) + source.slice(source.indexOf("const PLANNING_FIELD_KEYS"), source.indexOf("const applyDrillDownMetadata")) + "\nexport { applyTeamDateState, hasPlanningData };", resolveDir: new URL("../src/Pages/hooks/", import.meta.url).pathname, sourcefile: "workflow.js" }, bundle: true, write: false, format: "esm", platform: "node", plugins: [{ name: "synthetic-services", setup(build) {
     build.onResolve({ filter: /services\/jiraClient$/ }, () => ({ path: "services", namespace: "synthetic" }));
     build.onResolve({ filter: /siteContextStore\.js$/ }, () => ({ path: "context", namespace: "synthetic" }));
     build.onLoad({ filter: /.*/, namespace: "synthetic" }, ({ path }) => ({ contents: path === "context" ? 'export const getSiteContext = () => globalThis.d2Context;' : services.map((name) => `export const ${name} = (...args) => globalThis.d2Services.${name}(...args);`).join("\n") }));
@@ -36,6 +36,7 @@ test("task workflow hydrates followUp-only shared rows and clear without replaci
   globalThis.d2Context = context;
   let followUp = "next";
   globalThis.d2Services = {
+    getTeamPriorityHealthSnapshot: () => ({ enabled: true }),
     fetchTeamDatesBulk: async (_keys, options) => { calls.push(options); return {}; },
     fetchTeamMetadataBulk: async (_keys, options) => { calls.push(options); return { "ABC-1": { followUp } }; },
   };
@@ -88,9 +89,15 @@ test("same-key local and shared followUp edits and Save All preserve their own s
   const { build } = await import("esbuild");
   const source = await fs.readFile(new URL("../src/Pages/hooks/useTaskManagerJira.js", import.meta.url), "utf8");
   const handlers = source.slice(source.indexOf("  const handleSavePlanningAll"), source.indexOf("  const handlePinnedGanttChange"));
+  const persistence = source.slice(source.indexOf("  const persistTeamChange"), source.indexOf("  const [fieldMappingsLoading"));
   const bundled = await build({ stdin: { contents: `import { validateMetadataPatch } from "../../../shared/issueMetadataFields.mjs";
     export const configure = ({ saveTeamDate, saveIssueMetadata, setPlanningMetaByKey, planningMetaByKey, startDateByKey = {}, completeDateByKey = {} }) => {
       const React = { useCallback: (callback) => callback };
+      const hydrationReady = true, combined = false, siteContext = undefined;
+      const teamPlanningMetaByKey = planningMetaByKey, teamStartDateByKey = {}, teamCompleteDateByKey = {};
+      const setTeamPlanningMetaByKey = setPlanningMetaByKey, assertTeamPriorityEnabled = () => {};
+      const onConfirmedTeam = undefined, reconcileTeam = undefined;
+      ${persistence}
       ${handlers}
       return { handleSavePlanningAll, handlePlanningFieldChange };
     };`, resolveDir: new URL("../src/Pages/hooks/", import.meta.url).pathname }, bundle: true, write: false, format: "esm", platform: "node" });
@@ -127,7 +134,7 @@ test("task table renders exclusive Now/Next checkboxes with source-specific clea
     await build({ entryPoints: ["src/Pages/components/JiraResultsTable.jsx"], bundle: true, outfile, packages: "external", format: "cjs", platform: "node", define: { "import.meta.env.VITE_API_BASE": "undefined" } });
     const Table = createRequire(import.meta.url)(outfile).default;
     const props = Object.fromEntries(["selectedForPush", "pushState", "saveState", "rowUpdateState", "statusDrafts", "iddDrafts", "dueDateDrafts", "mrdDrafts", "startDateByKey", "completeDateByKey", "assigneeDrafts", "jiraRowPriorities", "jiraNotes", "noteImagesByKey", "noteImageErrorsByKey", "keepNoteImagesByKey", "noteImageKeepPendingByKey", "lastPushedJiraNoteByKey"].map((key) => [key, {}]));
-    Object.assign(props, { statusOptions: [], isClosedLikeStatus: () => false, clampPriority: (value) => value, getPriorityClass: () => "", getPriorityRowClass: () => "", formatDate: () => "", planningMetaByKey: { "ABC-1": { followUp: "now", teamFollowUp: "next" } }, expandedPlanningKey: "ABC-1", handlePlanningFieldChange: () => {} });
+    Object.assign(props, { teamEnabled: true, statusOptions: [], isClosedLikeStatus: () => false, clampPriority: (value) => value, getPriorityClass: () => "", getPriorityRowClass: () => "", formatDate: () => "", planningMetaByKey: { "ABC-1": { followUp: "now", teamFollowUp: "next" } }, expandedPlanningKey: "ABC-1", handlePlanningFieldChange: () => {} });
     const render = (sharedProgramId) => renderToStaticMarkup(React.createElement(Table, { ...props, jqlRuns: [{ jql: "key = ABC-1", label: "Synthetic tasks", sharedProgramId, issues: [{ id: "1", key: "ABC-1", fields: { summary: "Task", status: { name: "Open" }, issuetype: { name: "Bug" } } }] }] }));
     const local = render("");
     const team = render("team");
@@ -155,19 +162,20 @@ test("Now/Next checkbox events replace the active choice and unchecking clears i
   const bundled = await build({ stdin: { contents: `import React from "react"; import { FOLLOW_UP_OPTIONS } from "../../../shared/issueMetadataFields.mjs";
     export const render = ({ followUp, handlePlanningFieldChange, sharedProgramId = "team" }) => {
       const issueKey = "ABC-1";
-      const isClosedOrResolved = false;
+      const combinedRun = null, disableEditing = false, forceTeam = false;
+      const issue = { key: issueKey };
       return (${fragment});
     };`, loader: "jsx", resolveDir: new URL("../src/Pages/components/", import.meta.url).pathname }, bundle: true, write: false, format: "esm", platform: "node" });
   const actual = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`);
   let followUp = "now";
   const changes = [];
   const render = () => actual.render({ followUp, handlePlanningFieldChange: (...args) => { changes.push(args); followUp = args[2]; } });
-  const inputs = () => render().props.children[1].map((label) => label.props.children[0]);
+  const inputs = () => render().props.children.flat().filter(child => child?.type === "label").map((label) => label.props.children[0]);
   assert.deepEqual(inputs().map((input) => input.props.checked), [true, false]);
   inputs()[1].props.onChange({ target: { checked: true } });
   assert.equal(followUp, "next");
   assert.deepEqual(inputs().map((input) => input.props.checked), [false, true]);
-  assert.deepEqual(changes[0], ["ABC-1", "followUp", "next", { sharedProgramId: "team" }]);
+  assert.deepEqual(changes[0], ["ABC-1", "followUp", "next", { sharedProgramId: "team", forceTeam: false }]);
   inputs()[1].props.onChange({ target: { checked: false } });
   assert.equal(followUp, null);
   assert.deepEqual(inputs().map((input) => input.props.checked), [false, false]);
@@ -179,6 +187,7 @@ test("shared Load More and local planning hydration preserve both sources throug
   const { build } = await import("esbuild");
   const source = await fs.readFile(new URL("../src/Pages/hooks/useTaskManagerJira.js", import.meta.url), "utf8");
   const handlers = source.slice(source.indexOf("  const handleSavePlanningAll"), source.indexOf("  const handlePinnedGanttChange"));
+  const persistence = source.slice(source.indexOf("  const persistTeamChange"), source.indexOf("  const [fieldMappingsLoading"));
   const bundled = await build({ stdin: { contents: `
     export * from "./src/Pages/hooks/jiraJqlRunWorkflow.js";
     export * from "./src/utils/siteContextStore.js";
@@ -186,6 +195,11 @@ test("shared Load More and local planning hydration preserve both sources throug
     import { validateMetadataPatch } from "./shared/issueMetadataFields.mjs";
     export const configurePlanning = ({ planningMetaByKey, setPlanningMetaByKey, startDateByKey, completeDateByKey }) => {
       const React = { useCallback: (callback) => callback };
+      const hydrationReady = true, combined = false, siteContext = undefined;
+      const teamPlanningMetaByKey = planningMetaByKey, teamStartDateByKey = {}, teamCompleteDateByKey = {};
+      const setTeamPlanningMetaByKey = setPlanningMetaByKey, assertTeamPriorityEnabled = () => {};
+      const onConfirmedTeam = undefined, reconcileTeam = undefined;
+      ${persistence}
       ${handlers}
       return { handleSavePlanningAll, handlePlanningFieldChange };
     };`, resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node", define: { "import.meta.env.VITE_API_BASE": "undefined" } });
@@ -210,7 +224,8 @@ test("shared Load More and local planning hydration preserve both sources throug
           calls.push({ url, options, body });
           assert.equal(options.headers["X-Docket-Site"], name);
           let result;
-          if (url === "/api/jira/search/all") result = { issues: [issue], total: 1, loaded: 1, isComplete: true };
+          if (url === "/api/team-priority/health") result = { enabled: true, configured: true, connected: true, ok: true };
+          else if (url === "/api/jira/search/all") result = { issues: [issue], total: 1, loaded: 1, isComplete: true };
           else if (url === "/api/jira/issue-metadata/bulk") result = { items: { "ABC-1": saved } };
           else if (url === "/api/team-priority/metadata/bulk") result = { items: { "ABC-1": { followUp: "next" } } };
           else if (url === "/api/team-priority/dates/bulk" || url === "/api/team-priority/bulk") result = { items: {} };
@@ -237,7 +252,8 @@ test("shared Load More and local planning hydration preserve both sources throug
         };
         if (sharedFirst) {
           await loadMore("team");
-          assert.deepEqual(planning["ABC-1"], { teamFollowUp: "next" });
+          assert.equal(planning["ABC-1"].teamFollowUp, "next");
+          assert.equal(planning["ABC-1"].followUp, "now");
           await hydrateLocal();
         } else {
           await hydrateLocal();

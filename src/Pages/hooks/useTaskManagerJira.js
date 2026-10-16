@@ -13,6 +13,8 @@ import {
 } from "../../utils/workWeekStorage.js";
 import {
   fetchFieldMappings,
+  fetchJiraSearch,
+  fetchTeamPriorityHealth, getTeamPriorityHealthSnapshot, subscribeTeamPriorityHealth, assertTeamPriorityEnabled,
   pushJiraIssueNote,
   saveIssueMetadata,
   saveTeamPriority,
@@ -28,7 +30,7 @@ import {
   JIRA_UNASSIGNED_ASSIGNEE,
   isJiraUnassignValue,
 } from "../../services/jiraClient";
-import { runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey, loadDrillDownIssuesByAssignee, loadDrillDownByJql } from "./jiraJqlRunWorkflow.js";
+import { fetchOptionalTeamHealth, hydrateCombinedRun, runJqlWorkflow, loadRemainingJqlIssues, loadDrillDownIssueByKey, loadDrillDownIssuesByAssignee, loadDrillDownByJql } from "./jiraJqlRunWorkflow.js";
 import {
   dismissDrillDownId,
   drillDownJqlRuns,
@@ -233,13 +235,14 @@ const formatJqlRefreshNotice = ({ unsavedAssigneeCount, pullLatestComment }) => 
 
 const NOTE_AUTOSAVE_DELAY_MS = 350;
 
-export const useTaskManagerJira = () => {
-  const siteContext = React.useRef(getSiteContext()).current;
+export const useTaskManagerJira = ({ siteContext: explicitSiteContext, combinedRun, onConfirmedIssue, onConfirmedTeam } = {}) => {
+  const siteContext = React.useRef(explicitSiteContext || getSiteContext()).current;
+  const combined = Boolean(combinedRun);
   const instanceId = siteContext?.instanceId;
-  const stored = loadStoredPreferences();
-  const storedNotes = readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraNotes);
-  const storedRowPriorities = readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraRowPriorities);
-  const storedPlanningMeta = readJsonObject(WORK_WEEK_STORAGE_KEYS.planningMetaByKey);
+  const stored = combined ? getDefaultStoredPreferences() : loadStoredPreferences();
+  const storedNotes = combined ? {} : readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraNotes);
+  const storedRowPriorities = combined ? {} : readJsonObject(WORK_WEEK_STORAGE_KEYS.jiraRowPriorities);
+  const storedPlanningMeta = combined ? {} : readJsonObject(WORK_WEEK_STORAGE_KEYS.planningMetaByKey);
 
   const [jqlCount, setJqlCount] = React.useState(stored.jqlCount);
   const [jqlInputs, setJqlInputs] = React.useState(stored.jqlInputs);
@@ -251,15 +254,21 @@ export const useTaskManagerJira = () => {
   const [jqlPending, setJqlPending] = React.useState(false);
   const bgJqlRunning = useBackgroundJobRunning(BACKGROUND_JOB_IDS.WORK_WEEK_JQL);
   const jqlLoading = jqlLoadingLocal || jqlPending || bgJqlRunning;
-  const [jqlRuns, setJqlRuns] = React.useState(loadInitialJqlRuns);
+  const [jqlRuns, setJqlRuns] = React.useState(() => combined ? [combinedRun] : loadInitialJqlRuns());
   const [showRestoredJqlBanner, setShowRestoredJqlBanner] = React.useState(
-    () => loadStoredJqlRuns().length > 0
+    () => !combined && loadStoredJqlRuns().length > 0
   );
+  // Older shared-row browser fields have no Local/Team provenance. Preserve their
+  // original cache for recovery; display Local database values instead of guessing.
+  const ambiguousCache = React.useRef({
+    keys: new Set(jqlRuns.filter(run => run.sharedProgramId || stored.jqlSharedProgramIds?.[run.index]).flatMap(run => (run.issues || []).map(issue => issue.key))),
+    priorities: storedRowPriorities, planning: storedPlanningMeta,
+  }).current;
   const [jqlError, setJqlError] = React.useState("");
   const [jqlMaxResults, setJqlMaxResults] = React.useState(200);
   const [pullLatestComment, setPullLatestComment] = React.useState(stored.pullLatestComment);
   const [jiraNotes, setJiraNotes] = React.useState(storedNotes);
-  const [jiraRowPriorities, setJiraRowPriorities] = React.useState(storedRowPriorities);
+  const [jiraRowPriorities, setJiraRowPriorities] = React.useState(() => Object.fromEntries(Object.entries(storedRowPriorities).filter(([key]) => !ambiguousCache.keys.has(key))));
   const [prioritySourceByKey, setPrioritySourceByKey] = React.useState({});
   const [selectedForPush, setSelectedForPush] = React.useState({});
   const [lastPushedJiraNoteByKey, setLastPushedJiraNoteByKey] = React.useState({});
@@ -271,7 +280,7 @@ export const useTaskManagerJira = () => {
   const [mrdDrafts, setMrdDrafts] = React.useState({});
   const [startDateByKey, setStartDateByKey] = React.useState({});
   const [completeDateByKey, setCompleteDateByKey] = React.useState({});
-  const [planningMetaByKey, setPlanningMetaByKey] = React.useState(storedPlanningMeta);
+  const [planningMetaByKey, setPlanningMetaByKey] = React.useState(() => Object.fromEntries(Object.entries(storedPlanningMeta).filter(([key]) => !ambiguousCache.keys.has(key))));
   const [showPlanningPanel, setShowPlanningPanel] = React.useState(() => {
     try { return localStorage.getItem("ww_show_planning") === "true"; } catch { return false; }
   });
@@ -285,7 +294,45 @@ export const useTaskManagerJira = () => {
   const [keepNoteImagesByKey, setKeepNoteImagesByKey] = React.useState({});
   const [noteImageKeepPendingByKey, setNoteImageKeepPendingByKey] = React.useState({});
   const [assigneeRefreshNotice, flashJqlRefreshNotice] = useFlash(5000);
-  const [fieldMappingRows, setFieldMappingRows] = React.useState([]);
+  const [fieldMappingRows, setFieldMappingRows] = React.useState(combinedRun?.fieldMappings || []);
+  const [teamHealth, setTeamHealth] = React.useState(getTeamPriorityHealthSnapshot);
+  React.useEffect(() => subscribeTeamPriorityHealth(() => setTeamHealth(getTeamPriorityHealthSnapshot())), []);
+  const teamEnabled = teamHealth?.enabled === true;
+  const teamConnected = teamEnabled && teamHealth?.connected === true;
+  const [teamRowPriorities, setTeamRowPriorities] = React.useState({});
+  const [hydrationReady, setHydrationReady] = React.useState(!combined && ambiguousCache.keys.size === 0);
+  const [teamPlanningMetaByKey, setTeamPlanningMetaByKey] = React.useState({});
+  const [teamStartDateByKey, setTeamStartDateByKey] = React.useState({});
+  const [teamCompleteDateByKey, setTeamCompleteDateByKey] = React.useState({});
+  const pendingTeamFields = React.useRef({});
+  const reconcileTeam = React.useCallback((issueKey, patch) => {
+    for (const [field, value] of Object.entries(patch)) {
+      if (pendingTeamFields.current[issueKey]?.[field]) continue;
+      if (field === "priority") {
+        setTeamRowPriorities((prev) => patchIssueKeyed(prev, issueKey, value));
+        setPrioritySourceByKey((prev) => patchIssueKeyed(prev, issueKey, { source: "team-db", author: "Team" }));
+      } else if (field === "startDate" || field === "completeDate") {
+        (field === "startDate" ? setTeamStartDateByKey : setTeamCompleteDateByKey)((prev) => patchIssueKeyed(prev, issueKey, value));
+      } else {
+        setTeamPlanningMetaByKey((prev) => ({ ...prev,
+          [issueKey]: { ...prev[issueKey], [field === "followUp" ? "teamFollowUp" : field]: value } }));
+      }
+    }
+  }, []);
+  const persistTeamChange = React.useCallback(async (issueKey, patch, save) => {
+    try { assertTeamPriorityEnabled(); }
+    catch (error) { setJqlError(error.message); throw error; }
+    if (!combined) return save();
+    // Keep pending and failed fields private until their own save is confirmed.
+    const token = {};
+    const pending = pendingTeamFields.current[issueKey] ||= {};
+    for (const field of Object.keys(patch)) pending[field] = token;
+    const result = await save();
+    for (const field of Object.keys(patch)) if (pending[field] === token) delete pending[field];
+    onConfirmedTeam?.(siteContext, issueKey, patch);
+    reconcileTeam(issueKey, patch);
+    return result;
+  }, [combined, onConfirmedTeam, reconcileTeam, siteContext]);
   const [fieldMappingsLoading, setFieldMappingsLoading] = React.useState(true);
   const enrichSeqRef = React.useRef(0);
   const noteImagesRef = React.useRef({});
@@ -311,7 +358,7 @@ export const useTaskManagerJira = () => {
         return;
       }
 
-      saveKeptNoteImages({ issueKey, images: noteImagesByKey[issueKey] || [] }).catch((error) => {
+      saveKeptNoteImages({ issueKey, images: noteImagesByKey[issueKey] || [] }, { siteContext }).catch((error) => {
         setNoteImageErrorsByKey((prev) =>
           patchIssueKeyed(prev, issueKey, errorMessage(error, "Failed to keep note images."))
         );
@@ -333,8 +380,9 @@ export const useTaskManagerJira = () => {
   });
 
   React.useEffect(() => {
+    if (combined) { setFieldMappingsLoading(false); return; }
     setFieldMappingsLoading(true);
-    fetchFieldMappings()
+    fetchFieldMappings({ siteContext })
       .then((rows) => setFieldMappingRows(Array.isArray(rows) ? rows : []))
       .catch((error) => {
         console.warn("Failed to load Jira field mappings", error);
@@ -343,6 +391,7 @@ export const useTaskManagerJira = () => {
   }, []);
 
   React.useEffect(() => {
+    if (combined) return;
     const { regular } = partitionJqlRuns(jqlRuns);
     if (fieldMappingsLoading || regular.length === 0 || !runsNeedParentMrddEnrich(regular)) {
       return;
@@ -367,7 +416,7 @@ export const useTaskManagerJira = () => {
   }, [fieldMappingRows, fieldMappingsLoading, jqlRuns]);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") {
+    if (combined || typeof window === "undefined") {
       return;
     }
 
@@ -382,10 +431,10 @@ export const useTaskManagerJira = () => {
     );
     window.localStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jiraNotes, instanceId), JSON.stringify(jiraNotes));
     window.localStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.jiraRowPriorities, instanceId),
-      JSON.stringify(jiraRowPriorities)
+      JSON.stringify({ ...jiraRowPriorities, ...Object.fromEntries(Object.entries(ambiguousCache.priorities).filter(([key]) => ambiguousCache.keys.has(key))) })
     );
     window.localStorage.setItem(siteStorageKey(WORK_WEEK_STORAGE_KEYS.planningMetaByKey, instanceId),
-      JSON.stringify(planningMetaByKey)
+      JSON.stringify({ ...planningMetaByKey, ...Object.fromEntries(Object.entries(ambiguousCache.planning).filter(([key]) => ambiguousCache.keys.has(key))) })
     );
   }, [
     jqlCount,
@@ -399,6 +448,7 @@ export const useTaskManagerJira = () => {
   ]);
 
   React.useEffect(() => {
+    if (combined) return;
     setJqlRuns((prev) => {
       const { drillDown, regular } = partitionJqlRuns(prev);
       const nextRegular = regular.filter(isConfiguredJqlRun);
@@ -410,7 +460,7 @@ export const useTaskManagerJira = () => {
   }, [jqlInputs, jqlLabels]);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") {
+    if (combined || typeof window === "undefined") {
       return;
     }
 
@@ -464,7 +514,7 @@ export const useTaskManagerJira = () => {
 
   const handleSelectAll = (issues, checked) => {
     const openIssues = issues.filter(
-      (issue) => !isClosedLikeStatus(issue.fields?.status?.name || "")
+      (issue) => combined ? issue.fields?.status?.statusCategory?.key !== "done" : !isClosedLikeStatus(issue.fields?.status?.name || "")
     );
 
     setSelectedForPush((prev) => {
@@ -508,7 +558,7 @@ export const useTaskManagerJira = () => {
     }));
 
     try {
-      await pushJiraIssueNote({ issueKey, note, images });
+      await pushJiraIssueNote({ issueKey, note, images }, { siteContext });
       setJiraNotes((prev) => patchIssueKeyed(prev, issueKey, note));
       if (images.length > 0) {
         clearNoteImagesForIssue(issueKey);
@@ -536,7 +586,7 @@ export const useTaskManagerJira = () => {
   const handlePushSelected = async (issues) => {
     const toPush = issues.filter(
       (issue) =>
-        selectedForPush[issue.key] && !isClosedLikeStatus(issue.fields?.status?.name || "")
+        selectedForPush[issue.key] && (combined ? issue.fields?.status?.statusCategory?.key !== "done" : !isClosedLikeStatus(issue.fields?.status?.name || ""))
     );
     await Promise.all(toPush.map((issue) => handlePushNote(issue.key)));
   };
@@ -705,6 +755,41 @@ export const useTaskManagerJira = () => {
       });
   }, []);
 
+  React.useEffect(() => {
+    if (!combined) return;
+    let cancelled = false;
+    const issueKeys = (combinedRun.issues || []).map((issue) => issue.key);
+    const teamHealth = fetchTeamPriorityHealth({ siteContext });
+    Promise.allSettled([
+      hydrateCombinedRun({ siteContext, teamHealth, issueKeys, clampPriority, setJiraNotes, setJiraRowPriorities, setTeamRowPriorities,
+        setPrioritySourceByKey, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey,
+        hydrateNoteImages: hydrateKeptNoteImages, setTeamPlanningMetaByKey, setTeamStartDateByKey, setTeamCompleteDateByKey }),
+      enrichRunWithParentDoneDates(combinedRun, combinedRun.fieldMappings, { siteContext, propagateErrors: true }).then((enriched) => {
+        if (!cancelled) setJqlRuns((runs) => runs.map((run) => ({ ...enriched, issues: run.issues })));
+      }),
+      teamHealth,
+    ]).then((outcomes) => {
+      if (cancelled) return;
+      const failures = outcomes.filter((outcome) => outcome.status === "rejected");
+      const ready = failures.length === 0;
+      setHydrationReady(ready);
+      if (!ready) setJqlError(`Source metadata or inherited dates could not load. Editing is unavailable; refresh to retry. ${failures.map((outcome) => errorMessage(outcome.reason, "Read failed.")).join(" ")}`);
+    });
+    return () => { cancelled = true; };
+  }, [combinedRun, siteContext]);
+
+  React.useEffect(() => {
+    if (combined) return;
+    let cancelled = false;
+    const teamHealth = fetchOptionalTeamHealth(siteContext);
+    hydrateCombinedRun({ siteContext, teamHealth, issueKeys: [...ambiguousCache.keys], clampPriority,
+      setJiraNotes, setJiraRowPriorities, setPrioritySourceByKey, setStartDateByKey, setCompleteDateByKey, setPlanningMetaByKey,
+      setTeamRowPriorities, setTeamPlanningMetaByKey, setTeamStartDateByKey, setTeamCompleteDateByKey,
+    }).then(() => { if (!cancelled) setHydrationReady(true); })
+      .catch(error => { if (!cancelled) setJqlError(`Source metadata could not load. ${error.message}`); });
+    return () => { cancelled = true; };
+  }, [combined, siteContext]);
+
   const handleKeepNoteImagesToggle = async (issueKey, checked) => {
     if (checked && (noteImagesRef.current[issueKey] || []).length === 0) {
       setNoteImageErrorsByKey((prev) =>
@@ -717,9 +802,9 @@ export const useTaskManagerJira = () => {
 
     try {
       if (checked) {
-        await saveKeptNoteImages({ issueKey, images: noteImagesRef.current[issueKey] || [] });
+        await saveKeptNoteImages({ issueKey, images: noteImagesRef.current[issueKey] || [] }, { siteContext });
       } else {
-        await deleteKeptNoteImages(issueKey);
+        await deleteKeptNoteImages(issueKey, { siteContext });
       }
       setKeepNoteImagesByKey((prev) => patchIssueKeyed(prev, issueKey, checked));
       setNoteImageErrorsByKey((prev) => removeIssueKeyed(prev, issueKey));
@@ -733,13 +818,14 @@ export const useTaskManagerJira = () => {
   };
 
   const handleRowPriorityChange = (issueKey, value, options = {}) => {
+    if (!hydrationReady) return;
     const priority = clampPriority(value);
     const sharedProgramId = String(options.sharedProgramId || "").trim();
     const alreadyTeam =
-      prioritySourceByKey?.[issueKey]?.source === "team-db" ||
+      (teamEnabled && prioritySourceByKey?.[issueKey]?.source === "team-db") ||
       Boolean(options.forceTeam);
 
-    setJiraRowPriorities((prev) => patchIssueKeyed(prev, issueKey, priority));
+    (sharedProgramId || alreadyTeam ? setTeamRowPriorities : setJiraRowPriorities)((prev) => patchIssueKeyed(prev, issueKey, priority));
     if (sharedProgramId || alreadyTeam) {
       setPrioritySourceByKey((prev) =>
         patchIssueKeyed(prev, issueKey, {
@@ -747,7 +833,7 @@ export const useTaskManagerJira = () => {
           author: "Team",
         })
       );
-      saveTeamPriority({ issueKey, priority }).catch((error) => {
+      persistTeamChange(issueKey, { priority }, () => saveTeamPriority({ issueKey, priority }, { siteContext })).catch((error) => {
         console.error("Failed to persist team priority", issueKey, error);
         setJqlError(
           `Failed to save team priority for ${issueKey}: ${
@@ -759,7 +845,7 @@ export const useTaskManagerJira = () => {
     }
 
     setPrioritySourceByKey((prev) => removeIssueKeyed(prev, issueKey));
-    saveIssueMetadata({ issueKey, priority }).catch((error) => {
+    saveIssueMetadata({ issueKey, priority }, { siteContext }).catch((error) => {
       console.error("Failed to persist priority", issueKey, error);
     });
   };
@@ -813,6 +899,29 @@ export const useTaskManagerJira = () => {
     );
   };
 
+  const reconcileIssue = React.useCallback((confirmedIssue) => {
+    setJqlRuns((runs) => runs.map((run) => ({ ...run, issues: run.issues.map((issue) => {
+      if (issue.key !== confirmedIssue.key) return issue;
+      const originalAssignee = combinedRun?.issues.find((item) => item.key === issue.key)?.fields?.assignee?.accountId;
+      return { ...issue, fields: { ...issue.fields, ...confirmedIssue.fields },
+        combinedEligible: confirmedIssue.fields?.status?.statusCategory?.key !== "done" &&
+          (!originalAssignee || confirmedIssue.fields?.assignee?.accountId === originalAssignee) };
+    }) })));
+  }, [combinedRun]);
+
+  const confirmCombinedIssue = async (issueKey) => {
+    if (!combined) return;
+    try {
+      const data = await fetchJiraSearch({ jql: `key = "${issueKey}"`, maxResults: 1, siteContext });
+      const confirmed = data.issues?.find((issue) => issue.key === issueKey);
+      if (!confirmed) throw new Error("The updated issue was not returned by Jira.");
+      reconcileIssue(confirmed);
+      onConfirmedIssue?.(siteContext, confirmed);
+    } catch (error) {
+      setJqlError(`Update saved for ${issueKey}, but eligibility could not be refreshed: ${errorMessage(error, "Refresh the loaded work to check Jira.")}`);
+    }
+  };
+
   // Shared loading/success/error lifecycle for a single-row Jira field push —
   // Status, Due date, and MRD all follow this same shape; each caller supplies
   // its own pre-validation, the API call, the local issue patch, and messages.
@@ -825,6 +934,7 @@ export const useTaskManagerJira = () => {
         updateIssueInRuns(issueKey, patchIssue);
       }
       setRowUpdateMessage(issueKey, { loading: false, success: successMessage });
+      await confirmCombinedIssue(issueKey);
     } catch (error) {
       setRowUpdateMessage(issueKey, {
         loading: false,
@@ -841,7 +951,7 @@ export const useTaskManagerJira = () => {
     }
 
     await performRowFieldUpdate(issueKey, {
-      apply: () => updateJiraIssueStatus({ issueKey, targetStatus }),
+      apply: () => updateJiraIssueStatus({ issueKey, targetStatus }, { siteContext }),
       patchIssue: (issue) => ({
         ...issue,
         fields: {
@@ -862,7 +972,7 @@ export const useTaskManagerJira = () => {
     const value = String(iddDrafts[issueKey] ?? fallbackValue ?? "").trim();
 
     await performRowFieldUpdate(issueKey, {
-      apply: () => updateJiraIssueDateField({ issueKey, role: "initial_done_date", value }),
+      apply: () => updateJiraIssueDateField({ issueKey, role: "initial_done_date", value }, { siteContext }),
       patchIssue: (issue) => ({ ...issue, fields: { ...issue.fields, [iddFieldId]: value || null } }),
       successMessage: value ? `IDD set to ${value}.` : "IDD cleared.",
       errorFallback: "Failed to update IDD",
@@ -881,7 +991,7 @@ export const useTaskManagerJira = () => {
     const value = String(dueDateDrafts[issueKey] ?? fallbackValue ?? "").trim();
 
     await performRowFieldUpdate(issueKey, {
-      apply: () => updateJiraIssueDateField({ issueKey, role: "due_date", value }),
+      apply: () => updateJiraIssueDateField({ issueKey, role: "due_date", value }, { siteContext }),
       patchIssue: (issue) => ({ ...issue, fields: { ...issue.fields, duedate: value || null } }),
       successMessage: value ? `Due date set to ${value}.` : "Due date cleared.",
       errorFallback: "Failed to update Due date",
@@ -897,7 +1007,7 @@ export const useTaskManagerJira = () => {
     const value = String(mrdDrafts[issueKey] ?? fallbackValue ?? "").trim();
 
     await performRowFieldUpdate(issueKey, {
-      apply: () => updateJiraIssueDateField({ issueKey, role: "most_recent_done_date", value }),
+      apply: () => updateJiraIssueDateField({ issueKey, role: "most_recent_done_date", value }, { siteContext }),
       patchIssue: (issue) => ({ ...issue, fields: { ...issue.fields, [mrdFieldId]: value || null } }),
       successMessage: value ? `MRD set to ${value}.` : "MRD cleared.",
       errorFallback: "Failed to update MRD",
@@ -911,16 +1021,16 @@ export const useTaskManagerJira = () => {
     const trimmed = String(value || "").trim();
     const sharedProgramId = String(options.sharedProgramId || "").trim();
 
-    setStartDateByKey((prev) => patchIssueKeyed(prev, issueKey, trimmed));
+    (sharedProgramId || options.forceTeam ? setTeamStartDateByKey : setStartDateByKey)((prev) => patchIssueKeyed(prev, issueKey, trimmed));
 
-    if (sharedProgramId) {
-      saveTeamDate({ issueKey, startDate: trimmed }).catch((error) => {
+    if (sharedProgramId || options.forceTeam) {
+      persistTeamChange(issueKey, { startDate: trimmed }, () => saveTeamDate({ issueKey, startDate: trimmed }, { siteContext })).catch((error) => {
         console.error("Failed to persist team start date", issueKey, error);
       });
       return;
     }
 
-    saveIssueMetadata({ issueKey, startDate: trimmed }).catch((error) => {
+    saveIssueMetadata({ issueKey, startDate: trimmed }, { siteContext }).catch((error) => {
       console.error("Failed to persist start date", issueKey, error);
     });
   };
@@ -932,16 +1042,16 @@ export const useTaskManagerJira = () => {
     const trimmed = String(value || "").trim();
     const sharedProgramId = String(options.sharedProgramId || "").trim();
 
-    setCompleteDateByKey((prev) => patchIssueKeyed(prev, issueKey, trimmed));
+    (sharedProgramId || options.forceTeam ? setTeamCompleteDateByKey : setCompleteDateByKey)((prev) => patchIssueKeyed(prev, issueKey, trimmed));
 
-    if (sharedProgramId) {
-      saveTeamDate({ issueKey, completeDate: trimmed }).catch((error) => {
+    if (sharedProgramId || options.forceTeam) {
+      persistTeamChange(issueKey, { completeDate: trimmed }, () => saveTeamDate({ issueKey, completeDate: trimmed }, { siteContext })).catch((error) => {
         console.error("Failed to persist team complete date", issueKey, error);
       });
       return;
     }
 
-    saveIssueMetadata({ issueKey, completeDate: trimmed }).catch((error) => {
+    saveIssueMetadata({ issueKey, completeDate: trimmed }, { siteContext }).catch((error) => {
       console.error("Failed to persist complete date", issueKey, error);
     });
   };
@@ -951,17 +1061,18 @@ export const useTaskManagerJira = () => {
   const handleClearDateTracking = (issueKey, options = {}) => {
     const sharedProgramId = String(options.sharedProgramId || "").trim();
 
-    setStartDateByKey((prev) => removeIssueKeyed(prev, issueKey));
-    setCompleteDateByKey((prev) => removeIssueKeyed(prev, issueKey));
+    (sharedProgramId || options.forceTeam ? setTeamStartDateByKey : setStartDateByKey)((prev) => removeIssueKeyed(prev, issueKey));
+    (sharedProgramId || options.forceTeam ? setTeamCompleteDateByKey : setCompleteDateByKey)((prev) => removeIssueKeyed(prev, issueKey));
 
-    if (sharedProgramId) {
-      deleteTeamDate(issueKey).catch((error) => {
+    if (sharedProgramId || options.forceTeam) {
+      persistTeamChange(issueKey, { startDate: "", completeDate: "", plannedStart: "", plannedFinish: "", pmOverride: "" },
+        () => deleteTeamDate(issueKey, { siteContext })).catch((error) => {
         console.error("Failed to clear team date tracking", issueKey, error);
       });
       return;
     }
 
-    saveIssueMetadata({ issueKey, startDate: "", completeDate: "" }).catch((error) => {
+    saveIssueMetadata({ issueKey, startDate: "", completeDate: "" }, { siteContext }).catch((error) => {
       console.error("Failed to clear date tracking", issueKey, error);
     });
   };
@@ -1024,42 +1135,44 @@ export const useTaskManagerJira = () => {
   }, []);
 
   const handleSavePlanningAll = React.useCallback(async (issueKey, options = {}) => {
+    if (options.sharedProgramId || options.forceTeam) assertTeamPriorityEnabled();
+    if (!hydrationReady) return;
     const sharedProgramId = String(options.sharedProgramId || "").trim();
-    const meta = planningMetaByKey[issueKey] || {};
+    const meta = (sharedProgramId || options.forceTeam ? teamPlanningMetaByKey : planningMetaByKey)[issueKey] || {};
     const patch = {
-      followUp: (sharedProgramId ? meta.teamFollowUp : meta.followUp) ?? null,
+      followUp: (sharedProgramId || options.forceTeam ? meta.teamFollowUp : meta.followUp) ?? null,
       plannedStart: meta.plannedStart || "",
       plannedFinish: meta.plannedFinish || "",
       requestor: meta.requestor || "",
       hasOpenDecision: Boolean(meta.hasOpenDecision),
       openDecisionNote: meta.openDecisionNote || "",
       pmOverride: meta.pmOverride || "",
-      startDate: startDateByKey[issueKey] || "",
-      completeDate: completeDateByKey[issueKey] || "",
+      startDate: (sharedProgramId || options.forceTeam ? teamStartDateByKey : startDateByKey)[issueKey] || "",
+      completeDate: (sharedProgramId || options.forceTeam ? teamCompleteDateByKey : completeDateByKey)[issueKey] || "",
     };
     const { errors } = validateMetadataPatch(patch);
     if (errors.length) throw new Error(errors.join("; "));
-    if (sharedProgramId) {
-      return saveTeamDate({ issueKey, ...patch });
+    if (sharedProgramId || options.forceTeam) {
+      return persistTeamChange(issueKey, patch, () => saveTeamDate({ issueKey, ...patch }, { siteContext }));
     }
-    return saveIssueMetadata({ issueKey, ...patch });
-  }, [planningMetaByKey, startDateByKey, completeDateByKey]);
+    return saveIssueMetadata({ issueKey, ...patch }, { siteContext });
+  }, [hydrationReady, planningMetaByKey, startDateByKey, completeDateByKey, teamPlanningMetaByKey, teamStartDateByKey, teamCompleteDateByKey, persistTeamChange]);
 
   const handlePlanningFieldChange = (issueKey, field, value, options = {}) => {
     const sharedProgramId = String(options.sharedProgramId || "").trim();
     const { patch, errors } = validateMetadataPatch({ [field]: value });
     if (errors.length) { console.error("Invalid planning field", errors.join("; ")); return; }
-    const stateField = sharedProgramId && field === "followUp" ? "teamFollowUp" : field;
-    setPlanningMetaByKey((prev) => ({
+    const stateField = (sharedProgramId || options.forceTeam) && field === "followUp" ? "teamFollowUp" : field;
+    (sharedProgramId || options.forceTeam ? setTeamPlanningMetaByKey : setPlanningMetaByKey)((prev) => ({
       ...prev,
       [issueKey]: { ...(prev[issueKey] || {}), [stateField]: patch[field] },
     }));
-    if (sharedProgramId) {
-      saveTeamDate({ issueKey, ...patch }).catch((error) => {
+    if (sharedProgramId || options.forceTeam) {
+      persistTeamChange(issueKey, patch, () => saveTeamDate({ issueKey, ...patch }, { siteContext })).catch((error) => {
         console.error(`Failed to persist team ${field}`, issueKey, error);
       });
     } else {
-      saveIssueMetadata({ issueKey, ...patch }).catch((error) => {
+      saveIssueMetadata({ issueKey, ...patch }, { siteContext }).catch((error) => {
         console.error(`Failed to persist ${field}`, issueKey, error);
       });
     }
@@ -1070,7 +1183,7 @@ export const useTaskManagerJira = () => {
       ...prev,
       [issueKey]: { ...(prev[issueKey] || {}), pinnedGantt: pinned },
     }));
-    updatePinnedGantt(issueKey, pinned).catch((err) => {
+    updatePinnedGantt(issueKey, pinned, { siteContext }).catch((err) => {
       console.error("Failed to update Gantt pin for", issueKey, err);
     });
   }, []);
@@ -1094,7 +1207,7 @@ export const useTaskManagerJira = () => {
       const result = await updateJiraIssueAssignee({
         issueKey,
         assignee: unassigning ? JIRA_UNASSIGNED_ASSIGNEE : draftOrAccount,
-      });
+      }, { siteContext });
 
       if (unassigning) {
         updateIssueInRuns(issueKey, (issue) => ({
@@ -1104,6 +1217,7 @@ export const useTaskManagerJira = () => {
             assignee: null,
           },
         }));
+        await confirmCombinedIssue(issueKey);
         clearAssigneeDraftForIssue(issueKey);
         setRowUpdateMessage(issueKey, {
           loading: false,
@@ -1124,6 +1238,7 @@ export const useTaskManagerJira = () => {
             : { displayName: nextAssignee },
         },
       }));
+      await confirmCombinedIssue(issueKey);
       clearAssigneeDraftForIssue(issueKey);
       setRowUpdateMessage(issueKey, {
         loading: false,
@@ -1169,6 +1284,7 @@ export const useTaskManagerJira = () => {
           setJiraNotes,
           setJiraRowPriorities,
           setPrioritySourceByKey,
+          setTeamRowPriorities, setTeamPlanningMetaByKey, setTeamStartDateByKey, setTeamCompleteDateByKey,
           setStartDateByKey,
           setCompleteDateByKey,
           setPlanningMetaByKey,
@@ -1199,6 +1315,7 @@ export const useTaskManagerJira = () => {
           setJqlLoading: setJqlLoadingLocal,
           setJiraRowPriorities,
           setPrioritySourceByKey,
+          setTeamRowPriorities, setTeamPlanningMetaByKey, setTeamStartDateByKey, setTeamCompleteDateByKey,
           setJiraNotes,
           setStartDateByKey,
           setCompleteDateByKey,
@@ -1341,6 +1458,14 @@ export const useTaskManagerJira = () => {
   }, []);
 
   return {
+    reconcileIssue,
+    reconcileTeam,
+    teamAvailable: teamConnected && hydrationReady,
+    teamEnabled,
+    hydrationReady,
+    teamPlanningMetaByKey,
+    teamStartDateByKey,
+    teamCompleteDateByKey,
     jqlCount,
     jqlInputs,
     jqlLabels,
@@ -1353,8 +1478,8 @@ export const useTaskManagerJira = () => {
     jqlMaxResults,
     pullLatestComment,
     jiraNotes,
-    jiraRowPriorities,
-    prioritySourceByKey,
+    jiraRowPriorities: teamEnabled ? { ...jiraRowPriorities, ...teamRowPriorities } : jiraRowPriorities,
+    prioritySourceByKey: teamEnabled ? prioritySourceByKey : {},
     selectedForPush,
     lastPushedJiraNoteByKey,
     pushState,
@@ -1363,9 +1488,9 @@ export const useTaskManagerJira = () => {
     iddDrafts,
     dueDateDrafts,
     mrdDrafts,
-    startDateByKey,
-    completeDateByKey,
-    planningMetaByKey,
+    startDateByKey: teamEnabled && !combined ? { ...startDateByKey, ...teamStartDateByKey } : startDateByKey,
+    completeDateByKey: teamEnabled && !combined ? { ...completeDateByKey, ...teamCompleteDateByKey } : completeDateByKey,
+    planningMetaByKey: teamEnabled && !combined ? Object.fromEntries([...new Set([...Object.keys(planningMetaByKey), ...Object.keys(teamPlanningMetaByKey)])].map(key => [key, { ...planningMetaByKey[key], ...teamPlanningMetaByKey[key] }])) : planningMetaByKey,
     showPlanningPanel,
     expandedPlanningKey,
     collapsedRowKeys,
