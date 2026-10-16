@@ -8,7 +8,7 @@ Internal reference for code structure, data flow, scripts, and extension points.
 
 The markdown files in `docs/` are canonical for GitHub, local desktop development, and non-Cursor editors.
 
-Cursor users can optionally mirror the docs canvas from [`docs/canvases/task-manager-docs.canvas.tsx`](./canvases/task-manager-docs.canvas.tsx). See [`docs/canvases/README.md`](./canvases/README.md) for the install note. Edit this guide for long-form changes; update the canvas mirror only when pages, data model, or architecture change materially.
+The [`Cursor canvas mirror`](./canvases/task-manager-docs.canvas.tsx) is historical reference and does not describe the current Combined Work, PostgreSQL, or source-scoped storage model. Use this guide and the [user guide](./END_USER_GUIDE.md) as the current references; see [canvas status](./canvases/README.md).
 
 **PR write-ups:** Cursor agents follow [`.cursor/rules/pr-writeups.mdc`](../.cursor/rules/pr-writeups.mdc). Human process and template → [§ PR write-ups](#pr-write-ups) below.
 
@@ -18,10 +18,10 @@ Cursor users can optionally mirror the docs canvas from [`docs/canvases/task-man
 
 | Layer | Technology |
 |-------|-----------|
-| UI | React 18, Vite 8, React Router 6, Semantic UI React 2 |
+| UI | React 18, Vite 8, React Router 7, Semantic UI React 2 |
 | Desktop shell | Electron 43 (local development) |
 | Proxy / API | Express 5 (`server/`) |
-| Database | better-sqlite3 → `data/workweek.sqlite` |
+| Database | better-sqlite3 local stores per scope; optional PostgreSQL via `pg` for shared metadata |
 | AI providers | Anthropic, OpenAI, Ollama, or Rovo via `llmClient.mjs` — explicit `CHAT_PROVIDER` in `.env` |
 | CSS | Global design system in `workWeekTaskElements.css` + `dashboard.css`; `ww-` namespace prefix |
 
@@ -68,8 +68,14 @@ taskManager/
 ├── server/
 │   ├── jiraProxy.mjs         # Entry point — mounts all route modules
 │   ├── db/
-│   │   └── schema.mjs        # SQLite schema + prepared statements
+│   │   ├── schema.mjs        # Site SQLite schema + reused goals/report schemas
+│   │   ├── todoDatabase.mjs  # App-wide personal To Dos + migration ledger
+│   │   └── team/             # Explicit PostgreSQL migrations
 │   ├── lib/
+│   │   ├── savedSiteOperations.mjs # Captured saved-entry revision checks and source DB handles
+│   │   ├── jiraRouteContext.mjs # Request-local Jira helpers
+│   │   ├── combinedWorkStore.mjs # Dedicated Combined Work goals/archive store
+│   │   ├── teamPriorityPostgres.mjs # Optional Team metadata, preference, pool and data access
 │   │   ├── logger.mjs        # Structured logger (createLogger); respects LOG_LEVEL
 │   │   ├── llmClient.mjs     # Shared Anthropic / OpenAI / Ollama client
 │   │   ├── chatProviders.mjs # Chat prompts + routing (LLM or Rovo)
@@ -115,9 +121,13 @@ taskManager/
 │   └── issuePriority.test.mjs
 ├── src/
 │   ├── context/
-│   │   └── EpicFiltersContext.jsx  # Shared preset + selection state (provider + hook)
+│   │   ├── EpicFiltersContext.jsx  # Active-site preset + selection state
+│   │   └── TodosContext.jsx        # Personal To Dos outside the site-remounted subtree
 │   ├── Pages/
-│   │   ├── WorkWeekTasks.jsx       # Work Week page shell
+│   │   ├── WorkWeekTasks.jsx       # Task Management page shell
+│   │   ├── CombinedOpenWork.jsx    # Mixed Managed tasks / List views + My Metrics
+│   │   ├── combinedWorkModel.js    # Source-aware rows and deduplicated metrics
+│   │   ├── combinedWorkReports.js  # Combined report summaries and history
 │   │   ├── Dashboard/              # Dashboard feature (index.jsx, hooks, components)
 │   │   │   ├── index.jsx
 │   │   │   ├── hooks/              # useDashboardRefresh, useReportGeneration
@@ -176,6 +186,7 @@ taskManager/
 │   ├── hooks/
 │   │   └── useBackgroundJobs.js   # Subscribe / attach to backgroundJobStore
 │   └── utils/
+│       ├── siteContextStore.js    # Site/Combined browser namespaces and recovery notice
 │       ├── backgroundJobStore.js  # Module-level jobs that survive route changes
 │       ├── chatSessionContext.js  # Chat session artifacts + JQL/dashboard summaries
 │       ├── pageReportPersistence.js # On-page report/plan localStorage + clear helpers
@@ -194,12 +205,45 @@ taskManager/
 │   ├── superpowers/          # Agent design specs + implementation plans
 │   ├── canvases/             # Cursor docs-canvas mirror
 │   └── examples/             # Sample reports / prompts
-├── data/                     # workweek.sqlite (auto-created, git-ignored)
+├── data/                     # Separate local stores and note-image folders (git-ignored)
 ├── .env                      # Credentials — never commit
 └── vite.config.js
 ```
 
 ---
+
+## Local stores and request context
+
+By default, data lives in the launched checkout's `data/` directory. `TASK_MANAGER_USER_DATA` changes the root to `<value>/data`. Do not treat every SQLite file as interchangeable.
+
+| Store | Owner and contents |
+|-------|--------------------|
+| `instances-meta.sqlite` | Saved Jira registry, active entry, registry metadata, app-wide `jira_instance_meta.use_team_db` preference |
+| `workweek-<instanceId>.sqlite` | Saved entry's local notes/planning, presets/settings, metrics, ordinary reports, and other site data |
+| `workweek.sqlite` | Legacy single-site store when no registry entry is active |
+| `personal-todos.sqlite` | App-wide `todos` and `todo_migration_ledger`, independent of Jira and Team |
+| `docket-combined.sqlite` | Combined Work `app_settings`, `generated_reports`, and archive index only |
+| `note-images-<instanceId>/` / `note-images/` | Saved-entry / legacy local note images |
+
+Ordinary requests capture the active context with `X-Docket-Site` and `X-Docket-Generation`. `siteContextStore.js` and `jiraClient.js` keep site changes from publishing stale results into the next site. `EpicFiltersProvider` remounts on generation changes; `TodosProvider` remains outside that subtree.
+
+Combined editors use `{kind:"saved-site", instanceId, siteHost, baseUrl, displayName, revision}` with `X-Docket-Saved-Site` and `X-Docket-Saved-Revision`. `savedSiteOperations.mjs` validates revisions, restricts routes, leases the registry entries, and opens source-specific DB handles. `jiraRouteContext.mjs` binds Jira helpers to that source without activating it. UI row identity includes saved-entry ID and issue key; Jira writes use the real issue key. Team rows and aggregate workload counts use canonical hostname + issue key. Thus duplicate saved entries can have independent Local notes while sharing Team metadata and counting once in metrics.
+
+Combined report requests use `{kind:"combined-work"}` and only `X-Docket-Report-Scope: combined-work`. Supported settings writes are the existing personal/company goals keys; project reports and archive reads/deletes use the dedicated Combined store. Mixed active/saved/Combined headers and unsupported routes are rejected. Report generation validates captured source revisions. Ordinary goals and archives are not copied into Combined Work.
+
+Combined Open Work starts in **Managed tasks**, reusing `JiraResultsTable` and each captured source model. **List** is the compact read-only presentation. My Metrics reuses Status Report, 1:1 Prep, PWB Review, current results, and assigned history. Source metadata/date hydration gates editing; failed required reads retain counts and coverage warnings. Team reads are skipped when confirmed off or unconfigured; unknown Combined ownership remains gated. History searches are bounded to 500 issues per source search and preserve incomplete-coverage notices in reports.
+
+## Optional PostgreSQL team metadata
+
+`server/lib/teamPriorityPostgres.mjs` owns the optional pool and Team preference. `server/db/team/001-team-metadata.sql` consolidates metadata in `team_issue_metadata`, keyed by `(site_host, issue_key)`, with priority, notes, Now/Next, planning dates, requestor, decision, PM override, and pin fields. `shared_programs` and `shared_program_epics` retain source-qualified roots. `002-tracking-presence.sql` adds the presence marker used to distinguish shared tracking from priority-only rows. SQL dates cross the store boundary as `YYYY-MM-DD` strings or null. Images/local paths are not stored in Team rows.
+
+Priority 0 clears priority without deleting other metadata. Clearing date tracking preserves notes, follow-up, requestor, decision information, pin, and priority. Local and Team maps/drafts remain separate; explicit Team failures do not fall back to Local. Shared-program ownership applies only while Team is enabled. Ordinary Local hydration can succeed when optional Team health fails; Combined retains its stricter source-readiness policy.
+
+`GET`/`PUT /api/team-priority/settings` read/save `{enabled:boolean}` in the existing metadata DB; absence means off. The setting is app-wide and does not become true just because `TEAM_PRIORITY_DATABASE_URL` exists. Health returns `enabled`, `configured`, and `connected`; disabled checks do not open a connection. Disabled data operations reject with `TEAM_DATABASE_DISABLED` (HTTP 403), including explicit Team import/export. Already dispatched work is not undone. Mounted consumers in the same application receive updates; no cross-tab broadcast is provided.
+
+The UI shows **Team data not configured — set TEAM_PRIORITY_DATABASE_URL** only for a successful health response with enabled true and configured false. Failed/loading checks and configured outages use different states.
+
+Configure the server URL/optional CA, export the migration environment, run `npm run team-db:migrate`, restart the API, then select **Settings → Team data → Use team DB**. The migration CLI does not load `.env`, and startup does not run migrations. See [setup](./JIRA_SETUP.md#optional-team-database-postgresql) and [database operations/recovery](../README.md#optional-shared-team-data-postgresql). Atlas/MongoDB and MySQL documents under `docs/specs/` describe historical designs, not the runtime. Old demo JSON imports require explicit source annotation and hostname mapping; there is no automatic external database migration.
 
 ## SQLite schema
 
@@ -214,13 +258,9 @@ taskManager/
 | `updated_at` | TEXT | ISO 8601 |
 | `pinned_gantt` | INTEGER | 0/1; 1 = issue appears in Gantt Pinned Issues view |
 
-**Multi-user / shared projects (today):** `issue_metadata` is **per machine** for personal slots. Slots linked to a shared program use Atlas (`TEAM_PRIORITY_MONGODB_URI`) for priority and start date; production target is MySQL (see below).
+**Current ownership:** `issue_metadata` belongs to the selected saved entry (or legacy single-site store). The table above highlights common fields rather than listing every planning column; `server/db/schema.mjs` is the schema authority. Local priorities use `shared/issuePriority.mjs` (0–20, where 0 is unranked). Shared-program priorities and explicit Team planning use the optional PostgreSQL store described above; Jira comment text is not parsed for priority.
 
-**Planned — team priority DB:** Shared program priority in team **MySQL**. Prefer **`jiraProxy` → MySQL** when a connection is available; optional Team Priority API only if DB access cannot be granted. Epic-root scope on writes; Task Management slots **link explicitly** to a shared program for team mode — all other slots stay local-only. Priority range **1–20**. Spec → **[specs/team-priority-sync.md](./specs/team-priority-sync.md)**; DDL → **[specs/team-priority-sync-mysql.sql](./specs/team-priority-sync-mysql.sql)**.
-
-**Current priority sources:** Local SQLite (`issue_metadata`) for personal Task Management slots; Atlas team DB for slots linked to a shared program. Jira comment text is **not** parsed for priority. The priority tracker CSV import seeds local and/or Atlas. Clamp helper: `shared/issuePriority.mjs`. See [END_USER_GUIDE.md](./END_USER_GUIDE.md) § Shared projects — notes and priority.
-
-**Start date sources:** Same split as priority — local SQLite for personal slots, the team store (`team_issue_dates` Mongo collection / `team_issue_date` MySQL table, see specs above) for shared-program-linked issues. Deliberately a separate table/collection from priority: `team_issue_priority` deletes its row when priority hits 0, and a start date must survive that. **Due date** and **MRD** (Most Recent Done Date) are real Jira fields (`duedate` and the field mapped to the `most_recent_done_date` role — see Settings → field mappings) — editing them in Task Management pushes straight to Jira via `POST /api/jira/issues/:issueKey/date-field`, no local storage involved.
+**Date destinations:** Local/Team actual and planned dates are metadata. Due date and mapped MRD/IDD fields are Jira fields; editing them calls `POST /api/jira/issues/:issueKey/date-field` with the captured source context.
 
 **`epic_presets`** — saved JQL/epic presets
 
@@ -250,7 +290,7 @@ Notable snapshot fields used by the UI and Chat context:
 
 **`app_settings`** — key-value store for `epic_past_due_mode`, `proxy_url`, `chat_custom_instructions`
 
-**`reminders`** — the four header reminder slots (`slot_index` 0–3), read/written via `GET`/`PUT /api/reminders`
+**`reminders`** — legacy four-slot source records retained for recovery/compatibility; the current To Do panel uses the app-wide store
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -259,7 +299,7 @@ Notable snapshot fields used by the UI and Chat context:
 | `done` | INTEGER | 0/1 |
 | `updated_at` | TEXT | ISO 8601 |
 
-**`todos`** — to-do list (replaces the legacy reminders system)
+**`todos`** — current personal To Dos in `personal-todos.sqlite` (older site copies remain migration sources)
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -271,7 +311,7 @@ Notable snapshot fields used by the UI and Chat context:
 | `created_at` | TEXT | ISO timestamp |
 | `completed_at` | TEXT | `YYYY-MM-DD` when done, empty otherwise |
 
-Max 15 active todos. Migrates legacy `reminders` rows on first GET when table is empty.
+New items are limited to 15 active To Dos; existing migrated items are preserved. `todoDatabase.mjs` copies unambiguous source records and records them in `todo_migration_ledger`, so deleting a migrated item does not recreate it. Ambiguous lineage remains in original databases for recovery; unknown completion dates are included in All time. `TodosContext.jsx` owns the current UI/save queue across site switches.
 
 **`watched_assignees`** — saved people and custom queries for the Individual contributors tab's "Layered in" panel (not the auto-derived "From your selected projects" panel, which has no dedicated table — it's computed from epic `contributorMetrics` at read time)
 
@@ -303,7 +343,7 @@ Created automatically in `server/db/schema.mjs` on first API start. WAL mode ena
 
 ### Export / backup
 
-For **single-user backup** or handoff — not live collaboration. Shared ranking uses shared-program slots (Atlas demo / future MySQL); see END_USER_GUIDE.
+For **single-user backup** or handoff. Choose the exact store from [Local stores and request context](#local-stores-and-request-context); the example below covers only the legacy single-site database. Back up registered-site, metadata, personal To Do, and Combined stores separately, plus note-image folders. Use SQLite-aware backups while running or stop the app before file-level backup; do not copy only a live main database file and omit its WAL. Shared metadata uses your PostgreSQL backup process.
 
 ```bash
 # Full backup
@@ -384,7 +424,7 @@ Upcoming vs past-due list membership:
 
 ### Work Week Dates column (`src/utils/jiraIssueDoneDates.js`)
 
-`JiraResultsTable` stacks three date fields into one **Dates** column per row — **Due**, **MRD**, and **Start** — rather than separate columns. Due and MRD are editable `<input type="date">` fields with their own **Update** button each, pushing straight to Jira via `POST /api/jira/issues/:issueKey/date-field` (`handleDueDateUpdate` / `handleMrdUpdate` in `useTaskManagerJira.js`). Start is local-only — see [SQLite schema](#sqlite-schema) below.
+`JiraResultsTable` stacks three date fields into one **Dates** column per row — **Due**, **MRD**, and **Start** — rather than separate columns. Due and MRD are editable `<input type="date">` fields with their own **Update** button each, pushing straight to Jira via `POST /api/jira/issues/:issueKey/date-field` (`handleDueDateUpdate` / `handleMrdUpdate` in `useTaskManagerJira.js`). Actual/planned dates use the selected Local or Team destination — see [team metadata](#optional-postgresql-team-metadata).
 
 After each **Run JQL**, `enrichRunWithParentDoneDates` (in `jiraJqlRunWorkflow.js`) attaches `mrdFieldId` and `parentMostRecentDoneDateByKey` to each run. Restored runs from `localStorage` are re-enriched when field mappings finish loading (`useTaskManagerJira.js`).
 
@@ -403,7 +443,7 @@ Display logic in `getMostRecentDoneDateForIssue`:
 
 On each **Run JQL** (and **Load remaining**), when **Pull most recent Jira comment** is off, local SQLite notes merge into row Notes as before. When it is on (`pullLatestComment` in `workWeekTasksJiraPreferences`), `fetchLatestJiraCommentsBulk` overwrites Notes from Jira and skips local note merge for those keys.
 
-Priority is **not** read from comment text. Shared-program slots load priority via `fetchTeamPriorityBulk` / `applyTeamPriorityState` in `jiraJqlRunWorkflow.js`. `PriorityCell` shows a **Team** badge when `prioritySourceByKey[issueKey].source === "team-db"`.
+Priority is **not** read from comment text. When Team is enabled and ready, shared-program slots load priority via `fetchTeamPriorityBulk` / `applyTeamPriorityState` in `jiraJqlRunWorkflow.js`. `PriorityCell` shows a **Team** badge when `prioritySourceByKey[issueKey].source === "team-db"`.
 
 ### Assignee updates (Jira user search)
 
@@ -441,7 +481,7 @@ A fetch sequence guard drops stale responses when keys change quickly or all dri
 | GET | `/api/epic-presets/export` | JSON pack (`version`, `exportedAt`, `presets[]`) |
 | POST | `/api/epic-presets/import` | Body: `{ presets, mode: "merge" \| "replace" }` — fingerprint dedupes on merge |
 
-Settings UI: **Export team pack** / **Import team pack**. Align with `npm run seed:presets` for admin seeding — see [pilot-presets.md](./pilot-presets.md).
+Settings UI: **Export team pack** / **Import team pack**. Align with `npm run seed:presets` for admin seeding — see [preset setup](./JIRA_SETUP.md#5-set-up-presets-required-for-metrics--chat).
 
 ### Create Issue (`CreateIssueModal.jsx` + `jiraIssueRoutes.mjs`)
 
@@ -614,9 +654,9 @@ Each `POST /api/chat` request includes an `epicContext` object from the browser:
 
 `sessionContext` is built client-side on each send:
 
-1. **JQL queries** — summarized from `localStorage` key `workWeekTasksJiraLastJqlRuns` (label, JQL, counts, top open issues).
+1. **JQL queries** — summarized from the site-scoped `localStorage` logical key `workWeekTasksJiraLastJqlRuns` (label, JQL, counts, top open issues).
 2. **Dashboard snapshot** — refreshed via `GET /api/dashboard/metrics` on Chat load and again on each send. Summary includes separate `dueByPastDueCount` and `dueByUpcomingCount` when `dueByDate` is set.
-3. **Artifacts** — last 8 generated reports/plans from `localStorage` key `taskManagerChatSessionArtifacts`.
+3. **Artifacts** — last 8 generated reports/plans from the site-scoped `localStorage` logical key `taskManagerChatSessionArtifacts`.
 
 Artifacts are saved when the user generates:
 
@@ -651,6 +691,8 @@ Ad-hoc Chat saves use `saveAdHocReport()` → `POST /api/reports/archive` (not a
 
 ## State persistence
 
+Browser keys below are logical names. Site-scoped helpers prefix them with `docket:site:<instanceId>:` (or `docket:site:legacy:`); Combined report/job state uses `docket:combined-work:`. Unscoped legacy records are never adopted based on issue-key matches. The browser recovery banner can be dismissed via `docket:legacy-site-recovery-dismissed`; acknowledgement preserves the original values. Blocked browser storage falls back to session-only dismissal. Ambiguous old shared-row priority/planning caches also stay at their original keys while authoritative Local and available Team values hydrate separately.
+
 | Data | Mechanism | Key(s) |
 |------|-----------|--------|
 | JQL inputs, labels, count | `localStorage` | `workWeekTasksJiraPreferences` |
@@ -666,10 +708,12 @@ Ad-hoc Chat saves use `saveAdHocReport()` → `POST /api/reports/archive` (not a
 | Collapsible open/closed (including header calendar/reminders panel) | `localStorage` via `usePersistedState` | various `ww-*` / `dashboard-*` keys, e.g. `ww-today-details-open` |
 | Dashboard visible sections | `localStorage` | `dashboard-visible-sections` (`dueByUpcoming`, `dueByPastDue`, …) |
 | Issue notes + P1–P20 (persisted) | SQLite via proxy | `issue_metadata` |
-| Header reminders (4 slots, debounced save on change) | SQLite via proxy | `reminders` (`GET`/`PUT /api/reminders`) |
-| Generated reports archive | SQLite via proxy | `generated_reports` |
+| Personal To Dos / completed history | App-wide SQLite via proxy | `personal-todos.sqlite` → `todos`, migration ledger |
+| Generated reports archive | Site SQLite or dedicated Combined store | `generated_reports`; Combined scope is isolated |
+| Combined report goals | `docket-combined.sqlite` | `app_settings`, independent of selected entries |
+| Use team DB preference | `instances-meta.sqlite` | `jira_instance_meta.use_team_db`, default off |
 | Dashboard snapshot | SQLite via proxy | `dashboard_snapshots` (+ related metric tables) |
-| Packaged desktop `.env` + SQLite | OS user data folder | `TASK_MANAGER_USER_DATA` (see Packaged desktop below) |
+| Historical packaged desktop `.env` + SQLite | OS user data folder | Unsupported; see historical recovery notes below |
 | Epic preset selections (Dashboard/Chat) | `localStorage` | `epicFilterSelectedIds` |
 | Rovo OAuth tokens | SQLite via proxy | `chat_sessions` |
 
@@ -794,7 +838,10 @@ Pages that consume it — `Dashboard/index.jsx`, `Chat.jsx`, `WorkWeekTasks.jsx`
 | `npm run desktop:rebuild-native` | Rebuilds native modules for current Electron version |
 | `npm run check:jira-client-exports` | Verifies every imported `jiraClient` symbol is exported (prevents runtime blank-screen import failures) |
 | `npm test` | Unit tests: `dashboardMetrics.mjs`, `epicFilterJql.mjs`, `chatSessionPrompt.mjs`, `issuePriority.mjs`, … `pretest` rebuilds `better-sqlite3` for system Node first — without it, running the desktop app beforehand leaves the native module built for Electron's ABI and tests fail with `ERR_DLOPEN_FAILED` (an environment artifact, not a real test failure) |
-| `npm run seed:presets` | Seed shared Epic/JQL presets into local SQLite — see [pilot-presets.md](./pilot-presets.md) |
+| `npm run team-db:migrate` | Explicit PostgreSQL schema migrations using exported environment |
+| `npm run team-db:import-demo -- <annotated-json> <site-map>` | Explicit import of mapped historical demo exports |
+| `npm run test:team-db` | PostgreSQL integration tests; requires a disposable `DOCKET_TEST_DATABASE_URL` |
+| `npm run seed:presets` | Seed shared Epic/JQL presets into local SQLite — see the [preset catalog](../presets/pilot-presets.json) |
 | `npm run build` | Runs export guard (`prebuild`), then creates production Vite bundle → `dist/` |
 | `npm run desktop:build` | Alias for `npm run build`; does not create an installer |
 
@@ -815,7 +862,9 @@ npm run build
 
 # 4. Smoke test (with a real Jira test site):
 #    - Run JQL on Task Management; confirm Loaded X of Y and Load remaining when needed
-#    - Confirm shared-program slot priority loads from Atlas (Team badge); personal slot stays local
+#    - Confirm Use team DB starts off; enable a configured test DB and verify Team vs Local ownership
+#    - Combined Open Work: source edits, Managed/List, unique metrics, report goals and Combined archive
+#    - Dismiss the older-browser-data notice and verify original records remain
 #    - Generate a project report; navigate away and back while it runs
 #    - Generate a week plan
 #    - Dashboard refresh + weekly digest + Generate Report; drill-down link to Task Management (?key=, ?assignee=)
@@ -826,7 +875,7 @@ npm run build
 #    - Notes on run: Pull most recent Jira comment vs Keep local notes
 #    - Settings: export/import team preset pack
 #    - Chat: ask about a generated week plan or report (session context)
-#    - Packaged desktop: edit userData `.env`, confirm Test Jira Connection
+#    - Supported local desktop: restart after project `.env` edits, confirm Test Jira Connection
 #    - Create Issue modal: epic preset, JQL preset parent chains, manual parent key, AI Draft, Bug priority, post-create Jira link; resubmit after validation error
 ```
 
@@ -841,7 +890,7 @@ Feature and fix branches should include a short write-up under [`docs/PR_WriteUp
 | **When** | Multi-commit or reviewable change sets (features, non-trivial bug fixes). Skip for typo-only / formatting-only commits unless you want a record. |
 | **Where** | `docs/PR_WriteUps/PR_<TOPIC>.md` (`SCREAMING_SNAKE_CASE`) |
 | **Cursor** | [`.cursor/rules/pr-writeups.mdc`](../.cursor/rules/pr-writeups.mdc) (`alwaysApply`) — agents create/update the write-up when committing, pushing, or opening a PR for substantive work |
-| **Examples** | [`PR_CREATE_ISSUE_FIXES.md`](./PR_WriteUps/PR_CREATE_ISSUE_FIXES.md), [`PR_DASHBOARD_JQL_EPIC_METRICS.md`](./PR_WriteUps/PR_DASHBOARD_JQL_EPIC_METRICS.md) |
+| **Examples** | [`PR_CREATE_ISSUE_FIXES.md`](./PR_WriteUps/PR_CREATE_ISSUE_FIXES.md), [`PR_COLLECT_DUE_BY_DEDUPE.md`](./PR_WriteUps/PR_COLLECT_DUE_BY_DEDUPE.md) |
 
 ### Template
 
@@ -898,4 +947,4 @@ Packaged installers are unsupported. The former desktop packaging workflow has b
 
 More setup detail: [JIRA_SETUP.md](./JIRA_SETUP.md)
 Non-technical usage: [END_USER_GUIDE.md](./END_USER_GUIDE.md).
-App overview: [README.md](./README.md)
+App overview: [README.md](../README.md)
