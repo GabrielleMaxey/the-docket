@@ -1,6 +1,6 @@
 # Team database setting and recovery notice Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Make Team functionality explicitly optional and let users dismiss the preserved legacy-browser-data notice.
 
@@ -46,9 +46,9 @@
 - Existing client exports: add `saveTeamPrioritySettings({enabled})` and use health for reading initial preference. Sync preference changes to relevant mounted consumers using existing patterns; no general settings framework.
 - Dismiss existing notice via an exported store action, persist a dedicated acknowledgement key distinct from site data, notify existing subscribers; readSiteStorage continues to refuse ambiguous legacy fallback.
 
-- [ ] Write regressions for default off/persisted on/off, settings validation, disabled direct writes/reads including import/export, and health differentiation; run to observe expected missing-feature failures.
-- [ ] Implement minimal persistent opt-in and common store guard in existing modules. Keep CLI database migration tools usable intentionally; don't make tests silently opt in by default just to keep green. Regression fixtures may explicitly enable existing Team behavior where required.
-- [ ] Write UI/client behavior tests for toggle/warning, Local independence, stale Team state/program ownership and report/import/export gates; observe expected failures, then integrate existing consumers. No generic catch masking unknown metadata failures.
-- [ ] Write notice dismissal/preservation/reload regression, observe fail, then implement store and accessible Dismiss control.
-- [ ] Run focused changed tests, full `npm test`, `npm run build`, `git diff --check` using Node22 in this isolated checkout. Inspect scanner availability without external upload; report limitation accurately.
-- [ ] Commit focused implementation and handoff. Report reviewable result, tests, exact changed files/lines and any remaining gaps. Do not push or merge.
+- [x] Write regressions for default off/persisted on/off, settings validation, disabled direct writes/reads including import/export, and health differentiation; run to observe expected missing-feature failures.
+- [x] Implement minimal persistent opt-in and common store guard in existing modules. Keep CLI database migration tools usable intentionally; don't make tests silently opt in by default just to keep green. Regression fixtures may explicitly enable existing Team behavior where required.
+- [x] Write UI/client behavior tests for toggle/warning, Local independence, stale Team state/program ownership and report/import/export gates; observe expected failures, then integrate existing consumers. No generic catch masking unknown metadata failures.
+- [x] Write notice dismissal/preservation/reload regression, observe fail, then implement store and accessible Dismiss control.
+- [x] Run focused changed tests, full `npm test`, `npm run build`, `git diff --check` using Node22 in this isolated checkout. Inspect scanner availability without external upload; report limitation accurately.
+- [x] Commit focused implementation and handoff. Report reviewable result, tests, exact changed files/lines and any remaining gaps. Do not push or merge.

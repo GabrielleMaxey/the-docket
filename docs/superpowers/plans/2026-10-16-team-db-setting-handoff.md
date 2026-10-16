@@ -2,6 +2,14 @@
 
 Implemented the approved follow-up on `codex/team-db-setting`, based on `383d33b`. No push or merge.
 
+## Current status — 2026-10-16
+
+Complete and independently reviewed through product commit `b6ebcd9`. Both final findings are addressed; no new Critical/Important issues were identified in the fix. Final verification: **701 total, 691 passed, 0 failed, 10 existing disposable PostgreSQL skips; production build passed**. Earlier counts below are historical. No live PostgreSQL or full browser smoke was performed; Sonar upload remains blocked/unverified.
+
+Test checkout: `/Users/gabriellemaxey/.codex/worktrees/combined-managed-work/taskManager`, branch `codex/team-db-setting`. This branch includes the completed Combined Work updates. Use Node22 and your local environment configuration, then `npm run dev:all` or `npm run desktop:dev`. The isolated checkout has no copied secrets. Restart an existing development session to load the changed API. In Settings → Team data, select **Use team DB** to opt in; default is off, even when a URL is already configured. If enabled without configuration, the exact requested warning appears. The browser banner's **Dismiss** button acknowledges the warning without deleting its data.
+
+Generated review scratch is removed after the durable record is committed; the behavior, verification, final verdict and decisions are retained here.
+
 ## Behavior and interfaces
 
 - `GET /api/team-priority/settings` and `PUT /api/team-priority/settings` use the existing origin/session/site protection. PUT accepts `{enabled:boolean}` and returns that shape. Existing `jira_instance_meta.use_team_db` stores `true` or `false`; absence is off. The preference is app-wide across saved sites and survives server restart through SQLite.
@@ -131,3 +139,34 @@ Commands all selected Node22 using `PATH=/Users/gabriellemaxey/.nvm/versions/nod
 | `git diff --check` | Passed | No output |
 
 This was the single final grouped fix wave; full tests/build ran once after its code was ready. No unrelated changes, new dependencies, real services, secrets, browser smoke, Sonar retry, push, or merge. Previously documented environment limitations remain unchanged. Scoped independent review follows this commit.
+
+## Final scoped review
+
+# Final scoped Team DB setting rereview
+
+Reviewed the supplied `577c024..b6ebcd9` fix diff, the two findings in `final-review.md`, the final grouped fix appendix in `task-1-report.md`, and narrow surrounding code for those findings. No product or Git edits, subagents, test reruns, or broader Combined Work review.
+
+## Finding verdicts
+
+- **P1 — ADDRESSED.** `src/Pages/hooks/jiraJqlRunWorkflow.js:282` exports the existing optional-health reader without changing its classification. `src/Pages/hooks/useTaskManagerJira.js:784` reuses it only for ordinary restored-row hydration. Successful authoritative Local hydration followed by health 503/transport failure can now complete readiness, while unknown Team health remains unavailable. The Combined mount effect still uses raw health and retains its conservative readiness policy. HTTP 409 captured-context errors and AbortError still reject; the existing cancellation guard prevents an unmounted hydration completion from unlocking editing. The new mounted regressions at `tests/combinedManagedWork.test.mjs:746` exercise Local priority writes after 503 and recovery/off, both captured-context codes with no writes, unavailable Team access, and preserved ambiguous cache. The test at line 794 covers completion after unmount.
+- **P3 — ADDRESSED.** `tests/teamDbSetting.test.mjs:31` uses a test-scoped console mock to capture Team logger output, forwards other logger output, and asserts the exact two safe disabled-route messages alongside the existing HTTP 403 / `TEAM_DATABASE_DISABLED` response checks. The capture is restored by the test framework and does not globally suppress suite errors.
+
+## New Critical / Important issues
+
+None found in this fix diff. The two previously identified findings are resolved; this scoped rereview has no remaining blocker.
+
+## Verification boundary
+
+Reviewed regression assertions and implementation statically. The supplied handoff records 64 affected tests passing, full suite 701 tests / 691 passing / 0 failing / 10 disposable-PostgreSQL skips, production build passing, and diff whitespace checks passing. These runs were not repeated; the controller is inspecting the logs. Existing browser, real PostgreSQL, and unavailable/blocked Sonar verification limitations remain unchanged.
+
+## Files changed by this rereview
+
+- `.superpowers/sdd/2026-10-16-team-db-setting/final-rereview.md:1` — this scoped rereview report only.
+
+## Rulings I made
+
+1. Store the opt-in app-wide in existing local instances metadata, default off — matches a single optional company DB across Jira sites — if wrong, users wanting different preferences by site would need a later setting-scope migration.
+
+2. Persist notice acknowledgement in this browser without recovery/import/delete — dismisses repetitive warning while preserving ambiguous records — if wrong, users may forget older records exist; a later recovery UI can expose them.
+
+3. Retain the final review's five boundaries (no instant cross-tab UI broadcast; no undo of already dispatched Team work; unchanged conservative Combined unknown-source readiness; synthetic-only validation without real SQL/browser/Sonar certification; no legacy ownership migration or recovery UI) — these match the approved scope and preservation requirements — if wrong, users need refresh in other tabs, dispatched work may complete, uncertain Combined sources remain gated, deployment/browser/scanner gaps remain unverified, and legacy recovery requires a separate feature.
