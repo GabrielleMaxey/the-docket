@@ -67,9 +67,9 @@ export const useAttachBackgroundJob = (jobId, handlers) => {
     handlersRef.current?.onStart?.();
 
     job.promise
-      .then((result) => handlersRef.current?.onSuccess?.(result))
-      .catch((error) => handlersRef.current?.onError?.(error))
-      .finally(() => handlersRef.current?.onFinally?.());
+      .then((result) => handlersRef.current?.onSuccess?.(result, jobId))
+      .catch((error) => handlersRef.current?.onError?.(error, jobId))
+      .finally(() => handlersRef.current?.onFinally?.(jobId));
   }, [jobId]);
 
   React.useEffect(() => {

@@ -92,3 +92,13 @@ Line anchors below identify every changed feature file, including regression fix
 | `tests/savedSiteOperations.test.mjs` | 1 | Regression coverage and compatible browser/context fixtures for combined managed work. |
 | `tests/siteContextStore.test.mjs` | 6 | Regression coverage and compatible browser/context fixtures for combined managed work. |
 | `docs/superpowers/plans/2026-10-15-combined-managed-tasks-handoff.md` | 1 | Durable cross-task interfaces, exact verification limits and complete changed-file inventory. |
+
+## Task3 review fix round1 — reattached report identity
+
+Reviewed finalized `task-3-review.md` P2 against base `3f17bc9`. Reproduced generation A → unmount/remount/attach → selected source B and 1:1 options → A resolves or rejects. The hook previously invoked the latest B handler with no origin identity, so A appeared under B despite the panel's captured-ID check.
+
+`src/hooks/useBackgroundJobs.js:70` now passes the attached job ID to success/error as a second argument and to finally as its argument. Latest-handler behavior remains unchanged for ordinary callers. `src/Pages/components/ProjectReportPanel.jsx:147` compares this origin with the current report identity; direct generation uses the captured default identity. Attached errors and finalization receive the same guard. `tests/combinedWorkReportsClient.test.mjs:188` exercises actual panel/background jobs across remount/source/option changes for both success/error, verifies no B display/cache pollution and successful A caching; `:223` retains ordinary latest-callback behavior.
+
+RED command (Node22 PATH): `node --test --test-name-pattern='reattach' tests/combinedWorkReportsClient.test.mjs` →1pass/2fail, exact failures A report displayed under B and A error displayed under B (`/tmp/managed-task3-r1-red.log`). GREEN command: `node --test tests/combinedWorkReportsClient.test.mjs` →10pass/0fail/0skip (`/tmp/managed-task3-r1-green.log`). `git diff --check` passed. No fullsuite/build/browser repeated per controller; prior limitations remain. Self-review confirms optional callback arguments preserve ordinary results/latest-handler selection, with no identity/storage abstraction or new dependency. Initial narrow write approval review timed out before execution; the single explicitly permitted narrow retry succeeded.
+
+Additional changed file since2dd4081: `src/hooks/useBackgroundJobs.js:70` — optional originating job identity for attachment callbacks.

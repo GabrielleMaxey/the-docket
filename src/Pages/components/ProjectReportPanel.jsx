@@ -144,17 +144,20 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [], scope, combi
     setError("");
   }, [runKey]);
 
-  const applyReport = React.useCallback((result) => {
-    if (!result || currentJob.current !== jobId) return;
+  const applyReport = React.useCallback((result, completedJobId = jobId) => {
+    if (!result || currentJob.current !== completedJobId) return;
     setReport(result);
   }, [jobId]);
 
   useAttachBackgroundJob(jobId, {
     onSuccess: applyReport,
-    onError: (err) => {
+    onError: (err, completedJobId) => {
+      if (currentJob.current !== completedJobId) return;
       setError(err instanceof Error ? err.message : "Report generation failed");
     },
-    onFinally: () => setReportPending(false),
+    onFinally: (completedJobId) => {
+      if (currentJob.current === completedJobId) setReportPending(false);
+    },
   });
 
   const handleGenerate = () => {

@@ -184,3 +184,51 @@ test("Past Reports Combined Work panel scopes listing, detail and delete even wi
   assert.ok(calls.every(call=>call.options.headers["X-Docket-Report-Scope"] === "combined-work"));
   api.unmount();
 });
+
+for (const outcome of ["success", "error"]) test(`reattached Combined Work ${outcome} stays with its originating sources and options`, async t => {
+  install(t);
+  const api = await bundleUi('export {default as Panel} from "./src/Pages/components/ProjectReportPanel.jsx"; export * from "./src/Pages/combinedWorkReports.js"; export * from "./src/utils/pageReportPersistence.js"; export {render,unmount} from "react";');
+  let finishReport;
+  globalThis.fetch = async url => {
+    if (url.endsWith("/api/report/project")) return new Promise(resolve => { finishReport = resolve; });
+    return new Response(JSON.stringify(url.endsWith("/api/settings") ? {settings:{}} : {ready:true}));
+  };
+  const propsA = {run:{label:"Combined Work",issues:[issue()]},scope:"combined-work",combinedSites:[{...source("a"),issues:[issue()]}],jiraRowPriorities:{}};
+  let tree = api.render("original", () => api.Panel(propsA));
+  nodes(tree).find(node => node.type === "button" && textOf(node) === "Generate Report").props.onClick();
+  await turn(); assert.ok(finishReport);
+  api.unmount();
+  api.render("remounted", () => api.Panel(propsA));
+  const propsB = {...propsA,combinedSites:[{...source("b"),issues:[issue()]}]};
+  tree = api.render("remounted", () => api.Panel(propsB));
+  nodes(tree).find(node => node.type === "button" && textOf(node).startsWith("1:1 Prep")).props.onClick();
+  tree = api.render("remounted", () => api.Panel(propsB));
+  tree = api.render("remounted", () => api.Panel(propsB));
+  assert.equal(nodes(tree).find(node => node.type?.name === "ReportOutput").props.report, null);
+  finishReport(new Response(JSON.stringify(outcome === "success" ? {report:"Source A report",label:"A"} : {error:"Source A failed"}), {status:outcome === "success" ? 200 : 500}));
+  for (let i=0;i<6;i++) await turn();
+  tree = api.render("remounted", () => api.Panel(propsB));
+  assert.equal(nodes(tree).find(node => node.type?.name === "ReportOutput").props.report, null, "A completion must not display under B");
+  assert.doesNotMatch(textOf(tree), /Source A failed/, "A error must not display under B");
+  const options = {reportScope:"current",allWorkMonths:3,reportType:"one_on_one",pwbPeriod:"quarterly"};
+  assert.equal(api.loadWorkWeekProjectReport(api.combinedReportRunKey(propsB.combinedSites,options),context),null);
+  if (outcome === "success") {
+    const savedA = api.loadWorkWeekProjectReport(api.combinedReportRunKey(propsA.combinedSites,{...options,reportType:"status"}),context);
+    assert.equal(savedA.report.report,"Source A report");
+  }
+  api.unmount();
+});
+
+test("ordinary reattachment keeps latest callbacks and original result", async t => {
+  install(t);
+  const api = await bundleUi('export {useAttachBackgroundJob,runBackgroundJob} from "./src/hooks/useBackgroundJobs.js"; export {render,unmount} from "react";');
+  let finish;
+  const pending = api.runBackgroundJob("ordinary", {run:() => new Promise(resolve => {finish=resolve;})});
+  await turn();
+  const received=[];
+  api.render("ordinary", () => api.useAttachBackgroundJob("ordinary", {onSuccess:value => received.push(["old",value])}));
+  api.render("ordinary", () => api.useAttachBackgroundJob("ordinary", {onSuccess:value => received.push(["latest",value])}));
+  finish("ordinary result"); await pending; await turn();
+  assert.deepEqual(received,[["latest","ordinary result"]]);
+  api.unmount();
+});
