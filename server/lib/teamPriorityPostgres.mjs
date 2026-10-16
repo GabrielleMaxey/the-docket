@@ -9,8 +9,21 @@ const selectMetadata = Object.entries(fields).map(([field, column]) =>
   `${dateFields.includes(field) ? `to_char(${column}, 'YYYY-MM-DD')` : column} AS "${field}"`
 ).join(", ");
 let pool;
+let settingsDb;
 
 const fail = (message, status = 400, code = "TEAM_METADATA_INVALID") => Object.assign(new Error(message), { status, code });
+export const initializeTeamPrioritySettings = (metaDb) => { settingsDb = metaDb; };
+export const getTeamPrioritySettings = (metaDb = settingsDb) => ({
+  enabled: metaDb?.prepare("SELECT value FROM jira_instance_meta WHERE key = 'use_team_db'").get()?.value === "true",
+});
+export const saveTeamPrioritySettings = ({ enabled }) => {
+  if (typeof enabled !== "boolean") throw fail("enabled must be a boolean", 400);
+  settingsDb.prepare("INSERT INTO jira_instance_meta (key, value) VALUES ('use_team_db', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(String(enabled));
+  return { enabled };
+};
+export const assertTeamPriorityEnabled = (metaDb = settingsDb) => {
+  if (!getTeamPrioritySettings(metaDb).enabled) throw fail("Team database is disabled. Enable Use team DB in Settings.", 403, "TEAM_DATABASE_DISABLED");
+};
 export const isTeamPriorityConfigured = () => Boolean(String(process.env.TEAM_PRIORITY_DATABASE_URL || "").trim());
 
 export const teamPoolOptions = (env = process.env) => {
@@ -59,7 +72,7 @@ export const closeTeamPool = async () => {
 };
 
 export const teamDatabaseError = (error) => {
-  if (["TEAM_DATABASE_UNCONFIGURED", "TEAM_DATABASE_CONFIG", "TEAM_METADATA_INVALID", "TEAM_METADATA_CONFLICT", "TEAM_SCHEMA_REQUIRED", "TEAM_DATABASE_UNAVAILABLE"].includes(error?.code)) return error;
+  if (["TEAM_DATABASE_DISABLED", "TEAM_DATABASE_UNCONFIGURED", "TEAM_DATABASE_CONFIG", "TEAM_METADATA_INVALID", "TEAM_METADATA_CONFLICT", "TEAM_SCHEMA_REQUIRED", "TEAM_DATABASE_UNAVAILABLE"].includes(error?.code)) return error;
   if (error?.code === "40001" || error?.code === "40P01") return fail("Team metadata changed; refresh and review before saving", 409, "TEAM_METADATA_CONFLICT");
   if (["42P01", "42703", "3F000"].includes(error?.code)) return fail("Team schema unavailable — run npm run team-db:migrate", 503, "TEAM_SCHEMA_REQUIRED");
   if (["23514", "22007", "22008", "22P02", "22003", "23502"].includes(error?.code)) return fail("Invalid team metadata value", 400);
@@ -67,12 +80,13 @@ export const teamDatabaseError = (error) => {
 };
 
 export const getTeamStatus = async () => {
-  if (!isTeamPriorityConfigured()) return { configured: false, connected: false };
+  const { enabled } = getTeamPrioritySettings();
+  if (!enabled || !isTeamPriorityConfigured()) return { enabled, configured: isTeamPriorityConfigured(), connected: false };
   try {
     await getTeamPool().query("SELECT priority, follow_up, note, start_date, planned_finish, has_tracking FROM team_issue_metadata LIMIT 0");
     await getTeamPool().query("SELECT p.slug, e.site_host FROM shared_programs p LEFT JOIN shared_program_epics e ON e.program_slug = p.slug LIMIT 0");
-    return { configured: true, connected: true };
-  } catch (error) { return { configured: true, connected: false, error: teamDatabaseError(error).message }; }
+    return { enabled, configured: true, connected: true };
+  } catch (error) { return { enabled, configured: true, connected: false, error: teamDatabaseError(error).message }; }
 };
 
 export const normalizeTeamSiteHost = (siteHost) => {
@@ -87,6 +101,7 @@ const issueKey = (key) => {
 };
 // Both readers share one query so tracking presence and values cannot race a clear.
 const readTeamMetadata = async ({ siteHost, issueKeys }, trackingOnly = false) => {
+  assertTeamPriorityEnabled();
   const db = getTeamPool();
   const host = normalizeTeamSiteHost(siteHost);
   const keys = [...new Set((Array.isArray(issueKeys) ? issueKeys : []).map(issueKey))];
@@ -131,6 +146,7 @@ export const writeTeamMetadataEntries = async (client, { siteHost, entries, upda
 };
 
 export const writeTeamMetadata = async (input) => {
+  assertTeamPriorityEnabled();
   let client;
   try {
     client = await getTeamPool().connect();
@@ -149,6 +165,7 @@ export const bulkGetTeamPriorities = async (issueKeys, siteHost) => {
   return Object.fromEntries(Object.entries(rows).filter(([, row]) => row.priority > 0).map(([key, row]) => [key, { priority: row.priority, updatedAt: row.updatedAt, updatedBy: row.updatedBy }]));
 };
 export const listAllTeamPriorities = async (siteHost) => {
+  assertTeamPriorityEnabled();
   try {
     const { rows } = await getTeamPool().query('SELECT issue_key AS "issueKey", priority, updated_at AS "updatedAt", updated_by AS "updatedBy" FROM team_issue_metadata WHERE site_host = $1 AND priority > 0 ORDER BY issue_key', [normalizeTeamSiteHost(siteHost)]);
     return rows;
@@ -179,6 +196,7 @@ export const putTeamDate = async ({ siteHost, issueKey: key, updatedBy, ...input
   return { ok: true, deleted: false, issueKey: issueKey(key), ...patch, updatedAt: row.updatedAt, updatedBy: row.updatedBy };
 };
 export const deleteTeamDate = async ({ siteHost, issueKey: key, updatedBy }) => {
+  assertTeamPriorityEnabled();
   try {
     await getTeamPool().query(`UPDATE team_issue_metadata SET
       start_date = NULL, complete_date = NULL, planned_start = NULL, planned_finish = NULL, pm_override = '',
@@ -189,6 +207,7 @@ export const deleteTeamDate = async ({ siteHost, issueKey: key, updatedBy }) => 
   } catch (error) { throw teamDatabaseError(error); }
 };
 export const listSharedPrograms = async (siteHost) => {
+  assertTeamPriorityEnabled();
   try {
     const { rows } = await getTeamPool().query(`SELECT p.slug, p.display_name AS "displayName", p.enabled, array_agg(e.issue_key ORDER BY e.issue_key) AS "epicRoots" FROM shared_programs p JOIN shared_program_epics e ON e.program_slug = p.slug WHERE p.enabled = true AND e.site_host = $1 GROUP BY p.slug ORDER BY p.slug`, [normalizeTeamSiteHost(siteHost)]);
     return rows;

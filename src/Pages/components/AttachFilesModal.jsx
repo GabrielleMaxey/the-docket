@@ -13,7 +13,7 @@ import {
 } from "../../../shared/attachmentLimits.mjs";
 
 /** Server-configured limits (ATTACHMENT_MAX_MB), falling back to the shared defaults. */
-export const useAttachmentLimits = (enabled) => {
+export const useAttachmentLimits = (enabled, siteContext) => {
   const [limits, setLimits] = React.useState({
     maxMb: ATTACHMENT_DEFAULT_MAX_MB,
     maxCount: ATTACHMENT_MAX_COUNT,
@@ -21,7 +21,7 @@ export const useAttachmentLimits = (enabled) => {
   React.useEffect(() => {
     if (!enabled) return undefined;
     let cancelled = false;
-    fetchAttachmentLimits()
+    fetchAttachmentLimits({ siteContext })
       .then((data) => {
         if (!cancelled && data?.maxMb) {
           setLimits({ maxMb: Number(data.maxMb), maxCount: Number(data.maxCount) || ATTACHMENT_MAX_COUNT });
@@ -31,11 +31,11 @@ export const useAttachmentLimits = (enabled) => {
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, siteContext]);
   return limits;
 };
 
-const AttachFilesModal = ({ issueKey, issueSummary = "", browseUrl = "", open, onClose }) => {
+const AttachFilesModal = ({ issueKey, siteContext, issueSummary = "", browseUrl = "", open, onClose }) => {
   const [files, setFiles] = React.useState([]);
   const [existing, setExisting] = React.useState([]);
   const [loadingExisting, setLoadingExisting] = React.useState(false);
@@ -43,21 +43,21 @@ const AttachFilesModal = ({ issueKey, issueSummary = "", browseUrl = "", open, o
   const [progress, setProgress] = React.useState(null);
   const [error, setError] = React.useState("");
   const [result, setResult] = React.useState(null);
-  const limits = useAttachmentLimits(open);
+  const limits = useAttachmentLimits(open, siteContext);
 
   const loadExisting = React.useCallback(async () => {
     if (!issueKey) return;
     setLoadingExisting(true);
     setExistingError("");
     try {
-      const data = await fetchIssueAttachments(issueKey);
+      const data = await fetchIssueAttachments(issueKey, { siteContext });
       setExisting(Array.isArray(data?.attachments) ? data.attachments : []);
     } catch (loadError) {
       setExistingError(loadError instanceof Error ? loadError.message : "Could not load attachments");
     } finally {
       setLoadingExisting(false);
     }
-  }, [issueKey]);
+  }, [issueKey, siteContext]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -75,7 +75,7 @@ const AttachFilesModal = ({ issueKey, issueSummary = "", browseUrl = "", open, o
     setResult(null);
     setProgress(0);
     try {
-      const data = await uploadIssueAttachments(issueKey, files, { onProgress: setProgress });
+      const data = await uploadIssueAttachments(issueKey, files, { onProgress: setProgress, siteContext });
       setResult(data);
       // Keep only the files that failed so they can be retried or removed.
       const failedNames = new Set((data?.failed || []).map((item) => item.filename));

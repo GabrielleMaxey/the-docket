@@ -26,8 +26,10 @@ const mount = async (t, overrides = {}) => {
       export const unmount = () => cleanups.forEach(cleanup => cleanup?.());
       export default {useState,useRef,useMemo,useCallback,useEffect,createElement,createContext};
     ` }));
+    build.onResolve({ filter: /^react-router-dom$/ }, () => ({ path: "router", namespace: "router" }));
+    build.onLoad({ filter: /.*/, namespace: "router" }, () => ({ contents: 'export const Link="a";' }));
     build.onResolve({ filter: /^semantic-ui-react$/ }, () => ({ path: "semantic", namespace: "ui" }));
-    build.onLoad({ filter: /.*/, namespace: "ui" }, () => ({ contents: 'export const Button="button", Modal="modal", Icon="i", Input="input", Dropdown="select", Message="message";' }));
+    build.onLoad({ filter: /.*/, namespace: "ui" }, () => ({ contents: 'export const Button="button", Modal="modal", Icon="i", Input="input", Dropdown="select", Message="message", Checkbox="input", Form="form";' }));
   } }] });
   const app = await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString("base64")}#${bundleId++}`);
   const props = { jqlRuns: [run(0, "Preset A"), run(1, "Preset B")], isClosedLikeStatus: () => false, jiraRowPriorities: {}, ...overrides };
@@ -60,7 +62,8 @@ test("combined selection never persists a fake JQL index and preserves ordinary 
   tab(app, "Preset A").props.onClick();
   assert.equal(tab(app, "Preset A").props["aria-selected"], true);
   assert.deepEqual(selected, [0]);
-  assert.equal(find(app.render(), node => node.type?.name === "CombinedOpenWork").length, 0);
+  assert.equal(find(app.render(), node => node.type?.name === "CombinedOpenWork").length, 1, "visited combined work remains mounted across ordinary tab switches");
+  assert.equal(find(app.render(), node => node.props["data-combined-work-view"] === true)[0]?.props.hidden, true);
   assert.equal(find(app.render(), node => node.props.className === "ww-key-filter-row").length, 1);
 });
 

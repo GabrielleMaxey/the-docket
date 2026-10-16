@@ -1,3 +1,4 @@
+import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 // Core Jira endpoints: connection test and JQL search.
 
 import { getJiraSearchFields } from "../lib/jiraSearchFields.mjs";
@@ -13,8 +14,10 @@ import { listAvailableJiraFilters } from "../lib/jiraFilterList.mjs";
 
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
 
-export const registerJiraCoreRoutes = (app, { withSiteOperation = (handler) => handler, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest, getDb }) => {
+export const registerJiraCoreRoutes = (app, context) => {
+  const { withSiteOperation = (handler) => handler, jiraRequest, ensureEnvOrRespond } = context;
   app.get("/api/jira/myself", withSiteOperation(async (_req, res) => {
+    const { jiraRequest, ensureEnvOrRespond } = getRequestOperationContext(_req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -55,6 +58,7 @@ export const registerJiraCoreRoutes = (app, { withSiteOperation = (handler) => h
 
   // Resolves display names / emails for assignee updates.
   app.get("/api/jira/users/search", withSiteOperation(async (req, res) => {
+    const { jiraRequest, ensureEnvOrRespond } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -78,6 +82,7 @@ export const registerJiraCoreRoutes = (app, { withSiteOperation = (handler) => h
   // Resolves raw Atlassian account IDs (e.g. saved in Direct Reports queries
   // before a display name/email was available) back to a human-readable name.
   app.post("/api/jira/users/resolve-bulk", withSiteOperation(async (req, res) => {
+    const { jiraRequest, ensureEnvOrRespond } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -110,7 +115,8 @@ export const registerJiraCoreRoutes = (app, { withSiteOperation = (handler) => h
     }
   }));
 
-  const handleJiraSearch = async (jql, maxResults, res) => {
+  const handleJiraSearch = async (req, jql, maxResults, res) => {
+    const { ensureEnvOrRespond, runJiraSearchRequest, getDb } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -144,11 +150,12 @@ export const registerJiraCoreRoutes = (app, { withSiteOperation = (handler) => h
   app.post("/api/jira/search", withSiteOperation(async (req, res) => {
     const jql = String(req.body?.jql || "").trim();
     const maxResults = Number(req.body?.maxResults || 5);
-    return handleJiraSearch(jql, maxResults, res);
+    return handleJiraSearch(req, jql, maxResults, res);
   }));
 
   // Paginated fetch up to maxTotal (cap 5000).
   app.post("/api/jira/search/all", withSiteOperation(async (req, res) => {
+    const { ensureEnvOrRespond, runJiraSearchRequest } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
@@ -180,12 +187,13 @@ export const registerJiraCoreRoutes = (app, { withSiteOperation = (handler) => h
 
   // Kept for curl/testing convenience; POST /api/jira/search is preferred otherwise.
   app.get("/api/jira/search", withSiteOperation(async (req, res) => {
+    const { ensureEnvOrRespond } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
     }
 
     const jql = String(req.query.jql || "").trim();
     const maxResults = Number(req.query.maxResults || 10);
-    return handleJiraSearch(jql, maxResults, res);
+    return handleJiraSearch(req, jql, maxResults, res);
   }));
 };

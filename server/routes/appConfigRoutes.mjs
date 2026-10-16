@@ -1,3 +1,4 @@
+import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { createLogger } from "../lib/logger.mjs";
 const log = createLogger("config");
@@ -30,6 +31,17 @@ const PRESET_TYPES = new Set(["epic", "jql"]);
 const JQL_PRESET_KEY = "JQL";
 const REMINDER_SLOT_COUNT = 4;
 const REMINDER_TEXT_MAX_LENGTH = 500;
+
+const createSettingsStatements = ( db ) => ({
+  listSettingsStmt: db.prepare( "SELECT key, value FROM app_settings" ),
+  upsertSettingStmt: db.prepare( `
+    INSERT INTO app_settings (key, value, updated_at)
+    VALUES (@key, @value, CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET
+      value = excluded.value,
+      updated_at = CURRENT_TIMESTAMP
+  `),
+});
 
 const createStatements = ( db ) => {
   const upsertReminderStmt = db.prepare( `
@@ -79,14 +91,7 @@ const createStatements = ( db ) => {
         updated_at = CURRENT_TIMESTAMP
     `),
 
-    listSettingsStmt: db.prepare( "SELECT key, value FROM app_settings" ),
-    upsertSettingStmt: db.prepare( `
-      INSERT INTO app_settings (key, value, updated_at)
-      VALUES (@key, @value, CURRENT_TIMESTAMP)
-      ON CONFLICT(key) DO UPDATE SET
-        value = excluded.value,
-        updated_at = CURRENT_TIMESTAMP
-    `),
+    ...createSettingsStatements( db ),
 
     listRemindersStmt: db.prepare(
       "SELECT slot_index, text, done FROM reminders ORDER BY slot_index ASC"
@@ -263,7 +268,8 @@ const normalizeEpicPresetPayload = ( body, existing = null ) => {
     };
   };
 
-export const registerAppConfigRoutes = ( app, { withSiteOperation = (handler) => handler, getDb, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest } ) => {
+export const registerAppConfigRoutes = ( app, context ) => {
+  const { withSiteOperation = (handler) => handler, getDb, jiraRequest, ensureEnvOrRespond, runJiraSearchRequest } = context;
   app.get( "/api/epic-presets", withSiteOperation(( _req, res ) => {
     const items = createStatements( getDb() ).listEpicPresetsStmt.all().map( mapEpicPresetRow );
     return res.json( { items } );
@@ -666,6 +672,7 @@ export const registerAppConfigRoutes = ( app, { withSiteOperation = (handler) =>
   }) );
 
   app.get( "/api/jira/field-mappings", withSiteOperation(( _req, res ) => {
+    const { getDb } = getRequestOperationContext( _req, context );
     const items = createStatements( getDb() ).listFieldMappingsStmt.all().map( ( row ) => ( {
       role: row.role,
       fieldId: String(row.field_id || "").trim(),
@@ -790,16 +797,22 @@ export const registerAppConfigRoutes = ( app, { withSiteOperation = (handler) =>
   }) );
 
   app.get( "/api/settings", withSiteOperation(( _req, res ) => {
-    return res.json( { settings: readSettingsMap( createStatements( getDb() ) ) } );
+    const { getDb } = getRequestOperationContext( _req, context );
+    return res.json( { settings: readSettingsMap( createSettingsStatements( getDb() ) ) } );
   }) );
 
   app.put( "/api/settings", withSiteOperation(( req, res ) => {
+    const { getDb } = getRequestOperationContext( req, context );
     const settings = req.body?.settings;
     if (!settings || typeof settings !== "object") {
       return res.status(400).json({ error: "Provide settings object" });
     }
 
-    const stmts = createStatements( getDb() );
+    if (req.docketReportScope === "combined-work" && Object.keys(settings).some(key =>
+      !["work_week_report_user_goals", "work_week_report_company_goals"].includes(key))) {
+      return res.status(400).json({ error: "Combined Work settings only support report goals." });
+    }
+    const stmts = createSettingsStatements( getDb() );
     for ( const [ key, value ] of Object.entries( settings ) )
     {
       const normalizedKey = String( key ).trim();

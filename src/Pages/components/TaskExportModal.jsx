@@ -1,6 +1,6 @@
 import React from "react";
 import { Button, Message, Modal, Table } from "semantic-ui-react";
-import { downloadTaskExport, fetchJiraInstances, fetchTaskExportScopes, fetchTeamPriorityHealth, previewTaskExport } from "../../services/jiraClient.js";
+import { downloadTaskExport, getTeamPriorityHealthSnapshot, subscribeTeamPriorityHealth, fetchJiraInstances, fetchTaskExportScopes, fetchTeamPriorityHealth, previewTaskExport } from "../../services/jiraClient.js";
 import { BACKGROUND_JOB_IDS, cancelBackgroundJob, runBackgroundJob, subscribeBackgroundJobs } from "../../utils/backgroundJobStore.js";
 
 const EXPORT_JOB_KEY = `docket:site:legacy:${BACKGROUND_JOB_IDS.TASK_EXPORT}`;
@@ -22,6 +22,17 @@ const TaskExportModal = ({ open, onClose }) => {
   const [notice, setNotice] = React.useState("");
   const [jobs, setJobs] = React.useState([]);
   const requestVersion = React.useRef(0);
+  React.useEffect(() => subscribeTeamPriorityHealth(() => {
+    const health = getTeamPriorityHealthSnapshot();
+    setTeamAvailable(Boolean(health?.enabled && health?.configured && health?.connected));
+    setTeamReason(health?.enabled === false ? "Team database is off. Local export is available." : "Team is unavailable. Check Team data in Settings.");
+    if (health?.enabled === false) {
+      requestVersion.current += 1;
+      cancelBackgroundJob(EXPORT_JOB_KEY);
+      setBusy("");
+      setPreview(null);
+    }
+  }), []);
 
   const invalidatePreview = () => {
     setPreview(null);
@@ -46,7 +57,7 @@ const TaskExportModal = ({ open, onClose }) => {
     const load = async () => {
       const [registry, health] = await Promise.allSettled([fetchJiraInstances(), fetchTeamPriorityHealth()]);
       if (!current) return;
-      const available = health.status === "fulfilled" && health.value.configured && health.value.connected;
+      const available = health.status === "fulfilled" && health.value.enabled && health.value.configured && health.value.connected;
       setTeamAvailable(Boolean(available));
       setTeamReason(available ? "" : "Team is unavailable or not configured. Check Team data in Settings, then reload choices.");
       if (registry.status === "rejected") throw registry.reason;
@@ -90,7 +101,7 @@ const TaskExportModal = ({ open, onClose }) => {
     setEntries(current => current.map(entry => entry.id === id ? { ...entry, ...patch } : entry));
   };
 
-  const canPreview = selectedEntries.length > 0 && selectedEntries.every(entry => entry.scopeValues.length > 0 && entry.scopes) && pendingSaves.length === 0 && (failedSaves.length === 0 || savedConsent);
+  const canPreview = selectedEntries.length > 0 && selectedEntries.every(entry => entry.scopeValues.length > 0 && entry.scopes && (entry.source !== "team" || teamAvailable)) && pendingSaves.length === 0 && (failedSaves.length === 0 || savedConsent);
   const partial = preview?.snapshot.sites.some(site => site.status !== "complete");
   const excludedKeys = new Set(excludedRows.map(row => JSON.stringify(row)));
 

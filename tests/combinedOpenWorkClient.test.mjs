@@ -22,17 +22,24 @@ const mount = async (t, fetcher) => {
   const app = await bundle('export { default as Page } from "./src/Pages/CombinedOpenWork.jsx"; export * from "react";', [{
     name: "page-hooks",
     setup(build) {
+      build.onResolve({ filter: /^semantic-ui-react$/ }, () => ({ path: "semantic", namespace: "ui" }));
+      build.onLoad({ filter: /.*/, namespace: "ui" }, () => ({ contents: 'export const Button="button", Modal="modal", Icon="i", Input="input", Dropdown="select", Message="message", Checkbox="input", Form="form";' }));
+      build.onResolve({ filter: /^react-router-dom$/ }, () => ({ path: "router", namespace: "router" }));
+      build.onLoad({ filter: /.*/, namespace: "router" }, () => ({ contents: 'export const Link="a";' }));
       build.onResolve({ filter: /^react$/ }, () => ({ path: "react", namespace: "hooks" }));
       build.onLoad({ filter: /.*/, namespace: "hooks" }, () => ({ contents: `
         let values = [], cursor = 0, effects = [], cleanups = [], Component;
         export const useState = initial => { const i = cursor++; if (!(i in values)) values[i] = typeof initial === 'function' ? initial() : initial; return [values[i], next => { values[i] = typeof next === 'function' ? next(values[i]) : next; }]; };
         export const useRef = initial => { const [ref] = useState(() => ({current: initial})); return ref; };
         export const useEffect = (effect, deps) => { const i = cursor++; if (!values[i] || deps.some((value, index) => value !== values[i][index])) { effects.push(() => { cleanups[i]?.(); cleanups[i] = effect(); }); values[i] = deps; } };
+        export const useMemo = (fn, deps) => { const i = cursor++; if (!values[i] || deps.some((v,n) => v !== values[i].deps[n])) values[i] = {deps, value: fn()}; return values[i].value; };
+        export const useCallback = (fn, deps) => useMemo(() => fn, deps);
+        export const createContext = value => ({Provider: 'provider', value});
         export const createElement = (type, props, ...children) => ({type, props: props || {}, children});
         export const render = () => { cursor = 0; const tree = Component(); effects.splice(0).forEach(effect => effect()); return tree; };
         export const start = component => { Component = component; return render(); };
         export const unmount = () => cleanups.forEach(cleanup => cleanup?.());
-        export default {useState,useRef,useEffect,createElement};
+        export default {useState,useRef,useEffect,useMemo,useCallback,createContext,createElement};
       ` }));
     },
   }]);

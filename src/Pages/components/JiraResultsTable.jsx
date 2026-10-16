@@ -118,7 +118,13 @@ const ResultsPagerBar = ({
 };
 
 const JiraResultsTable = ({
-  jqlRuns,
+  jqlRuns = [],
+  combinedRun,
+  getIssueStateKey = (issue) => issue.key,
+  expandedPlanningKeys,
+  teamPlanningMetaByKey,
+  teamStartDateByKey,
+  teamCompleteDateByKey,
   selectedForPush,
   pushState,
   saveState,
@@ -182,6 +188,8 @@ const JiraResultsTable = ({
   initialActiveRunIndex,
   prioritySourceByKey,
   jqlSharedProgramIds,
+  teamEnabled = false,
+  hydrationReady = true,
   onLoadRemaining,
   onClearDrillDownRun,
   onClearDrillDownFilter,
@@ -213,13 +221,14 @@ const JiraResultsTable = ({
   const [sortField, setSortField] = React.useState("default");
   const [sortDirection, setSortDirection] = React.useState("asc");
   const [expandedNoteKey, setExpandedNoteKey] = React.useState(null);
+  const [planningDestinationByKey, setPlanningDestinationByKey] = React.useState({});
   const [planSaveStatus, setPlanSaveStatus] = React.useState({});
   const planSaveTimers = React.useRef({});
 
-  const triggerPlanSave = React.useCallback((issueKey, sharedProgramId) => {
+  const triggerPlanSave = React.useCallback((issueKey, sharedProgramId, forceTeam = false) => {
     setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "saving" }));
     clearTimeout(planSaveTimers.current[issueKey]);
-    handleSavePlanningAll(issueKey, { sharedProgramId })
+    handleSavePlanningAll(issueKey, { sharedProgramId, forceTeam })
       .then(() => {
         setPlanSaveStatus((prev) => ({ ...prev, [issueKey]: "saved" }));
         planSaveTimers.current[issueKey] = setTimeout(() => {
@@ -254,9 +263,9 @@ const JiraResultsTable = ({
   }, [drillDownPending]);
 
   const visibleRuns = React.useMemo(() => {
-    const configuredRuns = (jqlRuns || []).filter(isConfiguredJqlRun);
+    const configuredRuns = combinedRun ? [combinedRun] : (jqlRuns || []).filter(isConfiguredJqlRun);
     return pendingDrillDownRun ? [pendingDrillDownRun, ...configuredRuns] : configuredRuns;
-  }, [jqlRuns, pendingDrillDownRun]);
+  }, [jqlRuns, pendingDrillDownRun, combinedRun]);
 
 
   const getJqlRunsIndex = React.useCallback(
@@ -339,7 +348,9 @@ const JiraResultsTable = ({
     setPageByRunIndex((prevPages) => ({ ...prevPages, [stateKey]: 1 }));
   }, [drillDownFilters, getJqlRunsIndex, onActiveTabChange, visibleRuns]);
 
-  const showCombinedOpenWork = combinedOpenWorkActive || visibleRuns.length === 0;
+  const showCombinedOpenWork = !combinedRun && (combinedOpenWorkActive || visibleRuns.length === 0);
+  const [combinedVisited, setCombinedVisited] = React.useState(showCombinedOpenWork);
+  React.useEffect(() => { if (showCombinedOpenWork) setCombinedVisited(true); }, [showCombinedOpenWork]);
   const safeTab = Math.min(activeTab, visibleRuns.length - 1);
   const run = visibleRuns[safeTab] || {};
   const runStateKey = getRunStateKey(run, safeTab);
@@ -368,6 +379,8 @@ const JiraResultsTable = ({
     clampPriority,
     sortField,
     sortDirection,
+    getIssueStateKey,
+    useStatusCategory: Boolean(combinedRun),
   });
   const totalRows = sortedIssues.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
@@ -484,7 +497,7 @@ const JiraResultsTable = ({
   return (
     <div className="ww-results-section">
 
-      <div className="ww-jql-tab-bar">
+      {!combinedRun && <div className="ww-jql-tab-bar">
         <div className="ww-jql-tabs" role="tablist" aria-label="JQL result tabs">
           {visibleRuns.map((item, idx) => (
             <div
@@ -533,9 +546,10 @@ const JiraResultsTable = ({
             </button>
           </div>
         </div>
-      </div>
+      </div>}
 
-      {showCombinedOpenWork ? <CombinedOpenWork /> : <div className="ww-jql-result">
+      {!combinedRun && (showCombinedOpenWork || combinedVisited) && <div hidden={!showCombinedOpenWork} data-combined-work-view><CombinedOpenWork /></div>}
+      {!showCombinedOpenWork && <div className="ww-jql-result">
         <div className="ww-jql-result-header">
           <p className="ww-jql-title">{run.label}</p>
         </div>
@@ -734,7 +748,7 @@ const JiraResultsTable = ({
                   <button
                     type="button"
                     className="ww-row-expand-all-btn"
-                    onClick={() => handleExpandAllRows(sortedIssues.map((issue) => issue.key))}
+                    onClick={() => handleExpandAllRows(sortedIssues.map(getIssueStateKey))}
                     disabled={sortedIssues.length === 0}
                   >
                     Expand all
@@ -742,7 +756,7 @@ const JiraResultsTable = ({
                   <button
                     type="button"
                     className="ww-row-expand-all-btn"
-                    onClick={() => handleCollapseAllRows(sortedIssues.map((issue) => issue.key))}
+                    onClick={() => handleCollapseAllRows(sortedIssues.map(getIssueStateKey))}
                     disabled={sortedIssues.length === 0}
                   >
                     Collapse all
@@ -753,13 +767,13 @@ const JiraResultsTable = ({
                     type="checkbox"
                     checked={
                       issuesMatchingKey.filter(
-                        (issue) => !isClosedLikeStatus(issue.fields?.status?.name)
+                        (issue) => combinedRun ? issue.fields?.status?.statusCategory?.key !== "done" : !isClosedLikeStatus(issue.fields?.status?.name)
                       ).length > 0 &&
                       issuesMatchingKey
                         .filter(
-                          (issue) => !isClosedLikeStatus(issue.fields?.status?.name)
+                          (issue) => combinedRun ? issue.fields?.status?.statusCategory?.key !== "done" : !isClosedLikeStatus(issue.fields?.status?.name)
                         )
-                        .every((issue) => selectedForPush[issue.key])
+                        .every((issue) => selectedForPush[getIssueStateKey(issue)])
                     }
                     onChange={(event) =>
                       handleSelectAll(issuesMatchingKey, event.target.checked)
@@ -774,8 +788,8 @@ const JiraResultsTable = ({
                   disabled={
                     !issuesMatchingKey.some(
                       (issue) =>
-                        selectedForPush[issue.key] &&
-                        !isClosedLikeStatus(issue.fields?.status?.name)
+                        selectedForPush[getIssueStateKey(issue)] &&
+                        (combinedRun ? issue.fields?.status?.statusCategory?.key !== "done" : !isClosedLikeStatus(issue.fields?.status?.name))
                     )
                   }
                 >
@@ -787,6 +801,7 @@ const JiraResultsTable = ({
                 <thead>
                   <tr>
                     <th className="ww-th-expand" aria-hidden="true" />
+                    {combinedRun && <th>Jira site</th>}
                     <th aria-sort={getHeaderAriaSort("key")}>
                       <button
                         type="button"
@@ -819,7 +834,11 @@ const JiraResultsTable = ({
                 </thead>
                 <tbody>
                   {pagedIssues.map((issue) => {
-                    const issueKey = issue.key;
+                    const issueKey = getIssueStateKey(issue);
+                    const sourceRun = issue.sourceRun || run;
+                    const forceTeam = planningDestinationByKey[issueKey] === "team";
+                    const planningDatesStart = forceTeam ? teamStartDateByKey : startDateByKey;
+                    const planningDatesComplete = forceTeam ? teamCompleteDateByKey : completeDateByKey;
                     const issueBrowseUrl = getIssueBrowseUrl(issue);
                     const status = issue.fields?.status?.name || "-";
                     const assignee = issue.fields?.assignee?.displayName || "Unassigned";
@@ -828,7 +847,8 @@ const JiraResultsTable = ({
                     const push = pushState[issueKey] || { loading: false, error: "", success: "" };
                     const save = saveState[issueKey] || { loading: false, error: "", success: "" };
                     const rowUpdate = rowUpdateState[issueKey] || { loading: false, error: "", success: "" };
-                    const isClosedOrResolved = isClosedLikeStatus(status);
+                    const isClosedOrResolved = combinedRun ? issue.fields?.status?.statusCategory?.key === "done" : isClosedLikeStatus(status);
+                    const disableEditing = combinedRun ? issue.hydrationReady === false || (forceTeam && !issue.teamAvailable) : !hydrationReady || isClosedOrResolved;
                     const noteDraft =
                       jiraNotes[issueKey] ||
                       jiraNotes[String(issueKey || "").toUpperCase()] ||
@@ -841,20 +861,20 @@ const JiraResultsTable = ({
                     const isNoteAlreadyPushed = noteMatchesLastJiraPush(noteFingerprint, pushedNoteSnapshot);
 
                     const isExpandedRow = !collapsedRowKeys?.has?.(issueKey);
-                    const isExpandedPlanning = expandedPlanningKey === issueKey;
-                    const planningMeta = planningMetaByKey[issueKey] || {};
+                    const isExpandedPlanning = expandedPlanningKeys ? expandedPlanningKeys.has(issueKey) : expandedPlanningKey === issueKey;
+                    const planningMeta = (forceTeam ? teamPlanningMetaByKey : planningMetaByKey)?.[issueKey] || {};
                     const summary = issue.fields?.summary || "No summary";
-                    const sharedProgramId = String(
+                    const sharedProgramId = teamEnabled ? String(
                       run.sharedProgramId || jqlSharedProgramIds?.[runSlotIndex] || ""
-                    ).trim();
-                    const followUp = sharedProgramId ? planningMeta.teamFollowUp : planningMeta.followUp;
-                    const hasAnyTracking = startDateByKey[issueKey] || completeDateByKey[issueKey] ||
+                    ).trim() : "";
+                    const followUp = (sharedProgramId || forceTeam) ? planningMeta.teamFollowUp : planningMeta.followUp;
+                    const hasAnyTracking = planningDatesStart?.[issueKey] || planningDatesComplete?.[issueKey] ||
                       planningMeta.plannedStart || planningMeta.plannedFinish || planningMeta.pmOverride ||
                       planningMeta.requestor;
                     const issueLinks = parseIssueLinks(issue);
 
                     return (
-                      <React.Fragment key={issue.id}>
+                      <React.Fragment key={getIssueStateKey(issue)}>
                       {!isExpandedRow ? (
                       <tr
                         className={`${isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}${planningMeta.hasOpenDecision ? " ww-row-open-decision" : ""}${hasAnyTracking ? " ww-row-has-tracking" : ""}`}
@@ -865,20 +885,21 @@ const JiraResultsTable = ({
                             className="ww-row-expand-btn"
                             onClick={() => handleToggleRowExpand(issueKey)}
                             title="Expand row"
-                            aria-label={`Expand details for ${issueKey}`}
+                            aria-label={`Expand details for ${issue.key}`}
                             aria-expanded={false}
                           >
                             ▸
                           </button>
                         </td>
+                        {combinedRun && <td className="ww-cell-source">{issue.sourceContext.displayName}<br />{issue.sourceContext.siteHost}{issue.combinedEligible === false && <p>Saved — no longer assigned open work. Remaining drafts are kept.</p>}</td>}
                         <td className="ww-cell-key">
                           {followUp ? <span className="ww-planning-label">{FOLLOW_UP_OPTIONS.find((option) => option.value === followUp)?.label} </span> : null}
                           {issueBrowseUrl ? (
                             <a href={issueBrowseUrl} target="_blank" rel="noreferrer noopener">
-                              {issueKey}
+                              {issue.key}
                             </a>
                           ) : (
-                            issueKey
+                            issue.key
                           )}
                         </td>
                         <td>
@@ -912,7 +933,7 @@ const JiraResultsTable = ({
                               onChange={(event) =>
                                 handleStatusDraftChange(issueKey, event.target.value)
                               }
-                              disabled={isClosedOrResolved}
+                              disabled={disableEditing}
                             >
                               <option value={status}>{status}</option>
                               {statusOptions
@@ -927,7 +948,7 @@ const JiraResultsTable = ({
                               type="button"
                               className="ww-inline-action-btn"
                               onClick={() => handleStatusUpdate(issueKey, status)}
-                              disabled={rowUpdate.loading || isClosedOrResolved}
+                              disabled={rowUpdate.loading || disableEditing}
                             >
                               Update Status
                             </button>
@@ -936,7 +957,7 @@ const JiraResultsTable = ({
 
                         <PriorityCell
                           issueKey={issueKey}
-                          isClosedOrResolved={isClosedOrResolved}
+                          isClosedOrResolved={disableEditing}
                           rowPriority={rowPriority}
                           priorityClassName={getPriorityClass(rowPriority)}
                           prioritySource={prioritySourceByKey}
@@ -949,13 +970,14 @@ const JiraResultsTable = ({
                         <tr
                           className={`ww-row-detail-row ${isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}${planningMeta.hasOpenDecision ? " ww-row-open-decision" : ""}`}
                         >
-                          <td colSpan={5} className="ww-row-detail-cell">
+                          <td colSpan={combinedRun ? 6 : 5} className="ww-row-detail-cell">
                             <div className="ww-row-detail-panel">
                               <table className="ww-results-table ww-results-table--expanded-detail">
                                 <tbody>
                                   <tr
                                     className={`${isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}${hasAnyTracking ? " ww-row-has-tracking" : ""}`}
                                   >
+                                    {combinedRun && <td className="ww-cell-source">{issue.sourceContext.displayName}<br />{issue.sourceContext.siteHost}{issue.combinedEligible === false && <p>Saved — no longer assigned open work. Remaining drafts are kept.</p>}</td>}
                                     <td className="ww-cell-key">
                                       {followUp ? <span className="ww-planning-label">{FOLLOW_UP_OPTIONS.find((option) => option.value === followUp)?.label} </span> : null}
                                       <button
@@ -963,7 +985,7 @@ const JiraResultsTable = ({
                                         className="ww-row-expand-btn ww-row-expand-btn--open"
                                         onClick={() => handleToggleRowExpand(issueKey)}
                                         title="Collapse row"
-                                        aria-label={`Collapse details for ${issueKey}`}
+                                        aria-label={`Collapse details for ${issue.key}`}
                                         aria-expanded={true}
                                       >
                                         ▾
@@ -973,16 +995,16 @@ const JiraResultsTable = ({
                                         className={`ww-planning-expand-btn${isExpandedPlanning ? " ww-planning-expand-btn--open" : ""}`}
                                         onClick={() => handleTogglePlanningRow(issueKey)}
                                         title={isExpandedPlanning ? "Collapse planning" : "Expand planning"}
-                                        aria-label={`${isExpandedPlanning ? "Collapse" : "Expand"} planning for ${issueKey}`}
+                                        aria-label={`${isExpandedPlanning ? "Collapse" : "Expand"} planning for ${issue.key}`}
                                       >
                                         {isExpandedPlanning ? "Plan ▾" : "Plan ▸"}
                                       </button>
                                       {issueBrowseUrl ? (
                                         <a href={issueBrowseUrl} target="_blank" rel="noreferrer noopener">
-                                          {issueKey}
+                                          {issue.key}
                                         </a>
                                       ) : (
-                                        issueKey
+                                        issue.key
                                       )}
                                     </td>
                                     <td>
@@ -1021,7 +1043,7 @@ const JiraResultsTable = ({
                                           onChange={(event) =>
                                             handleStatusDraftChange(issueKey, event.target.value)
                                           }
-                                          disabled={isClosedOrResolved}
+                                          disabled={disableEditing}
                                         >
                                           <option value={status}>{status}</option>
                                           {statusOptions
@@ -1036,15 +1058,17 @@ const JiraResultsTable = ({
                                           type="button"
                                           className="ww-inline-action-btn"
                                           onClick={() => handleStatusUpdate(issueKey, status)}
-                                          disabled={rowUpdate.loading || isClosedOrResolved}
+                                          disabled={rowUpdate.loading || disableEditing}
                                         >
                                           Update Status
                                         </button>
                                       </div>
                                       <AssigneeCell
+                                        siteContext={issue.sourceContext}
+                                        displayIssueKey={issue.key}
                                         issueKey={issueKey}
                                         assignee={assignee}
-                                        isClosedOrResolved={isClosedOrResolved}
+                                        isClosedOrResolved={disableEditing}
                                         draftValue={assigneeDrafts[issueKey]}
                                         knownAssignees={knownAssignees}
                                         loading={rowUpdate.loading}
@@ -1056,20 +1080,20 @@ const JiraResultsTable = ({
                                     <td>{updated}</td>
                                     <td className="ww-cell-dates">
                                       {(() => {
-                                        const ownIdd = formatDateOnly(getFieldValue(issue, run.iddFieldId)) || "";
+                                        const ownIdd = formatDateOnly(getFieldValue(issue, sourceRun.iddFieldId)) || "";
                                         const inheritedIdd = getMostRecentDoneDateForIssue(
                                           issue,
-                                          run.iddFieldId,
-                                          run.parentIddByKey
+                                          sourceRun.iddFieldId,
+                                          sourceRun.parentIddByKey
                                         );
-                                        const ownMrd = formatDateOnly(getFieldValue(issue, run.mrdFieldId)) || "";
+                                        const ownMrd = formatDateOnly(getFieldValue(issue, sourceRun.mrdFieldId)) || "";
                                         const inheritedMrd = getMostRecentDoneDateForIssue(
                                           issue,
-                                          run.mrdFieldId,
-                                          run.parentMostRecentDoneDateByKey
+                                          sourceRun.mrdFieldId,
+                                          sourceRun.parentMostRecentDoneDateByKey
                                         );
                                         const ownDue =
-                                          formatDateOnly(getFieldValue(issue, run.dueFieldId || "duedate")) || "";
+                                          formatDateOnly(getFieldValue(issue, sourceRun.dueFieldId || "duedate")) || "";
                                         const issueTypeName = String(issue.fields?.issuetype?.name || "Issue").trim();
                                         const isEpic = matchesIssueTypeFamily(issueTypeName, "epic");
 
@@ -1083,14 +1107,14 @@ const JiraResultsTable = ({
                                                     type="date"
                                                     className="ww-edit-input"
                                                     value={iddDrafts[issueKey] ?? (ownIdd || inheritedIdd || "")}
-                                                    disabled={isClosedOrResolved}
+                                                    disabled={disableEditing}
                                                     onChange={(event) => handleIddDraftChange(issueKey, event.target.value)}
                                                   />
                                                   <button
                                                     type="button"
                                                     className="ww-inline-action-btn"
-                                                    onClick={() => handleIddUpdate(issueKey, ownIdd || inheritedIdd || "", run.iddFieldId)}
-                                                    disabled={rowUpdate.loading || isClosedOrResolved}
+                                                    onClick={() => handleIddUpdate(issueKey, ownIdd || inheritedIdd || "", sourceRun.iddFieldId)}
+                                                    disabled={rowUpdate.loading || disableEditing}
                                                   >
                                                     Update
                                                   </button>
@@ -1104,14 +1128,14 @@ const JiraResultsTable = ({
                                                     type="date"
                                                     className="ww-edit-input"
                                                     value={mrdDrafts[issueKey] ?? ownMrd}
-                                                    disabled={isClosedOrResolved}
+                                                    disabled={disableEditing}
                                                     onChange={(event) => handleMrdDraftChange(issueKey, event.target.value)}
                                                   />
                                                   <button
                                                     type="button"
                                                     className="ww-inline-action-btn"
-                                                    onClick={() => handleMrdUpdate(issueKey, ownMrd, run.mrdFieldId)}
-                                                    disabled={rowUpdate.loading || isClosedOrResolved}
+                                                    onClick={() => handleMrdUpdate(issueKey, ownMrd, sourceRun.mrdFieldId)}
+                                                    disabled={rowUpdate.loading || disableEditing}
                                                   >
                                                     Update
                                                   </button>
@@ -1127,14 +1151,14 @@ const JiraResultsTable = ({
                                                 type="date"
                                                 className="ww-edit-input"
                                                 value={dueDateDrafts[issueKey] ?? ownDue}
-                                                disabled={isClosedOrResolved}
+                                                disabled={disableEditing}
                                                 onChange={(event) => handleDueDateDraftChange(issueKey, event.target.value)}
                                               />
                                               <button
                                                 type="button"
                                                 className="ww-inline-action-btn"
                                                 onClick={() => handleDueDateUpdate(issueKey, ownDue)}
-                                                disabled={rowUpdate.loading || isClosedOrResolved}
+                                                disabled={rowUpdate.loading || disableEditing}
                                               >
                                                 Update
                                               </button>
@@ -1145,7 +1169,7 @@ const JiraResultsTable = ({
                                     </td>
                                     <PriorityCell
                                       issueKey={issueKey}
-                                      isClosedOrResolved={isClosedOrResolved}
+                                      isClosedOrResolved={disableEditing}
                                       rowPriority={rowPriority}
                                       priorityClassName={getPriorityClass(rowPriority)}
                                       prioritySource={prioritySourceByKey}
@@ -1154,7 +1178,7 @@ const JiraResultsTable = ({
                                       }
                                     />
                                     <td>
-                                      {isClosedOrResolved ? (
+                                      {disableEditing ? (
                                         <span>-</span>
                                       ) : (
                                         <div className="ww-note-cell-wrap">
@@ -1163,13 +1187,13 @@ const JiraResultsTable = ({
                                             className="ww-note-expand-btn"
                                             onClick={() => setExpandedNoteKey(issueKey)}
                                             title="Pop out notes to a larger editor"
-                                            aria-label={`Expand notes for ${issueKey}`}
+                                            aria-label={`Expand notes for ${issue.key}`}
                                           >
                                             ⤢
                                           </button>
                                           <NoteImagesStrip
                                             images={noteImagesByKey[issueKey]}
-                                            disabled={push.loading || isClosedOrResolved}
+                                            disabled={push.loading || disableEditing}
                                             error={noteImageErrorsByKey[issueKey]}
                                             onAddFiles={(files) => handleNoteImagesAdd(issueKey, files)}
                                             onRemove={(localId) => handleNoteImageRemove(issueKey, localId)}
@@ -1195,7 +1219,7 @@ const JiraResultsTable = ({
                                       )}
                                     </td>
                                     <td>
-                                      {isClosedOrResolved ? (
+                                      {disableEditing ? (
                                         <span>-</span>
                                       ) : (
                                         <div className="ww-push-actions">
@@ -1234,7 +1258,8 @@ const JiraResultsTable = ({
                                             title="Attach screenshots, recordings, or files to this issue in Jira"
                                             onClick={() =>
                                               setAttachTarget({
-                                                key: issueKey,
+                                                key: issue.key,
+                                                siteContext: issue.sourceContext,
                                                 summary,
                                                 browseUrl: issueBrowseUrl || "",
                                               })
@@ -1279,19 +1304,25 @@ const JiraResultsTable = ({
                       )}
                       {isExpandedRow && isExpandedPlanning ? (
                           <tr className="ww-planning-panel-row">
-                            <td colSpan={5} className="ww-planning-panel-cell">
+                            <td colSpan={combinedRun ? 6 : 5} className="ww-planning-panel-cell">
                               <div className="ww-planning-panel">
                                 <div className="ww-planning-panel-fields">
                                   <div className="ww-planning-field">
                                     <span className="ww-planning-label">Now / Next</span>
-                                    {FOLLOW_UP_OPTIONS.map((option) => (
+                                    {combinedRun && <label>Planning destination
+                                    <select disabled={issue.hydrationReady === false} aria-label={`Planning destination for ${issue.key} on ${issue.sourceContext.displayName}`} value={forceTeam ? "team" : "local"}
+                                      onChange={(event) => setPlanningDestinationByKey((prev) => ({ ...prev, [issueKey]: event.target.value }))}>
+                                      <option value="local">Local</option><option value="team" disabled={!issue.teamAvailable}>Team database</option>
+                                    </select>
+                                  </label>}
+                                  {FOLLOW_UP_OPTIONS.map((option) => (
                                       <label key={option.value}>
                                         <input
                                           type="checkbox"
-                                          aria-label={`${option.label} for ${issueKey}`}
+                                          aria-label={`${option.label} for ${issue.key}`}
                                           checked={followUp === option.value}
-                                          disabled={isClosedOrResolved}
-                                          onChange={(e) => handlePlanningFieldChange(issueKey, "followUp", e.target.checked ? option.value : null, { sharedProgramId })}
+                                          disabled={disableEditing}
+                                          onChange={(e) => handlePlanningFieldChange(issueKey, "followUp", e.target.checked ? option.value : null, { sharedProgramId, forceTeam })}
                                         />
                                         {option.label}
                                       </label>
@@ -1302,9 +1333,9 @@ const JiraResultsTable = ({
                                     <input
                                       type="checkbox"
                                       checked={Boolean(planningMeta.hasOpenDecision)}
-                                      disabled={isClosedOrResolved}
+                                      disabled={disableEditing}
                                       onChange={(e) =>
-                                        handlePlanningFieldChange(issueKey, "hasOpenDecision", e.target.checked, { sharedProgramId })
+                                        handlePlanningFieldChange(issueKey, "hasOpenDecision", e.target.checked, { sharedProgramId, forceTeam })
                                       }
                                     />
                                   </label>
@@ -1315,10 +1346,10 @@ const JiraResultsTable = ({
                                         className="ww-edit-input ww-planning-decision-note"
                                         rows={3}
                                         value={planningMeta.openDecisionNote || ""}
-                                        disabled={isClosedOrResolved}
+                                        disabled={disableEditing}
                                         placeholder="Describe the open decision…"
                                         onChange={(e) =>
-                                          handlePlanningFieldChange(issueKey, "openDecisionNote", e.target.value, { sharedProgramId })
+                                          handlePlanningFieldChange(issueKey, "openDecisionNote", e.target.value, { sharedProgramId, forceTeam })
                                         }
                                       />
                                     </label>
@@ -1330,9 +1361,9 @@ const JiraResultsTable = ({
                                       type="date"
                                       className="ww-edit-input"
                                       value={planningMeta.plannedStart || ""}
-                                      disabled={isClosedOrResolved}
+                                      disabled={disableEditing}
                                       onChange={(e) =>
-                                        handlePlanningFieldChange(issueKey, "plannedStart", e.target.value, { sharedProgramId })
+                                        handlePlanningFieldChange(issueKey, "plannedStart", e.target.value, { sharedProgramId, forceTeam })
                                       }
                                     />
                                   </label>
@@ -1342,9 +1373,9 @@ const JiraResultsTable = ({
                                     <input
                                       type="date"
                                       className="ww-edit-input"
-                                      value={startDateByKey[issueKey] || ""}
-                                      disabled={isClosedOrResolved}
-                                      onChange={(e) => handleStartDateChange(issueKey, e.target.value, { sharedProgramId })}
+                                      value={planningDatesStart?.[issueKey] || ""}
+                                      disabled={disableEditing}
+                                      onChange={(e) => handleStartDateChange(issueKey, e.target.value, { sharedProgramId, forceTeam })}
                                     />
                                   </label>
 
@@ -1354,9 +1385,9 @@ const JiraResultsTable = ({
                                       type="date"
                                       className="ww-edit-input"
                                       value={planningMeta.plannedFinish || ""}
-                                      disabled={isClosedOrResolved}
+                                      disabled={disableEditing}
                                       onChange={(e) =>
-                                        handlePlanningFieldChange(issueKey, "plannedFinish", e.target.value, { sharedProgramId })
+                                        handlePlanningFieldChange(issueKey, "plannedFinish", e.target.value, { sharedProgramId, forceTeam })
                                       }
                                     />
                                   </label>
@@ -1366,9 +1397,9 @@ const JiraResultsTable = ({
                                     <input
                                       type="date"
                                       className="ww-edit-input"
-                                      value={completeDateByKey[issueKey] || ""}
-                                      disabled={isClosedOrResolved}
-                                      onChange={(e) => handleCompleteDateChange(issueKey, e.target.value, { sharedProgramId })}
+                                      value={planningDatesComplete?.[issueKey] || ""}
+                                      disabled={disableEditing}
+                                      onChange={(e) => handleCompleteDateChange(issueKey, e.target.value, { sharedProgramId, forceTeam })}
                                     />
                                   </label>
 
@@ -1378,10 +1409,10 @@ const JiraResultsTable = ({
                                       type="text"
                                       className="ww-edit-input"
                                       value={planningMeta.requestor || ""}
-                                      disabled={isClosedOrResolved}
+                                      disabled={disableEditing}
                                       placeholder="Name, team, or role…"
                                       onChange={(e) =>
-                                        handlePlanningFieldChange(issueKey, "requestor", e.target.value, { sharedProgramId })
+                                        handlePlanningFieldChange(issueKey, "requestor", e.target.value, { sharedProgramId, forceTeam })
                                       }
                                     />
                                   </label>
@@ -1394,22 +1425,23 @@ const JiraResultsTable = ({
                                   </div>
 
                                   <label className="ww-planning-field">
-                                    <span className="ww-planning-label" title="Include this issue in the Pinned Issues view on the Gantt chart">Pin to Gantt</span>
+                                    <span className="ww-planning-label" title="Include this issue in the Pinned Issues view on the Gantt chart">{combinedRun ? "Pin to Gantt (local)" : "Pin to Gantt"}</span>
                                     <input
                                       type="checkbox"
-                                      checked={Boolean(planningMeta.pinnedGantt)}
+                                      disabled={Boolean(combinedRun) && disableEditing}
+                                      checked={Boolean(planningMetaByKey[issueKey]?.pinnedGantt)}
                                       onChange={(e) => handlePinnedGanttChange && handlePinnedGanttChange(issueKey, e.target.checked)}
                                     />
                                   </label>
 
-                                  {(startDateByKey[issueKey] || completeDateByKey[issueKey]) ? (
+                                  {(planningDatesStart?.[issueKey] || planningDatesComplete?.[issueKey]) ? (
                                     <button
                                       type="button"
                                       className="ww-date-clear-btn"
-                                      disabled={isClosedOrResolved}
+                                      disabled={disableEditing}
                                       onClick={() => {
-                                        if (window.confirm(`Clear start/complete date tracking for ${issueKey}?`)) {
-                                          handleClearDateTracking(issueKey, { sharedProgramId });
+                                        if (window.confirm(`Clear start/complete date tracking for ${issue.key}?`)) {
+                                          handleClearDateTracking(issueKey, { sharedProgramId, forceTeam });
                                         }
                                       }}
                                     >
@@ -1422,8 +1454,8 @@ const JiraResultsTable = ({
                                   <button
                                     type="button"
                                     className="ww-planning-save-btn"
-                                    disabled={planSaveStatus[issueKey] === "saving"}
-                                    onClick={() => triggerPlanSave(issueKey, sharedProgramId)}
+                                    disabled={(Boolean(combinedRun) && disableEditing) || planSaveStatus[issueKey] === "saving"}
+                                    onClick={() => triggerPlanSave(issueKey, sharedProgramId, forceTeam)}
                                   >
                                     {planSaveStatus[issueKey] === "saving" ? "Saving…" : "Save to database"}
                                   </button>
@@ -1451,7 +1483,7 @@ const JiraResultsTable = ({
 
             {expandedNoteKey
               ? (() => {
-                  const noteIssue = pagedIssues.find((issue) => issue.key === expandedNoteKey);
+                  const noteIssue = allLoadedIssues.find((issue) => getIssueStateKey(issue) === expandedNoteKey);
                   if (!noteIssue) {
                     return null;
                   }
@@ -1471,7 +1503,7 @@ const JiraResultsTable = ({
                       closeIcon
                     >
                       <Modal.Header>
-                        {expandedNoteKey}
+                        {noteIssue.key}
                         <span className="ww-note-modal-summary">
                           {noteIssue.fields?.summary || ""}
                         </span>
@@ -1488,7 +1520,7 @@ const JiraResultsTable = ({
                           value={modalNoteDraft}
                           onChange={(next) => handleNoteChange(expandedNoteKey, next)}
                           placeholder="Add notes here"
-                          disabled={modalClosedOrResolved}
+                          disabled={modalClosedOrResolved && !combinedRun}
                         />
                       </Modal.Content>
                       <Modal.Actions>
@@ -1516,6 +1548,8 @@ const JiraResultsTable = ({
       </div>}
       <AttachFilesModal
         open={Boolean(attachTarget)}
+        key={attachTarget ? combinedRun ? JSON.stringify([attachTarget.siteContext?.instanceId, attachTarget.key]) : attachTarget.key : "attachments"}
+        siteContext={attachTarget?.siteContext}
         issueKey={attachTarget?.key || ""}
         issueSummary={attachTarget?.summary || ""}
         browseUrl={attachTarget?.browseUrl || ""}

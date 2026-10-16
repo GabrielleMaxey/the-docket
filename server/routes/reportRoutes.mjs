@@ -1,3 +1,4 @@
+import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 // Dashboard AI reports from the latest stored snapshot + configured LLM.
 
 import {
@@ -480,12 +481,13 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
 
   // ─── Per-project report (WorkWeek task manager) ───────────────────────────
   app.post("/api/report/project", withSiteOperation(async (req, res) => {
-    const db = getDb();
+    const db = getRequestOperationContext(req, { getDb }).getDb();
+    const combined = req.docketReportScope === "combined-work";
     const label = String(req.body?.label || "Project").trim();
     const jql = String(req.body?.jql || "").trim();
     const summary = req.body?.summary || {};
     const customInstructions = String(
-      createStatements(db).getCustomInstructionsStmt.get()?.value || ""
+      db.prepare("SELECT value FROM app_settings WHERE key = 'chat_custom_instructions'").get()?.value || ""
     ).trim();
     const rawReportType = String(req.body?.reportType || "").trim();
     const careerReportType = isValidCareerReportType(rawReportType) ? rawReportType : null;
@@ -527,7 +529,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
         .map((issue) => issue.key)
         .filter(Boolean);
       const staleStatusKeys = new Set();
-      if (backlogKeys.length > 0) {
+      if (!combined && backlogKeys.length > 0) {
         try {
           const fourteenDaysAgo = new Date();
           fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
@@ -562,9 +564,17 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       }
     }
 
+    if (combined) {
+      contextLines.push("", "### Saved source details (entry-local notes and planning are separate; totals deduplicate hostname/issue key)",
+        JSON.stringify(summary.sources || []), "### Coverage notices", JSON.stringify(summary.notices || []));
+    }
+
     let systemPromptBase;
     let archiveReportType = "work_week_project_report";
-    const archiveMeta = { summary, jql: jql || undefined };
+    const archiveMeta = { summary, jql: jql || undefined, ...(combined ? {
+      scope: "combined-work", selectedEntries: req.docketCombinedEntries,
+      reportQueryScope: req.body?.reportQueryScope, coverage: summary.notices || [], timestamp: new Date().toISOString(),
+    } : {}) };
     if (careerReportType === CAREER_REPORT_TYPES.ONE_ON_ONE) {
       systemPromptBase = buildOneOnOneSystemPrompt({ label, userGoals, companyGoals });
       archiveReportType = "work_week_one_on_one";
@@ -776,7 +786,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
     const limit = Math.min(200, Math.max(1, Number(req.query?.limit) || 100));
 
     try {
-      const items = listGeneratedReports(getDb(), { source, limit });
+      const items = listGeneratedReports(getRequestOperationContext(req, { getDb }).getDb(), { source, limit });
       return res.json({ items });
     } catch (error) {
       log.error("archive list failed", error instanceof Error ? error.message : error);
@@ -864,7 +874,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
     }
 
     try {
-      const item = getGeneratedReportById(getDb(), id);
+      const item = getGeneratedReportById(getRequestOperationContext(req, { getDb }).getDb(), id);
       if (!item) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -885,7 +895,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
     }
 
     try {
-      const deleted = deleteGeneratedReportById(getDb(), id);
+      const deleted = deleteGeneratedReportById(getRequestOperationContext(req, { getDb }).getDb(), id);
       if (!deleted) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -909,7 +919,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
     }
 
     try {
-      const deletedCount = deleteGeneratedReportsBySource(getDb(), { source });
+      const deletedCount = deleteGeneratedReportsBySource(getRequestOperationContext(req, { getDb }).getDb(), { source });
       return res.json({ ok: true, deletedCount });
     } catch (error) {
       log.error("archive bulk delete failed", error instanceof Error ? error.message : error);

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { enableTeamDatabase } from "./teamSettingsFixture.mjs";
 import { test } from "node:test";
 import fs from "node:fs";
 import os from "node:os";
@@ -17,6 +18,7 @@ const fixture = (t, overrides = {}) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "task-export-"));
   const metaDb = new Database(":memory:");
   instances.initInstancesSchema(metaDb);
+  if (overrides.teamEnabled) metaDb.prepare("INSERT INTO jira_instance_meta (key,value) VALUES ('use_team_db','true')").run();
   const saved = ["A", "B", "Unselected"].map(displayName => instances.createInstance(metaDb, { displayName, baseUrl: "https://lumen.atlassian.net", email: `${displayName}@example.test` }));
   for (const [i, item] of saved.entries()) {
     const db = new Database(instances.appDbPathForInstance(dataDir, item.id));
@@ -63,7 +65,7 @@ test("two saved entries keep same host and keys separate; active site does not c
 });
 
 test("Team metadata controls filters and explicit team/local notes without substitution", async t => {
-  const f = fixture(t);
+  const f = fixture(t, { teamEnabled: true });
   const snapshot = await f.service.collectTaskExport({ sites: [selected(f.saved[0].id, "team", { priorities: [9], followUp: "next" })] });
   const row = snapshot.sites[0].rows[0];
   assert.equal(row.priority, 9);
@@ -76,7 +78,7 @@ test("Team metadata controls filters and explicit team/local notes without subst
 });
 
 test("team failure does not use local fallback", async t => {
-  const f = fixture(t, { team: async () => { throw new Error("secret connection detail"); } });
+  const f = fixture(t, { teamEnabled: true, team: async () => { throw new Error("secret connection detail"); } });
   const { sites: [site] } = await f.service.collectTaskExport({ sites: [selected(f.saved[0].id, "team")] });
   assert.equal(site.status, "failed");
   assert.deepEqual(site.rows, []);
@@ -86,7 +88,7 @@ test("team failure does not use local fallback", async t => {
 });
 
 test("Team supplemental local notes unavailable is partial; Local metadata unavailable fails without migration", async t => {
-  const f = fixture(t);
+  const f = fixture(t, { teamEnabled: true });
   const dbPath = instances.appDbPathForInstance(f.dataDir, f.saved[0].id);
   fs.unlinkSync(dbPath);
   const team = await f.service.collectTaskExport({ sites: [selected(f.saved[0].id, "team")] });
@@ -275,7 +277,7 @@ test("contradictory comment ordering is unavailable and oversized text remains e
 });
 
 test("missing Team preset store fails explicitly and old Local schema is never modified", async t => {
-  const f = fixture(t);
+  const f = fixture(t, { teamEnabled: true });
   const filename = instances.appDbPathForInstance(f.dataDir, f.saved[0].id);
   fs.unlinkSync(filename);
   const oldDb = new Database(filename);
@@ -294,7 +296,7 @@ test("missing Team preset store fails explicitly and old Local schema is never m
 
 test("missing selected Team values stay unset and changes after capture cannot mutate stored snapshot", async t => {
   const team = { "ABC-1": { priority: 0, note: "", followUp: null } };
-  const f = fixture(t, { team: async () => team });
+  const f = fixture(t, { teamEnabled: true, team: async () => team });
   const preview = await f.service.createPreview({ sites: [selected(f.saved[0].id, "team")] });
   team["ABC-1"].note = "later changed";
   const row = f.service.getPreview(preview.previewId).snapshot.sites[0].rows[0];
@@ -303,7 +305,7 @@ test("missing selected Team values stay unset and changes after capture cannot m
 });
 
 test("deadline during Team read retains selected Team rows but does no later local/comment requests", async t => {
-  const f = fixture(t, { env: { DOCKET_EXPORT_TIMEOUT_MS: "10" }, team: async () => {
+  const f = fixture(t, { teamEnabled: true, env: { DOCKET_EXPORT_TIMEOUT_MS: "10" }, team: async () => {
     await new Promise(resolve => setTimeout(resolve, 30));
     return { "ABC-1": { priority: 7, note: "captured team" } };
   } });
@@ -373,8 +375,9 @@ test("real PostgreSQL Team export retains full selected fields, separate local n
   });
   const { migrateTeamDatabase } = await import("../scripts/migrate-team-db.mjs");
   await migrateTeamDatabase(pool);
+  store.initializeTeamPrioritySettings(enableTeamDatabase(t));
   await store.writeTeamMetadata({ siteHost: "lumen.atlassian.net", entries: [{ issueKey: "E1EXPORT-1", patch: { priority: 6, followUp: "next", note: "real Team note", requestor: "Requester", plannedStart: "2026-10-15", plannedFinish: "2026-10-16", openDecisionNote: "Decision" } }] });
-  const f = fixture(t, { service: { getTeamMetadata: store.getTeamMetadata }, request: async o => o.pathWithQuery.includes("/comment") ? { ok: true, data: { startAt: 0, total: 0, comments: [] } } : { ok: true, data: { issues: [issue("E1EXPORT-1")], isLast: true } } });
+  const f = fixture(t, { teamEnabled: true, service: { getTeamMetadata: store.getTeamMetadata }, request: async o => o.pathWithQuery.includes("/comment") ? { ok: true, data: { startAt: 0, total: 0, comments: [] } } : { ok: true, data: { issues: [issue("E1EXPORT-1")], isLast: true } } });
   const preview = await f.service.createPreview({ sites: [selected(f.saved[0].id, "team")] });
   await store.writeTeamMetadata({ siteHost: "lumen.atlassian.net", entries: [{ issueKey: "E1EXPORT-1", patch: { note: "after preview" } }] });
   const row = f.service.getPreview(preview.previewId).snapshot.sites[0].rows[0];
@@ -386,7 +389,7 @@ test("real PostgreSQL Team export retains full selected fields, separate local n
 
 test("deadline during search fails provisional site before selected metadata without dropping earlier approved rows", async t => {
   let searches = 0;
-  const f = fixture(t, { env: { DOCKET_EXPORT_TIMEOUT_MS: "30" }, request: async o => {
+  const f = fixture(t, { teamEnabled: true, env: { DOCKET_EXPORT_TIMEOUT_MS: "30" }, request: async o => {
     if (o.pathWithQuery.includes("/comment")) return { ok: true, data: { startAt: 0, total: 0, comments: [] } };
     searches += 1;
     if (searches === 1) return { ok: true, data: { issues: [issue()], isLast: true } };
@@ -547,7 +550,7 @@ test("client workbook download returns binary bytes, keeps snapshot identity and
 test("real export routes require a fresh preview for source changes, enforce consent and reject forged exclusions and expired IDs", async t => {
   const { registerTaskExportRoutes } = await import("../server/routes/taskExportRoutes.mjs");
   let now = Date.now();
-  const f = fixture(t, { service: { now: () => now }, request: async o => o.pathWithQuery.includes("/comment") ? { ok: false, status: 403 } : { ok: true, data: { issues: [issue()], isLast: true } } });
+  const f = fixture(t, { teamEnabled: true, service: { now: () => now }, request: async o => o.pathWithQuery.includes("/comment") ? { ok: false, status: 403 } : { ok: true, data: { issues: [issue()], isLast: true } } });
   const app = express(); app.use(express.json());
   registerTaskExportRoutes(app, { taskExportService: f.service });
   const server = await new Promise(resolve => { const listener = app.listen(0, "127.0.0.1", () => resolve(listener)); });
@@ -564,4 +567,17 @@ test("real export routes require a fresh preview for source changes, enforce con
   assert.equal((await post("download", { previewId: preview.previewId, allowPartial: true })).status, 200);
   now += 15 * 60 * 1000 + 1;
   assert.equal((await post("download", { previewId: preview.previewId, allowPartial: true })).status, 409);
+});
+
+
+test("disabled Team rejects an explicit export and a retained Team preview while Local export stays usable", async t => {
+  const f = fixture(t);
+  await assert.rejects(f.service.createPreview({ sites: [selected(f.saved[0].id, "team")] }), error => error.code === "TEAM_DATABASE_DISABLED");
+  assert.equal(f.teamCalls.length, 0);
+  f.metaDb.prepare("INSERT INTO jira_instance_meta (key,value) VALUES ('use_team_db','true')").run();
+  const team = await f.service.createPreview({ sites: [selected(f.saved[0].id, "team")] });
+  f.metaDb.prepare("UPDATE jira_instance_meta SET value = 'false' WHERE key = 'use_team_db'").run();
+  assert.throws(() => f.service.getPreview(team.previewId), error => error.code === "TEAM_DATABASE_DISABLED");
+  const local = await f.service.createPreview({ sites: [selected(f.saved[0].id)] });
+  assert.equal(f.service.getPreview(local.previewId).snapshot.sites[0].rows[0].priority, 1);
 });

@@ -1,3 +1,5 @@
+import { getSavedSiteContext, openSavedSiteDatabase } from "./savedSiteOperations.mjs";
+import { getJiraSearchFields } from "./jiraSearchFields.mjs";
 import { beginInstanceOperations, getInstanceCredentials, listInstances, MAX_JIRA_INSTANCES } from "./jiraInstances.mjs";
 import { searchAllIssues } from "./jiraSearchHelpers.mjs";
 import { requestJira as sendJiraRequest } from "./jiraTransport.mjs";
@@ -27,7 +29,7 @@ const projectRows = (issues, origin) => {
   return rows;
 };
 
-export const collectCombinedOpenWork = async ({ metaDb, instanceIds, env = process.env, requestJira = sendJiraRequest, signal: callerSignal }) => {
+export const collectCombinedOpenWork = async ({ metaDb, dataDir, instanceIds, env = process.env, requestJira = sendJiraRequest, signal: callerSignal }) => {
   const saved = listInstances(metaDb);
   if (!Array.isArray(instanceIds) || !instanceIds.length || instanceIds.length > MAX_JIRA_INSTANCES || new Set(instanceIds).size !== instanceIds.length || instanceIds.some(id => typeof id !== "string" || !id.trim() || !saved.some(site => site.id === id && site.enabled))) {
     throw Object.assign(new TypeError("Choose one to five unique enabled saved Jira entries."), { status: 400 });
@@ -48,11 +50,22 @@ export const collectCombinedOpenWork = async ({ metaDb, instanceIds, env = proce
     const settled = await Promise.allSettled(instanceIds.map(async instanceId => {
       const entry = saved.find(site => site.id === instanceId);
       const site = { instanceId, displayName: entry.displayName, siteHost: "", status: "failed", rows: [], loaded: 0 };
+      let db;
       let failureMessage = "Jira search unavailable. Retry this selection.";
       try {
         failureMessage = "Check this saved entry's approved HTTPS Jira URL in Settings.";
         const credentials = Object.freeze({ ...getInstanceCredentials(metaDb, instanceId, env) });
         site.siteHost = new URL(credentials.baseUrl).hostname;
+        // Callers without persistent storage retain the compact list-only contract.
+        let fields = ["summary", "status", "priority", "duedate"];
+        if (dataDir) {
+          site.sourceContext = getSavedSiteContext(metaDb, instanceId, env);
+          site.issues = [];
+          db = openSavedSiteDatabase(dataDir, instanceId);
+          site.fieldMappings = db.prepare("SELECT role, field_id, field_name, updated_at FROM jira_field_mappings").all()
+            .map(row => ({ role: row.role, fieldId: row.field_id.trim(), fieldName: row.field_name.trim(), updatedAt: row.updated_at }));
+          fields = [...new Set([...getJiraSearchFields(db), "priority"])];
+        }
         failureMessage = "Set this saved entry's email in Settings and configure the server Jira token.";
         if (!credentials.email || !credentials.apiToken) return { ...site, message: failureMessage };
         failureMessage = "Jira search unavailable. Check the connection and retry this selection.";
@@ -62,7 +75,7 @@ export const collectCombinedOpenWork = async ({ metaDb, instanceIds, env = proce
           signal,
           runJiraSearchRequest: async (jql, paging) => {
             checkDeadline();
-            const result = await requestJira({ credentials, signal, timeoutMs: env.JIRA_REQUEST_TIMEOUT_MS, method: "POST", pathWithQuery: "/rest/api/3/search/jql", body: { jql, ...paging, fields: ["summary", "status", "priority", "duedate"] } });
+            const result = await requestJira({ credentials, signal, timeoutMs: env.JIRA_REQUEST_TIMEOUT_MS, method: "POST", pathWithQuery: "/rest/api/3/search/jql", body: { jql, ...paging, fields } });
             checkDeadline();
             if (!result?.ok) {
               if ([401, 403].includes(result?.status)) failureMessage = "Jira access denied. Check this saved entry's account and server token.";
@@ -75,6 +88,11 @@ export const collectCombinedOpenWork = async ({ metaDb, instanceIds, env = proce
         });
         site.rows = projectRows(search.issues, credentials.baseUrl);
         site.loaded = site.rows.length;
+        if (dataDir) {
+          const unique = new Map();
+          for (const issue of search.issues) if (!unique.has(issue.key)) unique.set(issue.key, issue);
+          site.issues = [...unique.values()];
+        }
         if (!deadline.signal.aborted && performance.now() >= deadlineAt) deadline.abort(new DOMException("Collection deadline reached", "TimeoutError"));
         site.status = search.isComplete && !signal.aborted ? "complete" : "partial";
         if (site.status === "partial") {
@@ -85,9 +103,12 @@ export const collectCombinedOpenWork = async ({ metaDb, instanceIds, env = proce
       } catch {
         // Upstream errors can contain credentials or personal data; return only local messages.
         site.rows = [];
+        if (dataDir) site.issues = [];
         site.loaded = 0;
         site.message = deadline.signal.aborted ? "Collection deadline reached; this list is incomplete. Refresh to retry." : failureMessage;
         if (deadline.signal.aborted) site.status = "partial";
+      } finally {
+        db?.close();
       }
       return site;
     }));
