@@ -2,6 +2,7 @@ import React from "react";
 import { Button, Message } from "semantic-ui-react";
 import {
   fetchSharedPrograms,
+  saveTeamPrioritySettings,
   fetchTeamPriorityHealth,
   pullTeamPrioritiesToLocal,
   seedTeamPriorityPrograms,
@@ -17,9 +18,10 @@ const TeamPriorityDemoSection = () => {
   const [message, setMessage] = React.useState("");
 
   const loadStatus = React.useCallback(async () => {
+    setHealth(null);
     const nextHealth = await fetchTeamPriorityHealth();
     setHealth(nextHealth);
-    if (nextHealth?.configured && nextHealth?.connected) {
+    if (nextHealth?.enabled && nextHealth?.configured && nextHealth?.connected) {
       setPrograms(await fetchSharedPrograms());
     } else {
       setPrograms([]);
@@ -44,12 +46,9 @@ const TeamPriorityDemoSection = () => {
   }, [loadStatus]);
 
   const statusLine = (() => {
-    if (busy === "refresh" && !health) {
-      return "Checking…";
-    }
-    if (!health?.configured) {
-      return "Not configured — set TEAM_PRIORITY_DATABASE_URL in .env and restart the API.";
-    }
+    if (!health) return error ? "Team status unavailable. Retry Refresh status." : "Checking…";
+    if (!health.enabled) return "Team database is off. Local saving is available.";
+    if (health.configured === false) return "Team data not configured — set TEAM_PRIORITY_DATABASE_URL";
     if (health.connected) {
       return "Connected to the team database.";
     }
@@ -63,6 +62,14 @@ const TeamPriorityDemoSection = () => {
       title="Team data"
       description="Shared priorities and planning for Work Week slots linked to a program."
     >
+      <label><input type="checkbox" checked={health?.enabled === true} disabled={isBusy || !health} onChange={(event) => {
+        const enabled = event.target.checked;
+        return runAction("settings", async () => {
+          await saveTeamPrioritySettings({ enabled });
+          setHealth(previous => ({ ...previous, enabled, connected: false }));
+          await loadStatus();
+        });
+      }} /> Use team DB</label>
       <p style={{ marginTop: 0, color: "#475569", fontSize: "0.9rem" }}>
         {statusLine} Link a Work Week slot to a shared program — priority changes push to the team database
         immediately. Use <strong>Import team priorities</strong> above with target{" "}
@@ -92,7 +99,7 @@ const TeamPriorityDemoSection = () => {
             })
           }
           loading={busy === "seed"}
-          disabled={isBusy || !health?.configured}
+          disabled={isBusy || !health?.enabled || !health?.connected}
         >
           Refresh programs
         </Button>
@@ -108,7 +115,7 @@ const TeamPriorityDemoSection = () => {
             })
           }
           loading={busy === "sync"}
-          disabled={isBusy || !health?.connected}
+          disabled={isBusy || !health?.enabled || !health?.connected}
         >
           Save local priorities to team
         </Button>
@@ -124,7 +131,7 @@ const TeamPriorityDemoSection = () => {
             })
           }
           loading={busy === "pull"}
-          disabled={isBusy || !health?.connected}
+          disabled={isBusy || !health?.enabled || !health?.connected}
         >
           Pull from the team database
         </Button>

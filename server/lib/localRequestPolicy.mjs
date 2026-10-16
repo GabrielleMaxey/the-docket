@@ -32,7 +32,7 @@ export function localRequestPolicy({ apiPort, allowedOrigins }) {
       }
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, X-Docket-Site, X-Docket-Generation");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, X-Docket-Site, X-Docket-Generation, X-Docket-Saved-Site, X-Docket-Saved-Revision, X-Docket-Report-Scope");
       res.setHeader("Vary", "Origin");
     }
     if (req.method === "OPTIONS") return res.sendStatus(204);

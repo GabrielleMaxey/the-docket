@@ -3,7 +3,7 @@ import { test } from "node:test";
 import * as store from "../src/utils/siteContextStore.js";
 import * as jobs from "../src/utils/backgroundJobStore.js";
 
-globalThis.window = { setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms); timer.unref(); return timer; }, clearTimeout };
+globalThis.window = { dispatchEvent: () => true, setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms); timer.unref(); return timer; }, clearTimeout };
 
 test("identical keys in two sites remain isolated and captured identity stays stable", () => {
   store.setSiteContext({ instanceId: "a", generation: "1" });
@@ -211,4 +211,37 @@ test("deferred drill-down state updaters persist only to their captured site", a
     assert.match(values.get("docket:site:original:workWeekTasksJiraLastJqlRuns"), /Private original run/, name);
     assert.equal(values.has("docket:site:new:workWeekTasksJiraLastJqlRuns"), false, name);
   }
+});
+
+
+test("dismissing the recovery notice persists without claiming or removing legacy data", async () => {
+  const values = new Map([["old-notes", "private legacy notes"]]);
+  const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  const first = await import(`../src/utils/siteContextStore.js?notice=first`);
+  first.readSiteStorage(storage, "old-notes", "a");
+  assert.match(first.getSiteRecoveryNotice(), /preserved/);
+  assert.equal(typeof first.dismissSiteRecoveryNotice, "function");
+  first.dismissSiteRecoveryNotice(storage);
+  assert.equal(first.getSiteRecoveryNotice(), "");
+  const reloaded = await import(`../src/utils/siteContextStore.js?notice=reloaded`);
+  assert.equal(reloaded.readSiteStorage(storage, "old-notes", "b"), null);
+  assert.equal(reloaded.getSiteRecoveryNotice(), "");
+  assert.equal(values.get("old-notes"), "private legacy notes");
+  assert.equal(values.has("docket:site:b:old-notes"), false);
+  const blocked = await import(`../src/utils/siteContextStore.js?notice=blocked`);
+  blocked.readSiteStorage(storage, "other", "a");
+  blocked.dismissSiteRecoveryNotice({ setItem: () => { throw new DOMException("Blocked", "SecurityError"); } });
+  assert.equal(blocked.getSiteRecoveryNotice(), "");
+});
+
+
+test("notice can be dismissed for the session when accessing browser storage is blocked", async () => {
+  const original = globalThis.window;
+  const fresh = await import("../src/utils/siteContextStore.js?notice=getter-blocked");
+  fresh.readSiteStorage({ getItem: key => key === "old" ? "preserved" : null }, "old", "a");
+  globalThis.window = { get localStorage() { throw new DOMException("Blocked", "SecurityError"); } };
+  try {
+    assert.doesNotThrow(() => fresh.dismissSiteRecoveryNotice());
+    assert.equal(fresh.getSiteRecoveryNotice(), "");
+  } finally { globalThis.window = original; }
 });

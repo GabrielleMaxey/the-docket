@@ -284,3 +284,11 @@ The combined table shows the saved site label and hostname, issue link, title, s
 `POST /api/combined-open-work` accepts only `{instanceIds: string[]}` with one to five unique enabled saved-entry IDs. It uses the configured account email and server token per saved entry and returns no credentials or assignee details. The response is not cached. Entries being collected cannot be edited/deleted until all their requests settle.
 
 Server settings `DOCKET_OPEN_WORK_MAX_ROWS_PER_SITE` (default/cap 5000) and `DOCKET_OPEN_WORK_TIMEOUT_MS` (default 120000 ms, cap 600000 ms) bound this view. Settings accept positive integers; invalid values use the default and larger values are capped. Reaching row, collection-deadline, or pagination bounds marks returned rows partial. The existing Jira request timeout still applies independently.
+
+### Combined Work reports
+
+Combined Open Work opens in Managed tasks mode: one editable table with a Jira site column, expanded My Metrics, and an optional List view. Selected saved entries contribute unfinished work assigned to their configured accounts. Duplicate hostname/issue-key pairs count once in workload totals; each saved entry retains its own notes and local planning. Local and Team planning destinations remain separate.
+
+My Metrics includes current-results and assigned-work-history reports, Status, 1:1 Prep and PWB controls. History uses each captured saved source, with a 500-issue bound per search and visible incomplete-coverage notices. Jira/date/metadata failures do not erase known issue counts. Reports retain source labels and missing-coverage notices.
+
+Combined Work has one shared set of report goals, independent of selected entries, and its own **Past Reports → Combined Work** archive. These live in `docket-combined.sqlite` under the application's data directory. Ordinary site goals and archives are not copied or migrated. Report generation uses the existing AI provider configuration. Combined browser report/job state uses `docket:combined-work:` keys; source edits retain their captured saved-entry revision and never activate another site.

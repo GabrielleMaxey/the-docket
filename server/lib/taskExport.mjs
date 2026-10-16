@@ -6,7 +6,7 @@ import { searchAllIssues } from "./jiraSearchHelpers.mjs";
 import { getJiraSearchFields } from "./jiraSearchFields.mjs";
 import { resolvePresetJql, buildUnionScopeFromJqls } from "./epicFilterJql.mjs";
 import { getLocalMetadata } from "./issueMetadataStore.mjs";
-import { getTeamMetadata as readTeamMetadata } from "./teamPriorityPostgres.mjs";
+import { assertTeamPriorityEnabled, getTeamMetadata as readTeamMetadata } from "./teamPriorityPostgres.mjs";
 import { METADATA_COLUMNS } from "../../shared/issueMetadataFields.mjs";
 import { adfToPlainText } from "./jiraCommentText.mjs";
 
@@ -92,6 +92,7 @@ export const createTaskExportService = ({ metaDb, dataDir, env = process.env, re
   };
   const collectTaskExport = async ({ signal: userSignal, ...input }) => {
     const options = validateInput(input);
+    if (options.sites.some(site => site.source === "team")) assertTeamPriorityEnabled(metaDb);
     userSignal?.throwIfAborted();
     const lease = beginInstanceOperations(metaDb, options.sites.map(site => site.instanceId));
     const deadline = new AbortController();
@@ -157,6 +158,7 @@ export const createTaskExportService = ({ metaDb, dataDir, env = process.env, re
           if (stopped()) { site.message = `${deadlineMessage} Deadline occurred before selected-source metadata could be read; search hits are provisional.`; continue; }
           phase = selection.source;
           const keys = issues.map(issue => issue.key);
+          if (selection.source === "team") assertTeamPriorityEnabled(metaDb);
           const metadata = selection.source === "local" ? readMetadata(dataDir, identity.instanceId, keys) : structuredClone(await getTeamMetadata({ siteHost: identity.siteHost, issueKeys: keys }));
           userSignal?.throwIfAborted();
           const filtered = issues.filter(issue => {
@@ -278,6 +280,7 @@ export const createTaskExportService = ({ metaDb, dataDir, env = process.env, re
     cleanup();
     const preview = previews.get(previewId);
     if (!preview) throw fail("Export preview expired or unavailable. Preview again.", 409);
+    if (preview.snapshot.sites.some(site => site.source === "team")) assertTeamPriorityEnabled(metaDb);
     return structuredClone({ previewId, snapshot: preview.snapshot, expiresAt: preview.expiresAt });
   };
   return { collectTaskExport, getExportScopes, createPreview, getPreview };

@@ -1,3 +1,4 @@
+import { COMBINED_REPORT_CONTEXT } from "./combinedWorkReports.js";
 import React from "react";
 import { Container, Header, Message, Tab, Table, Button } from "semantic-ui-react";
 import CollapsibleSection from "../Components/CollapsibleSection";
@@ -178,6 +179,7 @@ const ReportArchivePanel = ({
   title,
   emptyMessage,
   coworkOnly = false,
+  siteContext,
 }) => {
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -233,7 +235,7 @@ const ReportArchivePanel = ({
       try {
         const nextItems = coworkOnly
           ? await fetchCoworkWeeklyPlans()
-          : await fetchArchivedReports({ source });
+          : await fetchArchivedReports({ source, siteContext });
         if (!cancelled) {
           setItems(nextItems);
         }
@@ -257,7 +259,7 @@ const ReportArchivePanel = ({
     return () => {
       cancelled = true;
     };
-  }, [source, coworkOnly, loadArchivedLookup]);
+  }, [source, coworkOnly, loadArchivedLookup, siteContext]);
 
   const reloadList = React.useCallback(async () => {
     setLoading(true);
@@ -268,7 +270,7 @@ const ReportArchivePanel = ({
         setItems(await fetchCoworkWeeklyPlans());
         await loadArchivedLookup();
       } else {
-        setItems(await fetchArchivedReports({ source }));
+        setItems(await fetchArchivedReports({ source, siteContext }));
       }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load reports");
@@ -276,7 +278,7 @@ const ReportArchivePanel = ({
     } finally {
       setLoading(false);
     }
-  }, [source, coworkOnly, loadArchivedLookup]);
+  }, [source, coworkOnly, loadArchivedLookup, siteContext]);
 
   const handleSelect = React.useCallback(async (item) => {
     const id = item?.id ?? item;
@@ -292,7 +294,7 @@ const ReportArchivePanel = ({
         const fileItem = await fetchCoworkWeeklyPlanByFilename(filename);
         setSelectedReport(fileItem);
       } else {
-        const archived = await fetchArchivedReportById(id);
+        const archived = await fetchArchivedReportById(id, { siteContext });
         setSelectedReport(archived);
       }
     } catch (loadError) {
@@ -300,7 +302,7 @@ const ReportArchivePanel = ({
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [siteContext]);
 
   const handleSaveToArchive = React.useCallback(
     async (item) => {
@@ -380,7 +382,7 @@ const ReportArchivePanel = ({
       setSaveMessage("");
 
       try {
-        await deleteArchivedReport(item.id);
+        await deleteArchivedReport(item.id, { siteContext });
         if (selectedId === item.id) {
           setSelectedId(null);
           setSelectedReport(null);
@@ -392,7 +394,7 @@ const ReportArchivePanel = ({
         setDeletingId(null);
       }
     },
-    [selectedId, reloadList, archivedByFilename]
+    [selectedId, reloadList, archivedByFilename, siteContext]
   );
 
   const filesWithArchivedCopy = coworkOnly
@@ -449,7 +451,7 @@ const ReportArchivePanel = ({
     setSaveMessage("");
 
     try {
-      await deleteArchivedReportsBySource(source);
+      await deleteArchivedReportsBySource(source, { siteContext });
       setSelectedId(null);
       setSelectedReport(null);
       await reloadList();
@@ -458,7 +460,7 @@ const ReportArchivePanel = ({
     } finally {
       setDeletingAll(false);
     }
-  }, [coworkOnly, items, source, reloadList, filesWithArchivedCopy, archivedByFilename]);
+  }, [coworkOnly, items, source, reloadList, filesWithArchivedCopy, archivedByFilename, siteContext]);
 
   return (
     <div className="report-archive-panel">
@@ -609,10 +611,18 @@ const CompletedTodosPanel = () => {
 const ReportArchive = () => {
   const panes = [
     {
+      menuItem: "Combined Work",
+      render: () => (
+        <Tab.Pane attached={false}>
+          <ReportArchivePanel key="combined-work" source="work_week" title="Combined Work reports" siteContext={COMBINED_REPORT_CONTEXT} />
+        </Tab.Pane>
+      ),
+    },
+    {
       menuItem: "Task Management",
       render: () => (
         <Tab.Pane attached={false}>
-          <ReportArchivePanel source="work_week" title="Task Management reports" />
+          <ReportArchivePanel key="task-management" source="work_week" title="Task Management reports" />
         </Tab.Pane>
       ),
     },
@@ -663,7 +673,7 @@ const ReportArchive = () => {
     <Container fluid className="report-archive-page">
       <Header as="h2" className="report-archive-heading">Past reports</Header>
       <p className="report-archive-intro">
-        Every generated report and week plan is saved on this machine. Browse previous Work Week, Dashboard,
+        Every generated report and week plan is saved on this machine. Combined Work has its own archive. Browse previous Work Week, Dashboard,
         and ad-hoc Chat responses below. CoWork weekly plan files from the data folder appear under Files.
       </p>
       <Tab menu={{ secondary: true, pointing: true }} panes={panes} />

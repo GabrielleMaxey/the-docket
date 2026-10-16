@@ -206,3 +206,33 @@ it("rejects changing a saved hostname without changing its identity or data snap
   assert.equal(sameHost.status, 200);
   assert.equal((await sameHost.json()).baseUrl, "https://lumen.atlassian.net");
 });
+
+it("admits saved-source preflight headers only for an allowed origin", () => {
+  const policy = localRequestPolicy({ apiPort: 8787, allowedOrigins: ["http://localhost:5173"] });
+  for (const origin of ["http://localhost:5173", "http://localhost:9999"]) {
+    const headers = {};
+    let status;
+    const response = {
+      setHeader(key, value) { headers[key] = value; },
+      sendStatus(code) { status = code; },
+      status(code) { status = code; return this; },
+      json() {},
+    };
+    policy({ method: "OPTIONS", headers: {
+      host: "localhost:8787", origin,
+      "access-control-request-method": "PUT",
+      "access-control-request-headers": "content-type,x-docket-saved-site,x-docket-saved-revision",
+    } }, response, () => assert.fail("preflight should stop"));
+    if (origin === "http://localhost:5173") {
+      assert.equal(status, 204);
+      assert.equal(headers["Access-Control-Allow-Origin"], origin);
+      const allowedHeaders = headers["Access-Control-Allow-Headers"].split(", ");
+      assert.ok(allowedHeaders.includes("X-Docket-Saved-Site"));
+      assert.ok(allowedHeaders.includes("X-Docket-Saved-Revision"));
+    } else {
+      assert.equal(status, 403);
+      assert.equal(headers["Access-Control-Allow-Origin"], undefined);
+      assert.equal(headers["Access-Control-Allow-Headers"], undefined);
+    }
+  }
+});

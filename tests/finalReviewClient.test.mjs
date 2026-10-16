@@ -12,7 +12,7 @@ const turn = () => new Promise((resolve) => setImmediate(resolve));
 const windowFixture = (t) => {
   const previousWindow = globalThis.window;
   const previousFetch = globalThis.fetch;
-  globalThis.window = { setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms === 350 ? 0 : ms); if (ms !== 350) timer.unref(); return timer; }, clearTimeout, localStorage: { getItem: () => null } };
+  globalThis.window = { dispatchEvent: () => true, setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms === 350 ? 0 : ms); if (ms !== 350) timer.unref(); return timer; }, clearTimeout, localStorage: { getItem: () => null } };
   t.after(() => { globalThis.window = previousWindow; globalThis.fetch = previousFetch; });
 };
 

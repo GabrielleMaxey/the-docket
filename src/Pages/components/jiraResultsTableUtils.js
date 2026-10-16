@@ -89,17 +89,19 @@ export const sortIssues = ({
   clampPriority,
   sortField,
   sortDirection,
+  getIssueStateKey = (issue) => String(issue.key || "").trim(),
+  useStatusCategory = false,
 }) =>
   [...issues].sort((a, b) => {
     const aStatus = getIssueStatus(a);
     const bStatus = getIssueStatus(b);
-    const aClosed = isClosedLikeStatus(aStatus);
-    const bClosed = isClosedLikeStatus(bStatus);
+    const aClosed = useStatusCategory ? a.fields?.status?.statusCategory?.key === "done" : isClosedLikeStatus(aStatus);
+    const bClosed = useStatusCategory ? b.fields?.status?.statusCategory?.key === "done" : isClosedLikeStatus(bStatus);
     if (aClosed !== bClosed) return aClosed ? 1 : -1;
     if (sortField === "default") {
       if (aClosed && bClosed) return compareIssueKeys(a, b);
-      const aRank = getPrioritySortRank(clampPriority, jiraRowPriorities[String(a.key || "").trim()] ?? 0);
-      const bRank = getPrioritySortRank(clampPriority, jiraRowPriorities[String(b.key || "").trim()] ?? 0);
+      const aRank = getPrioritySortRank(clampPriority, jiraRowPriorities[getIssueStateKey(a)] ?? 0);
+      const bRank = getPrioritySortRank(clampPriority, jiraRowPriorities[getIssueStateKey(b)] ?? 0);
       return aRank !== bRank ? aRank - bRank : compareIssueKeys(a, b);
     }
     let result = 0;
@@ -107,8 +109,8 @@ export const sortIssues = ({
     else if (sortField === "status") result = compareTextValues(aStatus, bStatus);
     else if (sortField === "assignee") result = compareTextValues(getIssueAssignee(a), getIssueAssignee(b));
     else if (sortField === "priority") {
-      const aRank = getPrioritySortRank(clampPriority, jiraRowPriorities[String(a.key || "").trim()] ?? 0);
-      const bRank = getPrioritySortRank(clampPriority, jiraRowPriorities[String(b.key || "").trim()] ?? 0);
+      const aRank = getPrioritySortRank(clampPriority, jiraRowPriorities[getIssueStateKey(a)] ?? 0);
+      const bRank = getPrioritySortRank(clampPriority, jiraRowPriorities[getIssueStateKey(b)] ?? 0);
       result = aRank - bRank;
     }
     return (result === 0 ? compareIssueKeys(a, b) : result) * (sortDirection === "desc" ? -1 : 1);

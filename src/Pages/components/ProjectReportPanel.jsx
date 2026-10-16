@@ -1,3 +1,5 @@
+import { COMBINED_REPORT_CONTEXT, combinedReportRunKey, buildCombinedReportSummary, loadCombinedReportHistory } from "../combinedWorkReports.js";
+import { buildSummaryFromIssues, monthsAgoDateString } from "../reportSummary.js";
 import { getSiteContext } from "../../utils/siteContextStore.js";
 import React from "react";
 import { Link } from "react-router-dom";
@@ -15,10 +17,7 @@ import {
   saveAppSettings,
 } from "../../services/jiraClient";
 import { saveChatSessionArtifact } from "../../utils/chatSessionContext";
-import {
-  buildParentMostRecentDoneDateMap,
-  getEffectiveDueDateForIssue,
-} from "../../utils/jiraIssueDoneDates.js";
+import { buildParentMostRecentDoneDateMap } from "../../utils/jiraIssueDoneDates.js";
 import {
   runBackgroundJob,
   useAttachBackgroundJob,
@@ -31,50 +30,6 @@ import {
   loadWorkWeekProjectReport,
   saveWorkWeekProjectReport,
 } from "../../utils/pageReportPersistence";
-
-// JQL has no months unit (`m` is minutes); `-3M` matched nothing.
-const monthsAgoDateString = (months) => {
-  const d = new Date();
-  d.setMonth(d.getMonth() - Number(months || 0));
-  return d.toISOString().slice(0, 10);
-};
-
-const isIssueOpen = (issue) => {
-  const status = String(issue?.fields?.status?.name || issue?.status || "").toLowerCase();
-  return !/(closed|resolved|done)/.test(status);
-};
-
-const isIssueOverdueByEffectiveDueDate = (issue, dueDateContext) => {
-  if (!isIssueOpen(issue)) {
-    return false;
-  }
-  const effectiveDue = getEffectiveDueDateForIssue(issue, dueDateContext);
-  if (!effectiveDue) {
-    return false;
-  }
-  const today = new Date().toISOString().slice(0, 10);
-  return effectiveDue < today;
-};
-
-const buildSummaryFromIssues = (issues, jiraRowPriorities, dueDateContext) => {
-  const open = issues.filter(isIssueOpen);
-  return {
-    total: issues.length,
-    open: open.length,
-    closed: issues.length - open.length,
-    overdue: open.filter((iss) => isIssueOverdueByEffectiveDueDate(iss, dueDateContext)).length,
-    topPriorities: open
-      .sort((a, b) => (jiraRowPriorities[a.key] || 99) - (jiraRowPriorities[b.key] || 99))
-      .slice(0, 8)
-      .map((iss) => ({
-        key: iss.key,
-        summary: iss.fields?.summary || iss.summary || "",
-        status: iss.fields?.status?.name || iss.status || "",
-        assignee: iss.fields?.assignee?.displayName || iss.assignee || "Unassigned",
-        isOverdue: isIssueOverdueByEffectiveDueDate(iss, dueDateContext),
-      })),
-  };
-};
 
 const REPORT_TYPE_OPTIONS = [
   {
@@ -105,11 +60,20 @@ const ALL_WORK_MONTHS_OPTIONS = [3, 6, 12];
 const USER_GOALS_SETTINGS_KEY = "work_week_report_user_goals";
 const COMPANY_GOALS_SETTINGS_KEY = "work_week_report_company_goals";
 
-const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
-  const instanceId = React.useRef(getSiteContext()?.instanceId).current;
-  const runKey = getWorkWeekRunKey(run);
-  const jobId = workWeekProjectReportJobId(runKey);
-  const persisted = loadWorkWeekProjectReport(runKey);
+const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [], scope, combinedSites = [] }) => {
+  const combined = scope === "combined-work";
+  const siteContext = React.useRef(combined ? COMBINED_REPORT_CONTEXT : getSiteContext()).current;
+  const instanceId = combined ? siteContext : siteContext?.instanceId;
+  const [reportType, setReportType] = React.useState("status");
+  const [pwbPeriod, setPwbPeriod] = React.useState("quarterly");
+  const [reportScope, setReportScope] = React.useState("current");
+  const [allWorkMonths, setAllWorkMonths] = React.useState(3);
+  const runKey = combined ? combinedReportRunKey(combinedSites, { reportScope, allWorkMonths, reportType, pwbPeriod }) : getWorkWeekRunKey(run);
+  const jobId = workWeekProjectReportJobId(runKey, siteContext);
+  const currentJob = React.useRef(jobId);
+  currentJob.current = jobId;
+  const persisted = loadWorkWeekProjectReport(runKey, instanceId);
+  const coverageNotices = combined ? buildCombinedReportSummary(combinedSites).notices : [];
 
   const [reportPending, setReportPending] = React.useState(false);
   const bgReportRunning = useBackgroundJobRunning(jobId);
@@ -123,8 +87,6 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
   }, []);
   const { copied, handleCopy, handleDownload } = useReportClipboard(report);
 
-  const [reportType, setReportType] = React.useState("status");
-  const [pwbPeriod, setPwbPeriod] = React.useState("quarterly");
   const [userGoals, setUserGoals] = React.useState("");
   const [includeCompanyGoals, setIncludeCompanyGoals] = React.useState(false);
   const [companyGoals, setCompanyGoals] = React.useState("");
@@ -132,7 +94,7 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
 
   React.useEffect(() => {
     let cancelled = false;
-    fetchAppSettings()
+    fetchAppSettings({ siteContext })
       .then((settings) => {
         if (cancelled) return;
         const savedUserGoals = String(settings?.[USER_GOALS_SETTINGS_KEY] || "");
@@ -154,20 +116,18 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
 
   const handleClearSavedUserGoals = () => {
     setUserGoals("");
-    saveAppSettings({ [USER_GOALS_SETTINGS_KEY]: "" }).catch(() => {});
+    saveAppSettings({ [USER_GOALS_SETTINGS_KEY]: "" }, { siteContext }).catch(() => {});
   };
 
   const handleClearSavedCompanyGoals = () => {
     setCompanyGoals("");
-    saveAppSettings({ [COMPANY_GOALS_SETTINGS_KEY]: "" }).catch(() => {});
+    saveAppSettings({ [COMPANY_GOALS_SETTINGS_KEY]: "" }, { siteContext }).catch(() => {});
   };
-
-  const [reportScope, setReportScope] = React.useState("current");
-  const [allWorkMonths, setAllWorkMonths] = React.useState(3);
 
   const isCareerReport = reportType === "one_on_one" || reportType === "pwb";
 
   const otherRuns = React.useMemo(() => {
+    if (combined) return [];
     return (jqlRuns || []).filter(
       (r) =>
         r.index !== run.index &&
@@ -176,25 +136,29 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
         String(r.jql || "").trim() &&
         String(r.label || "").trim()
     );
-  }, [jqlRuns, run.index]);
+  }, [jqlRuns, run.index, combined]);
 
   React.useEffect(() => {
-    const saved = loadWorkWeekProjectReport(runKey);
+    const saved = loadWorkWeekProjectReport(runKey, instanceId);
     setReport(saved?.report ?? null);
     setError("");
+    setReportPending(false);
   }, [runKey]);
 
-  const applyReport = React.useCallback((result) => {
-    if (!result) return;
+  const applyReport = React.useCallback((result, completedJobId = jobId) => {
+    if (!result || currentJob.current !== completedJobId) return;
     setReport(result);
-  }, []);
+  }, [jobId]);
 
   useAttachBackgroundJob(jobId, {
     onSuccess: applyReport,
-    onError: (err) => {
+    onError: (err, completedJobId) => {
+      if (currentJob.current !== completedJobId) return;
       setError(err instanceof Error ? err.message : "Report generation failed");
     },
-    onFinally: () => setReportPending(false),
+    onFinally: (completedJobId) => {
+      if (currentJob.current === completedJobId) setReportPending(false);
+    },
   });
 
   const handleGenerate = () => {
@@ -211,7 +175,8 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
 
     runBackgroundJob(jobId, {
       label: jobLabel,
-      run: async () => {
+      siteContext,
+      run: async (signal) => {
         if (isCareerReport) {
           const toSave = {};
           if (userGoals.trim()) toSave[USER_GOALS_SETTINGS_KEY] = userGoals.trim();
@@ -219,7 +184,8 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
             toSave[COMPANY_GOALS_SETTINGS_KEY] = companyGoals.trim();
           }
           if (Object.keys(toSave).length > 0) {
-            saveAppSettings(toSave).catch(() => {});
+            if (combined) await saveAppSettings(toSave, { siteContext });
+            else saveAppSettings(toSave, { siteContext }).catch(() => {});
           }
         }
 
@@ -229,7 +195,13 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
 
         const { dueFieldId, mrdFieldId } = run;
 
-        if (reportScope === "all_work") {
+        if (combined) {
+          scopeLabel = reportScope === "all_work" ? `Combined Work — past ${allWorkMonths} months` : "Combined Work";
+          scopeJql = reportScope === "all_work" ? `Assigned work history, past ${allWorkMonths} months, across selected saved entries` : "Unfinished assigned work across selected saved entries";
+          summary = reportScope === "all_work"
+            ? await loadCombinedReportHistory({ sites: combinedSites, months: allWorkMonths, signal })
+            : buildCombinedReportSummary(combinedSites);
+        } else if (reportScope === "all_work") {
           scopeLabel = `All my assigned work — past ${allWorkMonths} months`;
           const cutoff = monthsAgoDateString(allWorkMonths);
           // Jira `updated` includes automated field bumps; use status/assignee changelog instead.
@@ -324,7 +296,9 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
           pwbPeriod: reportType === "pwb" ? pwbPeriod : undefined,
           userGoals: isCareerReport ? userGoals.trim() : undefined,
           companyGoals: isCareerReport && includeCompanyGoals ? companyGoals.trim() : undefined,
-        });
+          combinedSources: combined ? combinedSites.map(site => ({ instanceId: site.instanceId, displayName: site.displayName, siteHost: site.siteHost, status: site.status, message: site.message, sourceContext: site.sourceContext })) : undefined,
+          reportQueryScope: combined ? { reportScope, months: reportScope === "all_work" ? allWorkMonths : undefined } : undefined,
+        }, { siteContext, signal });
         saveWorkWeekProjectReport(runKey, {
           report: result,
           runLabel: scopeLabel,
@@ -334,26 +308,29 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [] }) => {
           type: "work_week_project_report",
           label: result.label || scopeLabel,
           content: result.report,
-          meta: { jql: scopeJql },
+          meta: { jql: scopeJql, ...(combined ? { scope: "combined-work", sources: summary.sources.map(({instanceId, displayName, siteHost}) => ({instanceId, displayName, siteHost})), notices: summary.notices } : {}) },
         }, instanceId);
         return result;
       },
     })
       .then(applyReport)
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Report generation failed");
+        if (currentJob.current === jobId) setError(err instanceof Error ? err.message : "Report generation failed");
       })
-      .finally(() => setReportPending(false));
+      .finally(() => { if (currentJob.current === jobId) setReportPending(false); });
   };
 
   const handleClearReport = () => {
-    clearWorkWeekProjectReport(runKey);
+    clearWorkWeekProjectReport(runKey, instanceId);
     setReport(null);
     setError("");
   };
 
   return (
-    <CollapsibleSection title="📄 Project Report">
+    <CollapsibleSection title={combined ? "📄 Combined Work Report" : "📄 Project Report"}>
+      {coverageNotices.length > 0 ? (
+        <p role="status">Incomplete coverage: {coverageNotices.join("; ")}. Reports retain these notices.</p>
+      ) : null}
       <p className="app-report-type-label">Report scope</p>
       <div className="app-report-type-grid">
         <button
