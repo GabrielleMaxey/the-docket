@@ -264,6 +264,8 @@ const applyDrillDownMetadata = async ({
 
 export async function hydrateCombinedRun(options) {
   await applyDrillDownMetadata({ ...options, pullLatestComment: false });
+  const health = await options.teamHealth;
+  if (health?.configured === false) return;
   await applyTeamPriorityState({ ...options, propagateErrors: true });
   await applyTeamDateState({ ...options, propagateErrors: true,
     setPlanningMetaByKey: options.setTeamPlanningMetaByKey,

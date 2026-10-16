@@ -88,11 +88,14 @@ test("same-key local and shared followUp edits and Save All preserve their own s
   const { build } = await import("esbuild");
   const source = await fs.readFile(new URL("../src/Pages/hooks/useTaskManagerJira.js", import.meta.url), "utf8");
   const handlers = source.slice(source.indexOf("  const handleSavePlanningAll"), source.indexOf("  const handlePinnedGanttChange"));
+  const persistence = source.slice(source.indexOf("  const persistTeamChange"), source.indexOf("  const [fieldMappingsLoading"));
   const bundled = await build({ stdin: { contents: `import { validateMetadataPatch } from "../../../shared/issueMetadataFields.mjs";
     export const configure = ({ saveTeamDate, saveIssueMetadata, setPlanningMetaByKey, planningMetaByKey, startDateByKey = {}, completeDateByKey = {} }) => {
       const React = { useCallback: (callback) => callback };
       const hydrationReady = true, combined = false, siteContext = undefined;
       const teamPlanningMetaByKey = {}, teamStartDateByKey = {}, teamCompleteDateByKey = {};
+      const onConfirmedTeam = undefined, reconcileTeam = undefined;
+      ${persistence}
       ${handlers}
       return { handleSavePlanningAll, handlePlanningFieldChange };
     };`, resolveDir: new URL("../src/Pages/hooks/", import.meta.url).pathname }, bundle: true, write: false, format: "esm", platform: "node" });
@@ -182,6 +185,7 @@ test("shared Load More and local planning hydration preserve both sources throug
   const { build } = await import("esbuild");
   const source = await fs.readFile(new URL("../src/Pages/hooks/useTaskManagerJira.js", import.meta.url), "utf8");
   const handlers = source.slice(source.indexOf("  const handleSavePlanningAll"), source.indexOf("  const handlePinnedGanttChange"));
+  const persistence = source.slice(source.indexOf("  const persistTeamChange"), source.indexOf("  const [fieldMappingsLoading"));
   const bundled = await build({ stdin: { contents: `
     export * from "./src/Pages/hooks/jiraJqlRunWorkflow.js";
     export * from "./src/utils/siteContextStore.js";
@@ -191,6 +195,8 @@ test("shared Load More and local planning hydration preserve both sources throug
       const React = { useCallback: (callback) => callback };
       const hydrationReady = true, combined = false, siteContext = undefined;
       const teamPlanningMetaByKey = {}, teamStartDateByKey = {}, teamCompleteDateByKey = {};
+      const onConfirmedTeam = undefined, reconcileTeam = undefined;
+      ${persistence}
       ${handlers}
       return { handleSavePlanningAll, handlePlanningFieldChange };
     };`, resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node", define: { "import.meta.env.VITE_API_BASE": "undefined" } });

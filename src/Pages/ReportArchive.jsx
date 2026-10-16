@@ -614,7 +614,7 @@ const ReportArchive = () => {
       menuItem: "Combined Work",
       render: () => (
         <Tab.Pane attached={false}>
-          <ReportArchivePanel source="work_week" title="Combined Work reports" siteContext={COMBINED_REPORT_CONTEXT} />
+          <ReportArchivePanel key="combined-work" source="work_week" title="Combined Work reports" siteContext={COMBINED_REPORT_CONTEXT} />
         </Tab.Pane>
       ),
     },
@@ -622,7 +622,7 @@ const ReportArchive = () => {
       menuItem: "Task Management",
       render: () => (
         <Tab.Pane attached={false}>
-          <ReportArchivePanel source="work_week" title="Task Management reports" />
+          <ReportArchivePanel key="task-management" source="work_week" title="Task Management reports" />
         </Tab.Pane>
       ),
     },

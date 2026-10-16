@@ -19,11 +19,16 @@ export default function CombinedOpenWork() {
   const [mode, setMode] = React.useState("managed");
   const [models, setModels] = React.useState({});
   const [confirmedIssues, setConfirmedIssues] = React.useState({});
+  const [confirmedTeam, setConfirmedTeam] = React.useState({});
   const jobs = useBackgroundJobs();
   const saving = jobs.some((job) => job.siteSave && result?.sites.some((site) => site.instanceId === job.instanceId));
   const onModel = React.useCallback((id, model) => setModels((current) => ({ ...current, [id]: model })), []);
   const onConfirmedIssue = React.useCallback((context, issue) => {
     setConfirmedIssues((current) => ({ ...current, [context.siteHost]: { ...current[context.siteHost], [issue.key]: issue } }));
+  }, []);
+  const onConfirmedTeam = React.useCallback((context, issueKey, patch) => {
+    setConfirmedTeam((current) => ({ ...current, [context.siteHost]: { ...current[context.siteHost],
+      [issueKey]: { ...current[context.siteHost]?.[issueKey], ...patch } } }));
   }, []);
   const canReplaceLoadedWork = () => {
     if (saving) return false;
@@ -68,6 +73,7 @@ export default function CombinedOpenWork() {
     setResult(null);
     setModels({});
     setConfirmedIssues({});
+    setConfirmedTeam({});
     setError("");
   };
   const load = async () => {
@@ -82,6 +88,7 @@ export default function CombinedOpenWork() {
       if (request.current === controller && !controller.signal.aborted) {
         setModels({});
         setConfirmedIssues({});
+        setConfirmedTeam({});
         setResult(data);
       }
     } catch (failure) {
@@ -130,7 +137,8 @@ export default function CombinedOpenWork() {
       {loading && <p role="status">Loading open work…</p>}
       {result && <>
         {editableSites.map((site) => <CombinedSiteEditor key={`${result.fetchedAt}:${site.instanceId}`} site={site} onModel={onModel}
-          confirmedIssues={confirmedIssues[site.sourceContext.siteHost]} onConfirmedIssue={onConfirmedIssue} />)}
+          confirmedIssues={confirmedIssues[site.sourceContext.siteHost]} onConfirmedIssue={onConfirmedIssue}
+          confirmedTeam={confirmedTeam[site.sourceContext.siteHost]} onConfirmedTeam={onConfirmedTeam} />)}
         {editableSites.length > 0 && <>
           <MyMetricsSection run={{ ...metrics, label: "Combined Work" }} scope="combined-work" combinedMetrics={metrics}
             combinedSites={metricSites} jiraRowPriorities={table.jiraRowPriorities} />

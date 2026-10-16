@@ -142,6 +142,7 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [], scope, combi
     const saved = loadWorkWeekProjectReport(runKey, instanceId);
     setReport(saved?.report ?? null);
     setError("");
+    setReportPending(false);
   }, [runKey]);
 
   const applyReport = React.useCallback((result, completedJobId = jobId) => {
@@ -314,9 +315,9 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [], scope, combi
     })
       .then(applyReport)
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Report generation failed");
+        if (currentJob.current === jobId) setError(err instanceof Error ? err.message : "Report generation failed");
       })
-      .finally(() => setReportPending(false));
+      .finally(() => { if (currentJob.current === jobId) setReportPending(false); });
   };
 
   const handleClearReport = () => {

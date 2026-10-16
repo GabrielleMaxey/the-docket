@@ -469,3 +469,112 @@ test("ordinary parent-date reads retain their existing fallback while combined r
   await assert.rejects(app.enrichRunWithParentDoneDates(run, mappings, { siteContext: source("a"), propagateErrors: true }), /Parent dates unavailable/);
   assert.equal(warnings.length, 2, "combined failure propagates without duplicate logging");
 });
+
+
+for (const configured of [false, true]) test(`Team configured=${configured} preserves the correct Local editing readiness`, async t => {
+  installBrowser(t);
+  const app = await bundle('export * from "./src/Pages/hooks/useTaskManagerJira.js"; export * from "react";', [hooksPlugin]);
+  t.after(app.unmount);
+  const writes = [], teamReads = [];
+  globalThis.fetch = async (url, options) => {
+    if (url.endsWith("/health")) return new Response(JSON.stringify({ configured, ok: false, connected: false }));
+    if (url.includes("team-priority")) { teamReads.push(url); return new Response('{"error":"Team data not configured — set TEAM_PRIORITY_DATABASE_URL"}', { status: 503 }); }
+    if (options.method === "PUT" || url.endsWith("/status")) writes.push(url);
+    return new Response(JSON.stringify(url.endsWith("/search") ? { issues: [issue()] } : { items: { "ABC-1": { note: "Local note", plannedStart: "2026-10-01" } } }));
+  };
+  const site = { instanceId: "a", sourceContext: source("a"), issues: [issue()], fieldMappings: [] };
+  const render = () => app.render("a", () => app.useTaskManagerJira({ siteContext: site.sourceContext, combinedRun: site }));
+  render(); await turn(); await turn();
+  let model = render();
+  assert.equal(model.hydrationReady, !configured);
+  assert.equal(model.teamAvailable, false);
+  model.handleRowPriorityChange("ABC-1", 2);
+  await model.handleSavePlanningAll("ABC-1");
+  if (!configured) {
+    model.handleStatusDraftChange("ABC-1", "In Progress");
+    await render().handleStatusUpdate("ABC-1", "Custom Open");
+    assert.ok(writes.some(url => url.endsWith("/status")));
+    assert.equal(teamReads.length, 0);
+    assert.equal(render().jqlError, "");
+    assert.equal(render().jiraNotes["ABC-1"], "Local note");
+  } else {
+    assert.equal(writes.length, 0);
+    assert.match(model.jqlError, /unavailable|failed|configured/i);
+  }
+});
+
+test("duplicate Team confirmations reconcile shared fields without replacing Local or pending edits", async t => {
+  installBrowser(t);
+  const app = await bundle('export {default as Page} from "./src/Pages/CombinedOpenWork.jsx"; export * from "react";', [hooksPlugin]);
+  t.after(app.unmount);
+  const sites = ["a", "duplicate", "other"].map(id => ({ instanceId:id, id, enabled:true, displayName:id, baseUrl:source(id).baseUrl,
+    sourceContext:source(id, id === "duplicate" ? "a.atlassian.net" : `${id}.atlassian.net`), issues:[issue()], fieldMappings:[], status:"complete", rows:[], loaded:1 }));
+  const writes = []; let delayed, release, failNext = false;
+  globalThis.fetch = async (url, options = {}) => {
+    const id = options.headers?.["X-Docket-Saved-Site"];
+    if (["PUT", "DELETE"].includes(options.method)) {
+      const body = options.body ? JSON.parse(options.body) : {};
+      writes.push({id,url,body});
+      if (failNext) { failNext=false; return new Response('{"error":"Write failed"}',{status:503}); }
+      if (delayed === id) { delayed=null; await new Promise(resolve => { release=resolve; }); }
+      return new Response('{"ok":true}');
+    }
+    const data = url === "/api/health" ? {siteContext:{instanceId:"active",generation:1}} : url.endsWith("instances") ? {instances:sites} : url.endsWith("combined-open-work") ? {sites,fetchedAt:"now"}
+      : url.endsWith("/health") ? {configured:true,ok:true}
+      : url.endsWith("/issue-metadata/bulk") ? {items:{"ABC-1":{note:`local-${id}`,plannedStart:"2026-10-01"}}}
+      : url.endsWith("/dates/bulk") ? {items:{"ABC-1":{plannedStart:"2026-11-01",startDate:"2026-11-02",completeDate:"2026-11-03"}}}
+      : url.endsWith("/team-priority/bulk") ? {items:{"ABC-1":{priority:3}}} : {items:{}};
+    return new Response(JSON.stringify(data));
+  };
+  const renderPage = () => app.render("page", () => app.Page());
+  renderPage(); await turn();
+  await find(renderPage(), node => node.type === "button" && text(node) === "Load open work")[0].props.onClick();
+  const render = () => {
+    for (const editor of find(renderPage(), node => node.type?.name === "CombinedSiteEditor")) app.render(editor.props.site.instanceId, () => editor.type(editor.props));
+    return find(renderPage(), node => node.type?.name === "JiraResultsTable")[0].props;
+  };
+  render(); await turn(); await turn();
+  let table = render();
+  const a='["a","ABC-1"]', b='["duplicate","ABC-1"]', other='["other","ABC-1"]', team={forceTeam:true};
+  table.handlePlanningFieldChange(a,"plannedStart","2026-12-01",team);
+  await turn(); render(); table=render();
+  assert.equal(table.teamPlanningMetaByKey[b].plannedStart,"2026-12-01");
+  table.handlePlanningFieldChange(b,"requestor","Team owner",team);
+  await turn(); render(); table=render();
+  await table.handleSavePlanningAll(b,team);
+  assert.equal(writes.at(-1).body.plannedStart,"2026-12-01");
+  assert.equal(table.planningMetaByKey[b].plannedStart,"2026-10-01");
+  assert.equal(table.jiraNotes[b],"local-duplicate");
+  assert.equal(table.teamPlanningMetaByKey[other].plannedStart,"2026-11-01");
+  delayed="duplicate";
+  table.handlePlanningFieldChange(b,"requestor","Pending owner",team);
+  await turn();
+  table.handlePlanningFieldChange(a,"requestor","Confirmed owner",team);
+  await turn(); render(); table=render();
+  assert.equal(table.teamPlanningMetaByKey[b].requestor,"Pending owner");
+  release(); await turn(); render(); table=render();
+  assert.equal(table.teamPlanningMetaByKey[a].requestor,"Pending owner");
+  failNext=true;
+  table.handlePlanningFieldChange(b,"plannedFinish","2027-01-01",team);
+  await turn(); render(); table=render();
+  assert.notEqual(table.teamPlanningMetaByKey[a].plannedFinish,"2027-01-01");
+  table.handlePlanningFieldChange(a,"plannedFinish","2026-12-31",team);
+  await turn(); render(); table=render();
+  assert.equal(table.teamPlanningMetaByKey[b].plannedFinish,"2027-01-01","failed draft remains local to its editor");
+  table.handleRowPriorityChange(a,1,team);
+  table.handleStartDateChange(a,"2026-12-04",team);
+  table.handleCompleteDateChange(a,"2026-12-05",team);
+  await turn(); render(); table=render();
+  assert.equal(table.jiraRowPriorities[b],1);
+  assert.equal(table.teamStartDateByKey[b],"2026-12-04");
+  assert.equal(table.teamCompleteDateByKey[b],"2026-12-05");
+  table.handleClearDateTracking(a,team);
+  await turn(); render(); table=render();
+  assert.equal(table.teamStartDateByKey[b] || "", "");
+  assert.equal(table.teamCompleteDateByKey[b] || "", "");
+  assert.equal(table.teamPlanningMetaByKey[b].plannedStart, "");
+  assert.equal(table.teamPlanningMetaByKey[a].plannedFinish, "");
+  assert.equal(table.teamPlanningMetaByKey[b].plannedFinish, "2027-01-01");
+  assert.equal(table.planningMetaByKey[b].plannedStart, "2026-10-01");
+  assert.equal(table.teamStartDateByKey[other],"2026-11-02");
+});

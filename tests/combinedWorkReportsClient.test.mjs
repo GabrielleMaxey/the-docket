@@ -232,3 +232,73 @@ test("ordinary reattachment keeps latest callbacks and original result", async t
   assert.deepEqual(received,[["latest","ordinary result"]]);
   api.unmount();
 });
+
+
+for (const configured of [false,true]) test(`history handles Team configured=${configured} without inventing optional failures`, async t => {
+  install(t); const api=await reports(); let teamReads=0;
+  globalThis.fetch=async url => {
+    if(url.endsWith("/team-priority/health")) return new Response(JSON.stringify({configured,ok:false,connected:false}));
+    if(url.includes("team-priority")) { teamReads++; return new Response('{"error":"Team data not configured — set TEAM_PRIORITY_DATABASE_URL"}',{status:503}); }
+    return new Response(JSON.stringify(url.includes("search/all") ? {issues:[issue()],isComplete:true} : url.includes("recent-notes") ? {issueKeys:[]} : url.includes("field-mappings") ? {items:[]} : {items:{}}));
+  };
+  const result=await api.loadCombinedReportHistory({sites:[source("a")],months:3});
+  assert.equal(result.total,1);
+  assert.equal(result.incomplete,configured);
+  if(!configured) { assert.equal(teamReads,0); assert.deepEqual(result.notices,[]); }
+  else assert.match(result.notices.join(" "),/Team/);
+});
+
+test("archive scope switches isolate late delete reloads and details with overlapping IDs",async t=>{
+  install(t); const api=await bundleUi('export {default as Archive} from "./src/Pages/ReportArchive.jsx"; export {render,unmount} from "react";');
+  t.after(api.unmount);
+  let releaseDelete,releaseDetail; const deletes=[];
+  globalThis.fetch=async(url,options)=>{
+    const combined=options.headers["X-Docket-Report-Scope"] === "combined-work";
+    if(url.endsWith("/api/health")) return new Response('{"siteContext":{"instanceId":"ordinary","generation":1}}');
+    if(options.method === "DELETE") { deletes.push({combined,url}); if(!combined) await new Promise(resolve=>{releaseDelete=resolve;}); return new Response('{"ok":true}'); }
+    if(url.endsWith("/1")) { if(!combined) await new Promise(resolve=>{releaseDetail=resolve;}); return new Response(JSON.stringify({item:{id:1,label:combined?"Combined":"Ordinary",content:combined?"Combined content":"Ordinary content"}})); }
+    return new Response(JSON.stringify({items:[{id:1,label:combined?"Combined":"Ordinary"}]}));
+  };
+  const panes=nodes(api.render("archive",()=>api.Archive())).find(node=>node.props.panes).props.panes;
+  const ordinary=panes.find(p=>p.menuItem === "Task Management").render().children[0];
+  const combined=panes.find(p=>p.menuItem === "Combined Work").render().children[0];
+  // Match React's mounted identity at this shared child position, including its key.
+  const render=panel=>api.render(`panel:${panel.props.key || "unkeyed"}`,()=>panel.type(panel.props));
+  const list=tree=>nodes(tree).find(node=>node.type?.name === "ReportList");
+  render(ordinary); await turn();
+  const oldList=list(render(ordinary));
+  const deletion=oldList.props.onDelete({id:1,label:"Ordinary"});
+  const detail=oldList.props.onSelect({id:1}); await turn();
+  render(combined); await turn();
+  assert.equal(list(render(combined)).props.items[0].label,"Combined");
+  releaseDelete(); releaseDetail(); await Promise.all([deletion,detail]);
+  let tree=render(combined);
+  assert.equal(list(tree).props.items[0].label,"Combined");
+  assert.equal(nodes(tree).find(node=>node.type?.name === "ReportOutput"),undefined,"old detail does not mount in Combined");
+  await list(tree).props.onSelect({id:1}); tree=render(combined);
+  assert.equal(nodes(tree).find(node=>node.type?.name === "ReportOutput").props.report.report,"Combined content");
+  await list(tree).props.onDelete(list(tree).props.items[0]);
+  assert.deepEqual(deletes.map(d=>d.combined),[false,true]);
+});
+
+test("direct report rejection after an in-place option/source change leaves the new selection usable",async t=>{
+  install(t); const api=await bundleUi('export {default as Panel} from "./src/Pages/components/ProjectReportPanel.jsx"; export {render,unmount} from "react";');
+  t.after(api.unmount);
+  const finish=[];
+  globalThis.fetch=async url=>url.endsWith("/api/report/project") ? new Promise(resolve=>finish.push(resolve)) : new Response('{"settings":{},"ready":true}');
+  let props={run:{label:"Combined Work",issues:[issue()]},scope:"combined-work",combinedSites:[{...source("a"),issues:[issue()]}],jiraRowPriorities:{}};
+  const render=()=>api.render("same",()=>api.Panel(props));
+  const generate=tree=>nodes(tree).find(node=>node.type === "button" && /Generate Report|Generating/.test(textOf(node)));
+  generate(render()).props.onClick(); await turn();
+  props={...props,combinedSites:[{...source("b"),issues:[issue()]}]};
+  nodes(render()).find(node=>node.type === "button" && textOf(node).startsWith("1:1 Prep")).props.onClick(); render();
+  assert.equal(generate(render()).props.disabled,false,"new identity is not held pending by A");
+  generate(render()).props.onClick(); await turn();
+  finish[0](new Response('{"error":"Source A failed"}',{status:500}));
+  for(let i=0;i<6;i++) await turn();
+  assert.doesNotMatch(textOf(render()),/Source A failed/);
+  assert.equal(generate(render()).props.disabled,true,"A finalization does not clear B pending");
+  finish[1](new Response('{"report":"B result","label":"B"}'));
+  for(let i=0;i<6;i++) await turn();
+  assert.equal(generate(render()).props.disabled,false);
+});

@@ -1,5 +1,5 @@
 import { fetchJiraSearchAll, fetchRecentlyNotedIssueKeys, fetchLatestJiraCommentsBulk, fetchFieldMappings,
-  fetchIssueMetadataBulk, fetchTeamMetadataBulk } from "../services/jiraClient.js";
+  fetchIssueMetadataBulk, fetchTeamMetadataBulk, fetchTeamPriorityHealth } from "../services/jiraClient.js";
 import { enrichRunWithParentDoneDates } from "../utils/jiraIssueDoneDates.js";
 import { buildCombinedMetrics } from "./combinedWorkModel.js";
 import { monthsAgoDateString, buildSummaryFromIssues } from "./reportSummary.js";
@@ -52,12 +52,13 @@ export const loadCombinedReportHistory = async ({ sites, months, signal }) => {
         return fallback;
       }
     };
-    const [changed, notedKeys, assigned, mappings] = await Promise.all([
+    const [changed, notedKeys, assigned, mappings, teamHealth] = await Promise.all([
       read("Changed-work search", () => fetchJiraSearchAll({ siteContext, signal, maxTotal: 500,
         jql: `assignee = currentUser() AND (status changed after "${cutoff}" OR assignee changed after "${cutoff}") ORDER BY updated DESC` }), { issues: [] }),
       read("Recent notes", () => fetchRecentlyNotedIssueKeys(cutoff, { siteContext, signal }), []),
       read("Assigned-work search", () => fetchJiraSearchAll({ siteContext, signal, maxTotal: 500, jql: "assignee = currentUser()" }), { issues: [] }),
       read("Field mappings", () => fetchFieldMappings({ siteContext, signal }), site.fieldMappings || []),
+      read("Team availability", () => fetchTeamPriorityHealth({ siteContext, signal }), null),
     ]);
     for (const result of [changed, assigned]) if (result.isComplete === false || result.issues?.length >= 500) reportNotices.push("History query reached its 500-issue bound or returned incomplete results.");
     const issues = new Map((changed.issues || []).map(issue => [issue.key, issue]));
@@ -72,7 +73,7 @@ export const loadCombinedReportHistory = async ({ sites, months, signal }) => {
     const [enriched, localMetadata, teamMetadata] = await Promise.all([
       read("Parent dates", () => enrichRunWithParentDoneDates({ issues: allIssues }, mappings, { siteContext, signal, propagateErrors: true }), {}),
       allIssues.length ? read("Local notes/planning", () => fetchIssueMetadataBulk([...issues.keys()], { siteContext, signal }), {}) : {},
-      allIssues.length ? read("Team planning", () => fetchTeamMetadataBulk([...issues.keys()], { siteContext, signal }), {}) : {},
+      allIssues.length && teamHealth?.configured !== false ? read("Team planning", () => fetchTeamMetadataBulk([...issues.keys()], { siteContext, signal }), {}) : {},
     ]);
     signal?.throwIfAborted();
     return { ...site, ...enriched, issues: allIssues,
