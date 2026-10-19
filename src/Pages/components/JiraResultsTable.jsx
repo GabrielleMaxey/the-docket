@@ -1205,6 +1205,7 @@ const JiraResultsTable = ({
                                               className={`ww-note-textarea${
                                                 isNoteAlreadyPushed ? " ww-note-textarea-pushed" : ""
                                               }`}
+                                              saveState={save}
                                               value={noteDraft}
                                               onChange={(next) => handleNoteChange(issueKey, next)}
                                               placeholder="Add notes here"
@@ -1250,7 +1251,7 @@ const JiraResultsTable = ({
                                             onClick={() => handleSaveMetadata(issueKey)}
                                             disabled={save.loading}
                                           >
-                                            {save.loading ? "Saving..." : "Save to local DB"}
+                                            Save to local DB
                                           </button>
                                           <button
                                             type="button"
@@ -1271,8 +1272,6 @@ const JiraResultsTable = ({
                                       )}
                                       {push.error && <p className="ww-inline-error">{push.error}</p>}
                                       {push.success && <p className="ww-inline-success">{push.success}</p>}
-                                      {save.error && <p className="ww-inline-error">{save.error}</p>}
-                                      {save.success && <p className="ww-inline-success">{save.success}</p>}
                                       {rowUpdate.error && <p className="ww-inline-error">{rowUpdate.error}</p>}
                                       {rowUpdate.success && <p className="ww-inline-success">{rowUpdate.success}</p>}
                                     </td>
@@ -1517,6 +1516,7 @@ const JiraResultsTable = ({
                         <NoteFormattedField
                           className="ww-note-modal-textarea"
                           modal
+                          saveState={saveState[expandedNoteKey] || {}}
                           value={modalNoteDraft}
                           onChange={(next) => handleNoteChange(expandedNoteKey, next)}
                           placeholder="Add notes here"

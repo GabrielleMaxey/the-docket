@@ -59,7 +59,7 @@ Navigate between them using the menu at the top of the screen.
 
 ## Settings — do this first
 
-Before anything else works, your Jira credentials need to be in place.
+Configure Jira before loading or editing Jira issues. Personal To Dos work without a Jira connection, and a company database is optional.
 
 **Developers (browser or desktop dev):** copy `.env.example` to `.env` in the project folder and fill in Jira credentials — see [JIRA_SETUP.md](./JIRA_SETUP.md).
 
@@ -77,11 +77,29 @@ Then in the app:
 Use this when you work across more than one Jira Cloud site (different company URLs).
 
 - **One site from `.env` only:** keep using **Test Jira Connection** as above. Your notes and presets stay in the app’s usual database; the top bar shows **Jira** until you add more sites.
-- **Several sites:** go to **Settings → Jira sites**. Add up to **five** sites (name, URL, email, API token). Use **Set active** or the **Site** menu in the top bar to change which Jira the app talks to.
-- **After you switch:** the app reloads. Presets, notes, past reports, and other saved data belong to **that site only** — nothing is merged across clouds.
+- **Several sites:** go to **Settings → Jira sites**. Add up to **five** sites (name, URL, email). The server uses `JIRA_API_TOKEN` from its environment for all entries; Settings does not accept tokens. Use **Set active** or the **Site** menu in the top bar to change which Jira the app talks to.
+- **After you switch:** site-scoped pages reload their data. Presets, notes, and ordinary reports belong to the saved entry. Personal To Dos, the Team DB preference, and Combined Work goals/archive have their own app-wide scope.
 - **Test before save:** in the add/edit dialog, use **Test connection** to confirm credentials.
 
 Developers can also pre-register sites in `.env` with `JIRA_INSTANCE_1_*` … `JIRA_INSTANCE_5_*` (see [JIRA_SETUP.md](./JIRA_SETUP.md)); the app does not turn a single legacy `.env` site into a registry entry by itself at startup.
+
+### Optional Team database
+
+**Settings → Team data → Use team DB** is off by default, even if the server already has a database URL. The setting applies across all saved Jira sites and survives restart. Leave it off to use local notes, priorities, planning, and personal To Dos.
+
+To use shared metadata, ask the database owner to complete [PostgreSQL configuration and migrations](./JIRA_SETUP.md#optional-team-database-postgresql), restart the API, then turn on **Use team DB**. Use **Refresh status** to check the connection. The exact warning **Team data not configured — set TEAM_PRIORITY_DATABASE_URL** appears only when a successful check confirms the switch is on and configuration is missing. A configured connection failure has a separate message.
+
+Turning the switch off preserves local data and unsaved Team drafts. Team saves, imports, and exports stay unavailable until Team is ready; they do not silently save locally. Choose **Local** explicitly when that is your intended destination. An operation already sent may finish, and other open browser tabs may need a refresh.
+
+![Optional Team database settings](./images/mockup-team-db-settings.png)
+*Documentation mockup — synthetic data; simplified layout.*
+
+### Older browser data notice
+
+If the banner says **Older browser data has an unknown Jira site**, the app has preserved old browser records without assigning them to the current site. Click **Dismiss** to acknowledge the notice. It stays hidden across reloads and site switches in this browser; the original data is neither deleted nor imported. With browser storage blocked, dismissal lasts for the current session. This is separate from the recovery notice for older personal To Dos.
+
+![Dismissible browser recovery notice](./images/mockup-recovery-notice.png)
+*Documentation mockup — synthetic data; simplified layout.*
 
 ### Epic & JQL presets
 
@@ -133,6 +151,22 @@ This is the main screen for managing your open work.
 │  Results table                       │
 └──────────────────────────────────────┘
 ```
+
+### Combined Open Work
+
+1. Add the Jira entries you need in **Settings → Jira sites**.
+2. In Task Management, select the **Combined Open Work** result tab, choose the saved entries, and click **Load open work**.
+3. Use **Managed tasks** to edit work in one table, or **List** for a compact overview. Each row names its Jira source; editing uses that saved source without switching the active site.
+4. Open **My Metrics → Combined Work Report** for **Current query results** or **All my assigned work**. Choose **Status Report**, **1:1 Prep**, or **PWB Review**, then use the existing generate, copy, and download controls.
+
+Open work means issues assigned to each entry's configured account whose Jira status category is not Done. Duplicate hostname/issue-key pairs count once in workload totals; rows, local notes, and planning remain separate for each saved entry. Managed editing uses the existing status, assignee, priority, notes/attachments, dates, and planning controls. Local and Team values remain separate; Team requires the opt-in and a working connection.
+
+Source metadata must finish loading before editing. Successful rows remain visible if another source fails. Partial or failed sources and bounded history searches retain coverage notices, including in generated reports. **Refresh** recollects the selected sources; **Cancel** stops collection. Wait for pending saves before changing selection or refreshing.
+
+Combined Work has one set of personal and company/team report goals across source selections. Its reports appear in **Past Reports → Combined Work**, separate from ordinary site reports and goals. It uses your existing AI provider setup.
+
+![Combined Open Work with Managed tasks and My Metrics](./images/mockup-combined-work.png)
+*Documentation mockup — synthetic data; simplified layout.*
 
 ### Header
 
@@ -270,7 +304,7 @@ A green banner confirms the active drill-down. Use **Clear filter** to remove th
 
 **Parent column:** Sits right after **Key** — links to the issue's parent (Story or Epic) when Jira reports one.
 
-On **shared projects**, link a Task Management slot to a **Shared program** (when the PostgreSQL team database is configured) so priorities sync across machines. Otherwise use local priority + the priority tracker CSV import — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
+On **shared projects**, link a Task Management slot to a **Shared program** (when **Use team DB** is on and PostgreSQL is connected) so priorities sync across machines. Otherwise use local priority + the priority tracker CSV import — see [Shared projects — notes and priority](#shared-projects--notes-and-priority-pms-and-managers) below.
 
 **Closed/resolved issues are read-only** — you can read them but not edit them.
 
@@ -461,13 +495,14 @@ When you open an issue's planning panel in Project Managers, the available field
 | Tab | Contents |
 |-----|----------|
 | **Task Management** | Project reports and week plans (saved automatically when you click Generate). Also includes a **Completed To Dos** section showing completed to-dos with date range filter chips: **Last 30 days**, **Last 90 days**, **All time** (default is last 90 days). |
-| **Dashboard** | Executive / PM / Developer audience reports (saved automatically on Generate) |
+| **Combined Work** | Reports generated from Combined Open Work, separate from the active site archive |
+| **Metrics** | Executive / PM / Developer audience reports (saved automatically on Generate) |
 | **Ad-hoc** | Chat assistant replies you explicitly saved with **Save to Past Reports** |
 | **Files** | Live list of CoWork `weekly-plan-*.md` files in the data folder (read from disk; optional **Save to archive**) |
 
 For each tab: pick a row → **View** → expand the report to read, copy, or download. Dashboard archived reports may include the status chart that was shown at generation time.
 
-**Deleting:** Task Management, Dashboard, and Ad-hoc each have a **Delete** button per row and a **Delete all** button for the whole tab (both ask for confirmation first — this cannot be undone). **Files** never deletes the actual file on disk; instead, a file that's already been **Save to archive**d shows a **Remove from archive** button (and a **Remove all from archive** button appears once at least one file has an archived copy) that removes just the saved database copy — the file itself is untouched. Files with no archived copy show neither button, since there's nothing to remove; use **Save to archive** first if you want a removable copy.
+**Deleting:** Task Management, Combined Work, Metrics, and Ad-hoc each have a **Delete** button per row and a **Delete all** button for the whole tab (both ask for confirmation first — this cannot be undone). **Files** never deletes the actual file on disk; instead, a file that's already been **Save to archive**d shows a **Remove from archive** button (and a **Remove all from archive** button appears once at least one file has an archived copy) that removes just the saved database copy — the file itself is untouched. Files with no archived copy show neither button, since there's nothing to remove; use **Save to archive** first if you want a removable copy.
 
 **CoWork weekly plans:** When Claude CoWork writes `weekly-plan-<date>.md` into the app's `data/` folder, those files show under **Files**. Content is read live from disk until you click **Save to archive**, which copies it into the local Past Reports database as a week plan (so it remains after the file is moved or deleted).
 
@@ -540,7 +575,7 @@ Some teams used a shared Excel tracker so everyone sees the same ranking. In The
 | Status and assignee changes | Yes — in Jira |
 | Notes you **push** as Jira comments | Yes — visible on the issue in Jira (text and inline attachments) |
 | Local **Notes** box (before push) | No — your machine only |
-| Note **attachments** (before push) | No — your machine only unless **Keep on this machine** is on |
+| Note **attachments** (before push) | No — **Keep on this machine** retains a local copy |
 | **Priority** on a personal Task Management slot | No — local SQLite on this machine |
 | **Priority** on a slot linked to a **Shared program** | Yes — PostgreSQL team database (Team badge) |
 | **Start date** on a personal Task Management slot | No — local SQLite on this machine |
@@ -549,13 +584,13 @@ Some teams used a shared Excel tracker so everyone sees the same ranking. In The
 
 ### Shared-program slots (recommended for team ranking)
 
-1. Ask your database owner to configure the PostgreSQL team database. Local use requires no company database.
-2. In Settings → **Team data**, check the connection; use **Import metadata** to review a CSV and **Save to team**, or explicitly **Seed from local priorities**.
+1. Ask your database owner to configure PostgreSQL, run the migrations, and restart the API. Local use requires no company database.
+2. In **Settings → Team data**, enable **Use team DB** and check the connection. Use **Import metadata** to review a CSV and **Save to team**, or explicitly **Save local priorities to team**.
 3. On Task Management, set the slot’s **Shared program**.
 4. Change **Priority** as usual — it saves to the shared store immediately. Rows show a **Team** badge when priority comes from that store.
 5. **Run JQL** on that slot loads priorities from the shared store (not from Jira comments).
 
-Personal slots (Shared program = None) keep using local SQLite only.
+Personal slots (Shared program = None) keep local ownership for priorities. In **Combined Open Work**, planning offers explicit **Local** and **Team** destinations; ordinary slots follow shared-program ownership. When Team is off, shared-program ownership is inactive; existing Team drafts are retained and explicit Team actions are blocked.
 
 ### Notes vs priority
 
@@ -581,23 +616,23 @@ Previews expire after 15 minutes. Restarting the API requires a new preview; bro
 
 ## Where your data lives
 
-| Data | Stored where | Shared with Jira? |
-|------|-------------|-------------------|
-| JQL inputs, labels, table snapshot | This browser only (`localStorage`) | No |
-| Task Management drill-down tabs | This browser session only (`sessionStorage`) | No |
-| On-page report/plan display (before archive) | This browser only (`localStorage`) | No |
-| **Past Reports** archive | Local file (`data/workweek.sqlite` → `generated_reports`), saved with your browser's local timestamp/timezone | No |
-| Chat session artifacts (for Chat context) | This browser only (`localStorage`) | No |
-| Desktop app credentials + DB (packaged) | `%APPDATA%\The Docket\` (Windows) or `~/Library/Application Support/The Docket/` (Mac) | No |
-| To-dos (Header To Do panel) | Local file (`data/workweek.sqlite`) | No |
-| Issue notes + priorities (P1–P20) | Local file (`data/workweek.sqlite`); shared-program slots use the PostgreSQL team database | No for personal slots — see [Shared projects](#shared-projects--notes-and-priority-pms-and-managers) |
-| Start date (ad-hoc, for Gantt views) | Local file (`data/workweek.sqlite`); shared-program slots use the PostgreSQL team database, same as priority | No for personal slots |
-| Note attachments (**Keep on this machine**) | Local file (`data/note-images/` + SQLite) | No — cleared after a successful **Push note** |
-| Epic/JQL preset team pack (export/import) | JSON file you save/share | No |
-| Metrics snapshot | Local file (`data/workweek.sqlite`) | No |
-| Status/assignee changes | Jira | Yes |
-| Due date / MRD changes | Jira | Yes |
-| Notes you push as comments | Jira | Yes — text and attachments; priority is not read from comments |
+Local files are under the launched project's `data/` directory by default. Registered Jira entries use `workweek-<instanceId>.sqlite`; legacy single-site mode uses `workweek.sqlite`. Same-hostname saved entries still have separate local stores.
+
+| Data | Stored where | Sharing behavior |
+|------|--------------|------------------|
+| JQL inputs, labels, table snapshots, on-page reports | Site-scoped browser storage | Searches go to Jira; selected context can be sent to AI |
+| Chat session artifacts | Site-scoped browser storage | Sent as context when you use Chat |
+| Ordinary Past Reports, presets, notes, planning, metrics snapshots | Site SQLite | Local unless explicitly sent to Jira, AI, or Team |
+| Combined Work goals and report archive | `data/docket-combined.sqlite` | Separate from ordinary site goals/reports; generation uses the configured AI provider |
+| Personal To Dos and completed history | `data/personal-todos.sqlite` | App-wide, independent of Jira sites and Team settings |
+| Saved Jira entries and Use team DB preference | `data/instances-meta.sqlite` | Server-managed configuration |
+| Note images kept on this machine | `data/note-images-<instanceId>/` or legacy `data/note-images/` | Sent to Jira only when pushed |
+| Team metadata | Optional PostgreSQL database | Shared through explicit Team operations when enabled and connected |
+| Status, assignee, Due date, MRD, pushed comments | Jira | Visible to people with access to the Jira issue |
+| Jira / AI credentials | Server environment or project `.env` | Used by the server to authenticate to the configured service |
+
+Personal To Dos save automatically across site switches, deletion of a site, and restarts. Existing records migrate with a ledger so deleted migrated items are not recreated. Ambiguous older records stay in their original database for recovery; a notice identifies that situation. New To Dos are limited to 15 active items, without discarding existing migrated items. Completed **All time** includes items with an unknown completion date.
+
 
 ---
 

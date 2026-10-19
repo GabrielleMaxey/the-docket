@@ -4,7 +4,26 @@
 
 ---
 
-## Screenshots
+## Current workflow mockups
+
+**Combined Open Work — Managed tasks, My Metrics, and source-aware editing**
+![Combined Open Work documentation mockup](./docs/images/mockup-combined-work.png)
+*Documentation mockup — synthetic data; simplified layout.*
+
+**Settings → Team data — explicit, optional team database access**
+![Team database settings documentation mockup](./docs/images/mockup-team-db-settings.png)
+*Documentation mockup — synthetic data; simplified layout.*
+
+**Older browser data — dismiss the notice while preserving the original data**
+![Recovery notice documentation mockup](./docs/images/mockup-recovery-notice.png)
+*Documentation mockup — synthetic data; simplified layout.*
+
+[Mockup sources and provenance](./docs/images/README.md).
+
+<details>
+<summary>Historical reference screenshots — earlier application layouts</summary>
+
+These older captures remain useful for orientation. They do not show the current Combined Work, Team DB opt-in, or recovery-notice behavior.
 
 **Task Management — daily JQL runs with inline status updates, priorities, and notes**
 ![Task Management table](./docs/images/screenshot-task-table.png)
@@ -27,11 +46,15 @@
 **Settings — Jira connection, presets, date fields, and contributor configuration**
 ![Settings](./docs/images/screenshot-settings.png)
 
+</details>
+
 ---
 
 ## Overview
 
-The Docket connects to your Jira project through a local Express proxy. Credentials stay in your local `.env` file; no third-party cloud service receives them.
+The Docket connects to Jira through a local Express proxy. Work in one saved Jira site or collect assigned work across saved sites in **Combined Open Work**. Local notes, planning, personal To Dos, and report archives remain available without a company database. Shared team metadata uses optional PostgreSQL, enabled explicitly in Settings.
+
+The server reads credentials from its environment and authenticates requests to Jira or the selected AI provider. AI chat and reports send their selected context to that provider; the browser does not receive the Jira API token.
 
 ---
 
@@ -39,14 +62,14 @@ The Docket connects to your Jira project through a local Express proxy. Credenti
 
 | Tab | Use it for | Key outputs |
 |-----|------------|-------------|
-| Task Management | Daily JQL runs, issue edits, notes, priorities, create issue | Per-query metrics, project reports, week plans |
+| Task Management | Daily JQL runs, Combined Open Work, issue edits, notes, priorities, personal To Dos | My Metrics, reports, week plans, task workbooks |
 | Metrics | Project and contributor health across saved epics/JQL presets | Metrics snapshot, audience reports, weekly digest |
 | Project Managers | Capacity planning from Contributor Metrics entries, Gantt timelines, and stakeholder Asks | Capacity cards, `.md` / `.csv` exports, saved reports, Asks CSV |
-| Past Reports | Archived generated outputs and saved Chat replies | View, copy, download, or delete local report records |
+| Past Reports | Site archives, Combined Work reports, saved Chat replies, completed To Dos | View, copy, download, or delete local report records |
 | Chat | Natural-language Jira questions with app session context | Jira-backed answers, optional save to Past Reports |
 | Settings | Jira setup, presets, field mappings, report/chat preferences | Shared preset packs and connection checks |
 
-**Task Management** is the daily driver. Run up to five saved JQL queries, update status or assignee, set P1–P20 priority, write notes, push notes to Jira, attach screenshots and recordings, create issues, and generate AI reports or week plans from the loaded work.
+**Task Management** is the daily driver. Use **Combined Open Work → Managed tasks** to edit assigned work across saved Jira entries, or **List** for a compact overview. My Metrics includes Status Report, 1:1 Prep, and PWB Review, with separate Combined Work goals and archive. Run up to five saved JQL queries, update status or assignee, set P1–P20 priority, write notes, push notes to Jira, attach screenshots and recordings, create issues, and generate AI reports or week plans from the loaded work.
 
 **Metrics** is the project view. Pick saved Epic/JQL presets, refresh a Jira snapshot, review overall/project/contributor metrics, inspect due-date lists, and generate leadership or team-facing reports.
 
@@ -115,6 +138,8 @@ Some corporate secure laptops may block Electron windows, local desktop apps, or
 
 Packaged installers, including unsigned Mac `.dmg` and Windows NSIS installers, are unsupported. Both supported launch workflows require the project checkout, Node, installed dependencies, and the local `.env` setup above. `npm run build` builds the browser assets; `npm run desktop:build` remains an alias for that build.
 
+After starting, test the Jira connection in **Settings**. Add saved entries under **Jira sites** to use Combined Open Work; then select the result tab in Task Management and click **Load open work**. Leave **Settings → Team data → Use team DB** off for local work. Company database setup is optional; follow [the team setup steps](#optional-shared-team-data-postgresql) before enabling it.
+
 ### Native SQLite recovery
 
 Installation rebuilds `better-sqlite3` for Node. `npm run dev:all` rebuilds it for the browser API, while `npm run desktop:dev` rebuilds it for Electron before launching. These runtimes use different native ABIs, so stop the current workflow before switching.
@@ -163,7 +188,7 @@ Unit and PostgreSQL results are reported separately in CI. Company SonarQube rem
 
 ## Optional shared team data (PostgreSQL)
 
-Local SQLite works without a team database. A company database is neither provisioned nor needed for local use. To enable shared data, have the database owner provide an approved PostgreSQL database and set server-only `TEAM_PRIORITY_DATABASE_URL` (explicit user, hostname and database). Optionally set `TEAM_PRIORITY_DATABASE_CA_FILE` to an absolute PEM trust-file path. Keep credentials out of browser settings, source control and exported files.
+Local SQLite works without a team database. **Settings → Team data → Use team DB** defaults to off, even when a database URL is configured. This preference is saved app-wide across Jira sites and server restarts. To enable shared data, have the database owner provide an approved PostgreSQL database and set server-only `TEAM_PRIORITY_DATABASE_URL` (explicit user, hostname and database). Optionally set `TEAM_PRIORITY_DATABASE_CA_FILE` to an absolute PEM trust-file path. Keep credentials out of browser settings, source control and exported files.
 
 Remote connections always verify TLS against the system trust roots or the supplied CA. Remove SSL options from the URL when providing a CA; conflicting URL options are rejected. URLs may contain only `sslmode=verify-full`, or `sslmode=disable` for explicit loopback development/test hosts. TLS-free access is allowed only for `localhost`, `127.0.0.1` or `::1` outside production. Production requires verified TLS even on loopback. The pool opens lazily, has at most five connections, a five-second connect timeout and a thirty-second statement timeout.
 
@@ -176,7 +201,11 @@ npm run dev:all
 
 The migration CLI reads the exported environment; it does not read `.env`. The API also supports its normal server `.env`. Migrations run only when explicitly requested. Version records in `team_schema_versions` and a transaction-level migration lock make repeated/concurrent runs safe. A failed migration rolls back; correct the reported setup problem and rerun. Before an upgrade, use your approved database backup process; restore that backup into a separate database for recovery. Do not edit an applied migration or drop shared tables as a recovery shortcut.
 
-Settings → **Team data** shows configured/connected status. An absent schema is unavailable with `npm run team-db:migrate` guidance, rather than an empty shared-data result. Individual priority/date edits and explicit priority push/pull remain available. Settings → **Import metadata** opens an editable CSV preview: fix values, exclude rows, add/remove supported columns, and review old/new values before **Approve changes**. **Save locally** and **Save to team** are equally primary choices for priority, note, Now/Next, requestor, planned start/finish, actual start and decision note. Team saving requires a configured, connected database and never falls back to local saving. Changing the destination reads that destination's values and requires fresh approval. Existing notes are protected unless replacement is checked for that row. Empty CSV cells preserve saved values; clearing an edited field is explicit. Importing never changes Jira or note images. Re-run your task query after saving.
+After configuring the server and running migrations, restart the API, open **Settings → Team data**, select **Use team DB**, and click **Refresh status** to confirm the connection. Configuration alone does not enable Team access.
+
+The warning **Team data not configured — set TEAM_PRIORITY_DATABASE_URL** appears only after a successful status check says Team is enabled and unconfigured. Off, loading, failed checks, and configured-but-disconnected states have separate messages. Turning Team off preserves local work and Team drafts; explicit Team imports, exports, and saves remain Team actions and are blocked rather than redirected to Local. Already dispatched work may finish. Other open browser tabs may need a refresh.
+
+Settings → **Team data** shows enabled/configured/connected status. An absent schema is unavailable with `npm run team-db:migrate` guidance, rather than an empty shared-data result. Individual priority/date edits and explicit priority push/pull remain available. Settings → **Import metadata** opens an editable CSV preview: fix values, exclude rows, add/remove supported columns, and review old/new values before **Approve changes**. **Save locally** and **Save to team** are equally primary choices for priority, note, Now/Next, requestor, planned start/finish, actual start and decision note. Team saving requires an enabled, configured, connected database and never falls back to local saving. Changing the destination reads that destination's values and requires fresh approval. Existing notes are protected unless replacement is checked for that row. Empty CSV cells preserve saved values; clearing an edited field is explicit. Importing never changes Jira or note images. Re-run your task query after saving.
 
 `POST /api/jira/issue-metadata/import/preview` accepts `{destination:'local'|'team',csvText?,rows?,supersedesPreviewId?}` with exactly one input. Edited rows are `{rowId,issueKey,selected,patch,replaceNote}`. Responses contain `previewId,siteContext,destination,rows,diff,errors,ignoredHeaders,expiresAt`; diff includes supported saved values and approved old/new changes. `supersedesPreviewId` replaces only an uncommitted, unexpired preview bound to the same accepted site context; invalid replacement retains the old preview. Five live previews can wait for at most 15 minutes. Approval alone writes nothing; `POST /api/jira/issue-metadata/import/commit` accepts only the reviewed `previewId` for saving. Authoritative patches/expected values remain private on the server. Conflicts reject the whole batch and require a new preview; site switching or API restart also requires re-review. Up to five successful results are retained separately for 60 seconds for duplicate-submit confirmation. A network failure has an unknown outcome: retry the same save before starting another destination. The obsolete `/api/jira/issue-metadata/import` and `/api/team-priority/import-csv` mutation endpoints return 409 `IMPORT_PREVIEW_REQUIRED` with Settings guidance. Full team reads remain at `POST /api/team-priority/metadata/bulk`.
 
@@ -238,26 +267,31 @@ Collection is sequential with the existing Jira request timeout plus `DOCKET_EXP
 
 | What | Where stored | Leaves your machine? |
 |------|-------------|----------------------|
-| JQL text, labels, last table snapshot | Browser `localStorage` | No |
+| JQL text, labels, last table snapshot | Site-scoped browser `localStorage` | Searches go to Jira; selected context may go to the AI provider |
 | Task Management drill-down tabs | Browser `sessionStorage` | No |
-| Chat session artifacts (reports/plans for context) | Browser `localStorage` | No |
-| On-page reports/plans (Task Management + Metrics) | Browser `localStorage` | No |
-| **Past Reports** archive | `data/workweek.sqlite` → `generated_reports` | No |
+| Chat session artifacts (reports/plans for context) | Site-scoped browser `localStorage` | Included when sending Chat context to the selected provider |
+| On-page reports/plans (Task Management + Metrics) | Browser `localStorage` | Generated through the selected AI provider; may be included in Chat context |
+| **Past Reports** archive | Site SQLite; Combined Work uses `data/docket-combined.sqlite` | Stored locally; generation context goes to the selected AI provider |
 | Personal To Dos + completed history | `data/personal-todos.sqlite` (local file) | No |
-| Per-issue notes + P1–P20 priority | `data/workweek.sqlite` (local file) | No for personal slots |
-| Start date (ad-hoc, for Gantt views) | `data/workweek.sqlite` (local file) | No for personal slots |
+| Per-issue notes + P1–P20 priority | Site SQLite (local file) | Selected values may be sent as report/Chat context or explicitly saved to Team; notes can be pushed to Jira |
+| Start date (ad-hoc, for Gantt views) | Site SQLite (local file) | Selected planning context may be sent to AI or explicitly saved to Team |
 | Status/assignee changes | Jira (your Atlassian instance) | Yes — visible in Jira to anyone with access |
 | Due date / MRD changes | Jira (your Atlassian instance) | Yes |
 | Notes you push as comments | Jira (your Atlassian instance) | Yes — text and attachments, rendered as markdown |
-| Metrics snapshot | `data/workweek.sqlite` | No |
-| Jira credentials | `.env` file on this machine | No — only the local proxy reads them |
+| Metrics snapshot | Site SQLite | Selected context may be included in AI requests |
+| Jira credentials | Server environment / local `.env` | Server sends authentication to approved Jira destinations |
+| Team metadata | Optional PostgreSQL database | Yes — explicit Team operations use the configured database |
 | Chat message content | Your configured LLM provider (Anthropic/OpenAI/etc.) when you send a message | Yes — to that provider's API |
 
 ---
 
 Personal To Dos save automatically without a Jira connection and remain available across site switches, site deletion, and restarts. They are separate from team priorities. Existing records migrate without applying the 15-active-item creation limit; new items are allowed once fewer than 15 are active. Completed **All time** includes entries whose completion date is unknown.
 
-Migration keeps source databases and a durable record ledger, so deleting a migrated item never recreates it. Historical seed flags cannot prove whether a legacy database was copied, and old reminder conversion left no ledger. Ambiguous records stay in the original local databases for recovery; the To Do response and completed history panel show a recovery notice with source IDs and counts. Other report archives remain scoped to the selected Jira site.
+Migration keeps source databases and a durable record ledger, so deleting a migrated item never recreates it. Historical seed flags cannot prove whether a legacy database was copied, and old reminder conversion left no ledger. Ambiguous records stay in the original local databases for recovery; the To Do response and completed history panel show a recovery notice with source IDs and counts. Site report archives remain scoped to their saved Jira entry; Combined Work has a separate archive.
+
+Site SQLite means `data/workweek-<instanceId>.sqlite` for registered entries, or `data/workweek.sqlite` in legacy single-site mode. Saved entries remain distinct even when their hostnames match. The registry and app-wide Team preference live in `data/instances-meta.sqlite`; personal To Dos use `data/personal-todos.sqlite`.
+
+The separate **Older browser data has an unknown Jira site** notice concerns unscoped browser records. **Dismiss** hides that notice for this browser across reloads and site switches without importing, assigning, or deleting the original data. If browser storage is blocked, dismissal lasts for the current session.
 
 ## Tech stack
 
@@ -265,7 +299,7 @@ Migration keeps source databases and a durable record ledger, so deleting a migr
 - **Backend**: Express.js proxy (`server/`), better-sqlite3
 - **Desktop**: Electron 43 (local development)
 - **AI**: Anthropic / OpenAI / Ollama (configurable in `.env`)
-- **Database**: SQLite at `data/workweek.sqlite` (auto-created on first run)
+- **Database**: Local SQLite stores per saved site, plus personal To Dos and Combined Work; optional PostgreSQL for shared metadata
 
 ### Download a task workbook
 
@@ -277,11 +311,11 @@ Changes to selected entries, source, scope, or filters clear the preview. Retry 
 
 ### Combined Open Work
 
-Open **Task Management** and choose the **Combined Open Work** result tab beside your JQL preset tabs (`#/work-week?tab=combined-open-work`; the old `#/combined-open-work` link redirects here) to see Jira issues assigned to the account configured for each selected saved site. Enabled saved entries are selected initially; choose the entries you want and click **Load open work**. The fixed search is `assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC, key ASC`, across all projects accessible to that account. Collection leaves the active Jira site unchanged. This view is read-only.
+Open **Task Management** and choose the **Combined Open Work** result tab beside your JQL preset tabs (`#/work-week?tab=combined-open-work`; the old `#/combined-open-work` link redirects here) to see Jira issues assigned to the account configured for each selected saved site. Enabled saved entries are selected initially; choose the entries you want and click **Load open work**. The fixed search is `assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC, key ASC`, across all projects accessible to that account. Collection leaves the active Jira site unchanged. **Managed tasks** is the default editable table, with a Jira site column and expanded **My Metrics**. **List** offers a compact read-only presentation of the same collected work. Wait for source metadata and inherited dates to load before editing; source failures remain visible.
 
-The combined table shows the saved site label and hostname, issue link, title, status, Jira priority, and due date. Saved entries remain separate even when their hostname or issue keys match. Successful rows stay visible when a peer fails; failed entries are explicitly identified rather than reported as having no work. A partial notice means the list is incomplete. **Refresh** retries the selected set, **Cancel** stops collection, and changing selection clears prior results.
+The List table shows the saved site label and hostname, issue link, title, status, Jira priority, and due date. Saved entries remain separate even when their hostname or issue keys match. Successful rows stay visible when a peer fails; failed entries are explicitly identified rather than reported as having no work. A partial notice means the list is incomplete. **Refresh** retries the selected set, **Cancel** stops collection, and changing selection clears prior results.
 
-`POST /api/combined-open-work` accepts only `{instanceIds: string[]}` with one to five unique enabled saved-entry IDs. It uses the configured account email and server token per saved entry and returns no credentials or assignee details. The response is not cached. Entries being collected cannot be edited/deleted until all their requests settle.
+`POST /api/combined-open-work` accepts only `{instanceIds: string[]}` with one to five unique enabled saved-entry IDs. It uses the configured account email and server token per saved entry and returns source context and issue data, but no credentials. The collection endpoint does not cache the response; editor drafts and report state have their own source-scoped persistence. Entries being collected cannot be edited/deleted until all their requests settle.
 
 Server settings `DOCKET_OPEN_WORK_MAX_ROWS_PER_SITE` (default/cap 5000) and `DOCKET_OPEN_WORK_TIMEOUT_MS` (default 120000 ms, cap 600000 ms) bound this view. Settings accept positive integers; invalid values use the default and larger values are capped. Reaching row, collection-deadline, or pagination bounds marks returned rows partial. The existing Jira request timeout still applies independently.
 
@@ -289,6 +323,6 @@ Server settings `DOCKET_OPEN_WORK_MAX_ROWS_PER_SITE` (default/cap 5000) and `DOC
 
 Combined Open Work opens in Managed tasks mode: one editable table with a Jira site column, expanded My Metrics, and an optional List view. Selected saved entries contribute unfinished work assigned to their configured accounts. Duplicate hostname/issue-key pairs count once in workload totals; each saved entry retains its own notes and local planning. Local and Team planning destinations remain separate.
 
-My Metrics includes current-results and assigned-work-history reports, Status, 1:1 Prep and PWB controls. History uses each captured saved source, with a 500-issue bound per search and visible incomplete-coverage notices. Jira/date/metadata failures do not erase known issue counts. Reports retain source labels and missing-coverage notices.
+My Metrics includes **Current query results** and **All my assigned work**, with **Status Report**, **1:1 Prep**, and **PWB Review** controls. History uses each captured saved source, with a 500-issue bound per search and visible incomplete-coverage notices. Jira/date/metadata failures do not erase known issue counts. Reports retain source labels and missing-coverage notices.
 
 Combined Work has one shared set of report goals, independent of selected entries, and its own **Past Reports → Combined Work** archive. These live in `docket-combined.sqlite` under the application's data directory. Ordinary site goals and archives are not copied or migrated. Report generation uses the existing AI provider configuration. Combined browser report/job state uses `docket:combined-work:` keys; source edits retain their captured saved-entry revision and never activate another site.

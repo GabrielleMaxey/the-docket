@@ -21,7 +21,8 @@ export default function CombinedOpenWork() {
   const [confirmedIssues, setConfirmedIssues] = React.useState({});
   const [confirmedTeam, setConfirmedTeam] = React.useState({});
   const jobs = useBackgroundJobs();
-  const saving = jobs.some((job) => job.siteSave && result?.sites.some((site) => site.instanceId === job.instanceId));
+  const saves = jobs.filter((job) => job.siteSave && result?.sites.some((site) => site.instanceId === job.instanceId));
+  const saving = saves.length > 0;
   const onModel = React.useCallback((id, model) => setModels((current) => ({ ...current, [id]: model })), []);
   const onConfirmedIssue = React.useCallback((context, issue) => {
     setConfirmedIssues((current) => ({ ...current, [context.siteHost]: { ...current[context.siteHost], [issue.key]: issue } }));
@@ -146,7 +147,7 @@ export default function CombinedOpenWork() {
             <button type="button" className="ui button" aria-pressed={mode === "managed"} onClick={() => setMode("managed")}>Managed tasks</button>
             <button type="button" className="ui button" aria-pressed={mode === "list"} onClick={() => setMode("list")}>List</button>
           </div>
-          {saving && <p role="status">Saving source changes. Wait for the result before refreshing or changing sites.</p>}
+          {saves.some((job) => !job.id.includes(":note-autosave:")) && <p role="status">Saving source changes. Wait for the result before refreshing or changing sites.</p>}
           {metricSites.filter((site) => site.sourceContext && !site.hydrationReady && !site.hydrationError).map((site) => <p key={site.instanceId} role="status">{site.displayName}: Loading source metadata and inherited dates before editing…</p>)}
           {metricSites.filter((site) => site.hydrationError).map((site) => <p key={site.instanceId} role="alert" className="ui warning message">{site.displayName}: {site.hydrationError}</p>)}
           <fieldset disabled={loading} hidden={mode !== "managed"} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
