@@ -390,6 +390,8 @@ Each card shows open issue count, capacity status, status/assignee breakdowns, a
 
 Use **Save to Reports** to archive the current view, or download the planning summary as `.md` or `.csv`.
 
+Two more tabs sit beside **Capacity**: **Gantt** for timelines and **Asks** for tracking stakeholder requests — see below.
+
 ### Gantt tab
 
 The **Gantt** tab visualizes issue timelines with the following capabilities:
@@ -428,7 +430,21 @@ Pin any issue to the Gantt by opening its planning panel and checking **Pin to G
 
 ### Asks panel
 
-The text inputs for **Title**, **Who Asked**, and **Note** in the Asks panel auto-expand as you type — each field grows to fit your text rather than requiring you to scroll within a cramped fixed-height box.
+Use the **Asks** tab to track requests from executives, product owners, and other stakeholders before they become Jira work — a personal parking lot so nothing said in a meeting or hallway gets lost.
+
+1. Enter a **Title**, **Who asked** (for example, "VP Engineering" or "PO – Checkout"), and an optional **Note**, then click **Add**. The fields grow as you type.
+2. Each open ask has these actions:
+
+| Action | What it does |
+|--------|----------------|
+| **Create a task** | Opens **Create Issue** on Task Management with the ask's title and note filled in. When the issue is created, the ask is marked **Done** and linked to the new Jira key (click the key to open it in Jira). If linking fails, the ask stays open. |
+| **Done** | Marks the ask complete without creating a Jira issue. |
+| **Cancel** | Marks the ask canceled (for example, the request was withdrawn). |
+| **Edit** / **Delete** | Change the title, who asked, or note; or remove the ask (asks for confirmation). |
+
+Open asks are listed first; done and canceled asks show a status badge and can be **Reopen**ed or deleted. Use **Download CSV** to share the list (title, who asked, status, Jira key, note).
+
+Asks are stored only in this machine's local database for the active Jira site. They are not shared with your team, and ask notes are never pushed to Jira — only the issue you create with **Create a task** goes to Jira.
 
 ### Planning panel fields
 
