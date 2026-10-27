@@ -10,7 +10,8 @@ import {
 const hasLlmFallback = () =>
   Boolean(process.env.ANTHROPIC_API_KEY) ||
   Boolean(process.env.OPENAI_API_KEY) ||
-  Boolean(process.env.OLLAMA_BASE_URL);
+  Boolean(process.env.OLLAMA_BASE_URL) ||
+  Boolean(process.env.DATABRICKS_TOKEN);
 
 export const sendRovoChatMessage = async ({
   systemPrompt,
@@ -35,7 +36,7 @@ export const sendRovoChatMessage = async ({
       log.warn("Rovo MCP request failed", detail);
       if (!hasLlmFallback()) {
         throw new Error(
-          `Rovo MCP failed (${detail}). Sign in with Atlassian or configure an LLM fallback (ANTHROPIC_API_KEY, OPENAI_API_KEY, or Ollama).`
+          `Rovo MCP failed (${detail}). Sign in with Atlassian or configure an LLM fallback (ANTHROPIC_API_KEY, OPENAI_API_KEY, DATABRICKS_TOKEN, or Ollama).`
         );
       }
     }
