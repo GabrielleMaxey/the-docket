@@ -124,8 +124,7 @@ export const registerChatRoutes = (app, { withSiteOperation = (handler) => handl
     if (!pending || Date.now() > pending.expiresAt) {
       return res.status(409).json({ error: "Invalid or expired OAuth state. Try signing in again.", code: "SITE_CONTEXT_CHANGED" });
     }
-    // OAuth navigation cannot send API headers. Only this server-issued one-time
-    // state supplies callback context; callback query values never supply it.
+
     req.headers["x-docket-site"] = pending.siteContext.instanceId || "legacy";
     req.headers["x-docket-generation"] = pending.siteContext.generation;
     return next();
