@@ -64,7 +64,7 @@ The server reads credentials from its environment and authenticates requests to 
 |-----|------------|-------------|
 | Task Management | Daily JQL runs, Combined Open Work, issue edits, notes, priorities, personal To Dos | My Metrics, reports, week plans, task workbooks |
 | Metrics | Project and contributor health across saved epics/JQL presets | Metrics snapshot, audience reports, weekly digest |
-| Project Managers | Capacity planning from Contributor Metrics entries | Capacity cards, `.md` / `.csv` exports, saved reports |
+| Project Managers | Capacity planning from Contributor Metrics entries, Gantt timelines, and stakeholder Asks | Capacity cards, `.md` / `.csv` exports, saved reports, Asks CSV |
 | Past Reports | Site archives, Combined Work reports, saved Chat replies, completed To Dos | View, copy, download, or delete local report records |
 | Chat | Natural-language Jira questions with app session context | Jira-backed answers, optional save to Past Reports |
 | Settings | Jira setup, presets, field mappings, report/chat preferences | Shared preset packs and connection checks |
@@ -73,7 +73,7 @@ The server reads credentials from its environment and authenticates requests to 
 
 **Metrics** is the project view. Pick saved Epic/JQL presets, refresh a Jira snapshot, review overall/project/contributor metrics, inspect due-date lists, and generate leadership or team-facing reports.
 
-**Project Managers** turns Contributor Metrics entries into a capacity view. It compares open issue counts against optional capacity targets, highlights overdue/blocked/stale work, and exports planning summaries.
+**Project Managers** turns Contributor Metrics entries into a capacity view. It compares open issue counts against optional capacity targets, highlights overdue/blocked/stale work, and exports planning summaries. The **Asks** tab tracks exec or product-owner requests: create a Jira task from an ask (it links the new key and marks the ask done), or mark it done or canceled.
 
 **Past Reports** is the local archive for generated Task Management reports, week plans, Metrics reports, and Chat replies saved with **Save to Past Reports**.
 
