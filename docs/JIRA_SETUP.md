@@ -92,12 +92,16 @@ An **Older browser data has an unknown Jira site** banner means original unscope
 
 | Variable | Example | Notes |
 |----------|---------|-------|
-| `CHAT_PROVIDER` | `anthropic` | **Required** to enable chat. Use `openai`, `ollama`, `rovo`, or `disabled`. Unset = chat off |
+| `CHAT_PROVIDER` | `anthropic` | **Required** to enable chat. Use `openai`, `ollama`, `databricks`, `rovo`, or `disabled`. Unset = chat off |
 | `ANTHROPIC_API_KEY` | `sk-ant-...` | Required when `CHAT_PROVIDER=anthropic` |
 | `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Optional model override |
 | `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Optional; custom Anthropic-compatible API host |
 | `OPENAI_API_KEY` | `sk-...` | When `CHAT_PROVIDER=openai` or `REPORT_PROVIDER=openai` |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible endpoints (Databricks, Azure, LiteLLM, vLLM) |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible endpoints (Azure, LiteLLM, vLLM) |
+| `DATABRICKS_HOST` | `https://<workspace-host>` | When `CHAT_PROVIDER=databricks` or `REPORT_PROVIDER=databricks` |
+| `DATABRICKS_TOKEN` | `dapi...` | Databricks personal access token with permission to query the serving endpoint |
+| `DATABRICKS_ENDPOINT` | `<endpoint-name>` | Databricks serving endpoint name (sent as the chat `model`) |
+| `REPORT_DATABRICKS_ENDPOINT` | | Optional report-only serving endpoint (falls back to `DATABRICKS_ENDPOINT`) |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Optional OpenAI / compatible model name |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | When `CHAT_PROVIDER=ollama` or `REPORT_PROVIDER=ollama` |
 | `OLLAMA_MODEL` | `llama3.2` | Local model for chat (and reports if `OLLAMA_REPORT_MODEL` unset) |
@@ -118,7 +122,7 @@ An **Older browser data has an unknown Jira site** banner means original unscope
 | `MANAGED_AI_MODEL` | | Pinned company model id |
 | `AI_MODE` | `managed` or `local` | Optional host lock; overrides the Settings AI path choice |
 
-Chat and reports use the same provider (`CHAT_PROVIDER`) unless you set `REPORT_PROVIDER`. All three built-in providers (`anthropic`, `openai`, `ollama`) can generate reports and week plans.
+Chat and reports use the same provider (`CHAT_PROVIDER`) unless you set `REPORT_PROVIDER`. All four built-in providers (`anthropic`, `openai`, `ollama`, `databricks`) can generate reports and week plans.
 
 When **Managed / Company AI** is configured (`MANAGED_AI_BASE_URL`, `MANAGED_AI_API_KEY`, and `MANAGED_AI_MODEL` all set), it is the default for chat and reports. Users switch to Local only in **Settings → Chat assistant** when both paths are ready. The app does not silently fall back from Managed to Local on errors — a failed Managed call surfaces the error. `REPORT_PROVIDER` and `REPORT_*` credentials apply only while **Local** is the active path.
 
@@ -249,7 +253,8 @@ When both Managed and Local are ready, the app defaults to **Company AI**. Switc
 |------|----------------|
 | Anthropic (chat + reports) | `CHAT_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` |
 | OpenAI (chat + reports) | `CHAT_PROVIDER=openai` + `OPENAI_API_KEY` |
-| OpenAI-compatible (Databricks, Azure, LiteLLM, vLLM) | `CHAT_PROVIDER=openai` + `OPENAI_API_KEY` + `OPENAI_BASE_URL` + `OPENAI_MODEL` |
+| Databricks Model Serving | `CHAT_PROVIDER=databricks` + `DATABRICKS_HOST` + `DATABRICKS_TOKEN` + `DATABRICKS_ENDPOINT` |
+| OpenAI-compatible (Azure, LiteLLM, vLLM) | `CHAT_PROVIDER=openai` + `OPENAI_API_KEY` + `OPENAI_BASE_URL` + `OPENAI_MODEL` |
 | Local Ollama (chat + reports) | `CHAT_PROVIDER=ollama` + `OLLAMA_BASE_URL` (+ optional `OLLAMA_REPORT_MODEL` for a larger report model) |
 | Ollama chat + cloud reports | `CHAT_PROVIDER=ollama` + `REPORT_PROVIDER=openai` (+ report OpenAI vars; use `REPORT_OPENAI_*` if different from chat) |
 | Turn chat off | `CHAT_PROVIDER=disabled` or leave unset |
@@ -278,7 +283,7 @@ Only use if your Jira Cloud org has Rovo MCP enabled.
 
 `offline_access` enables refresh tokens; `search:rovo:mcp` is required for Rovo MCP search.
 
-**LLM fallback:** Chat is considered ready when you are signed in to Atlassian **or** when an LLM key is configured (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `OLLAMA_BASE_URL`). If Rovo MCP fails or you are not signed in, the proxy answers via the configured LLM and returns a `note` in the chat response (e.g. "Rovo MCP unavailable; answered via configured LLM fallback."). Configure at least one LLM key on the proxy host for reliable chat when Rovo is down.
+**LLM fallback:** Chat is considered ready when you are signed in to Atlassian **or** when an LLM key is configured (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DATABRICKS_TOKEN`, or `OLLAMA_BASE_URL`). If Rovo MCP fails or you are not signed in, the proxy answers via the configured LLM and returns a `note` in the chat response (e.g. "Rovo MCP unavailable; answered via configured LLM fallback."). Configure at least one LLM key on the proxy host for reliable chat when Rovo is down.
 
 ### Chat session context
 
@@ -294,6 +299,17 @@ Each Chat message includes **session context** assembled in the browser and sent
 Artifacts are saved automatically when the user generates a Task Management project report, week plan, or Metrics audience report (also written to **Past Reports** in SQLite). Chat replies are **not** auto-archived — use **Save to Past Reports** on the assistant bubble. The proxy formats session context into the system prompt via `shared/chatSessionPrompt.mjs` so the model can answer questions like "what did my week plan say?" without re-running Jira searches.
 
 Session context stays in the browser and SQLite (dashboard snapshot + archived reports); only the formatted prompt text is sent to your LLM provider (or Rovo) with each chat message.
+
+### Databricks Model Serving
+
+```env
+CHAT_PROVIDER=databricks
+DATABRICKS_HOST=https://<workspace-host>
+DATABRICKS_TOKEN=<personal-access-token>
+DATABRICKS_ENDPOINT=<serving-endpoint-name>
+```
+
+The app calls `<DATABRICKS_HOST>/serving-endpoints/chat/completions` with the endpoint name as `model`. Pick a chat endpoint that supports tool calling, since chat uses it for Jira search. Set `REPORT_DATABRICKS_ENDPOINT` to send reports to a different endpoint. Restart the API after editing `.env`.
 
 ### OpenAI-compatible providers
 
@@ -311,13 +327,13 @@ Use the same pattern for **reports only** on a different endpoint:
 ```env
 CHAT_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434
-REPORT_PROVIDER=openai
-REPORT_OPENAI_API_KEY=<databricks-token>
-REPORT_OPENAI_BASE_URL=https://<workspace-host>/serving-endpoints/<endpoint>/invocations/v1
-REPORT_OPENAI_MODEL=claude-sonnet-...
+REPORT_PROVIDER=databricks
+DATABRICKS_HOST=https://<workspace-host>
+DATABRICKS_TOKEN=<databricks-token>
+DATABRICKS_ENDPOINT=<endpoint-name>
 ```
 
-For Databricks, Azure, LiteLLM, vLLM, or similar gateways, confirm the endpoint supports chat completions, create a token with permission to call it, ensure the proxy machine can reach the URL, then set the OpenAI-compatible variables above and restart the API.
+For Azure, LiteLLM, vLLM, or similar gateways, confirm the endpoint supports chat completions, create a token with permission to call it, ensure the proxy machine can reach the URL, then set the OpenAI-compatible variables above and restart the API.
 
 If your endpoint uses a different request format (not OpenAI chat completions or Anthropic messages), you would need a dedicated provider in `server/lib/llmClient.mjs`.
 

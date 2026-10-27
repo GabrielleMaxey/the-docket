@@ -7,8 +7,8 @@ import {
 import { AI_PATH_MANAGED, getManagedAiCredentials } from "./aiPath.mjs";
 
 const MAX_TOOL_ROUNDS = 3;
-const SUPPORTED_PROVIDERS = new Set(["openai", "anthropic", "ollama"]);
-const LLM_PROVIDER_ORDER = ["anthropic", "openai", "ollama"];
+const SUPPORTED_PROVIDERS = new Set(["openai", "anthropic", "ollama", "databricks"]);
+const LLM_PROVIDER_ORDER = ["anthropic", "openai", "ollama", "databricks"];
 
 export const ROVO_PROVIDER = "rovo";
 
@@ -98,6 +98,8 @@ const isLlmCredentialReady = (provider) => {
       return Boolean(process.env.ANTHROPIC_API_KEY);
     case "ollama":
       return Boolean(process.env.OLLAMA_BASE_URL);
+    case "databricks":
+      return isDatabricksConfigured();
     default:
       return false;
   }
@@ -111,6 +113,8 @@ const isReportProviderReady = (provider) => {
       return Boolean(process.env.REPORT_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY);
     case "ollama":
       return Boolean(process.env.OLLAMA_BASE_URL);
+    case "databricks":
+      return isDatabricksConfigured({ forReports: true });
     default:
       return false;
   }
@@ -123,6 +127,7 @@ export const isChatProviderReady = (provider, { oauthConnected = false } = {}) =
     case "openai":
     case "anthropic":
     case "ollama":
+    case "databricks":
       return isLlmCredentialReady(provider);
     default:
       return false;
@@ -132,7 +137,8 @@ export const isChatProviderReady = (provider, { oauthConnected = false } = {}) =
 const hasAnyLlmFallback = () =>
   isLlmCredentialReady("anthropic") ||
   isLlmCredentialReady("openai") ||
-  isLlmCredentialReady("ollama");
+  isLlmCredentialReady("ollama") ||
+  isLlmCredentialReady("databricks");
 
 /** @deprecated Use isChatProviderReady */
 export const isLlmProviderReady = (provider) => isLlmCredentialReady(provider);
@@ -147,9 +153,18 @@ export const extractAssistantText = (data) => {
     return data.trim();
   }
 
-  const openAiText = data?.choices?.[0]?.message?.content;
-  if (typeof openAiText === "string") {
-    return openAiText.trim();
+  const openAiContent = data?.choices?.[0]?.message?.content;
+  if (typeof openAiContent === "string") {
+    return openAiContent.trim();
+  }
+  // Some Databricks-served models return content as typed blocks, e.g.
+  // [{ type: "reasoning", ... }, { type: "text", text: "..." }]. Keep only the text blocks.
+  if (Array.isArray(openAiContent)) {
+    return openAiContent
+      .filter((block) => typeof block === "string" || (block?.type === "text" && typeof block.text === "string"))
+      .map((block) => (typeof block === "string" ? block : block.text))
+      .join("")
+      .trim();
   }
 
   const anthropicText = data?.content?.[0]?.text;
@@ -203,6 +218,46 @@ const getAnthropicCredentials = ({ forReports = false } = {}) => {
   return { apiKey, baseUrl, model };
 };
 
+const normalizeDatabricksHost = (value) => {
+  let host = String(value || "").trim().replace(/\/+$/, "");
+  if (!host) {
+    return "";
+  }
+  if (!/^https?:\/\//i.test(host)) {
+    host = `https://${host}`;
+  }
+  return host.replace(/\/serving-endpoints$/i, "");
+};
+
+const isDatabricksConfigured = ({ forReports = false } = {}) =>
+  Boolean(
+    normalizeDatabricksHost(process.env.DATABRICKS_HOST) &&
+      String(process.env.DATABRICKS_TOKEN || "").trim() &&
+      String(
+        (forReports && process.env.REPORT_DATABRICKS_ENDPOINT) || process.env.DATABRICKS_ENDPOINT || ""
+      ).trim()
+  );
+
+// Databricks Model Serving exposes an OpenAI-compatible chat route at
+// {workspace}/serving-endpoints/chat/completions; "model" is the serving endpoint name.
+const getDatabricksCredentials = ({ forReports = false } = {}) => {
+  const host = normalizeDatabricksHost(process.env.DATABRICKS_HOST);
+  if (!host) {
+    throw new Error("DATABRICKS_HOST is not configured on the proxy host");
+  }
+  const apiKey = String(process.env.DATABRICKS_TOKEN || "").trim();
+  if (!apiKey) {
+    throw new Error("DATABRICKS_TOKEN is not configured on the proxy host");
+  }
+  const chatModel = String(process.env.DATABRICKS_ENDPOINT || "").trim();
+  const reportModel = String(process.env.REPORT_DATABRICKS_ENDPOINT || "").trim();
+  const model = forReports && reportModel ? reportModel : chatModel;
+  if (!model) {
+    throw new Error("DATABRICKS_ENDPOINT (the serving endpoint name) is not configured on the proxy host");
+  }
+  return { apiKey, baseUrl: `${host}/serving-endpoints`, model };
+};
+
 const getOllamaConfig = ({ forReports = false } = {}) => {
   const baseUrl = String(process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
   const chatModel = String(process.env.OLLAMA_MODEL || "llama3.2").trim();
@@ -240,6 +295,10 @@ const describeReportLlmTarget = (provider) => {
     }
     if (provider === "anthropic") {
       const { model, baseUrl } = getAnthropicCredentials({ forReports: true });
+      return { model, baseUrl };
+    }
+    if (provider === "databricks") {
+      const { model, baseUrl } = getDatabricksCredentials({ forReports: true });
       return { model, baseUrl };
     }
   } catch {
@@ -311,7 +370,7 @@ const fetchOrThrow = async (url, options, label, timeoutMs) => {
   }
 };
 
-const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens, tools, timeoutMs }) => {
+const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens, tools, timeoutMs, label = "OpenAI" }) => {
   const response = await fetchOrThrow(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -324,11 +383,11 @@ const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens,
       ...(maxTokens ? { max_tokens: maxTokens } : {}),
       ...(tools ? { tools, tool_choice: "auto" } : {}),
     }),
-  }, "OpenAI", timeoutMs);
+  }, label, timeoutMs);
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data?.error?.message || "OpenAI request failed");
+    throw new Error(data?.error?.message || data?.message || `${label} request failed (HTTP ${response.status})`);
   }
 
   return data;
@@ -399,6 +458,7 @@ const completeOpenAiText = async ({
   credentials,
   timeoutMs,
   failOnTruncation = false,
+  label = "OpenAI",
 }) => {
   const { apiKey, baseUrl, model } = credentials ?? getOpenAiCredentials({ forReports });
   const data = await callOpenAiMessages({
@@ -407,6 +467,7 @@ const completeOpenAiText = async ({
     model,
     maxTokens,
     timeoutMs,
+    label,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
@@ -414,12 +475,12 @@ const completeOpenAiText = async ({
   });
 
   if (failOnTruncation && data?.choices?.[0]?.finish_reason === "length") {
-    throw new LlmTruncatedError("OpenAI", maxTokens);
+    throw new LlmTruncatedError(label, maxTokens);
   }
 
   const text = extractAssistantText(data);
   if (!text) {
-    throw new Error("OpenAI returned an empty response");
+    throw new Error(`${label} returned an empty response`);
   }
 
   return text;
@@ -456,7 +517,7 @@ const completeAnthropicText = async ({
   return text;
 };
 
-const completeOpenAiWithJiraTools = async ({ systemPrompt, userMessage, maxTokens, jiraRequest, credentials }) => {
+const completeOpenAiWithJiraTools = async ({ systemPrompt, userMessage, maxTokens, jiraRequest, credentials, label = "OpenAI" }) => {
   const { apiKey, baseUrl, model } = credentials ?? getOpenAiCredentials();
   const messages = [
     { role: "system", content: systemPrompt },
@@ -465,14 +526,14 @@ const completeOpenAiWithJiraTools = async ({ systemPrompt, userMessage, maxToken
   const tools = jiraRequest ? [buildOpenAiJiraTool()] : undefined;
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
-    const data = await callOpenAiMessages({ apiKey, baseUrl, model, messages, maxTokens, tools });
+    const data = await callOpenAiMessages({ apiKey, baseUrl, model, messages, maxTokens, tools, label });
     const choiceMessage = data?.choices?.[0]?.message;
     const toolCalls = Array.isArray(choiceMessage?.tool_calls) ? choiceMessage.tool_calls : [];
 
     if (toolCalls.length === 0 || !jiraRequest || round === MAX_TOOL_ROUNDS) {
       const text = extractAssistantText(data);
       if (!text) {
-        throw new Error("OpenAI returned an empty response");
+        throw new Error(`${label} returned an empty response`);
       }
       return text;
     }
@@ -500,7 +561,7 @@ const completeOpenAiWithJiraTools = async ({ systemPrompt, userMessage, maxToken
     }
   }
 
-  throw new Error("OpenAI did not return a final response after tool calls");
+  throw new Error(`${label} did not return a final response after tool calls`);
 };
 
 const completeAnthropicWithJiraTools = async ({ systemPrompt, userMessage, maxTokens, jiraRequest }) => {
@@ -555,10 +616,10 @@ const completeAnthropicWithJiraTools = async ({ systemPrompt, userMessage, maxTo
 
 const buildProviderError = (provider, { forReports = false } = {}) => {
   if (forReports) {
-    return `No report LLM configured. Set REPORT_PROVIDER or CHAT_PROVIDER to anthropic, openai, or ollama with matching credentials in .env. OpenAI-compatible endpoints (Databricks, Azure, LiteLLM, vLLM) use CHAT_PROVIDER=openai or REPORT_PROVIDER=openai with OPENAI_BASE_URL or REPORT_OPENAI_BASE_URL.`;
+    return `No report LLM configured. Set REPORT_PROVIDER or CHAT_PROVIDER to anthropic, openai, ollama, or databricks with matching credentials in .env. Databricks Model Serving uses CHAT_PROVIDER=databricks with DATABRICKS_HOST, DATABRICKS_TOKEN, and DATABRICKS_ENDPOINT. Other OpenAI-compatible endpoints (Azure, LiteLLM, vLLM) use CHAT_PROVIDER=openai or REPORT_PROVIDER=openai with OPENAI_BASE_URL or REPORT_OPENAI_BASE_URL.`;
   }
 
-  return "Chat is disabled. Set CHAT_PROVIDER to anthropic, openai, ollama, or rovo in .env (or leave unset and configure provider credentials).";
+  return "Chat is disabled. Set CHAT_PROVIDER to anthropic, openai, ollama, databricks, or rovo in .env (or leave unset and configure provider credentials).";
 };
 
 export const completeLlmText = async ({
@@ -593,6 +654,13 @@ export const completeLlmText = async ({
       return completeOpenAiText({ ...common, forReports });
     case "ollama":
       return callOllamaChat({ ...common, forReports });
+    case "databricks":
+      return completeOpenAiText({
+        ...common,
+        forReports,
+        credentials: getDatabricksCredentials({ forReports }),
+        label: "Databricks",
+      });
     default:
       throw new Error(buildProviderError(provider, { forReports }));
   }
@@ -635,6 +703,15 @@ export const completeLlmWithJiraTools = async ({
       });
     case "ollama":
       return callOllamaChat({ systemPrompt, userMessage: userContent, maxTokens });
+    case "databricks":
+      return completeOpenAiWithJiraTools({
+        systemPrompt,
+        userMessage: userContent,
+        maxTokens,
+        jiraRequest,
+        credentials: getDatabricksCredentials(),
+        label: "Databricks",
+      });
     default:
       throw new Error(buildProviderError(provider));
   }
