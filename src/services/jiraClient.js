@@ -225,13 +225,7 @@ export const fetchCombinedOpenWork = ( instanceIds, { signal } = {} ) =>
 export const fetchJiraInstances = async () => requestJson( "/api/jira/instances" );
 
 export const createJiraInstance = async ( body ) =>
-  requestJson( "/api/jira/instances", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify( body ),
-  } );
+  postJson( "/api/jira/instances", body );
 
 export const updateJiraInstance = async ( id, body ) =>
   requestJson( `/api/jira/instances/${ encodeURIComponent( id ) }`, {
@@ -246,45 +240,19 @@ export const deleteJiraInstance = async ( id ) =>
   requestJson( `/api/jira/instances/${ encodeURIComponent( id ) }`, { method: "DELETE" } );
 
 export const activateJiraInstance = async ( id ) =>
-  requestJson( `/api/jira/instances/${ encodeURIComponent( id ) }/activate`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: "{}",
-  } );
+  postJson( `/api/jira/instances/${ encodeURIComponent( id ) }/activate`, {} );
 
 // Connection tests send site settings only; the API supplies JIRA_API_TOKEN.
 export const testJiraInstance = async ( id, { baseUrl, email } = {} ) =>
-  requestJson( `/api/jira/instances/${ encodeURIComponent( id ) }/test`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify( { baseUrl, email } ),
-  } );
+  postJson( `/api/jira/instances/${ encodeURIComponent( id ) }/test`, { baseUrl, email } );
 
 // Send JQL as POST JSON body to avoid URL-encoding edge cases.
 export const fetchJiraSearch = async ( { jql, maxResults = 5, siteContext, signal } ) => {
-  return requestJson( "/api/jira/search", {
-    siteContext, signal,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ jql, maxResults }),
-  });
+  return postJson( "/api/jira/search", { jql, maxResults }, { siteContext, signal } );
 };
 
 export const fetchJiraSearchAll = async ( { jql, maxTotal = 200, siteContext, signal } ) => {
-  return requestJson( "/api/jira/search/all", {
-    siteContext, signal,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ jql, maxTotal }),
-  });
+  return postJson( "/api/jira/search/all", { jql, maxTotal }, { siteContext, signal } );
 };
 
 // Resolve direct children first so generated JQL also includes their subtasks.
@@ -314,14 +282,7 @@ export const pushJiraIssueNote = async ( { issueKey, note, images = [] }, { site
 
   if ( images.length === 0 )
   {
-    return requestJson( path, {
-      siteContext,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ note }),
-    });
+    return postJson( path, { note }, { siteContext } );
   }
 
   const formData = new FormData();
@@ -370,14 +331,7 @@ export const fetchKeptNoteImageBlob = async ( issueKey, imageId, { siteContext }
 };
 
 export const updateJiraIssueStatus = async ( { issueKey, targetStatus }, { siteContext } = {} ) => {
-  return requestJson( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/status`, {
-    siteContext,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify( { targetStatus } ),
-  } );
+  return postJson( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/status`, { targetStatus }, { siteContext } );
 };
 
 export const JIRA_UNASSIGNED_ASSIGNEE = "__unassigned__";
@@ -390,14 +344,7 @@ export const isJiraUnassignValue = (value) => {
 };
 
 export const updateJiraIssueAssignee = async ( { issueKey, assignee }, { siteContext } = {} ) => {
-  return requestJson( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/assignee`, {
-    siteContext,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify( { assignee } ),
-  } );
+  return postJson( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/assignee`, { assignee }, { siteContext } );
 };
 
 export const searchJiraUsers = async ( query, { siteContext } = {} ) => {
@@ -407,26 +354,12 @@ export const searchJiraUsers = async ( query, { siteContext } = {} ) => {
 };
 
 export const resolveJiraUsersByAccountIds = async ( accountIds, { siteContext } = {} ) => {
-  const data = await requestJson( "/api/jira/users/resolve-bulk", {
-    siteContext,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ accountIds }),
-  });
+  const data = await postJson( "/api/jira/users/resolve-bulk", { accountIds }, { siteContext } );
   return data?.items || {};
 };
 
 export const fetchIssueMetadataBulk = async ( issueKeys, { siteContext, signal } = {} ) => {
-  const data = await requestJson( "/api/jira/issue-metadata/bulk", {
-    siteContext, signal,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ issueKeys }),
-  });
+  const data = await postJson( "/api/jira/issue-metadata/bulk", { issueKeys }, { siteContext, signal } );
 
   return data?.items || {};
 };
@@ -437,14 +370,7 @@ export const fetchRecentlyNotedIssueKeys = async ( since, { siteContext, signal 
 };
 
 export const fetchLatestJiraCommentsBulk = async ( issueKeys, { siteContext, signal, includeCoverage = false } = {} ) => {
-  const data = await requestJson( "/api/jira/issues/comments/latest/bulk", {
-    siteContext, signal,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ issueKeys }),
-  });
+  const data = await postJson( "/api/jira/issues/comments/latest/bulk", { issueKeys }, { siteContext, signal } );
 
   return includeCoverage ? { items: data?.items || {}, errors: data?.errors || {} } : data?.items || {};
 };
@@ -473,31 +399,14 @@ export const saveIssueMetadata = async ( { issueKey, note, priority, startDate, 
 
 // role: "due_date" | "most_recent_done_date". value: "YYYY-MM-DD" or "" to clear.
 export const updateJiraIssueDateField = async ( { issueKey, role, value }, { siteContext } = {} ) => {
-  return requestJson( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/date-field`, {
-    siteContext,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify( { role, value } ),
-  } );
+  return postJson( `/api/jira/issues/${ encodeURIComponent( issueKey ) }/date-field`, { role, value }, { siteContext } );
 };
 
 export const previewIssueMetadataImport = ( payload, { siteContext } = {} ) =>
-  requestJson( "/api/jira/issue-metadata/import/preview", {
-    siteContext,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify( payload ),
-  } );
+  postJson( "/api/jira/issue-metadata/import/preview", payload, { siteContext } );
 
 export const commitIssueMetadataImport = ( previewId, { siteContext } = {} ) =>
-  requestJson( "/api/jira/issue-metadata/import/commit", {
-    siteContext,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify( { previewId } ),
-  } );
+  postJson( "/api/jira/issue-metadata/import/commit", { previewId }, { siteContext } );
 
 export const fetchTeamPriorityHealth = async ( { siteContext, signal } = {} ) => {
   const revision = teamSettingsRevision;
@@ -550,24 +459,12 @@ export const fetchSharedPrograms = async ( { siteContext } = {} ) => {
 };
 
 export const fetchTeamMetadataBulk = async ( issueKeys, { siteContext, signal } = {} ) => {
-  const data = await requestJson( "/api/team-priority/metadata/bulk", {
-    siteContext, signal,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify( { issueKeys } ),
-  } );
+  const data = await postJson( "/api/team-priority/metadata/bulk", { issueKeys }, { siteContext, signal } );
   return data?.items || {};
 };
 
 export const fetchTeamPriorityBulk = async ( issueKeys, { siteContext } = {} ) => {
-  const data = await requestJson( "/api/team-priority/bulk", {
-    siteContext,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ issueKeys }),
-  });
+  const data = await postJson( "/api/team-priority/bulk", { issueKeys }, { siteContext } );
   return data?.items || {};
 };
 
@@ -583,14 +480,7 @@ export const saveTeamPriority = async ( { issueKey, priority }, { siteContext } 
 };
 
 export const fetchTeamDatesBulk = async ( issueKeys, { siteContext } = {} ) => {
-  const data = await requestJson( "/api/team-priority/dates/bulk", {
-    siteContext,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ issueKeys }),
-  });
+  const data = await postJson( "/api/team-priority/dates/bulk", { issueKeys }, { siteContext } );
   return data?.items || {};
 };
 
@@ -636,13 +526,7 @@ export const fetchEpicPresetScopeJql = async ( epicPresetId, { siteContext } = {
 };
 
 export const createEpicPreset = async (payload) => {
-  return requestJson("/api/epic-presets", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload || {}),
-  });
+  return postJson("/api/epic-presets", payload || {});
 };
 
 export const updateEpicPreset = async (id, payload) => {
@@ -665,26 +549,14 @@ export const exportEpicPresetsPack = async () =>
   requestJson("/api/epic-presets/export");
 
 export const importEpicPresetsPack = async ({ presets, mode = "merge" }) =>
-  requestJson("/api/epic-presets/import", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ presets, mode }),
-  });
+  postJson("/api/epic-presets/import", { presets, mode });
 
 export const runEpicFilters = async ({
   epicPresetIds,
   includePastDue,
   maxResults = 200,
 }) => {
-  const data = await requestJson("/api/epic-filters/run", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ epicPresetIds, includePastDue, maxResults }),
-  });
+  const data = await postJson("/api/epic-filters/run", { epicPresetIds, includePastDue, maxResults });
 
   return data?.runs || [];
 };
@@ -770,12 +642,7 @@ export const clearCompletedTodos = async () =>
   requestJson("/api/todos/completed", { method: "DELETE" });
 
 export const createTodo = async ( { clientId, text, priority, dueDate } ) => {
-  const data = await requestJson( "/api/todos", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify( { clientId, text, priority, dueDate } ),
-  } );
-  return data;
+  return postJson( "/api/todos", { clientId, text, priority, dueDate } );
 };
 
 export const updateTodo = async (id, fields) => {
@@ -801,13 +668,7 @@ export const fetchWatchedAssignees = async () => {
 };
 
 export const createWatchedAssignee = async (payload) => {
-  return requestJson("/api/watched-assignees", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload || {}),
-  });
+  return postJson("/api/watched-assignees", payload || {});
 };
 
 export const updateWatchedAssignee = async (id, payload) => {
@@ -840,14 +701,7 @@ export const fetchJiraFilters = async () => {
 export const fetchFavouriteJiraFilters = async () => fetchJiraFilters();
 
 export const refreshDashboardMetrics = async (payload, options = {}) => {
-  const data = await requestJson("/api/dashboard/refresh", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload || {}),
-    signal: options.signal,
-  });
+  const data = await postJson("/api/dashboard/refresh", payload || {}, { signal: options.signal });
 
   return data?.snapshot || null;
 };
@@ -1000,27 +854,14 @@ export const searchEpics = async (query) => {
 };
 
 export const fetchJiraParentCandidates = async ( { jql, maxTotal = 100 }, { siteContext } = {} ) => {
-  return requestJson( "/api/jira/issues/parent-candidates", {
-    siteContext,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      jql: String(jql || "").trim(),
-      maxTotal,
-    }),
-  });
+  return postJson( "/api/jira/issues/parent-candidates", {
+    jql: String(jql || "").trim(),
+    maxTotal,
+  }, { siteContext } );
 };
 
 export const createJiraIssue = async (payload) => {
-  return requestJson("/api/jira/issues", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload || {}),
-  });
+  return postJson("/api/jira/issues", payload || {});
 };
 
 export const generateIssueDescription = async ({
@@ -1033,12 +874,9 @@ export const generateIssueDescription = async ({
   attachmentNames = [],
 } ) => {
   const aiPath = getPreferredAiPath();
-  return requestJson( "/api/jira/issues/generate-description", {
-    // Slightly longer than the server's AI_DRAFT_TIMEOUT_MS so the server's clearer error wins.
-    timeoutMs: 150_000,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  return postJson(
+    "/api/jira/issues/generate-description",
+    {
       summary,
       issueType,
       epicKey: epicKey || "",
@@ -1047,8 +885,10 @@ export const generateIssueDescription = async ({
       attachmentPreference,
       attachmentNames,
       ...( aiPath ? { aiPath } : {} ),
-    } ),
-  } );
+    },
+    // Slightly longer than the server's AI_DRAFT_TIMEOUT_MS so the server's clearer error wins.
+    { timeoutMs: 150_000 }
+  );
 };
 
 export const generateProjectReport = async ({
@@ -1163,18 +1003,12 @@ export const saveCoworkWeeklyPlanToArchive = async ({
   label,
   filename,
 }) => {
-  return requestJson("/api/reports/archive", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      content,
-      label,
-      filename,
-      fromCoworkFile: true,
-      ...getLocalTimestampPayload(),
-    }),
+  return postJson("/api/reports/archive", {
+    content,
+    label,
+    filename,
+    fromCoworkFile: true,
+    ...getLocalTimestampPayload(),
   });
 };
 
@@ -1184,11 +1018,7 @@ export const fetchPmAsks = async () => {
 };
 
 export const createPmAsk = async ({ title, whoAsked, note }) => {
-  return requestJson("/api/project-managers/asks", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, whoAsked, note }),
-  });
+  return postJson("/api/project-managers/asks", { title, whoAsked, note });
 };
 
 export const updatePmAsk = async ( { id, title, whoAsked, note, status, jiraIssueKey } ) => {
