@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { createLogger } from "../lib/logger.mjs";
+import { createLogger, errorMessage } from "../lib/logger.mjs";
 const log = createLogger("chat");
 
 import { sendChatMessage } from "../lib/chatProviders.mjs";
@@ -236,7 +236,7 @@ export const registerChatRoutes = (app, { withSiteOperation = (handler) => handl
       });
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Unknown error";
-      log.error("request failed", { detail, error: error instanceof Error ? error.message : error });
+      log.error("request failed", { detail, error: errorMessage(error) });
       return res.status(500).json({
         error: "Chat request failed",
         message: detail,

@@ -1,4 +1,4 @@
-import { createLogger } from "../lib/logger.mjs";
+import { createLogger, errorMessage } from "../lib/logger.mjs";
 import { fetchCapacityWorkloads } from "../lib/capacityPlanning.mjs";
 import { mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildFieldMappingsMap } from "../lib/epicFilterJql.mjs";
@@ -67,7 +67,7 @@ export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handl
 
       return res.json({ issueKey, segments });
     } catch (error) {
-      log.error("status history fetch failed", error instanceof Error ? error.message : error);
+      log.error("status history fetch failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to load status history",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -110,7 +110,7 @@ export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handl
 
       return res.json({ items });
     } catch (error) {
-      log.error("capacity fetch failed", error instanceof Error ? error.message : error);
+      log.error("capacity fetch failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to load capacity data",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -237,7 +237,7 @@ export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handl
 
       return res.json({ slug, displayName, issues });
     } catch (error) {
-      log.error("gantt fetch failed", error instanceof Error ? error.message : error);
+      log.error("gantt fetch failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to load Gantt data",
         message: error instanceof Error ? error.message : "Unknown error",
