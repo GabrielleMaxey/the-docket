@@ -1067,6 +1067,7 @@ export const generateProjectReport = async ({
   companyGoals,
   combinedSources,
   reportQueryScope,
+  includeStrengthsGrowth,
 }, { siteContext, signal } = {} ) => {
   const aiPath = getPreferredAiPath();
   return requestJson( "/api/report/project", {
@@ -1083,6 +1084,7 @@ export const generateProjectReport = async ({
       companyGoals,
       combinedSources,
       reportQueryScope,
+      includeStrengthsGrowth,
       ...( aiPath ? { aiPath } : {} ),
       ...getLocalTimestampPayload(),
     }),

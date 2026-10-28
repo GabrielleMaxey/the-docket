@@ -66,6 +66,33 @@ const PWB_PERIOD_LABELS = {
   [PWB_PERIODS.YEARLY]: "annual",
 };
 
+const PWB_PERIOD_TITLE_PREFIXES = {
+  [PWB_PERIODS.QUARTERLY]: "Quarterly",
+  [PWB_PERIODS.MID_YEAR]: "Mid-Year",
+  [PWB_PERIODS.YEARLY]: "Annual",
+};
+
+const PWB_PERIOD_GUIDANCE = {
+  [PWB_PERIODS.QUARTERLY]:
+    "This is a quarterly check-in - focus on recent momentum and near-term priorities rather than a full-year narrative.",
+  [PWB_PERIODS.MID_YEAR]:
+    "This is a mid-year check-in - focus on progress against annual goals so far, and what adjustments (if any) make sense for the second half.",
+  [PWB_PERIODS.YEARLY]:
+    "This is a yearly review - write a comprehensive narrative covering the full scope of the work below, suitable to adapt directly into a formal PWB self-assessment.",
+};
+
+// Shared rules reused across report system prompts below - keep phrasing consistent and avoid repeating the same sentence in multiple builders.
+export const DATA_GROUNDING_RULE =
+  "Base the report ONLY on the data provided below. Do not invent metrics, names, or accomplishments not present in the data.";
+export const SINGLE_HEADING_PROSE_RULE =
+  "This is the only heading in the report - everything below it is flowing prose paragraphs, not further headings or bullets.";
+
+// Optional add-on for the personal report types (Status Report, 1:1 Prep, PWB Review) - appended only when the user opts in via the "Call out strengths & growth areas" checkbox.
+export const STRENGTHS_GROWTH_INSTRUCTION = `Also add two short labeled sections near the end, matching the report's existing style (bullets or prose, whichever this report already uses):
+- **What's going well** - positive signals the data actually supports: strong completion rate, steady pace, overdue items kept low, a healthy mix of in-progress vs backlog.
+- **Areas to improve** - specific, data-grounded gaps: low completion rate, growing overdue count, stalled consistency, or a Backlog item flagged with recent Jira comment activity (status not reflecting real progress).
+Base both sections ONLY on the metrics and items already in the data below. Do not speculate about effort, attitude, or behavior - describe what the numbers show, not the person. If one side has nothing notable to report, say so plainly rather than forcing a point.`;
+
 export const isValidCareerReportType = (value) =>
   Object.values(CAREER_REPORT_TYPES).includes(value);
 
@@ -113,7 +140,7 @@ If any item below is flagged as having recent Jira comment activity despite sitt
 Tone: direct and confident, like someone who has command of their own workload and wants a substantive conversation - not a casual daily-standup recap and not overly formal corporate-speak either.`,
     goalsSection,
     formatLumenCoreValuesBlock(),
-    "Base the report ONLY on the data provided below. Do not invent metrics, names, or accomplishments not present in the data. If a completion rate is given directly in the data, use that exact number rather than recalculating it.",
+    `${DATA_GROUNDING_RULE} If a completion rate is given directly in the data, use that exact number rather than recalculating it.`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -122,20 +149,14 @@ Tone: direct and confident, like someone who has command of their own workload a
 export const buildPwbSystemPrompt = ({ label, period, userGoals, companyGoals }) => {
   const periodLabel = PWB_PERIOD_LABELS[period] || "review-period";
   const goalsSection = buildGoalsSection({ userGoals, companyGoals });
-  const periodTitlePrefix =
-    period === PWB_PERIODS.YEARLY ? "Annual" : period === PWB_PERIODS.MID_YEAR ? "Mid-Year" : "Quarterly";
-  const periodGuidance =
-    period === PWB_PERIODS.YEARLY
-      ? "This is a yearly review - write a comprehensive narrative covering the full scope of the work below, suitable to adapt directly into a formal PWB self-assessment."
-      : period === PWB_PERIODS.MID_YEAR
-        ? "This is a mid-year check-in - focus on progress against annual goals so far, and what adjustments (if any) make sense for the second half."
-        : "This is a quarterly check-in - focus on recent momentum and near-term priorities rather than a full-year narrative.";
+  const periodTitlePrefix = PWB_PERIOD_TITLE_PREFIXES[period] || PWB_PERIOD_TITLE_PREFIXES[PWB_PERIODS.QUARTERLY];
+  const periodGuidance = PWB_PERIOD_GUIDANCE[period] || PWB_PERIOD_GUIDANCE[PWB_PERIODS.QUARTERLY];
 
   return [
     `You are helping someone draft self-assessment language for their ${periodLabel} PWB review, based on their work on "${label}" at Lumen.
 This is written in first person, as a professional but genuine self-assessment - the kind of writing someone would submit or read from in a formal review conversation, not casual notes.
 
-Start with a single markdown heading naming the report, in the form "## ${periodTitlePrefix} PWB Self-Assessment". This is the only heading in the report - everything below it is flowing prose paragraphs, not further headings or bullets.
+Start with a single markdown heading naming the report, in the form "## ${periodTitlePrefix} PWB Self-Assessment". ${SINGLE_HEADING_PROSE_RULE}
 
 ${periodGuidance}
 
@@ -150,7 +171,7 @@ If any item below is flagged as having recent Jira comment activity despite sitt
 Where the work genuinely reflects one of Lumen's 8 Cultural Behaviors (listed below for reference), you may name it naturally in a sentence - but only when the specific work actually demonstrates it, never as a checklist or forced mention of all eight.`,
     goalsSection,
     formatLumenCoreValuesBlock(),
-    "Base the report ONLY on the data provided below. Do not invent metrics, names, or accomplishments not present in the data.",
+    DATA_GROUNDING_RULE,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -167,15 +188,25 @@ When relevant, consider:
 - Backlog-heavy vs In Progress: intake without pulling work; grooming stalled.
 If the metrics look healthy, say that and do not force problems.`;
 
+// Shared boilerplate reused across AUDIENCE_CONFIGS instructions - keep every audience report consistent and avoid repeating the same sentence four times.
+const AUDIENCE_NO_DATA_RULE = `If a section has no supporting numbers, write "None in this snapshot."`;
+const AUDIENCE_SNAPSHOT_OPENER = "Start with the snapshot date. Then use these headings only:";
+const AUDIENCE_DATE_WINDOW_RULE = `When you mention overdue or upcoming due dates, include the date window from the snapshot (e.g. "within the past 6 months", "from today through YYYY-MM-DD").`;
+const AUDIENCE_WORK_WEEK_RULE =
+  "Do not invent Work Week URLs. A Work Week links section is appended after your report.";
+const AUDIENCE_CONTEXT_RULE = "If extra user context is present, treat it as notes; metrics win on conflict.";
+const TARGET_DATE_FIELD_RULE =
+  "Treat Initial Done Date, Most Recent Done Date, and Project End Date as target dates; never use those field names.";
+
 export const AUDIENCE_CONFIGS = {
   executive: {
     label: "Executive Summary",
     instruction: `Write an Executive Summary for senior leadership.
 Audience: non-technical. Do not mention Jira, epics, JQL, or field IDs.
 Use only the snapshot data. Do not invent names, tasks, milestones, or decisions.
-If a section has no supporting numbers, write "None in this snapshot."
+${AUDIENCE_NO_DATA_RULE}
 
-Start with the snapshot date. Then use these headings only:
+${AUDIENCE_SNAPSHOT_OPENER}
 1. **Project Status Overview** — 4–6 sentences: overall health using the three headline percentages (tasks resolved = delivery throughput; projects complete = share of projects finished; overdue = open work past due). Explain each in business terms.
 2. **Highlights** — progress the numbers support. No unverifiable wins.
 3. **Challenges and Risks** — past-due projects by name, overdue open work, deadline pressure.
@@ -184,10 +215,11 @@ Start with the snapshot date. Then use these headings only:
 6. **Possible reasons (hypotheses)** — why the numbers might look this way (unfinished work not closed out in the tracker, dates not kept current, uneven assignment). Label as possible, not confirmed.
 
 Keep it short (bullets under 2–5). Name individuals only when overdue load is a material risk.
-When you mention overdue or upcoming due dates, include the date window from the snapshot (e.g. "within the past 6 months", "from today through YYYY-MM-DD").
-Treat Initial Done Date, Most Recent Done Date, and Project End Date as target dates; never use those field names.
-Do not invent Work Week URLs. A Work Week links section is appended after your report.
-If extra user context is present, treat it as notes; metrics win on conflict.
+Tone: concise, business-level, confident.
+${AUDIENCE_DATE_WINDOW_RULE}
+${TARGET_DATE_FIELD_RULE}
+${AUDIENCE_WORK_WEEK_RULE}
+${AUDIENCE_CONTEXT_RULE}
 ${POSSIBLE_REASONS_INSTRUCTION}`,
   },
 
@@ -195,21 +227,23 @@ ${POSSIBLE_REASONS_INSTRUCTION}`,
     label: "Project Manager Summary",
     instruction: `Write a Project Manager Summary for running and communicating this portfolio.
 Use only the snapshot data. Do not invent goals, budgets, approvals, sign-offs, or scope impact.
-If a section has no supporting numbers, write "None in this snapshot."
+${AUDIENCE_NO_DATA_RULE}
 
-Start with the snapshot date. Then use these headings only:
+${AUDIENCE_SNAPSHOT_OPENER}
 1. **Progress Measures** — how completion is measured here (task resolved %, project complete %, overdue %). Name projects and cite counts.
 2. **People and Stalls** — compare contributor open/overdue counts. Name a person only when their workload is significantly heavier than others on the project, or they risk missing a due date (high overdue %, past-due work). Do not invent decision-owners or approval queues. Do not roster everyone.
-3. **Deadline Realism** — target dates (Initial Done Date, Most Recent Done Date, Project End Date) vs current completion. Name every past-due project.
+3. **Deadline Realism** — target dates vs current completion. Name every past-due project.
 4. **Schedule Health** — overall completion vs overdue rate; whether pace looks sufficient for remaining dates. No budget commentary (none in the data).
 5. **Risks and Delay Impact** — overdue items and past-due projects only. Downstream impact = delayed dates / unfinished work, not invented scope cuts. Name at-risk contributors when the metrics support it.
 6. **Stand-up Brief** — one short paragraph a PM can read aloud (counts, named at-risk people, next dates). Skip closeout language unless projects are actually complete.
 7. **Possible reasons (hypotheses)** — workflow/pipeline, date hygiene, and load-balance explanations that fit the metrics. Label as possible.
 
 Be specific: percentages, task counts, project names. Call out red-flag metrics. Naming people is appropriate for load imbalance or due-date risk; otherwise keep the team unnamed.
-When you mention overdue or upcoming due dates, include the date window from the snapshot.
-Do not invent Work Week URLs. A Work Week links section is appended after your report.
-If extra user context is present, treat it as notes; metrics win on conflict.
+Tone: operational, specific, decision-oriented.
+${AUDIENCE_DATE_WINDOW_RULE}
+${TARGET_DATE_FIELD_RULE}
+${AUDIENCE_WORK_WEEK_RULE}
+${AUDIENCE_CONTEXT_RULE}
 ${POSSIBLE_REASONS_INSTRUCTION}`,
   },
 
@@ -217,19 +251,20 @@ ${POSSIBLE_REASONS_INSTRUCTION}`,
     label: "Developer Report",
     instruction: `Write a status report for the development team.
 Use only the snapshot data. Do not invent task keys, summaries, or velocity (none are in this snapshot).
-If a section has no supporting numbers, write "None in this snapshot."
+${AUDIENCE_NO_DATA_RULE}
 
-Start with the snapshot date. Then use these headings only:
+${AUDIENCE_SNAPSHOT_OPENER}
 1. **Team Workload** — open vs overdue counts per person from the team metrics.
 2. **Overdue by Person** — who has overdue work and how much; skip people with none.
 3. **In Progress** — status breakdowns and open counts only; no invented ticket lists.
 4. **Focus** — past-due projects, high overdue %, and approaching target dates. No upcoming-task list unless dates are in the data.
 5. **Possible reasons (hypotheses)** — e.g. low resolution rate from tickets not moved to Done, statuses that never count as resolved, or a stalled verification step. Label as possible.
 
-When you mention overdue or upcoming due dates, include the date window from the snapshot.
-Do not invent Work Week URLs. A Work Week links section is appended after your report.
+${AUDIENCE_DATE_WINDOW_RULE}
+${TARGET_DATE_FIELD_RULE}
+${AUDIENCE_WORK_WEEK_RULE}
 Tone: practical, peer-level. Name people from the metrics. Prefer bullets.
-If extra user context is present, treat it as notes; metrics win on conflict.
+${AUDIENCE_CONTEXT_RULE}
 ${POSSIBLE_REASONS_INSTRUCTION}`,
   },
 
@@ -239,10 +274,10 @@ ${POSSIBLE_REASONS_INSTRUCTION}`,
 Do not include the current user / manager (currentUser()) in the roster or narrative — this report is about their direct reports only.
 Use only the snapshot people metrics. Do not invent names, tickets, or 1:1 notes.
 Name every person listed in the team metrics, including people with zero open work.
-If a section has no supporting numbers, write "None in this snapshot."
+${AUDIENCE_NO_DATA_RULE}
 Do not treat this as a project-complete or delivery-closeout report.
 
-Start with the snapshot date. Then use these headings only:
+${AUDIENCE_SNAPSHOT_OPENER}
 1. **Team roster and assignment** — for each person: assigned/open count and their share of team assigned work.
 2. **Overdue and upcoming** — overdue count and overdue %; upcoming-due count. Include the date windows from the snapshot.
 3. **Completion** — resolved vs total assigned (resolution %). Call out low completion only when the numbers support it.
@@ -250,9 +285,10 @@ Start with the snapshot date. Then use these headings only:
 5. **Manager actions** — short bullets implied by the metrics only (redistribute load, check overdue items). No invented coaching.
 6. **Possible reasons (hypotheses)** — why resolution %, overdue, or load might look this way (missed Jira status transitions, mismanaged pipelines, dates not updated, parked backlog). Label as possible, not confirmed.
 
-When you mention overdue or upcoming due dates, include the date window from the snapshot.
-Do not invent Work Week URLs. A Work Week links section is appended after your report.
-If extra user context is present, treat it as notes; metrics win on conflict.
+Tone: direct, people-focused, manager-level.
+${AUDIENCE_DATE_WINDOW_RULE}
+${AUDIENCE_WORK_WEEK_RULE}
+${AUDIENCE_CONTEXT_RULE}
 ${POSSIBLE_REASONS_INSTRUCTION}`,
   },
 };
@@ -262,7 +298,7 @@ export const buildStatusReportSystemPrompt = ({ label }) =>
 This report is written FROM the assignee's perspective and FOR their benefit — to help them understand their own workload, spot what needs attention, and feel clear on next steps.
 Write in second person ("you have", "your open items") so it reads as direct, useful feedback to the person doing the work.
 
-Start with a single markdown heading naming the report, in the form "## Status Report — ${label}". This is the only heading in the report - everything below it is flowing prose paragraphs, not further headings or bullets.
+Start with a single markdown heading naming the report, in the form "## Status Report — ${label}". ${SINGLE_HEADING_PROSE_RULE}
 
 Before writing, look at the query's label and JQL below (if given) to understand what this query is actually scoped to, and let that shape the report - do not default to a generic "project status" framing if the query is narrower or different than that:
 - If the label/JQL implies only OPEN or IN-PROGRESS work (e.g. "My Open Work", "assignee = currentUser() AND statusCategory != Done"), focus on active workload, what needs attention, and next steps as usual.
