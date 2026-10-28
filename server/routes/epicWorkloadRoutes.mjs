@@ -1,4 +1,4 @@
-import { createLogger } from "../lib/logger.mjs";
+import { createLogger, errorMessage } from "../lib/logger.mjs";
 import { buildFieldMappingsMap } from "../lib/epicFilterJql.mjs";
 import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
 import {
@@ -47,7 +47,7 @@ export const registerEpicWorkloadRoutes = (app, { withSiteOperation = (handler) 
       }));
       return res.json({ items });
     } catch (error) {
-      log.error("epic search failed", error instanceof Error ? error.message : error);
+      log.error("epic search failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to search epics",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -144,7 +144,7 @@ export const registerEpicWorkloadRoutes = (app, { withSiteOperation = (handler) 
         blockers,
       });
     } catch (error) {
-      log.error("epic workload fetch failed", error instanceof Error ? error.message : error);
+      log.error("epic workload fetch failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to load epic workload",
         message: error instanceof Error ? error.message : "Unknown error",

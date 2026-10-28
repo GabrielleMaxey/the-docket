@@ -198,6 +198,16 @@ const requestJsonNow = async ( path, options = {} ) => {
   return data;
 };
 
+// Shared shape for the common "POST a JSON body" call sites below - cuts the repeated
+// method/headers/JSON.stringify boilerplate. extraOptions may carry siteContext/signal/etc.
+const postJson = ( path, body, extraOptions = {} ) =>
+  requestJson( path, {
+    ...extraOptions,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...( extraOptions.headers || {} ) },
+    body: JSON.stringify( body ),
+  } );
+
 export const fetchJiraMyself = async ( { siteContext } = {} ) => requestJson( "/api/jira/myself", { siteContext } );
 
 export const fetchJiraHealth = async () => requestJson("/api/health");
@@ -850,21 +860,15 @@ export const generateReport = async ({
   chartVariant,
 } ) => {
   const aiPath = getPreferredAiPath();
-  return requestJson( "/api/report/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      audience,
-      epicPresetIds,
-      additionalContext,
-      statusCounts,
-      chartVariant,
-      ...( aiPath ? { aiPath } : {} ),
-      ...getLocalTimestampPayload(),
-    }),
-  });
+  return postJson( "/api/report/generate", {
+    audience,
+    epicPresetIds,
+    additionalContext,
+    statusCounts,
+    chartVariant,
+    ...( aiPath ? { aiPath } : {} ),
+    ...getLocalTimestampPayload(),
+  } );
 };
 
 export const fetchWeeklyDigest = async () =>
@@ -877,11 +881,7 @@ export const fetchChatStatus = async () => {
 };
 
 export const generateGanttSharepointSummary = async ( payload ) => {
-  return requestJson( "/api/report/gantt-summary", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify( payload ),
-  } );
+  return postJson( "/api/report/gantt-summary", payload );
 };
 
 export const startChatOAuth = async () => {
@@ -897,13 +897,7 @@ export const signOutChat = async () => {
 
 export const sendChatMessage = async ( { message, epicContext } ) => {
   const aiPath = getPreferredAiPath();
-  return requestJson( "/api/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify( { message, epicContext, ...( aiPath ? { aiPath } : {} ) } ),
-  } );
+  return postJson( "/api/chat", { message, epicContext, ...( aiPath ? { aiPath } : {} ) } );
 };
 
 export const fetchJiraProjects = async () => {
@@ -1070,11 +1064,9 @@ export const generateProjectReport = async ({
   includeStrengthsGrowth,
 }, { siteContext, signal } = {} ) => {
   const aiPath = getPreferredAiPath();
-  return requestJson( "/api/report/project", {
-    siteContext, signal,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  return postJson(
+    "/api/report/project",
+    {
       label,
       jql,
       summary,
@@ -1087,24 +1079,21 @@ export const generateProjectReport = async ({
       includeStrengthsGrowth,
       ...( aiPath ? { aiPath } : {} ),
       ...getLocalTimestampPayload(),
-    }),
-  });
+    },
+    { siteContext, signal }
+  );
 };
 
 export const generateWeekPlan = async ( { projects, focusStyle, capacityHours, additionalContext } ) => {
   const aiPath = getPreferredAiPath();
-  return requestJson( "/api/plan/week", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      projects,
-      focusStyle,
-      capacityHours,
-      additionalContext,
-      ...( aiPath ? { aiPath } : {} ),
-      ...getLocalTimestampPayload(),
-    }),
-  });
+  return postJson( "/api/plan/week", {
+    projects,
+    focusStyle,
+    capacityHours,
+    additionalContext,
+    ...( aiPath ? { aiPath } : {} ),
+    ...getLocalTimestampPayload(),
+  } );
 };
 
 export const fetchArchivedReports = async ( { source, limit, siteContext } = {} ) => {
@@ -1147,19 +1136,13 @@ export const saveAdHocReport = async ({
   provider,
   savedFrom,
 }) => {
-  return requestJson("/api/reports/archive", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      content,
-      label,
-      userPrompt,
-      provider,
-      savedFrom,
-      ...getLocalTimestampPayload(),
-    }),
+  return postJson("/api/reports/archive", {
+    content,
+    label,
+    userPrompt,
+    provider,
+    savedFrom,
+    ...getLocalTimestampPayload(),
   });
 };
 

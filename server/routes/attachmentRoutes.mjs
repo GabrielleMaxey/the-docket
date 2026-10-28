@@ -4,7 +4,7 @@ import path from "node:path";
 import { mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import multer from "multer";
-import { createLogger } from "../lib/logger.mjs";
+import { createLogger, errorMessage } from "../lib/logger.mjs";
 import {
   listIssueAttachments,
   removeTempFiles,
@@ -81,7 +81,7 @@ export const registerAttachmentRoutes = (app, context) => {
       }
       return res.json({ issueKey, attachments: result.attachments });
     } catch (error) {
-      log.error("list attachments failed", error instanceof Error ? error.message : error);
+      log.error("list attachments failed", errorMessage(error));
       return res.status(500).json({ error: "Could not load attachments from Jira" });
     }
   }));
@@ -122,7 +122,7 @@ export const registerAttachmentRoutes = (app, context) => {
         // 207-style partial success is reported in the body; the request itself succeeded.
         return res.json({ issueKey, uploaded, failed });
       } catch (error) {
-        log.error("upload attachments failed", error instanceof Error ? error.message : error);
+        log.error("upload attachments failed", errorMessage(error));
         return res.status(500).json({ error: "Attachment upload failed" });
       } finally {
         await removeTempFiles(req.files || []);

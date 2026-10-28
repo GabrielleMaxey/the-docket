@@ -1,6 +1,6 @@
 import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
-import { createLogger } from "../lib/logger.mjs";
+import { createLogger, errorMessage } from "../lib/logger.mjs";
 const log = createLogger("config");
 
 import {
@@ -329,7 +329,7 @@ export const registerAppConfigRoutes = ( app, context ) => {
     } catch (error) {
       log.error(
         `scope-jql for preset ${id} failed`,
-        error instanceof Error ? error.message : error,
+        errorMessage(error),
       );
       return res.status(500).json({
         error: "Failed to resolve preset JQL",
