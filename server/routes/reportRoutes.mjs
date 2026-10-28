@@ -34,6 +34,7 @@ import {
   isValidCareerReportType,
   isValidPwbPeriod,
   AUDIENCE_CONFIGS,
+  STRENGTHS_GROWTH_INSTRUCTION,
 } from "../lib/aiInstructions.mjs";
 import { computeOverallRollup, normalizePastDueLookbackYears } from "../../shared/dashboardMetrics.mjs";
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
@@ -493,6 +494,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
     const careerReportType = isValidCareerReportType(rawReportType) ? rawReportType : null;
     const userGoals = String(req.body?.userGoals || "").trim();
     const companyGoals = String(req.body?.companyGoals || "").trim();
+    const includeStrengthsGrowth = Boolean(req.body?.includeStrengthsGrowth);
 
     if (careerReportType === CAREER_REPORT_TYPES.PWB && !isValidPwbPeriod(req.body?.pwbPeriod)) {
       return res.status(400).json({ error: "A valid PWB review period (quarterly, mid_year, or yearly) is required." });
@@ -593,6 +595,10 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       systemPromptBase,
       "Base your report ONLY on the data provided. Do not invent metrics or names.",
     ];
+    if (includeStrengthsGrowth) {
+      systemParts.push(STRENGTHS_GROWTH_INSTRUCTION);
+      archiveMeta.includeStrengthsGrowth = true;
+    }
     if (customInstructions) systemParts.push(`\nAdditional instructions:\n${customInstructions}`);
     try {
       const report = await callLLMForReport({ systemPrompt: systemParts.join("\n\n"), context: contextLines.join("\n"), label, aiPath: req.body?.aiPath });

@@ -66,6 +66,7 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [], scope, combi
   const instanceId = combined ? siteContext : siteContext?.instanceId;
   const [reportType, setReportType] = React.useState("status");
   const [pwbPeriod, setPwbPeriod] = React.useState("quarterly");
+  const [includeStrengthsGrowth, setIncludeStrengthsGrowth] = React.useState(false);
   const [reportScope, setReportScope] = React.useState("current");
   const [allWorkMonths, setAllWorkMonths] = React.useState(3);
   const runKey = combined ? combinedReportRunKey(combinedSites, { reportScope, allWorkMonths, reportType, pwbPeriod }) : getWorkWeekRunKey(run);
@@ -296,6 +297,7 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [], scope, combi
           pwbPeriod: reportType === "pwb" ? pwbPeriod : undefined,
           userGoals: isCareerReport ? userGoals.trim() : undefined,
           companyGoals: isCareerReport && includeCompanyGoals ? companyGoals.trim() : undefined,
+          includeStrengthsGrowth,
           combinedSources: combined ? combinedSites.map(site => ({ instanceId: site.instanceId, displayName: site.displayName, siteHost: site.siteHost, status: site.status, message: site.message, sourceContext: site.sourceContext })) : undefined,
           reportQueryScope: combined ? { reportScope, months: reportScope === "all_work" ? allWorkMonths : undefined } : undefined,
         }, { siteContext, signal });
@@ -406,6 +408,13 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [], scope, combi
           ))}
         </Form.Group>
       ) : null}
+
+      <Checkbox
+        label="Call out strengths & growth areas"
+        checked={includeStrengthsGrowth}
+        onChange={(_e, { checked }) => setIncludeStrengthsGrowth(Boolean(checked))}
+        className="app-report-strengths-growth-toggle"
+      />
 
       {isCareerReport ? (
         <Form className="app-report-goals-form">
