@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildWeekPlanProjects, isIssueOpen, pickPlanPriorities } from "../src/utils/weekPlanProjects.js";
 
-const NOW = new Date("2026-10-28T12:00:00Z");
+const NOW = new Date(2026, 9, 28, 12); // local noon
 const UPDATED = "2026-10-27T12:00:00Z";
 
 const issue = (key, { status = "To Do", priority = "Medium", duedate, summary = `Summary ${key}`, extra = {} } = {}) => ({
@@ -52,14 +52,11 @@ test("does not mutate manual priorities", () => {
   assert.deepEqual(priorities, before);
 });
 
-test("uses run due-date context", () => {
-  const child = issue("A-1", { extra: { parent: { key: "P-1" }, customfield_1: null } });
-  const [p] = buildWeekPlanProjects(
-    [run([child], { mrdFieldId: "customfield_1", parentMostRecentDoneDateByKey: { "P-1": "2026-10-01" } })],
-    {},
-    { now: NOW },
-  );
+test("uses the run's configured due field", () => {
+  const child = issue("A-1", { extra: { customfield_2: "2026-10-01" } });
+  const [p] = buildWeekPlanProjects([run([child], { dueFieldId: "customfield_2" })], {}, { now: NOW });
   assert.ok(p.tasks[0].why.some((r) => r.startsWith("Overdue")));
+  assert.equal(p.tasks[0].isOverdue, true);
 });
 
 test("flattened issue shape", () => {
@@ -140,4 +137,17 @@ test("pickPlanPriorities leaves team values out only when team mode is on and ex
   assert.equal(pickPlanPriorities({ includeTeam: false, teamEnabled: true, merged, local }), local);
   assert.equal(pickPlanPriorities({ includeTeam: false, teamEnabled: false, merged, local }), merged);
   assert.deepEqual(pickPlanPriorities({ includeTeam: false, teamEnabled: true, merged, local: undefined }), {});
+});
+
+test("a parent's most recent done date does not make a task overdue (Metrics page rule)", () => {
+  const child = issue("A-1", { extra: { parent: { key: "P-1" } } });
+  const [p] = buildWeekPlanProjects(
+    [run([child], { mrdFieldId: "customfield_1", parentMostRecentDoneDateByKey: { "P-1": "2020-01-01" } })],
+    {},
+    { now: NOW }
+  );
+  assert.equal(p.overdue, 0);
+  assert.equal(p.tasks[0].isOverdue, false);
+  assert.equal(p.tasks[0].dueDate, null);
+  assert.ok(!p.tasks[0].why.some((w) => /Overdue|Due/.test(w)));
 });

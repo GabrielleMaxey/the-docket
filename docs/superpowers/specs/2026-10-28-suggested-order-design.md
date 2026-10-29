@@ -35,7 +35,7 @@ Score = jiraPriority + staleness + status + blocker + dueDate + manual.
 | Staleness | days since `updated`: >=30 -> 25; 15-29 -> 20; 7-14 -> 15; 3-6 -> 10; <3 -> 5. Whole days, UTC. Invalid or missing `updated` -> 0 and no reason. Items whose status weight is 5 (see below) are capped at 10 |
 | Status | In Progress, Analyzing, Ready for Verification -> 20. Any other open status -> 5 (including unknown statuses). Matching is case-insensitive on the trimmed name |
 | Blocker | `blocks` (this issue blocks another open issue) +30; `blockedBy` (this issue is blocked by an open issue) +20; both can apply |
-| Due date | "today" is `now`'s UTC date (matching the existing `toISOString().slice(0, 10)` overdue checks); `dueDate` before or equal to today +25; otherwise within the next 3 business days (Mon-Fri, no holiday calendar) +15; otherwise 0 |
+| Due date | "today" is `now`'s local calendar date (matching the Metrics page's overdue rule); the due date comes from the issue's own due field only; `dueDate` before or equal to today +25; otherwise within the next 3 business days (Mon-Fri, no holiday calendar) +15; otherwise 0 |
 | Manual priority | `round(30 * (21 - p) / 20)` for integer p in 1..20 (p=1 -> 30, p=20 -> 2); unset, 0, or non-finite -> 0 |
 
 The skill's Blocked status tier (30) and "user says urgent" (+10) are intentionally not ported: ODI statuses have no Blocked status, and manual priority replaces the urgent flag. These weights are the skill's defaults plus the Docket-specific rules above; they are config so they can be tuned.
