@@ -1268,29 +1268,6 @@ const CreateIssueModal = ({
     <Modal open={open} onClose={onClose} size="small">
       <Modal.Header>Create Jira issue</Modal.Header>
       <Modal.Content>
-        {duplicateMatches.length > 0 ? (
-          <Message warning size="small" data-testid="duplicate-matches">
-            <Message.Header>Possible existing issues</Message.Header>
-            <p>Open issues in {projectKey} with similar wording. Check these before {duplicateAction === "draft" ? "drafting" : "creating"} a new one.</p>
-            <ul style={{ margin: "0.25rem 0 0.5rem", paddingLeft: "1.1rem" }}>
-              {duplicateMatches.map((match) => {
-                const url = buildJiraBrowseUrl(jiraBaseUrl, match.key);
-                return (
-                  <li key={match.key}>
-                    {url ? <a href={url} target="_blank" rel="noopener noreferrer">{match.key}</a> : <strong>{match.key}</strong>}
-                    {" — "}{match.summary}{match.status ? ` (${match.status})` : ""}{match.matchedIn === "description" ? " — matched in description" : ""}
-                  </li>
-                );
-              })}
-            </ul>
-            <Button size="mini" primary disabled={submitting || generatingDesc} onClick={continueDespiteDuplicates}>
-              {duplicateAction === "draft" ? "Draft anyway" : "Create anyway"}
-            </Button>
-            <Button size="mini" basic onClick={() => setDuplicateMatches([])}>
-              Cancel
-            </Button>
-          </Message>
-        ) : null}
         {error ? (
           <Message negative size="small" style={{ whiteSpace: "pre-wrap" }}>{error}</Message>
         ) : null}
@@ -1867,6 +1844,29 @@ const CreateIssueModal = ({
         </Form>
       </Modal.Content>
       <Modal.Actions>
+        {duplicateMatches.length > 0 ? (
+          <Message warning size="small" data-testid="duplicate-matches" style={{ textAlign: "left", maxHeight: "40vh", overflowY: "auto" }}>
+            <Message.Header>Possible existing issues</Message.Header>
+            <p>Open issues in {projectKey} with similar wording. Check these before {duplicateAction === "draft" ? "drafting" : "creating"} a new one.</p>
+            <ul style={{ margin: "0.25rem 0 0.5rem", paddingLeft: "1.1rem" }}>
+              {duplicateMatches.map((match) => {
+                const url = buildJiraBrowseUrl(jiraBaseUrl, match.key);
+                return (
+                  <li key={match.key}>
+                    {url ? <a href={url} target="_blank" rel="noopener noreferrer">{match.key}</a> : <strong>{match.key}</strong>}
+                    {" — "}{match.summary}{match.status ? ` (${match.status})` : ""}{match.matchedIn === "description" ? " — matched in description" : ""}
+                  </li>
+                );
+              })}
+            </ul>
+            <Button size="mini" primary disabled={submitting || generatingDesc} onClick={continueDespiteDuplicates}>
+              {duplicateAction === "draft" ? "Draft anyway" : "Create anyway"}
+            </Button>
+            <Button size="mini" basic onClick={() => setDuplicateMatches([])}>
+              Dismiss
+            </Button>
+          </Message>
+        ) : null}
         <Button onClick={onClose}>Close</Button>
         {createdIssueUrl ? (
           <Button
