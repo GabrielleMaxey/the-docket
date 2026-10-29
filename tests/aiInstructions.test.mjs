@@ -4,7 +4,10 @@ import {
   CAREER_REPORT_TYPES,
   LUMEN_CORE_VALUES,
   PWB_PERIODS,
+  AUDIENCE_CONFIGS,
+  REPORT_WRITING_STYLE_RULES,
   STRENGTHS_GROWTH_INSTRUCTION,
+  buildStatusReportSystemPrompt,
   buildOneOnOneSystemPrompt,
   buildPwbSystemPrompt,
   buildWeekPlanSystemPrompt,
@@ -222,5 +225,31 @@ describe("buildWeekPlanSystemPrompt", () => {
     assert.ok(prompt.includes("state this once at the top of the plan"));
     assert.ok(prompt.includes("not an estimate of how long the task takes"));
     assert.ok(prompt.includes("15%"));
+  });
+});
+
+describe("REPORT_WRITING_STYLE_RULES", () => {
+  it("bans hedged numbers, vague verbs, outcome-less activity, filler and invented specifics, with examples", () => {
+    for (const phrase of ["approximately 12", "worked on", "made progress on", "Reviewed <item>", "It is worth noting that", "never estimate"]) {
+      assert.ok(REPORT_WRITING_STYLE_RULES.includes(phrase), phrase);
+    }
+    assert.ok(REPORT_WRITING_STYLE_RULES.includes("at least 12"));
+  });
+
+  it("is part of the status, 1:1 and PWB report prompts", () => {
+    const prompts = [
+      buildStatusReportSystemPrompt({ label: "X" }),
+      buildOneOnOneSystemPrompt({ label: "X", userGoals: "", companyGoals: "" }),
+      buildPwbSystemPrompt({ label: "X", period: PWB_PERIODS.QUARTERLY, userGoals: "", companyGoals: "" }),
+    ];
+    for (const prompt of prompts) assert.ok(prompt.includes(REPORT_WRITING_STYLE_RULES));
+  });
+
+  it("status report prompt still opens with its original instruction", () => {
+    assert.ok(buildStatusReportSystemPrompt({ label: "X" }).startsWith("You are writing a personal project status report"));
+  });
+
+  it("audience configs are untouched (the rules are added where the audience prompt is assembled)", () => {
+    assert.ok(Object.values(AUDIENCE_CONFIGS).every((c) => !c.instruction.includes("Writing style rules")));
   });
 });
