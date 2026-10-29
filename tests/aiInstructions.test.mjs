@@ -203,6 +203,15 @@ describe("buildWeekPlanSystemPrompt", () => {
     assert.ok(prompt.includes("Flag overdue items with"));
   });
 
+  it("week plan prompt includes a score key built from the real weights", () => {
+    const prompt = buildWeekPlanSystemPrompt({ focusStyle: "balance", capacityHours: 20 });
+    assert.ok(prompt.includes("Score key"));
+    assert.ok(prompt.includes("Highest 50"));
+    assert.ok(prompt.includes("+30 if it blocks another open issue"));
+    assert.ok(prompt.includes("+25 if due today or overdue"));
+    assert.ok(prompt.includes("relative ordering"));
+  });
+
   it("week plan prompt covers listed days, due dates, stale triage, blockers and estimates", () => {
     const prompt = buildWeekPlanSystemPrompt({ focusStyle: "balance", capacityHours: 20 });
     assert.ok(prompt.includes("Days to plan"));

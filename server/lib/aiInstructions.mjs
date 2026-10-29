@@ -1,4 +1,5 @@
 import { formatChatSessionContext, formatEpicEvaluationContext } from "../../shared/chatSessionPrompt.mjs";
+import { DEFAULT_PRIORITY_WEIGHTS as W } from "../../shared/workPriorityScore.mjs";
 
 export const LUMEN_CORE_VALUES = [
   {
@@ -324,6 +325,17 @@ const WEEK_PLAN_FOCUS_INSTRUCTIONS = {
   meetings: "Keep the plan light — account for limited deep-work time this week.",
 };
 
+export const WEEK_PLAN_SCORE_KEY = [
+  "Score key (how the suggested-order score is built; higher means do sooner):",
+  `- Jira priority: Highest ${W.priority.highest}, High ${W.priority.high}, Medium ${W.priority.medium}, Low ${W.priority.low}, Lowest ${W.priority.lowest} (unset counts as ${W.priority.unset})`,
+  `- Staleness (days since last update): up to ${W.staleness.d30} for 30+ days, down to ${W.staleness.fresh} for under 3 days`,
+  `- Status: ${W.status.active} for active work (In Progress, Analyzing, Ready for Verification), ${W.status.other} for other open statuses`,
+  `- Blockers: +${W.blocker.blocks} if it blocks another open issue, +${W.blocker.blockedBy} if an open issue blocks it`,
+  `- Due date: +${W.due.overdue} if due today or overdue, +${W.due.soon} if due within ${W.due.businessDays} business days`,
+  `- Manual priority set by the user (1 is top of the list): up to +${W.manual.max}`,
+  "The score is a relative ordering for this list, not a measure of effort or importance on its own.",
+].join("\n");
+
 export const buildWeekPlanSystemPrompt = ({ focusStyle, capacityHours, customInstructions }) =>
   [
     `You are a productivity coach helping a developer at Lumen plan their work week.
@@ -342,11 +354,13 @@ Rules:
 - Tasks are pre-ranked best first, each with a score and reasons
 - Keep that order within the day-by-day plan unless fixed commitments or capacity force a change, and then say so in one clause
 - Quote a score or reason only exactly as given. Do not invent scores or reasons.
+- Add one short line near the top of the plan explaining that tasks are ordered by a suggested-order score where higher means do sooner, using the score key below. Do not repeat the full key
 - Schedule a task that has a due date no later than that date when it falls on a listed day
 - A task that is stale for more than 90 days (see its "Stale N days" reason) gets a time-boxed triage of at most 1 hour: decide to keep, re-scope or close it. Do not give it a full work block ahead of a blocked or recently active task
 - If a task shows "blocked by <key>", name that key in the plan and schedule follow-up on it before the blocked task. If it shows "blocks <key>", say so
 - Hours next to a task are the suggested time to spend working on that task this week. They are not an estimate of how long the task takes, and the task may need more or less. Label them as suggested working time (for example "Suggested: 2h working time") and state this once at the top of the plan: "Hours are suggested time to spend working on each task, not how long it should take to complete." Never say or imply a task should only take that long
 - Leave about 15% of capacity unplanned for meetings and interruptions`,
+    WEEK_PLAN_SCORE_KEY,
     "Base the plan ONLY on the data provided below.",
     ...(customInstructions ? [`\nAdditional instructions:\n${customInstructions}`] : []),
   ].join("\n\n");
