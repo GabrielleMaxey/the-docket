@@ -35,6 +35,7 @@ import {
   isValidPwbPeriod,
   AUDIENCE_CONFIGS,
   STRENGTHS_GROWTH_INSTRUCTION,
+  REPORT_WRITING_STYLE_RULES,
 } from "../lib/aiInstructions.mjs";
 import { computeOverallRollup, normalizePastDueLookbackYears } from "../../shared/dashboardMetrics.mjs";
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
@@ -438,6 +439,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       config.instruction,
       "Base the report only on the data that follows. Do not invent names, metrics, or details.",
       "No preamble or sign-off. Use the requested headings only.",
+      REPORT_WRITING_STYLE_RULES,
     ];
 
     if (customInstructions) {

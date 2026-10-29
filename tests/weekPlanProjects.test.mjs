@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildWeekPlanProjects, isIssueOpen, pickPlanPriorities } from "../src/utils/weekPlanProjects.js";
+import { buildWeekPlanProjects, describePlanScope, isIssueOpen, pickPlanPriorities } from "../src/utils/weekPlanProjects.js";
 
 const NOW = new Date(2026, 9, 28, 12); // local noon
 const UPDATED = "2026-10-27T12:00:00Z";
@@ -85,14 +85,15 @@ test("empty open set", () => {
   assert.equal(p.total, 2);
 });
 
-test("isIssueOpen, overdue count and label fallback preserved", () => {
+test("isIssueOpen and overdue count preserved; drill-down tabs excluded", () => {
   assert.equal(isIssueOpen({ status: "Resolved" }), false);
   assert.equal(isIssueOpen({ fields: { status: { name: "In Progress" } } }), true);
   const open = issue("A-1", { duedate: "2020-01-01" });
   const closed = issue("A-2", { status: "Done", duedate: "2020-01-01" });
-  const [p, q] = buildWeekPlanProjects([{ jql: "x", label: "L", issues: [open, closed] }, { isDrillDown: true, index: 2, issues: [open] }], {}, { now: NOW });
+  const projects = buildWeekPlanProjects([{ jql: "x", label: "L", issues: [open, closed] }, { isDrillDown: true, index: 2, issues: [open] }], {}, { now: NOW });
+  assert.equal(projects.length, 1);
+  const [p] = projects;
   assert.equal(p.overdue, 1);
-  assert.equal(q.label, "Run 3");
   assert.equal(p.tasks[0].isOverdue, true);
 });
 
@@ -150,4 +151,48 @@ test("a parent's most recent done date does not make a task overdue (Metrics pag
   assert.equal(p.tasks[0].isOverdue, false);
   assert.equal(p.tasks[0].dueDate, null);
   assert.ok(!p.tasks[0].why.some((w) => /Overdue|Due/.test(w)));
+});
+
+const owned = (key, assignee) => issue(key, { extra: { assignee } });
+const me = { accountId: "acc-me", displayName: "Pat" };
+
+test("only the signed-in user's issues are planned (accountId match)", () => {
+  const issues = [
+    owned("A-1", { accountId: "acc-me", displayName: "Pat" }),
+    owned("A-2", { accountId: "acc-other", displayName: "Pat" }), // same name, different person
+    owned("A-3", { accountId: "acc-other", displayName: "Sam" }),
+    owned("A-4", null),
+  ];
+  const [p] = buildWeekPlanProjects([run(issues)], {}, { now: NOW, currentUser: me });
+  assert.deepEqual(p.tasks.map((t) => t.key), ["A-1"]);
+  assert.equal(p.total, 1);
+  assert.equal(p.open, 1);
+});
+
+test("falls back to display name when the issue has no accountId", () => {
+  const issues = [owned("A-1", { displayName: "pat" }), owned("A-2", { displayName: "Sam" })];
+  const [p] = buildWeekPlanProjects([run(issues)], {}, { now: NOW, currentUser: { displayName: "Pat" } });
+  assert.deepEqual(p.tasks.map((t) => t.key), ["A-1"]);
+});
+
+test("drill-down tabs are never planned, even without a known user", () => {
+  const regular = run([issue("A-1")]);
+  const drill = run([issue("D-1")], { isDrillDown: true, drillDownType: "assignee", label: "Drill-down: Sam" });
+  const projects = buildWeekPlanProjects([regular, drill], {}, { now: NOW });
+  assert.equal(projects.length, 1);
+  assert.deepEqual(projects[0].tasks.map((t) => t.key), ["A-1"]);
+});
+
+test("no known user leaves the tab's issues unfiltered", () => {
+  const issues = [owned("A-1", { displayName: "Pat" }), owned("A-2", { displayName: "Sam" })];
+  const [p] = buildWeekPlanProjects([run(issues)], {}, { now: NOW, currentUser: null });
+  assert.equal(p.tasks.length, 2);
+});
+
+test("scope note appears only when the user is unknown, and names the tabs used", () => {
+  const projects = buildWeekPlanProjects([run([issue("A-1"), issue("A-2")])], {}, { now: NOW });
+  const note = describePlanScope({ currentUser: null, projects });
+  assert.match(note, /all open issues in your tabs/);
+  assert.match(note, /Run A \(2 open\)/);
+  assert.equal(describePlanScope({ currentUser: me, projects }), "");
 });

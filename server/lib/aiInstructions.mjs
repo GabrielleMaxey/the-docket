@@ -85,6 +85,14 @@ const PWB_PERIOD_GUIDANCE = {
 // Shared rules reused across report system prompts below - keep phrasing consistent and avoid repeating the same sentence in multiple builders.
 export const DATA_GROUNDING_RULE =
   "Base the report ONLY on the data provided below. Do not invent metrics, names, or accomplishments not present in the data.";
+// Style rules for generated reports (status, 1:1, PWB, dashboard audiences). Concrete banned patterns
+// with rewrites work better than abstract advice. Adapted from the ATS jira-comment standards.
+export const REPORT_WRITING_STYLE_RULES = `Writing style rules (apply to every sentence):
+- No hedging on numbers. Write the exact figure from the data ("12 open"), never "approximately 12", "around 12" or "roughly a dozen". If the data only gives a minimum, write "at least 12".
+- No vague verbs. Replace "worked on", "looked into", "made progress on" and "handled" with what changed. Not "Worked on <item>" but "<item> moved to In Progress and 2 of 5 sub-tasks are closed" - only when the data shows it; otherwise name the item and its current status.
+- Every statement of activity needs its outcome or status. Not "Reviewed <item>" but "Reviewed <item>; it is still open and past due". If the data has no outcome, give the current status instead of implying one.
+- No filler. Cut "It is worth noting that", "Overall,", "In conclusion," and stacked qualifiers such as "somewhat", "fairly" or "quite".
+- No specifics that are not in the data. If a number, date, name or issue key is not given, leave it out; never estimate or round it into existence.`;
 export const SINGLE_HEADING_PROSE_RULE =
   "This is the only heading in the report - everything below it is flowing prose paragraphs, not further headings or bullets.";
 
@@ -142,6 +150,7 @@ Tone: direct and confident, like someone who has command of their own workload a
     goalsSection,
     formatLumenCoreValuesBlock(),
     `${DATA_GROUNDING_RULE} If a completion rate is given directly in the data, use that exact number rather than recalculating it.`,
+    REPORT_WRITING_STYLE_RULES,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -173,6 +182,7 @@ Where the work genuinely reflects one of Lumen's 8 Cultural Behaviors (listed be
     goalsSection,
     formatLumenCoreValuesBlock(),
     DATA_GROUNDING_RULE,
+    REPORT_WRITING_STYLE_RULES,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -295,6 +305,9 @@ ${POSSIBLE_REASONS_INSTRUCTION}`,
 };
 
 export const buildStatusReportSystemPrompt = ({ label }) =>
+  `${STATUS_REPORT_PROMPT_BODY(label)}\n\n${REPORT_WRITING_STYLE_RULES}`;
+
+const STATUS_REPORT_PROMPT_BODY = (label) =>
   `You are writing a personal project status report for the assignee working on "${label}" at Lumen.
 This report is written FROM the assignee's perspective and FOR their benefit — to help them understand their own workload, spot what needs attention, and feel clear on next steps.
 Write in second person ("you have", "your open items") so it reads as direct, useful feedback to the person doing the work.
