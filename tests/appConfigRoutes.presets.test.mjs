@@ -12,7 +12,7 @@ describe("epic preset routes", () => {
     const db = new Database(":memory:");
     initDatabase(db);
     registerAppConfigRoutes(app, {
-      db,
+      getDb: () => db,
       jiraRequest: async () => ({ ok: true, status: 200, data: {} }),
       ensureEnvOrRespond: () => true,
       runJiraSearchRequest: async () => ({ ok: true, status: 200, data: { issues: [] } }),
