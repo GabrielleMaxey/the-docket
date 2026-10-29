@@ -536,7 +536,7 @@ const WorkWeekTasks = () => {
           onTodoAdd={handleTodoAdd}
           onTodoClearCompleted={handleTodoClearCompleted}
           weeklyPlanPanel={
-            <WeeklyPlanPanel jqlRuns={jqlRuns} jiraRowPriorities={jiraRowPriorities} />
+            <WeeklyPlanPanel jqlRuns={jqlRuns} jiraRowPriorities={jiraRowPriorities} dueDateDrafts={dueDateDrafts} />
           }
         />
 

@@ -109,3 +109,16 @@ test("overdue comes from effective due date (metrics-page rule), not a stored fl
   const byKey = Object.fromEntries(p.tasks.map((t) => [t.key, t.isOverdue]));
   assert.deepEqual(byKey, { "A-1": true, "A-2": false, "A-3": false, "A-4": false });
 });
+
+test("unsaved due date typed in the results table counts without updating Jira", () => {
+  const a = issue("A-1", { duedate: "2999-01-01" });
+  const b = issue("A-2", { duedate: "2999-01-01" });
+  const c = issue("A-3", { duedate: "2999-01-01" });
+  const drafts = { "A-1": "2020-01-01", "A-2": "", "A-3": "garbage" };
+  const [p] = buildWeekPlanProjects([run([a, b, c])], {}, { now: NOW, dueDateDrafts: drafts });
+  assert.equal(p.overdue, 1);
+  assert.equal(p.tasks[0].key, "A-1");
+  assert.equal(p.tasks[0].isOverdue, true);
+  assert.ok(p.tasks[0].why.some((w) => w.startsWith("Overdue")));
+  assert.equal(a.fields.duedate, "2999-01-01"); // input not mutated
+});

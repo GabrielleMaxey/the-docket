@@ -16,6 +16,17 @@ const dueContextForRun = (run) => ({
   parentMostRecentDoneDateByKey: run.parentMostRecentDoneDateByKey,
 });
 
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+// A due date typed into the results table counts immediately, whether or not the
+// user has chosen to update Jira with it. Empty/invalid drafts are ignored.
+const withDraftDue = (issue, run, dueDateDrafts) => {
+  const draft = String(dueDateDrafts?.[issue.key] ?? "").trim();
+  if (!DATE_ONLY.test(draft)) return issue;
+  const dueId = String(run.dueFieldId || "duedate").trim() || "duedate";
+  return { ...issue, fields: { ...issue.fields, [dueId]: draft } };
+};
+
 const rankOpenIssues = (run, openIssues, jiraRowPriorities, now) => {
   const dueContext = dueContextForRun(run);
   const inputs = openIssues.map((issue) => ({
@@ -33,7 +44,7 @@ export const buildWeekPlanProjects = (jqlRuns, jiraRowPriorities, options = {}) 
   return (jqlRuns || [])
     .filter((r) => isConfiguredJqlRun(r) && r.issues?.length > 0)
     .map((r) => {
-      const openIssues = r.issues.filter(isIssueOpen);
+      const openIssues = r.issues.filter(isIssueOpen).map((i) => withDraftDue(i, r, options.dueDateDrafts));
       // Same overdue rule as the metrics page (effective due date strictly before today).
       const dueContext = dueContextForRun(r);
       const overdueKeys = new Set(

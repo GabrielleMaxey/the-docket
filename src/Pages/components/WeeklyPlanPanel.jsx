@@ -48,7 +48,7 @@ const buildWeekPlanContext = ({ fixedCommitments, additionalContext, coworkFilen
   return parts.join("\n\n");
 };
 
-const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
+const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities, dueDateDrafts }) => {
   const instanceId = React.useRef(getSiteContext()?.instanceId).current;
   const persistedPlan = loadWeekPlanState();
 
@@ -118,7 +118,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
     setPlanPending(true);
     setError("");
 
-    const projects = buildWeekPlanProjects(jqlRuns, jiraRowPriorities);
+    const projects = buildWeekPlanProjects(jqlRuns, jiraRowPriorities, { dueDateDrafts });
 
     const coworkFilename = selectedCoworkFilename.trim();
 
