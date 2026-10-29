@@ -12,7 +12,7 @@ const isIssueOpen = (issue) => {
   return !/(closed|resolved|done)/.test(status);
 };
 
-const isIssueOverdueByEffectiveDueDate = (issue, dueDateContext, isOpen) => {
+export const isIssueOverdueByEffectiveDueDate = (issue, dueDateContext, isOpen) => {
   if (!isOpen(issue)) {
     return false;
   }

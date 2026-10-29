@@ -91,10 +91,21 @@ test("empty open set", () => {
 test("isIssueOpen, overdue count and label fallback preserved", () => {
   assert.equal(isIssueOpen({ status: "Resolved" }), false);
   assert.equal(isIssueOpen({ fields: { status: { name: "In Progress" } } }), true);
-  const open = { ...issue("A-1"), isOverdue: true };
-  const closed = { ...issue("A-2", { status: "Done" }), isOverdue: true };
+  const open = issue("A-1", { duedate: "2020-01-01" });
+  const closed = issue("A-2", { status: "Done", duedate: "2020-01-01" });
   const [p, q] = buildWeekPlanProjects([{ jql: "x", label: "L", issues: [open, closed] }, { isDrillDown: true, index: 2, issues: [open] }], {}, { now: NOW });
   assert.equal(p.overdue, 1);
   assert.equal(q.label, "Run 3");
   assert.equal(p.tasks[0].isOverdue, true);
+});
+
+test("overdue comes from effective due date (metrics-page rule), not a stored flag", () => {
+  const past = issue("A-1", { duedate: "2020-01-01" });
+  const future = issue("A-2", { duedate: "2999-01-01" });
+  const noDue = issue("A-3");
+  const flagged = { ...issue("A-4"), isOverdue: true }; // stale flag must be ignored
+  const [p] = buildWeekPlanProjects([run([past, future, noDue, flagged])], {}, { now: NOW });
+  assert.equal(p.overdue, 1);
+  const byKey = Object.fromEntries(p.tasks.map((t) => [t.key, t.isOverdue]));
+  assert.deepEqual(byKey, { "A-1": true, "A-2": false, "A-3": false, "A-4": false });
 });
