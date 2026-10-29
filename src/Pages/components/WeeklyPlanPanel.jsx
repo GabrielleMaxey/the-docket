@@ -1,3 +1,4 @@
+import { fetchJiraMyself } from "../../services/jiraClient.js";
 import { getSiteContext } from "../../utils/siteContextStore.js";
 import React from "react";
 import { Button } from "semantic-ui-react";
@@ -23,7 +24,7 @@ import {
   saveWeekPlanState,
 } from "../../utils/pageReportPersistence";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
-import { buildWeekPlanProjects, pickPlanPriorities } from "../../utils/weekPlanProjects.js";
+import { buildWeekPlanProjects, describePlanScope, pickPlanPriorities } from "../../utils/weekPlanProjects.js";
 
 const WEEKLY_PLAN_KEY = "ww-weekly-plan-open";
 
@@ -117,9 +118,18 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities, localRowPriorities, teamE
     onFinally: () => setPlanPending(false),
   });
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setPlanPending(true);
     setError("");
+
+    // Only the signed-in user's issues are planned. If the profile can't be loaded the plan still
+    // runs on everything in the tabs (drill-down tabs are always left out).
+    let currentUser = null;
+    try {
+      currentUser = await fetchJiraMyself();
+    } catch {
+      currentUser = null;
+    }
 
     const projects = buildWeekPlanProjects(
       jqlRuns,
@@ -129,7 +139,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities, localRowPriorities, teamE
         merged: jiraRowPriorities,
         local: localRowPriorities,
       }),
-      { dueDateDrafts }
+      { dueDateDrafts, currentUser }
     );
 
     const coworkFilename = selectedCoworkFilename.trim();
@@ -159,6 +169,8 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities, localRowPriorities, teamE
           capacityHours: Number(capacityHours) || 40,
           additionalContext: combined,
         });
+        const scopeNote = describePlanScope({ currentUser, projects });
+        if (scopeNote) result.plan = `${scopeNote}${result.plan}`;
         saveWeekPlanState({
           plan: result.plan,
           step: "done",

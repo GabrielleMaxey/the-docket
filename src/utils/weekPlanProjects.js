@@ -43,19 +43,39 @@ const rankOpenIssues = (run, openIssues, jiraRowPriorities, now) => {
 export const pickPlanPriorities = ({ includeTeam, teamEnabled, merged, local }) =>
   teamEnabled && !includeTeam ? local || {} : merged || {};
 
+const norm = (v) => String(v || "").trim().toLowerCase();
+
+// True when the issue is assigned to the signed-in Jira user. accountId is the reliable match;
+// display name is the fallback for issues that only carry a name. Unassigned never matches.
+export const isAssignedToUser = (issue, user) => {
+  const assignee = issue?.fields?.assignee;
+  const name = norm(assignee?.displayName || issue?.assignee);
+  if (!assignee?.accountId && (!name || name === "unassigned")) return false;
+  if (user?.accountId && assignee?.accountId) return user.accountId === assignee.accountId;
+  return Boolean(name) && name === norm(user?.displayName);
+};
+
+// Drill-down tabs exist to look at someone else's (or an arbitrary) set of issues, so they never
+// belong in a plan of the user's own week.
+const isPlannableRun = (r) => isConfiguredJqlRun(r) && !r.isDrillDown && !r.isPendingDrillDown;
+
 export const buildWeekPlanProjects = (jqlRuns, jiraRowPriorities, options = {}) => {
   const now = options.now instanceof Date ? options.now : new Date();
+  const user = options.currentUser?.accountId || options.currentUser?.displayName ? options.currentUser : null;
+  const mine = (i) => !user || isAssignedToUser(i, user);
   return (jqlRuns || [])
-    .filter((r) => isConfiguredJqlRun(r) && r.issues?.length > 0)
+    .filter((r) => isPlannableRun(r) && r.issues?.length > 0)
     .map((r) => {
-      const openIssues = r.issues.filter(isIssueOpen).map((i) => withDraftDue(i, r, options.dueDateDrafts));
+      const openIssues = r.issues
+        .filter((i) => isIssueOpen(i) && mine(i))
+        .map((i) => withDraftDue(i, r, options.dueDateDrafts));
       const dueFieldId = String(r.dueFieldId || "").trim() || "duedate";
       const overdueKeys = new Set(
         openIssues.filter((i) => isIssueOverdueForMetrics(i, dueFieldId, [], null)).map((i) => i.key)
       );
       return {
         label: r.label || `Run ${(r.index || 0) + 1}`,
-        total: r.issues.length,
+        total: r.issues.filter(mine).length,
         open: openIssues.length,
         overdue: overdueKeys.size,
         tasks: rankOpenIssues(r, openIssues, jiraRowPriorities, now)
@@ -74,4 +94,18 @@ export const buildWeekPlanProjects = (jqlRuns, jiraRowPriorities, options = {}) 
           })),
       };
     });
+};
+
+// When the signed-in user is unknown the plan can't be limited to their issues. The plan text
+// then opens with a note saying exactly which data it used. Returns "" when the plan is filtered
+// to the user (nothing to flag).
+export const describePlanScope = ({ currentUser, projects }) => {
+  if (currentUser?.accountId || currentUser?.displayName) return "";
+  const list = Array.isArray(projects) ? projects : [];
+  const tabs = list.map((p) => `${p.label} (${p.open} open)`).join(", ") || "none";
+  return (
+    "> **Data used:** I couldn't identify your Jira user, so this plan covers **all open issues in your tabs, " +
+    "whoever they are assigned to** (not only yours): " +
+    `${tabs}. Drill-down tabs are excluded.\n\n`
+  );
 };
