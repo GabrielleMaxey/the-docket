@@ -515,6 +515,10 @@ Preset preload from the active Task Management tab uses `resolveCreateIssueDefau
 
 Story-backed work must use Jira **Sub-task** under a Story. **Task** issues parent to Epics (`Epic (Feature)`), not Stories — forcing Task + Story parent produces Parent Link / parentId validation errors. Portfolio **Parent Link** (`customfield_10018`) is not used for story parents.
 
+**Duplicate check (before Create / AI Draft):** `runDuplicateCheck` in `CreateIssueModal.jsx` builds search text from the title (without its `[label]`) or, with the AI helper on, the "I want" intake answer. `shared/duplicateCandidates.mjs` turns it into JQL — `project = "KEY" AND statusCategory != Done AND (summary ~ "w" OR description ~ "w" …)`, with description terms limited to the 8 most specific words — and ranks the results locally (`rankDuplicateCandidates`, light stemming, threshold scaled to word count, top 5, `matchedIn` = summary | description). The search is `POST /api/jira/search` with `includeDescription: true`; `server/lib/jiraSearchDescription.mjs` (`withDescriptionField`, `withPlainDescriptions`) adds the field and converts ADF to plain text capped at `DESCRIPTION_CHECK_CHARS` (500). The check fails open: a search error never blocks create. `duplicateAckRef` remembers text the user chose to continue with so it is not asked twice.
+
+**Title format:** `shared/issueTitle.mjs` — `extractTitleLabel`, `formatPrefixedTitle`, `stripTitleLabel`, `isLabelPrefixedTitle`. After AI Draft the modal formats the title as `[label] short ask`, taking `[label]` from the parent's title; the Story prompt asks for a short ask (under 12 words, no brackets). `validateOdiIssueCreate` accepts either a job story or a `[label] ask` title.
+
 **Components:** `loadProjectComponents` fetches `/rest/api/3/project/{key}/components`; unknown component names are rejected before the Jira API call.
 
 **Modal validation UX:** `descriptionError` state shows description/goal/clarification failures below the Description textarea; other errors stay in the top banner. `canSubmit` vs `canEditIssueFields` allows resubmit after fixing validation errors.
@@ -525,7 +529,7 @@ Story-backed work must use Jira **Sub-task** under a Story. **Task** issues pare
 
 `server/lib/reportArchive.mjs` — `REPORT_SOURCES` (`work_week`, `dashboard`, `adhoc`), `insertGeneratedReport`, `listGeneratedReports`, `getGeneratedReportById`. Tab filters use `report_type` sets (Work Week: project report + week plan; Dashboard: `dashboard_report`; Ad-hoc: `chat_response` or `source=adhoc`). Report saves pass `savedAtLocal` / `savedTimeZone` from the browser (`src/utils/localTimestamp.js`) so archived rows are created under the user's local timestamp; the timezone is also kept in `meta_json` when provided.
 
-UI: `ReportArchive.jsx` — three tabs, list + `ReportOutput` viewer. Dashboard archived items may include `meta.statusCounts` / `chartVariant` for chart replay.
+UI: `ReportArchive.jsx` — tabs in order Task Management, Combined Work, Metrics, Ad-hoc, Files, Completed To Dos; list + `ReportOutput` viewer. Dashboard archived items may include `meta.statusCounts` / `chartVariant` for chart replay.
 
 ### On-page report clear (not archive delete)
 
@@ -563,7 +567,7 @@ All routes mounted by `server/jiraProxy.mjs`.
 | GET | `/api/health` | Jira connection check + base URL |
 | GET | `/api/jira/myself` | Current user info |
 | GET | `/api/jira/fields` | All Jira fields |
-| GET/POST | `/api/jira/search` | JQL search (POST body or GET query) |
+| GET/POST | `/api/jira/search` | JQL search (POST body or GET query). Optional `includeDescription: true` adds plain-text descriptions (≤500 chars) for the duplicate check |
 | POST | `/api/jira/search/all` | Paginated JQL until `maxTotal` (cap 5000) |
 | POST | `/api/jira/issues/comments/latest/bulk` | Latest comment `{ text, author }` per issue key |
 | POST | `/api/jira/issues/:issueKey/comment` | Add Jira comment |
@@ -630,6 +634,9 @@ All routes mounted by `server/jiraProxy.mjs`.
 ### `/api/report/project` (Task Management — My Metrics)
 Written **from the assignee's perspective**, second person ("you have", "your open items"). Tone: supportive colleague, not manager status update. Covers: overall tracking %, key open items, overdue concerns, recommended next steps. Flowing prose, no bullet lists.
 
+### Writing style rules (all report prompts)
+`REPORT_WRITING_STYLE_RULES` in `server/lib/aiInstructions.mjs` is appended to the Status Report, 1:1 Prep and PWB Review prompt builders (`STATUS_REPORT_PROMPT_BODY` is split out so it can be appended) and to the dashboard audience `systemParts` in `server/routes/reportRoutes.mjs`. It bans hedged numbers, vague verbs, activity without an outcome, filler phrases and details not in the data. Add new report prompts to the same list so they inherit it; `tests/aiInstructions.test.mjs` covers the builders.
+
 ### `/api/report/generate` (Dashboard — Generate Report)
 Four audience variants — `AUDIENCE_CONFIGS` in `server/lib/aiInstructions.mjs`, keyed by `audience` in the request body (`AUDIENCE_OPTIONS` in `useReportGeneration.js` is the frontend mirror):
 - **`executive`** — Executive Summary: highlights, risks, action items for leadership
@@ -638,7 +645,17 @@ Four audience variants — `AUDIENCE_CONFIGS` in `server/lib/aiInstructions.mjs`
 - **`direct_reports`** — Ad-hoc team report: `isAdhocTeamReport` in `reportRoutes.mjs`; scoped to Settings → My Direct Reports rather than the selected project presets
 
 ### `/api/plan/week` (Task Management — Help me plan my week)
-Day-by-day Monday–Friday plan using actual issue keys from the loaded JQL runs. Respects `focusStyle` (balance / overdue-first / single-project / meeting-heavy), `capacityHours`, `fixedCommitments`, and `additionalContext`. Flags overdue items with ⚠️.
+Day-by-day plan for the working days left in the week using actual issue keys from the loaded JQL runs. Respects `focusStyle` (balance / overdue-first / single-project / meeting-heavy), `capacityHours`, `fixedCommitments`, and `additionalContext`. Flags overdue items with ⚠️.
+
+**Data flow:** `WeeklyPlanPanel.jsx` → `buildWeekPlanProjects` (`src/utils/weekPlanProjects.js`) → `generateWeekPlan` → `POST /api/plan/week` → `buildWeekPlanContext` (`server/lib/weekPlanContext.mjs`) → `buildWeekPlanSystemPrompt`.
+
+- **Scope:** drill-down runs (`isDrillDown` / `isPendingDrillDown`) are skipped. On Generate the panel calls `fetchJiraMyself()` and keeps only open issues assigned to that user (`isAssignedToUser`: accountId, display-name fallback; unassigned excluded). If the lookup fails the plan runs unfiltered and `describePlanScope` prepends a "Data used" note to the plan text.
+- **Ranking:** `shared/workPriorityScore.mjs` (`scoreIssue`, `rankIssues`, `DEFAULT_PRIORITY_WEIGHTS`) is a pure scorer: score = Jira priority + staleness + status + blocker + due + manual. "Today" is the user's **local** calendar date; the due date is the issue's own field only (no parent fallback). `toScoringInput` also returns `blocksKeys` / `blockedByKeys`. Each task carries `score`, `why`, `dueDate`, `blocks`, `blockedBy`, `isOverdue`; at most 10 tasks per run are sent.
+- **Overdue** uses `isIssueOverdueForMetrics` — the Metrics-page rule — not the Dashboard **Compare against** filter. Due dates typed into the table (`dueDateDrafts`) count before they are saved to Jira.
+- **Priorities:** with team DB enabled the hook merges `{...local, ...team}`; `pickPlanPriorities` uses the local-only set when the **Include team priorities** box is cleared.
+- **Prompt:** `buildWeekPlanContext` adds `Today`, `Days to plan`, and per-task `| due`, `| blocked by`, `| blocks`, `| score` fields. `WEEK_PLAN_SCORE_KEY` is generated from `DEFAULT_PRIORITY_WEIGHTS`, so changing a weight updates the key. Rules in `aiInstructions.mjs` cover due-date scheduling, >90-day stale triage (≤1h), blocker naming, "suggested working time" wording, and a ~15% buffer.
+
+Tests: `tests/workPriorityScore.test.mjs`, `tests/weekPlanProjects.test.mjs`, `tests/weekPlanContext.test.mjs`, `tests/aiInstructions.test.mjs`.
 
 ---
 

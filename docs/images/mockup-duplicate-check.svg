@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="840" viewBox="0 0 1440 840" role="img" aria-labelledby="title desc">
+<title id="title">Create Issue: possible existing issues</title><desc id="desc">Illustrative Create Issue modal. A Possible existing issues panel sits above the Close and Create buttons, listing open issues with similar wording and offering Create anyway or Dismiss.</desc>
+<defs><linearGradient id="nav"><stop stop-color="#054d78"/><stop offset="1" stop-color="#16b0f2"/></linearGradient></defs>
+<g font-family="Arial, Helvetica, sans-serif">
+<rect x="0" y="0" width="1440" height="840" fill="#f4f7fa"/>
+<rect x="0" y="0" width="1440" height="62" fill="url(#nav)"/>
+<text x="32" y="41" font-size="27" fill="#fdd219" font-weight="700">The Docket</text>
+<text x="360" y="39" font-size="19" fill="#fdd219" font-weight="600">Task Management</text>
+<rect x="360" y="53" width="221" height="3" fill="#fdd219"/>
+<text x="604" y="39" font-size="19" fill="white" font-weight="600">Metrics</text>
+<text x="729" y="39" font-size="19" fill="white" font-weight="600">Project Managers</text>
+<text x="965" y="39" font-size="19" fill="white" font-weight="600">Past Reports</text>
+<text x="1146" y="39" font-size="19" fill="white" font-weight="600">Chat</text>
+<text x="1239" y="39" font-size="19" fill="white" font-weight="600">Settings</text>
+<rect x="32" y="82" width="1376" height="40" rx="4" fill="#fff5d5" stroke="#eddfaa"/>
+<text x="49" y="109" font-size="17" fill="#6e5720" font-weight="700">DOCUMENTATION MOCKUP  •  SYNTHETIC DATA  •  SIMPLIFIED LAYOUT</text>
+<text x="40" y="170" font-size="30" fill="#223447" font-weight="700">Create Issue: possible existing issues appear above Close / Create</text>
+<rect x="140" y="195" width="1160" height="615" rx="10" fill="white" stroke="#cfd9e3"/>
+<text x="170" y="236" font-size="24" fill="#223447" font-weight="700">Create Issue</text>
+<text x="170" y="276" font-size="19" fill="#526779" font-weight="400">Parent: [Reporting Revamp - Exports] (Epic)  ·  Type: Story</text>
+<text x="170" y="316" font-size="18" fill="#526779" font-weight="700">Title</text>
+<rect x="170" y="326" width="1100" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
+<text x="184" y="355" font-size="19" fill="#223447" font-weight="400">[Reporting Revamp - Exports] Schedule weekly CSV export</text>
+<text x="170" y="402" font-size="18" fill="#526779" font-weight="700">Description  (✦ AI Draft)</text>
+<rect x="170" y="412" width="1100" height="86" rx="5" fill="#f8fafc" stroke="#ccd6e1"/>
+<text x="184" y="444" font-size="18" fill="#526779" font-weight="400">When a manager reviews progress, I want a scheduled CSV export so I can share it without</text>
+<text x="184" y="472" font-size="18" fill="#526779" font-weight="400">opening the app…</text>
+<rect x="170" y="518" width="1100" height="196" rx="8" fill="#fff8e1" stroke="#e7d28a"/>
+<text x="190" y="550" font-size="20" fill="#6e5720" font-weight="700">Possible existing issues</text>
+<text x="190" y="578" font-size="17" fill="#6e5720" font-weight="400">Open issues in ODI with similar wording. Check these before creating a new one.</text>
+<text x="200" y="610" font-size="18" fill="#185f89" font-weight="600">• ODI-2210 — Scheduled CSV export of metrics (In Progress)</text>
+<text x="200" y="640" font-size="18" fill="#185f89" font-weight="600">• ODI-1984 — Weekly report email — matched in description (To Do)</text>
+<rect x="190" y="660" width="150" height="38" rx="5" fill="#16b0f2"/>
+<text x="212" y="685" font-size="17" fill="white" font-weight="700">Create anyway</text>
+<rect x="354" y="660" width="100" height="38" rx="5" fill="white" stroke="#ccd6e1"/>
+<text x="376" y="685" font-size="17" fill="#263d52" font-weight="600">Dismiss</text>
+<rect x="1060" y="740" width="100" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
+<text x="1085" y="768" font-size="18" fill="#263d52" font-weight="600">Close</text>
+<rect x="1175" y="740" width="95" height="42" rx="5" fill="#16b0f2"/>
+<text x="1196" y="768" font-size="18" fill="white" font-weight="700">Create</text>
+<text x="170" y="798" font-size="15" fill="#526779" font-weight="400">Same panel appears for ✦ AI Draft (button reads Draft anyway). Search covers summary and the first 500 characters of description.</text>
+</g>
+</svg>
