@@ -22,3 +22,5 @@ export const createLogger = (tag) => ({
   warn:  (msg, meta) => emit("warn",  tag, msg, meta),
   error: (msg, meta) => emit("error", tag, msg, meta),
 });
+
+export const errorMessage = (error) => (error instanceof Error ? error.message : error);

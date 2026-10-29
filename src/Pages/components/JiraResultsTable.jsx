@@ -797,7 +797,7 @@ const JiraResultsTable = ({
                 </button>
               </div>
 
-              <table className="ww-results-table">
+              <table className={"ww-results-table" + (combinedRun ? " ww-results-table--combined" : " ww-results-table--single")}>
                 <thead>
                   <tr>
                     <th className="ww-th-expand" aria-hidden="true" />
@@ -972,7 +972,7 @@ const JiraResultsTable = ({
                         >
                           <td colSpan={combinedRun ? 6 : 5} className="ww-row-detail-cell">
                             <div className="ww-row-detail-panel">
-                              <table className="ww-results-table ww-results-table--expanded-detail">
+                              <table className={"ww-results-table ww-results-table--expanded-detail" + (combinedRun ? " ww-results-table--combined" : " ww-results-table--single")}>
                                 <tbody>
                                   <tr
                                     className={`${isClosedOrResolved ? "ww-row-closed" : getPriorityRowClass(rowPriority)}${hasAnyTracking ? " ww-row-has-tracking" : ""}`}

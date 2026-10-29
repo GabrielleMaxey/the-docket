@@ -22,7 +22,7 @@ import {
   listCoworkWeeklyPlans,
   readCoworkWeeklyPlan,
 } from "../lib/coworkWeeklyPlans.mjs";
-import { createLogger } from "../lib/logger.mjs";
+import { createLogger, errorMessage } from "../lib/logger.mjs";
 import { buildFieldMappingsMap, buildUnionScopeFromJqls, fallbackPresetJql } from "../lib/epicFilterJql.mjs";
 import { buildReportDueWindowsAndLinks } from "../lib/reportWorkWeekLinks.mjs";
 import {
@@ -34,11 +34,13 @@ import {
   isValidCareerReportType,
   isValidPwbPeriod,
   AUDIENCE_CONFIGS,
+  STRENGTHS_GROWTH_INSTRUCTION,
 } from "../lib/aiInstructions.mjs";
 import { computeOverallRollup, normalizePastDueLookbackYears } from "../../shared/dashboardMetrics.mjs";
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildDirectReportsJql, isCurrentUserMember, isJqlCurrentUser, looksLikeAccountId } from "../../shared/directReportsJql.mjs";
 import { fetchJiraMyself } from "../lib/jiraSearchHelpers.mjs";
+import { buildWeekPlanContext } from "../lib/weekPlanContext.mjs";
 
 const log = createLogger("report");
 
@@ -472,7 +474,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
         ...(statusCounts ? { statusCounts, chartVariant } : {}),
       });
     } catch (error) {
-      log.error("generation failed", error instanceof Error ? error.message : error);
+      log.error("generation failed", errorMessage(error));
       return res.status(500).json({
         error: error instanceof Error ? error.message : "Unable to generate report.",
       });
@@ -493,6 +495,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
     const careerReportType = isValidCareerReportType(rawReportType) ? rawReportType : null;
     const userGoals = String(req.body?.userGoals || "").trim();
     const companyGoals = String(req.body?.companyGoals || "").trim();
+    const includeStrengthsGrowth = Boolean(req.body?.includeStrengthsGrowth);
 
     if (careerReportType === CAREER_REPORT_TYPES.PWB && !isValidPwbPeriod(req.body?.pwbPeriod)) {
       return res.status(400).json({ error: "A valid PWB review period (quarterly, mid_year, or yearly) is required." });
@@ -547,7 +550,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
         } catch (error) {
           log.warn(
             "Skipped backlog/comment status-hygiene check",
-            error instanceof Error ? error.message : error
+            errorMessage(error)
           );
         }
       }
@@ -593,6 +596,10 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       systemPromptBase,
       "Base your report ONLY on the data provided. Do not invent metrics or names.",
     ];
+    if (includeStrengthsGrowth) {
+      systemParts.push(STRENGTHS_GROWTH_INSTRUCTION);
+      archiveMeta.includeStrengthsGrowth = true;
+    }
     if (customInstructions) systemParts.push(`\nAdditional instructions:\n${customInstructions}`);
     try {
       const report = await callLLMForReport({ systemPrompt: systemParts.join("\n\n"), context: contextLines.join("\n"), label, aiPath: req.body?.aiPath });
@@ -606,7 +613,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       });
       return res.json({ report, label, archiveId });
     } catch (error) {
-      log.error("project report generation failed", error instanceof Error ? error.message : error);
+      log.error("project report generation failed", errorMessage(error));
       return res.status(500).json({
         error: error instanceof Error ? error.message : "Unable to generate report.",
       });
@@ -670,7 +677,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       const generated = await callLLMForReport({ systemPrompt, context: contextLines.join("\n"), label: "gantt-summary" });
       return res.json({ summary: generated.trim() });
     } catch (error) {
-      log.error("gantt summary generation failed", error instanceof Error ? error.message : error);
+      log.error("gantt summary generation failed", errorMessage(error));
       return res.status(500).json({ error: error instanceof Error ? error.message : "Unable to generate summary." });
     }
   }));
@@ -688,29 +695,12 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
 
     if (projects.length === 0) return res.status(400).json({ error: "No project data provided." });
 
-    const contextLines = [
-      "## Weekly Planning Context",
-      `- Work week capacity: ${capacityHours} hours`,
-      `- Focus approach: ${focusStyle}`,
-    ];
-    if (additionalContext) contextLines.push(`- Additional context: ${additionalContext}`);
-    contextLines.push("", "## Active Projects");
-    for (const proj of projects) {
-      contextLines.push("", `### ${proj.label}`);
-      contextLines.push(`- Total: ${proj.total} | Open: ${proj.open} | Overdue: ${proj.overdue}`);
-      if (Array.isArray(proj.tasks) && proj.tasks.length > 0) {
-        contextLines.push("Top open tasks (by priority):");
-        for (const task of proj.tasks.slice(0, 10)) {
-          const flag = task.isOverdue ? " [OVERDUE]" : "";
-          contextLines.push(`  - ${task.key}: ${task.summary} (${task.status}, assigned: ${task.assignee})${flag}`);
-        }
-      }
-    }
+    const context = buildWeekPlanContext({ projects, capacityHours, focusStyle, additionalContext });
 
     const systemPrompt = buildWeekPlanSystemPrompt({ focusStyle, capacityHours, customInstructions });
 
     try {
-      const plan = await callLLMForReport({ systemPrompt, context: contextLines.join("\n"), label: "week plan", aiPath: req.body?.aiPath });
+      const plan = await callLLMForReport({ systemPrompt, context, label: "week plan", aiPath: req.body?.aiPath });
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.WORK_WEEK,
         reportType: "week_plan",
@@ -727,7 +717,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       });
       return res.json({ plan, archiveId });
     } catch (error) {
-      log.error("week plan generation failed", error instanceof Error ? error.message : error);
+      log.error("week plan generation failed", errorMessage(error));
       return res.status(500).json({
         error: error instanceof Error ? error.message : "Unable to generate report.",
       });
@@ -744,7 +734,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       }
       return res.json({ digest });
     } catch (error) {
-      log.error("weekly digest failed", error instanceof Error ? error.message : error);
+      log.error("weekly digest failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to build weekly digest",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -757,7 +747,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       const items = listCoworkWeeklyPlans(dataDir);
       return res.json({ items });
     } catch (error) {
-      log.error("cowork files list failed", error instanceof Error ? error.message : error);
+      log.error("cowork files list failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to list CoWork weekly plans",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -773,7 +763,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       }
       return res.json({ item: result.item });
     } catch (error) {
-      log.error("cowork file read failed", error instanceof Error ? error.message : error);
+      log.error("cowork file read failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to read CoWork weekly plan",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -789,7 +779,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       const items = listGeneratedReports(getRequestOperationContext(req, { getDb }).getDb(), { source, limit });
       return res.json({ items });
     } catch (error) {
-      log.error("archive list failed", error instanceof Error ? error.message : error);
+      log.error("archive list failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to load archived reports",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -825,7 +815,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
         });
         return res.json({ ok: true, archiveId, label });
       } catch (error) {
-        log.error("cowork archive save failed", error instanceof Error ? error.message : error);
+        log.error("cowork archive save failed", errorMessage(error));
         return res.status(500).json({
           error: "Failed to save report",
           message: error instanceof Error ? error.message : "Unknown error",
@@ -859,7 +849,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       });
       return res.json({ ok: true, archiveId, label });
     } catch (error) {
-      log.error("archive save failed", error instanceof Error ? error.message : error);
+      log.error("archive save failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to save report",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -880,7 +870,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       }
       return res.json({ item });
     } catch (error) {
-      log.error("archive get failed", error instanceof Error ? error.message : error);
+      log.error("archive get failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to load archived report",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -901,7 +891,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       }
       return res.json({ ok: true, id });
     } catch (error) {
-      log.error("archive delete failed", error instanceof Error ? error.message : error);
+      log.error("archive delete failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to delete archived report",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -922,7 +912,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       const deletedCount = deleteGeneratedReportsBySource(getRequestOperationContext(req, { getDb }).getDb(), { source });
       return res.json({ ok: true, deletedCount });
     } catch (error) {
-      log.error("archive bulk delete failed", error instanceof Error ? error.message : error);
+      log.error("archive bulk delete failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to delete archived reports",
         message: error instanceof Error ? error.message : "Unknown error",

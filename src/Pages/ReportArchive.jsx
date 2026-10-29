@@ -611,18 +611,18 @@ const CompletedTodosPanel = () => {
 const ReportArchive = () => {
   const panes = [
     {
-      menuItem: "Combined Work",
-      render: () => (
-        <Tab.Pane attached={false}>
-          <ReportArchivePanel key="combined-work" source="work_week" title="Combined Work reports" siteContext={COMBINED_REPORT_CONTEXT} />
-        </Tab.Pane>
-      ),
-    },
-    {
       menuItem: "Task Management",
       render: () => (
         <Tab.Pane attached={false}>
           <ReportArchivePanel key="task-management" source="work_week" title="Task Management reports" />
+        </Tab.Pane>
+      ),
+    },
+    {
+      menuItem: "Combined Work",
+      render: () => (
+        <Tab.Pane attached={false}>
+          <ReportArchivePanel key="combined-work" source="work_week" title="Combined Work reports" siteContext={COMBINED_REPORT_CONTEXT} />
         </Tab.Pane>
       ),
     },

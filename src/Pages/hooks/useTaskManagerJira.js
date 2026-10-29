@@ -1482,6 +1482,7 @@ export const useTaskManagerJira = ({ siteContext: explicitSiteContext, combinedR
     pullLatestComment,
     jiraNotes,
     jiraRowPriorities: teamEnabled ? { ...jiraRowPriorities, ...teamRowPriorities } : jiraRowPriorities,
+    localRowPriorities: jiraRowPriorities,
     prioritySourceByKey: teamEnabled ? prioritySourceByKey : {},
     selectedForPush,
     lastPushedJiraNoteByKey,

@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { createLogger } from "../lib/logger.mjs";
+import { createLogger, errorMessage } from "../lib/logger.mjs";
 const log = createLogger("chat");
 
 import { sendChatMessage } from "../lib/chatProviders.mjs";
@@ -124,8 +124,7 @@ export const registerChatRoutes = (app, { withSiteOperation = (handler) => handl
     if (!pending || Date.now() > pending.expiresAt) {
       return res.status(409).json({ error: "Invalid or expired OAuth state. Try signing in again.", code: "SITE_CONTEXT_CHANGED" });
     }
-    // OAuth navigation cannot send API headers. Only this server-issued one-time
-    // state supplies callback context; callback query values never supply it.
+
     req.headers["x-docket-site"] = pending.siteContext.instanceId || "legacy";
     req.headers["x-docket-generation"] = pending.siteContext.generation;
     return next();
@@ -237,7 +236,7 @@ export const registerChatRoutes = (app, { withSiteOperation = (handler) => handl
       });
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Unknown error";
-      log.error("request failed", { detail, error: error instanceof Error ? error.message : error });
+      log.error("request failed", { detail, error: errorMessage(error) });
       return res.status(500).json({
         error: "Chat request failed",
         message: detail,

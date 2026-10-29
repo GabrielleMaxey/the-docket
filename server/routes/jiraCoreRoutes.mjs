@@ -5,7 +5,11 @@ import { getJiraSearchFields } from "../lib/jiraSearchFields.mjs";
 import { createLogger } from "../lib/logger.mjs";
 const log = createLogger("jira-core");
 
-import { searchAllIssues, searchJiraUsers, fetchJiraUsersByAccountIds } from "../lib/jiraSearchHelpers.mjs";
+import {
+  searchAllIssues,
+  searchJiraUsers,
+  fetchJiraUsersByAccountIds,
+} from "../lib/jiraSearchHelpers.mjs";
 import { listAvailableJiraFilters } from "../lib/jiraFilterList.mjs";
 
 const JIRA_SEARCH_JQL_PATH = "/rest/api/3/search/jql";
@@ -83,13 +87,18 @@ export const registerJiraCoreRoutes = (app, context) => {
       return;
     }
 
-    const accountIds = Array.isArray(req.body?.accountIds) ? req.body.accountIds : [];
+    const accountIds = Array.isArray(req.body?.accountIds)
+      ? req.body.accountIds
+      : [];
     if (accountIds.length === 0) {
       return res.json({ items: {} });
     }
 
     try {
-      const users = await fetchJiraUsersByAccountIds({ accountIds, jiraRequest });
+      const users = await fetchJiraUsersByAccountIds({
+        accountIds,
+        jiraRequest,
+      });
       const items = {};
       for (const user of users) {
         items[user.accountId] = {
@@ -156,7 +165,10 @@ export const registerJiraCoreRoutes = (app, context) => {
       return res.status(400).json({ error: "Missing required field: jql" });
     }
 
-    const maxTotal = Math.min(5000, Math.max(1, Number(req.body?.maxTotal || 200)));
+    const maxTotal = Math.min(
+      5000,
+      Math.max(1, Number(req.body?.maxTotal || 200)),
+    );
 
     try {
       const { issues, total, loaded, isComplete } = await searchAllIssues({

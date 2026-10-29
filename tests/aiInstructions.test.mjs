@@ -4,8 +4,10 @@ import {
   CAREER_REPORT_TYPES,
   LUMEN_CORE_VALUES,
   PWB_PERIODS,
+  STRENGTHS_GROWTH_INSTRUCTION,
   buildOneOnOneSystemPrompt,
   buildPwbSystemPrompt,
+  buildWeekPlanSystemPrompt,
   formatLumenCoreValuesBlock,
   isValidCareerReportType,
   isValidPwbPeriod,
@@ -51,6 +53,18 @@ describe("formatLumenCoreValuesBlock", () => {
 
   it("instructs the model not to force-fit values", () => {
     assert.match(formatLumenCoreValuesBlock(), /only mention a specific value by name if/i);
+  });
+});
+
+describe("STRENGTHS_GROWTH_INSTRUCTION", () => {
+  it("requires both a positive and an improvement section", () => {
+    assert.match(STRENGTHS_GROWTH_INSTRUCTION, /What's going well/);
+    assert.match(STRENGTHS_GROWTH_INSTRUCTION, /Areas to improve/);
+  });
+
+  it("grounds both sections in data only, not personal judgments", () => {
+    assert.match(STRENGTHS_GROWTH_INSTRUCTION, /ONLY on the metrics and items already in the data/);
+    assert.match(STRENGTHS_GROWTH_INSTRUCTION, /Do not speculate about effort, attitude, or behavior/i);
   });
 });
 
@@ -176,5 +190,37 @@ describe("buildPwbSystemPrompt", () => {
     const prompt = buildPwbSystemPrompt({ label: "NORA", period: PWB_PERIODS.QUARTERLY, userGoals: "", companyGoals: "" });
     assert.match(prompt, /Lumen's 8 Cultural Behaviors/);
     assert.match(prompt, /Growth Mindset/);
+  });
+});
+
+describe("buildWeekPlanSystemPrompt", () => {
+  it("week plan prompt explains pre-ranked tasks", () => {
+    const prompt = buildWeekPlanSystemPrompt({ focusStyle: "balance", capacityHours: 40 });
+    assert.ok(prompt.includes("pre-ranked"));
+    assert.ok(prompt.includes("best first"));
+    assert.ok(prompt.includes("Do not invent scores or reasons"));
+    assert.ok(prompt.includes("Only reference actual issue keys"));
+    assert.ok(prompt.includes("Flag overdue items with"));
+  });
+
+  it("week plan prompt includes a score key built from the real weights", () => {
+    const prompt = buildWeekPlanSystemPrompt({ focusStyle: "balance", capacityHours: 20 });
+    assert.ok(prompt.includes("Score key"));
+    assert.ok(prompt.includes("Highest 50"));
+    assert.ok(prompt.includes("+30 if it blocks another open issue"));
+    assert.ok(prompt.includes("+25 if due today or overdue"));
+    assert.ok(prompt.includes("relative ordering"));
+  });
+
+  it("week plan prompt covers listed days, due dates, stale triage, blockers and estimates", () => {
+    const prompt = buildWeekPlanSystemPrompt({ focusStyle: "balance", capacityHours: 20 });
+    assert.ok(prompt.includes("Days to plan"));
+    assert.ok(prompt.includes("no later than that date"));
+    assert.ok(prompt.includes("more than 90 days"));
+    assert.ok(prompt.includes("blocked by <key>"));
+    assert.ok(prompt.includes("suggested time to spend working on that task"));
+    assert.ok(prompt.includes("state this once at the top of the plan"));
+    assert.ok(prompt.includes("not an estimate of how long the task takes"));
+    assert.ok(prompt.includes("15%"));
   });
 });

@@ -23,6 +23,7 @@ import {
   saveWeekPlanState,
 } from "../../utils/pageReportPersistence";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
+import { buildWeekPlanProjects, pickPlanPriorities } from "../../utils/weekPlanProjects.js";
 
 const WEEKLY_PLAN_KEY = "ww-weekly-plan-open";
 
@@ -32,11 +33,6 @@ const FOCUS_OPTIONS = [
   { value: "single", label: "Focus on one project" },
   { value: "meetings", label: "Light week (lots of meetings)" },
 ];
-
-const isIssueOpen = (issue) => {
-  const status = String(issue?.fields?.status?.name || issue?.status || "").toLowerCase();
-  return !/(closed|resolved|done)/.test(status);
-};
 
 const buildWeekPlanContext = ({ fixedCommitments, additionalContext, coworkFilename, coworkContent }) => {
   const notes = [fixedCommitments.trim(), additionalContext.trim()].filter(Boolean).join(" | ");
@@ -52,7 +48,7 @@ const buildWeekPlanContext = ({ fixedCommitments, additionalContext, coworkFilen
   return parts.join("\n\n");
 };
 
-const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
+const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities, localRowPriorities, teamEnabled, dueDateDrafts }) => {
   const instanceId = React.useRef(getSiteContext()?.instanceId).current;
   const persistedPlan = loadWeekPlanState();
 
@@ -73,6 +69,9 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
   );
   const [additionalContext, setAdditionalContext] = React.useState(
     String(persistedPlan?.additionalContext || "")
+  );
+  const [includeTeamPriorities, setIncludeTeamPriorities] = React.useState(
+    persistedPlan?.includeTeamPriorities !== false
   );
   const [coworkFiles, setCoworkFiles] = React.useState([]);
   const [selectedCoworkFilename, setSelectedCoworkFilename] = React.useState(
@@ -122,25 +121,16 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
     setPlanPending(true);
     setError("");
 
-    const projects = jqlRuns
-      .filter((r) => isConfiguredJqlRun(r) && r.issues?.length > 0)
-      .map((r) => ({
-        label: r.label || `Run ${(r.index || 0) + 1}`,
-        total: r.issues.length,
-        open: r.issues.filter(isIssueOpen).length,
-        overdue: r.issues.filter((i) => isIssueOpen(i) && i.isOverdue).length,
-        tasks: r.issues
-          .filter(isIssueOpen)
-          .sort((a, b) => (jiraRowPriorities[a.key] || 99) - (jiraRowPriorities[b.key] || 99))
-          .slice(0, 10)
-          .map((i) => ({
-            key: i.key,
-            summary: i.fields?.summary || i.summary || "",
-            status: i.fields?.status?.name || i.status || "",
-            assignee: i.fields?.assignee?.displayName || i.assignee || "Unassigned",
-            isOverdue: Boolean(i.isOverdue),
-          })),
-      }));
+    const projects = buildWeekPlanProjects(
+      jqlRuns,
+      pickPlanPriorities({
+        includeTeam: includeTeamPriorities,
+        teamEnabled,
+        merged: jiraRowPriorities,
+        local: localRowPriorities,
+      }),
+      { dueDateDrafts }
+    );
 
     const coworkFilename = selectedCoworkFilename.trim();
 
@@ -177,6 +167,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
           fixedCommitments,
           additionalContext,
           selectedCoworkFilename: coworkFilename,
+          includeTeamPriorities,
         }, instanceId);
         saveChatSessionArtifact({
           type: "week_plan",
@@ -213,6 +204,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
     setFixedCommitments("");
     setAdditionalContext("");
     setSelectedCoworkFilename("");
+    setIncludeTeamPriorities(true);
     clearWeekPlanState();
   };
 
@@ -282,6 +274,23 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
                 </p>
               ) : null}
             </div>
+            {teamEnabled ? (
+              <div className="ww-plan-question-block">
+                <label className="ww-plan-question-label">
+                  <input
+                    type="checkbox"
+                    checked={includeTeamPriorities}
+                    onChange={(e) => setIncludeTeamPriorities(e.target.checked)}
+                  />{" "}
+                  6. Include team priorities in planning?
+                </label>
+                <p className="ww-plan-optional" style={{ margin: "0.35rem 0 0" }}>
+                  {includeTeamPriorities
+                    ? "Team priorities take the place of your own priority on tasks that have one."
+                    : "Only your own priorities are used; team priorities are ignored for this plan."}
+                </p>
+              </div>
+            ) : null}
             <div>
               <Button primary size="small" onClick={() => setStep("ready")}>Continue →</Button>
             </div>
@@ -294,6 +303,9 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
               {(fixedCommitments || additionalContext) ? <span className="ww-run-metric-chip">+ notes</span> : null}
               {selectedCoworkFilename ? (
                 <span className="ww-run-metric-chip">+ {selectedCoworkFilename}</span>
+              ) : null}
+              {teamEnabled ? (
+                <span className="ww-run-metric-chip">{includeTeamPriorities ? "Team priorities on" : "Team priorities off"}</span>
               ) : null}
               <button type="button" className="ww-plan-edit-btn" onClick={handleReset}>✎ Edit</button>
             </div>

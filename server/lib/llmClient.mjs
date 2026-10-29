@@ -7,13 +7,20 @@ import {
 import { AI_PATH_MANAGED, getManagedAiCredentials } from "./aiPath.mjs";
 
 const MAX_TOOL_ROUNDS = 3;
-const SUPPORTED_PROVIDERS = new Set(["openai", "anthropic", "ollama", "databricks"]);
+const SUPPORTED_PROVIDERS = new Set([
+  "openai",
+  "anthropic",
+  "ollama",
+  "databricks",
+]);
 const LLM_PROVIDER_ORDER = ["anthropic", "openai", "ollama", "databricks"];
 
 export const ROVO_PROVIDER = "rovo";
 
 export const getConfiguredLlmProvider = () => {
-  const provider = String(process.env.CHAT_PROVIDER || "").trim().toLowerCase();
+  const provider = String(process.env.CHAT_PROVIDER || "")
+    .trim()
+    .toLowerCase();
   if (SUPPORTED_PROVIDERS.has(provider)) {
     return provider;
   }
@@ -21,7 +28,9 @@ export const getConfiguredLlmProvider = () => {
 };
 
 export const getConfiguredReportProvider = () => {
-  const provider = String(process.env.REPORT_PROVIDER || "").trim().toLowerCase();
+  const provider = String(process.env.REPORT_PROVIDER || "")
+    .trim()
+    .toLowerCase();
   if (SUPPORTED_PROVIDERS.has(provider)) {
     return provider;
   }
@@ -29,7 +38,9 @@ export const getConfiguredReportProvider = () => {
 };
 
 export const getConfiguredChatProvider = () => {
-  const provider = String(process.env.CHAT_PROVIDER || "").trim().toLowerCase();
+  const provider = String(process.env.CHAT_PROVIDER || "")
+    .trim()
+    .toLowerCase();
   if (!provider) {
     return "disabled";
   }
@@ -51,7 +62,9 @@ export const resolveLlmProvider = (defaultWhenUnset = "disabled") => {
     return configured;
   }
 
-  const fallback = String(defaultWhenUnset || "disabled").trim().toLowerCase();
+  const fallback = String(defaultWhenUnset || "disabled")
+    .trim()
+    .toLowerCase();
   return SUPPORTED_PROVIDERS.has(fallback) ? fallback : "disabled";
 };
 
@@ -108,9 +121,13 @@ const isLlmCredentialReady = (provider) => {
 const isReportProviderReady = (provider) => {
   switch (provider) {
     case "openai":
-      return Boolean(process.env.REPORT_OPENAI_API_KEY || process.env.OPENAI_API_KEY);
+      return Boolean(
+        process.env.REPORT_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+      );
     case "anthropic":
-      return Boolean(process.env.REPORT_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY);
+      return Boolean(
+        process.env.REPORT_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY,
+      );
     case "ollama":
       return Boolean(process.env.OLLAMA_BASE_URL);
     case "databricks":
@@ -120,7 +137,10 @@ const isReportProviderReady = (provider) => {
   }
 };
 
-export const isChatProviderReady = (provider, { oauthConnected = false } = {}) => {
+export const isChatProviderReady = (
+  provider,
+  { oauthConnected = false } = {},
+) => {
   switch (provider) {
     case ROVO_PROVIDER:
       return oauthConnected || hasAnyLlmFallback();
@@ -146,7 +166,8 @@ export const isLlmProviderReady = (provider) => isLlmCredentialReady(provider);
 export const isLocalChatReady = ({ oauthConnected = false } = {}) =>
   isChatProviderReady(getConfiguredChatProvider(), { oauthConnected });
 
-export const isLocalReportReady = () => resolveFirstReadyReportProvider() !== "disabled";
+export const isLocalReportReady = () =>
+  resolveFirstReadyReportProvider() !== "disabled";
 
 export const extractAssistantText = (data) => {
   if (typeof data === "string") {
@@ -161,7 +182,11 @@ export const extractAssistantText = (data) => {
   // [{ type: "reasoning", ... }, { type: "text", text: "..." }]. Keep only the text blocks.
   if (Array.isArray(openAiContent)) {
     return openAiContent
-      .filter((block) => typeof block === "string" || (block?.type === "text" && typeof block.text === "string"))
+      .filter(
+        (block) =>
+          typeof block === "string" ||
+          (block?.type === "text" && typeof block.text === "string"),
+      )
       .map((block) => (typeof block === "string" ? block : block.text))
       .join("")
       .trim();
@@ -188,8 +213,12 @@ const getOpenAiCredentials = ({ forReports = false } = {}) => {
     throw new Error("OPENAI_API_KEY is not configured on the proxy host");
   }
 
-  const defaultBaseUrl = String(process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
-  const reportBaseUrl = String(process.env.REPORT_OPENAI_BASE_URL || "").trim().replace(/\/$/, "");
+  const defaultBaseUrl = String(
+    process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+  ).replace(/\/$/, "");
+  const reportBaseUrl = String(process.env.REPORT_OPENAI_BASE_URL || "")
+    .trim()
+    .replace(/\/$/, "");
   const baseUrl = forReports && reportBaseUrl ? reportBaseUrl : defaultBaseUrl;
 
   const chatModel = String(process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
@@ -199,19 +228,36 @@ const getOpenAiCredentials = ({ forReports = false } = {}) => {
   return { apiKey, baseUrl, model };
 };
 
+const DEFAULT_DATABRICKS_API_PATH = String(process.env.DATABRICKS_API_PATH || "/ai-gateway/mlflow/v1").replace(/\/$/, "");
+const getDatabricksApiPath = () => {
+  const raw = String(process.env.DATABRICKS_API_PATH || "").trim().replace(/\/$/, "");
+  if (!raw) {
+    return DEFAULT_DATABRICKS_API_PATH;
+  }
+  return raw || DEFAULT_DATABRICKS_API_PATH;
+};
+
 const getAnthropicCredentials = ({ forReports = false } = {}) => {
   const defaultApiKey = String(process.env.ANTHROPIC_API_KEY || "").trim();
-  const reportApiKey = String(process.env.REPORT_ANTHROPIC_API_KEY || "").trim();
+  const reportApiKey = String(
+    process.env.REPORT_ANTHROPIC_API_KEY || "",
+  ).trim();
   const apiKey = forReports && reportApiKey ? reportApiKey : defaultApiKey;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured on the proxy host");
   }
 
-  const defaultBaseUrl = String(process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com").replace(/\/$/, "");
-  const reportBaseUrl = String(process.env.REPORT_ANTHROPIC_BASE_URL || "").trim().replace(/\/$/, "");
+  const defaultBaseUrl = String(
+    process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com",
+  ).replace(/\/$/, "");
+  const reportBaseUrl = String(process.env.REPORT_ANTHROPIC_BASE_URL || "")
+    .trim()
+    .replace(/\/$/, "");
   const baseUrl = forReports && reportBaseUrl ? reportBaseUrl : defaultBaseUrl;
 
-  const chatModel = String(process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6").trim();
+  const chatModel = String(
+    process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+  ).trim();
   const reportModel = String(process.env.REPORT_ANTHROPIC_MODEL || "").trim();
   const model = forReports && reportModel ? reportModel : chatModel;
 
@@ -219,23 +265,27 @@ const getAnthropicCredentials = ({ forReports = false } = {}) => {
 };
 
 const normalizeDatabricksHost = (value) => {
-  let host = String(value || "").trim().replace(/\/+$/, "");
+  let host = String(value || "")
+    .trim()
+    .replace(/\/+$/, "");
   if (!host) {
     return "";
   }
   if (!/^https?:\/\//i.test(host)) {
     host = `https://${host}`;
   }
-  return host.replace(/\/serving-endpoints$/i, "");
+  return host.replace(/\/(serving-endpoints|ai-gateway\/mlflow\/v1)$/i, "");
 };
 
 const isDatabricksConfigured = ({ forReports = false } = {}) =>
   Boolean(
     normalizeDatabricksHost(process.env.DATABRICKS_HOST) &&
-      String(process.env.DATABRICKS_TOKEN || "").trim() &&
-      String(
-        (forReports && process.env.REPORT_DATABRICKS_ENDPOINT) || process.env.DATABRICKS_ENDPOINT || ""
-      ).trim()
+    String(process.env.DATABRICKS_TOKEN || "").trim() &&
+    String(
+      (forReports && process.env.REPORT_DATABRICKS_ENDPOINT) ||
+      process.env.DATABRICKS_ENDPOINT ||
+      "",
+    ).trim(),
   );
 
 // Databricks Model Serving exposes an OpenAI-compatible chat route at
@@ -250,16 +300,22 @@ const getDatabricksCredentials = ({ forReports = false } = {}) => {
     throw new Error("DATABRICKS_TOKEN is not configured on the proxy host");
   }
   const chatModel = String(process.env.DATABRICKS_ENDPOINT || "").trim();
-  const reportModel = String(process.env.REPORT_DATABRICKS_ENDPOINT || "").trim();
+  const reportModel = String(
+    process.env.REPORT_DATABRICKS_ENDPOINT || "",
+  ).trim();
   const model = forReports && reportModel ? reportModel : chatModel;
   if (!model) {
-    throw new Error("DATABRICKS_ENDPOINT (the serving endpoint name) is not configured on the proxy host");
+    throw new Error(
+      "DATABRICKS_ENDPOINT (the gateway model or serving endpoint name) is not configured on the proxy host",
+    );
   }
-  return { apiKey, baseUrl: `${host}/serving-endpoints`, model };
+  return { apiKey, baseUrl: `${host}${getDatabricksApiPath()}`, model };
 };
 
 const getOllamaConfig = ({ forReports = false } = {}) => {
-  const baseUrl = String(process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
+  const baseUrl = String(
+    process.env.OLLAMA_BASE_URL || "http://localhost:11434",
+  ).replace(/\/$/, "");
   const chatModel = String(process.env.OLLAMA_MODEL || "llama3.2").trim();
   const reportModel = String(process.env.OLLAMA_REPORT_MODEL || "").trim();
   const model = forReports && reportModel ? reportModel : chatModel;
@@ -282,7 +338,11 @@ const buildAnthropicJiraTool = () => ({
 });
 
 const runJiraTool = ({ jiraRequest, args }) =>
-  executeJiraSearch({ jiraRequest, jql: args?.jql, maxResults: args?.maxResults });
+  executeJiraSearch({
+    jiraRequest,
+    jql: args?.jql,
+    maxResults: args?.maxResults,
+  });
 
 const describeReportLlmTarget = (provider) => {
   try {
@@ -311,6 +371,7 @@ export const formatUnableToGenerateReportError = (provider, error) => {
   const raw = error instanceof Error ? error.message : String(error || "");
   const { model, baseUrl } = describeReportLlmTarget(provider);
   const modelLabel = model || "configured";
+  const detail = raw && provider !== "ollama" ? ` Provider said ${raw}` : "";
 
   if (!provider || provider === "disabled") {
     return "Unable to generate report. No report model is configured.";
@@ -318,7 +379,7 @@ export const formatUnableToGenerateReportError = (provider, error) => {
 
   const modelUnavailable =
     /unreachable|ECONNREFUSED|ENOTFOUND|ECONNRESET|fetch failed|not found|does not exist|unknown model|model .*not/i.test(
-      raw
+      raw,
     );
 
   if (modelUnavailable) {
@@ -326,10 +387,10 @@ export const formatUnableToGenerateReportError = (provider, error) => {
       provider === "ollama" && baseUrl
         ? ` Start Ollama at ${baseUrl}, or configure a different report provider.`
         : "";
-    return `Unable to generate report. The ${modelLabel} model is not available.${hint}`;
+    return `Unable to generate report. The ${modelLabel} model is not available.${hint}${detail}`;
   }
 
-  return `Unable to generate report. ${raw}`;
+  return `Unable to generate report.${detail}`;
 };
 
 const readTimeoutMs = (name, fallback) => {
@@ -345,7 +406,9 @@ const defaultTimeoutMsFor = (label) =>
 
 export class LlmTruncatedError extends Error {
   constructor(label, maxTokens) {
-    super(`${label} response was cut off at the ${maxTokens}-token limit before it finished.`);
+    super(
+      `${label} response was cut off at the ${maxTokens}-token limit before it finished.`,
+    );
     this.name = "LlmTruncatedError";
     this.code = "LLM_TRUNCATED";
   }
@@ -354,11 +417,14 @@ export class LlmTruncatedError extends Error {
 const fetchOrThrow = async (url, options, label, timeoutMs) => {
   const effectiveTimeoutMs = timeoutMs || defaultTimeoutMsFor(label);
   try {
-    return await fetch(url, { ...options, signal: AbortSignal.timeout(effectiveTimeoutMs) });
+    return await fetch(url, {
+      ...options,
+      signal: AbortSignal.timeout(effectiveTimeoutMs),
+    });
   } catch (error) {
     if (error?.name === "TimeoutError" || error?.name === "AbortError") {
       const timeoutError = new Error(
-        `${label || "LLM"} did not respond within ${Math.round(effectiveTimeoutMs / 1000)}s.`
+        `${label || "LLM"} did not respond within ${Math.round(effectiveTimeoutMs / 1000)}s.`,
       );
       timeoutError.code = "LLM_TIMEOUT";
       throw timeoutError;
@@ -366,49 +432,83 @@ const fetchOrThrow = async (url, options, label, timeoutMs) => {
     const cause = error?.cause;
     const code = cause?.code || "";
     const detail = String(cause?.message || error?.message || "fetch failed");
-    throw new Error(`${label || "LLM"} unreachable at ${url}: ${detail}${code ? ` (${code})` : ""}`);
+    throw new Error(
+      `${label || "LLM"} unreachable at ${url}: ${detail}${code ? ` (${code})` : ""}`,
+    );
   }
 };
 
-const callOpenAiMessages = async ({ apiKey, baseUrl, model, messages, maxTokens, tools, timeoutMs, label = "OpenAI" }) => {
-  const response = await fetchOrThrow(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+const callOpenAiMessages = async ({
+  apiKey,
+  baseUrl,
+  model,
+  messages,
+  maxTokens,
+  tools,
+  timeoutMs,
+  label = "OpenAI",
+}) => {
+  const response = await fetchOrThrow(
+    `${baseUrl}/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        ...(maxTokens ? { max_tokens: maxTokens } : {}),
+        ...(tools ? { tools, tool_choice: "auto" } : {}),
+      }),
     },
-    body: JSON.stringify({
-      model,
-      messages,
-      ...(maxTokens ? { max_tokens: maxTokens } : {}),
-      ...(tools ? { tools, tool_choice: "auto" } : {}),
-    }),
-  }, label, timeoutMs);
+    label,
+    timeoutMs,
+  );
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data?.error?.message || data?.message || `${label} request failed (HTTP ${response.status})`);
+    throw new Error(
+      data?.error?.message ||
+      data?.message ||
+      `${label} request failed (HTTP ${response.status})`,
+    );
   }
 
   return data;
 };
 
-const callAnthropicMessages = async ({ apiKey, baseUrl, model, systemPrompt, messages, maxTokens, tools, timeoutMs }) => {
-  const response = await fetchOrThrow(`${baseUrl}/v1/messages`, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
+const callAnthropicMessages = async ({
+  apiKey,
+  baseUrl,
+  model,
+  systemPrompt,
+  messages,
+  maxTokens,
+  tools,
+  timeoutMs,
+}) => {
+  const response = await fetchOrThrow(
+    `${baseUrl}/v1/messages`,
+    {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages,
+        ...(tools ? { tools } : {}),
+      }),
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages,
-      ...(tools ? { tools } : {}),
-    }),
-  }, "Anthropic", timeoutMs);
+    "Anthropic",
+    timeoutMs,
+  );
 
   const data = await response.json();
   if (!response.ok) {
@@ -418,21 +518,33 @@ const callAnthropicMessages = async ({ apiKey, baseUrl, model, systemPrompt, mes
   return data;
 };
 
-const callOllamaChat = async ({ systemPrompt, userMessage, maxTokens, forReports = false, timeoutMs, failOnTruncation = false }) => {
+const callOllamaChat = async ({
+  systemPrompt,
+  userMessage,
+  maxTokens,
+  forReports = false,
+  timeoutMs,
+  failOnTruncation = false,
+}) => {
   const { baseUrl, model } = getOllamaConfig({ forReports });
-  const response = await fetchOrThrow(`${baseUrl}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      stream: false,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-      ...(maxTokens ? { options: { num_predict: maxTokens } } : {}),
-    }),
-  }, "Ollama", timeoutMs);
+  const response = await fetchOrThrow(
+    `${baseUrl}/api/chat`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+        ...(maxTokens ? { options: { num_predict: maxTokens } } : {}),
+      }),
+    },
+    "Ollama",
+    timeoutMs,
+  );
 
   const data = await response.json();
   if (!response.ok) {
@@ -460,7 +572,8 @@ const completeOpenAiText = async ({
   failOnTruncation = false,
   label = "OpenAI",
 }) => {
-  const { apiKey, baseUrl, model } = credentials ?? getOpenAiCredentials({ forReports });
+  const { apiKey, baseUrl, model } =
+    credentials ?? getOpenAiCredentials({ forReports });
   const data = await callOpenAiMessages({
     apiKey,
     baseUrl,
@@ -517,7 +630,14 @@ const completeAnthropicText = async ({
   return text;
 };
 
-const completeOpenAiWithJiraTools = async ({ systemPrompt, userMessage, maxTokens, jiraRequest, credentials, label = "OpenAI" }) => {
+const completeOpenAiWithJiraTools = async ({
+  systemPrompt,
+  userMessage,
+  maxTokens,
+  jiraRequest,
+  credentials,
+  label = "OpenAI",
+}) => {
   const { apiKey, baseUrl, model } = credentials ?? getOpenAiCredentials();
   const messages = [
     { role: "system", content: systemPrompt },
@@ -526,9 +646,19 @@ const completeOpenAiWithJiraTools = async ({ systemPrompt, userMessage, maxToken
   const tools = jiraRequest ? [buildOpenAiJiraTool()] : undefined;
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
-    const data = await callOpenAiMessages({ apiKey, baseUrl, model, messages, maxTokens, tools, label });
+    const data = await callOpenAiMessages({
+      apiKey,
+      baseUrl,
+      model,
+      messages,
+      maxTokens,
+      tools,
+      label,
+    });
     const choiceMessage = data?.choices?.[0]?.message;
-    const toolCalls = Array.isArray(choiceMessage?.tool_calls) ? choiceMessage.tool_calls : [];
+    const toolCalls = Array.isArray(choiceMessage?.tool_calls)
+      ? choiceMessage.tool_calls
+      : [];
 
     if (toolCalls.length === 0 || !jiraRequest || round === MAX_TOOL_ROUNDS) {
       const text = extractAssistantText(data);
@@ -564,7 +694,12 @@ const completeOpenAiWithJiraTools = async ({ systemPrompt, userMessage, maxToken
   throw new Error(`${label} did not return a final response after tool calls`);
 };
 
-const completeAnthropicWithJiraTools = async ({ systemPrompt, userMessage, maxTokens, jiraRequest }) => {
+const completeAnthropicWithJiraTools = async ({
+  systemPrompt,
+  userMessage,
+  maxTokens,
+  jiraRequest,
+}) => {
   const { apiKey, baseUrl, model } = getAnthropicCredentials();
   const messages = [{ role: "user", content: userMessage }];
   const tools = jiraRequest ? [buildAnthropicJiraTool()] : undefined;
@@ -582,7 +717,8 @@ const completeAnthropicWithJiraTools = async ({ systemPrompt, userMessage, maxTo
 
     const content = Array.isArray(data?.content) ? data.content : [];
     const toolUseBlocks = content.filter((block) => block.type === "tool_use");
-    const hasToolCalls = data?.stop_reason === "tool_use" && toolUseBlocks.length > 0;
+    const hasToolCalls =
+      data?.stop_reason === "tool_use" && toolUseBlocks.length > 0;
 
     if (!hasToolCalls || !jiraRequest || round === MAX_TOOL_ROUNDS) {
       const text = extractAssistantText(data);
@@ -638,7 +774,13 @@ export const completeLlmText = async ({
     throw new Error("Message is required");
   }
 
-  const common = { systemPrompt, userMessage: userContent, maxTokens, timeoutMs, failOnTruncation };
+  const common = {
+    systemPrompt,
+    userMessage: userContent,
+    maxTokens,
+    timeoutMs,
+    failOnTruncation,
+  };
 
   if (aiPath === AI_PATH_MANAGED) {
     const credentials = getManagedAiCredentials();
@@ -681,7 +823,13 @@ export const completeLlmWithJiraTools = async ({
 
   if (aiPath === AI_PATH_MANAGED) {
     const credentials = getManagedAiCredentials();
-    return completeOpenAiWithJiraTools({ systemPrompt, userMessage: userContent, maxTokens, jiraRequest, credentials });
+    return completeOpenAiWithJiraTools({
+      systemPrompt,
+      userMessage: userContent,
+      maxTokens,
+      jiraRequest,
+      credentials,
+    });
   }
 
   const provider = providerOverride || resolveLlmProvider("disabled");
@@ -702,7 +850,11 @@ export const completeLlmWithJiraTools = async ({
         jiraRequest,
       });
     case "ollama":
-      return callOllamaChat({ systemPrompt, userMessage: userContent, maxTokens });
+      return callOllamaChat({
+        systemPrompt,
+        userMessage: userContent,
+        maxTokens,
+      });
     case "databricks":
       return completeOpenAiWithJiraTools({
         systemPrompt,

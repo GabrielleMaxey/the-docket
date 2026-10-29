@@ -164,7 +164,7 @@ test("one mixed table uses composite UI identity while retaining real issue labe
   const render = () => app.render("table", () => app.Table(props));
   const tree = render();
   assert.equal(find(tree, node => node.type?.name === "CombinedOpenWork").length, 0, "no recursive combined page");
-  assert.equal(find(tree, node => node.type === "table" && node.props.className === "ww-results-table").length, 1);
+  assert.equal(find(tree, node => node.type === "table" && node.props.className === "ww-results-table ww-results-table--combined").length, 1);
   assert.match(text(tree), /Jira site/);
   const notes = find(tree, node => node.props.className === "ww-note-textarea");
   assert.deepEqual(notes.map(node => node.props.value), ["note-a", "note-b"]);

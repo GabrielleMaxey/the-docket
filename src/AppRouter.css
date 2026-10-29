@@ -143,6 +143,15 @@
   outline-offset: 2px;
 }
 
+.app-nav-jira-switcher-error {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: #fff3b0;
+}
+
 .app-nav-jira-switcher--legacy {
   font-size: 0.78rem;
   font-weight: 600;
