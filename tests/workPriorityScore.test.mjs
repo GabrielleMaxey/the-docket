@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DEFAULT_PRIORITY_WEIGHTS, rankIssues, scoreIssue, toScoringInput } from "../shared/workPriorityScore.mjs";
 
-const now = new Date("2026-10-28T12:00:00Z");
+const now = new Date(2026, 9, 28, 12); // local noon: "today" is the local calendar date
 const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (n) => new Date(now.getTime() - n * DAY).toISOString();
 

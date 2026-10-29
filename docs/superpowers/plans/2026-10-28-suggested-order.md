@@ -14,7 +14,7 @@
 
 - Read-only: no import of `teamPriorityPostgres`, no write to `jiraRowPriorities`, localStorage priorities, SQLite or Jira from any new code.
 - Weights (verbatim from spec): Jira priority Highest 50 / High 40 / Medium 30 / Low 20 / Lowest 10 / unset or unknown 30; staleness >=30d 25, 15-29d 20, 7-14d 15, 3-6d 10, <3d 5, capped at 10 when the status weight is 5; status In Progress / Analyzing / Ready for Verification 20, any other open status 5; blocks another open issue +30, blocked by an open issue +20 (both can apply); due on or before today +25, within next 3 business days (Mon-Fri) +15; manual priority `round(30 * (21 - p) / 20)`.
-- "Today" is `now`'s UTC date. `now` is always a parameter; the scorer never reads the clock.
+- "Today" is `now`'s local calendar date (changed from UTC to match the Metrics page). `now` is always a parameter; the scorer never reads the clock.
 - Blocker link names come from `DEFAULT_PRIORITY_WEIGHTS.blockerLinkNames = { blocks: ["blocks"], blockedBy: ["is blocked by"] }`, matched trimmed and case-insensitive; unmatched names set no flag and raise no error.
 - Sort: score desc, then manual priority asc (set before unset), then effective due date asc (null last), then key by plain string comparison.
 - Server validation of task `score`: finite number, rounded, clamped 0-500. `why`: array of at most 8 strings, control characters and newlines stripped, truncated to 120 chars. Invalid values omit the suffix; the line renders as it does today.

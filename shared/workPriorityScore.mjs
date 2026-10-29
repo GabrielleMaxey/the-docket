@@ -118,7 +118,9 @@ export function scoreIssue(input, options = {}) {
   const dueMs = parseDueDate(issue.dueDate);
   if (dueMs !== null && Number.isFinite(nowMs)) {
     const d = new Date(nowMs);
-    const todayMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    // The user's local calendar date, as UTC midnight so it compares with parsed due dates.
+    // The Metrics page also decides "today" by local date.
+    const todayMs = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
     if (dueMs <= todayMs) {
       due = w.due.overdue;
       reasons.push(dueMs === todayMs ? `Due today (+${due})` : `Overdue (+${due})`);

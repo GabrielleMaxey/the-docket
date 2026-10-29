@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildWeekPlanProjects, isIssueOpen, pickPlanPriorities } from "../src/utils/weekPlanProjects.js";
 
-const NOW = new Date("2026-10-28T12:00:00Z");
+const NOW = new Date(2026, 9, 28, 12); // local noon
 const UPDATED = "2026-10-27T12:00:00Z";
 
 const issue = (key, { status = "To Do", priority = "Medium", duedate, summary = `Summary ${key}`, extra = {} } = {}) => ({
