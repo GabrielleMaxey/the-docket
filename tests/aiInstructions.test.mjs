@@ -4,6 +4,7 @@ import {
   CAREER_REPORT_TYPES,
   LUMEN_CORE_VALUES,
   PWB_PERIODS,
+  STRENGTHS_GROWTH_INSTRUCTION,
   buildOneOnOneSystemPrompt,
   buildPwbSystemPrompt,
   formatLumenCoreValuesBlock,
@@ -51,6 +52,18 @@ describe("formatLumenCoreValuesBlock", () => {
 
   it("instructs the model not to force-fit values", () => {
     assert.match(formatLumenCoreValuesBlock(), /only mention a specific value by name if/i);
+  });
+});
+
+describe("STRENGTHS_GROWTH_INSTRUCTION", () => {
+  it("requires both a positive and an improvement section", () => {
+    assert.match(STRENGTHS_GROWTH_INSTRUCTION, /What's going well/);
+    assert.match(STRENGTHS_GROWTH_INSTRUCTION, /Areas to improve/);
+  });
+
+  it("grounds both sections in data only, not personal judgments", () => {
+    assert.match(STRENGTHS_GROWTH_INSTRUCTION, /ONLY on the metrics and items already in the data/);
+    assert.match(STRENGTHS_GROWTH_INSTRUCTION, /Do not speculate about effort, attitude, or behavior/i);
   });
 });
 

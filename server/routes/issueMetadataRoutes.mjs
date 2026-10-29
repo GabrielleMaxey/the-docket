@@ -16,7 +16,7 @@ import {
   replaceNoteImages,
   deleteAllNoteImages,
 } from "../lib/noteImageStore.mjs";
-import { createLogger } from "../lib/logger.mjs";
+import { createLogger, errorMessage } from "../lib/logger.mjs";
 import {
   NOTE_IMAGE_MAX_BYTES,
   NOTE_IMAGE_MAX_COUNT,
@@ -129,7 +129,7 @@ export const registerIssueMetadataRoutes = (
         log.info(`comment pushed to ${issueKey}${images.length ? ` with ${images.length} image(s)` : ""}`);
         return res.json(result.data);
       } catch (error) {
-        log.error(`comment push failed for ${issueKey}`, error instanceof Error ? error.message : error);
+        log.error(`comment push failed for ${issueKey}`, errorMessage(error));
         return res.status(500).json({
           error: "Failed to push comment to Jira",
           message: error instanceof Error ? error.message : "Unknown error",
@@ -207,7 +207,7 @@ export const registerIssueMetadataRoutes = (
         transitionId: matchingTransition.id,
       });
     } catch (error) {
-      log.error(`status update failed for ${issueKey}`, error instanceof Error ? error.message : error);
+      log.error(`status update failed for ${issueKey}`, errorMessage(error));
       return res.status(500).json({
         error: "Failed to update Jira status",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -285,7 +285,7 @@ export const registerIssueMetadataRoutes = (
         resolvedAssignee,
       });
     } catch (error) {
-      log.error(`assignee update failed for ${issueKey}`, error instanceof Error ? error.message : error);
+      log.error(`assignee update failed for ${issueKey}`, errorMessage(error));
       return res.status(500).json({
         error: "Failed to update Jira assignee",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -560,7 +560,7 @@ export const registerIssueMetadataRoutes = (
       log.info(`${role} updated ${issueKey} → ${value || "(cleared)"}`);
       return res.json({ ok: true, issueKey, role, fieldId, value });
     } catch (error) {
-      log.error(`${role} update failed for ${issueKey}`, error instanceof Error ? error.message : error);
+      log.error(`${role} update failed for ${issueKey}`, errorMessage(error));
       return res.status(500).json({
         error: `Failed to update ${role === "due_date" ? "Due date" : "MRD"}`,
         message: error instanceof Error ? error.message : "Unknown error",

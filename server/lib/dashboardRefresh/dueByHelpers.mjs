@@ -10,7 +10,7 @@ import {
 } from "../../../shared/dashboardMetrics.mjs";
 import { getEpicIssueFieldIds, loadIssuesIntoCache } from "../jiraSearchHelpers.mjs";
 
-const resolveGrandparentEpicKey = (grandparentKey, parentIssue, issueCache) => {
+const resolveGrandparentEpicKey = (grandparentKey, parentIssue, issueCache, parentKey) => {
   const grandparentTypeFromParent = String(
     parentIssue.fields?.parent?.fields?.issuetype?.name || ""
   ).toLowerCase();
@@ -23,7 +23,8 @@ const resolveGrandparentEpicKey = (grandparentKey, parentIssue, issueCache) => {
     return grandparentKey;
   }
 
-  return grandparentKey;
+  // Grandparent isn't confirmed to be an Epic - group under the immediate parent instead.
+  return parentKey;
 };
 
 const resolveEpicKeyFromCache = (issue, issueCache) => {
@@ -57,7 +58,7 @@ const resolveEpicKeyFromCache = (issue, issueCache) => {
 
   const grandparentKey = String(parentIssue.fields?.parent?.key || "").trim();
   if (grandparentKey) {
-    return resolveGrandparentEpicKey(grandparentKey, parentIssue, issueCache);
+    return resolveGrandparentEpicKey(grandparentKey, parentIssue, issueCache, parentKey);
   }
 
   return parentKey;

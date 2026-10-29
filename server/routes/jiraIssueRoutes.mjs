@@ -1,5 +1,5 @@
 import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
-import { createLogger } from "../lib/logger.mjs";
+import { createLogger, errorMessage } from "../lib/logger.mjs";
 import {
   completeLlmText,
   isLocalReportReady,
@@ -515,7 +515,7 @@ export const registerJiraIssueRoutes = (
         self: result.data?.self,
       });
     } catch (error) {
-      log.error("issue creation failed", error instanceof Error ? error.message : error);
+      log.error("issue creation failed", errorMessage(error));
       return res.status(500).json({
         error: "Failed to create Jira issue",
         message: error instanceof Error ? error.message : "Unknown error",
@@ -650,7 +650,7 @@ export const registerJiraIssueRoutes = (
 
       return res.json(response);
     } catch (error) {
-      log.error("generate-description failed", error instanceof Error ? error.message : error);
+      log.error("generate-description failed", errorMessage(error));
       if (error instanceof LlmTruncatedError) {
         return res.status(502).json({
           error:

@@ -1,7 +1,7 @@
 import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
-import { createLogger } from "../lib/logger.mjs";
-const log = createLogger( "config" );
+import { createLogger, errorMessage } from "../lib/logger.mjs";
+const log = createLogger("config");
 
 import {
   buildFieldMappingsMap,
@@ -10,7 +10,10 @@ import {
   splitTrailingOrderBy,
 } from "../lib/epicFilterJql.mjs";
 import { computePastDueFloorDate } from "../../shared/dashboardMetrics.mjs";
-import { buildDirectReportsJql, normalizeMemberNames } from "../../shared/directReportsJql.mjs";
+import {
+  buildDirectReportsJql,
+  normalizeMemberNames,
+} from "../../shared/directReportsJql.mjs";
 import {
   DEFAULT_OVERDUE_DATE_BASIS,
   OVERDUE_DATE_BASES,
@@ -18,9 +21,13 @@ import {
 } from "../../shared/overdueDateBasis.mjs";
 import { listAvailableJiraFilters } from "../lib/jiraFilterList.mjs";
 
-const EPIC_PAST_DUE_MODES = new Set( [ "most_recent_done_date", "project_end_date", "either" ] );
-const WATCH_TYPES = new Set( [ "person", "jql", "direct_reports" ] );
-const PRESET_TYPES = new Set( [ "epic", "jql" ] );
+const EPIC_PAST_DUE_MODES = new Set([
+  "most_recent_done_date",
+  "project_end_date",
+  "either",
+]);
+const WATCH_TYPES = new Set(["person", "jql", "direct_reports"]);
+const PRESET_TYPES = new Set(["epic", "jql"]);
 const JQL_PRESET_KEY = "JQL";
 const REMINDER_SLOT_COUNT = 4;
 const REMINDER_TEXT_MAX_LENGTH = 500;
@@ -138,20 +145,16 @@ const normalizeEpicPresetPayload = ( body, existing = null ) => {
     const jql = String( body?.jql ?? existing?.jql ?? "" ).trim();
     const jiraFilterId = String( body?.jiraFilterId ?? existing?.jira_filter_id ?? "" ).trim();
 
-    if ( !PRESET_TYPES.has( presetType ) )
-    {
-      return { error: "Invalid presetType", allowed: [ ...PRESET_TYPES ] };
+    if (!PRESET_TYPES.has(presetType)) {
+      return { error: "Invalid presetType", allowed: [...PRESET_TYPES] };
     }
 
-    if ( !epicName )
-    {
+    if (!epicName) {
       return { error: "epicName is required" };
     }
 
-    if ( presetType === "jql" )
-    {
-      if ( !jql )
-      {
+    if (presetType === "jql") {
+      if (!jql) {
         return { error: "jql is required for JQL presets" };
       }
 
@@ -161,13 +164,12 @@ const normalizeEpicPresetPayload = ( body, existing = null ) => {
         epicName,
         jql,
         jiraFilterId,
-        sortOrder: Number( body?.sortOrder ?? existing?.sort_order ?? 0 ),
+        sortOrder: Number(body?.sortOrder ?? existing?.sort_order ?? 0),
       };
     }
 
-    const epicKey = String( body?.epicKey ?? existing?.epic_key ?? "" ).trim();
-    if ( !epicKey )
-    {
+    const epicKey = String(body?.epicKey ?? existing?.epic_key ?? "").trim();
+    if (!epicKey) {
       return { error: "epicKey is required for epic presets" };
     }
 
@@ -177,76 +179,90 @@ const normalizeEpicPresetPayload = ( body, existing = null ) => {
       epicName,
       jql,
       jiraFilterId,
-      sortOrder: Number( body?.sortOrder ?? existing?.sort_order ?? 0 ),
+      sortOrder: Number(body?.sortOrder ?? existing?.sort_order ?? 0),
     };
   };
 
-  const normalizeWatchedPayload = ( body, existing = null ) => {
-    const displayName = String( body?.displayName ?? existing?.display_name ?? "" ).trim();
-    const watchType = String( body?.watchType ?? existing?.watch_type ?? "person" ).trim();
-    const jql = String( body?.jql ?? existing?.jql ?? "" ).trim();
+  const normalizeWatchedPayload = (body, existing = null) => {
+    const displayName = String(
+      body?.displayName ?? existing?.display_name ?? "",
+    ).trim();
+    const watchType = String(
+      body?.watchType ?? existing?.watch_type ?? "person",
+    ).trim();
+    const jql = String(body?.jql ?? existing?.jql ?? "").trim();
 
-    if ( !displayName )
-    {
+    if (!displayName) {
       return { error: "displayName is required" };
     }
 
-    if ( !WATCH_TYPES.has( watchType ) )
-    {
-      return { error: "Invalid watchType", allowed: [ ...WATCH_TYPES ] };
+    if (!WATCH_TYPES.has(watchType)) {
+      return { error: "Invalid watchType", allowed: [...WATCH_TYPES] };
     }
 
-    if ( watchType === "jql" && !jql )
-    {
+    if (watchType === "jql" && !jql) {
       return { error: "jql is required when watchType is jql" };
     }
 
-    const existingNames = ( () => {
-      try
-      {
-        const parsed = JSON.parse( existing?.member_names_json || "[]" );
-        return Array.isArray( parsed ) ? parsed : [];
-      } catch
-      {
+    const existingNames = (() => {
+      try {
+        const parsed = JSON.parse(existing?.member_names_json || "[]");
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
         return [];
       }
-    } )();
+    })();
     const memberNames = normalizeMemberNames(
-      body?.memberNames !== undefined ? body.memberNames : existingNames
+      body?.memberNames !== undefined ? body.memberNames : existingNames,
     );
 
-    if ( watchType === "direct_reports" && memberNames.length === 0 )
-    {
+    if (watchType === "direct_reports" && memberNames.length === 0) {
       return { error: "Add at least one contributor name" };
     }
 
     // better-sqlite3 needs null, not undefined; ""/null in the request clears the target.
-    const rawCapacity = body?.capacity !== undefined ? body.capacity : existing?.capacity;
+    const rawCapacity =
+      body?.capacity !== undefined ? body.capacity : existing?.capacity;
     const capacity =
       rawCapacity === null || rawCapacity === "" || rawCapacity === undefined
         ? null
-        : Math.max( 0, Math.round( Number( rawCapacity ) ) || 0 );
+        : Math.max(0, Math.round(Number(rawCapacity)) || 0);
 
-    if ( body?.overdueDateBasis !== undefined && body?.overdueDateBasis !== null && String( body.overdueDateBasis ).trim() !== "" )
-    {
-      const requestedBasis = String( body.overdueDateBasis ).trim();
-      if ( !OVERDUE_DATE_BASES.includes( requestedBasis ) )
-      {
-        return { error: "Invalid overdueDateBasis", allowed: [ ...OVERDUE_DATE_BASES ] };
+    if (
+      body?.overdueDateBasis !== undefined &&
+      body?.overdueDateBasis !== null &&
+      String(body.overdueDateBasis).trim() !== ""
+    ) {
+      const requestedBasis = String(body.overdueDateBasis).trim();
+      if (!OVERDUE_DATE_BASES.includes(requestedBasis)) {
+        return {
+          error: "Invalid overdueDateBasis",
+          allowed: [...OVERDUE_DATE_BASES],
+        };
       }
     }
 
     const overdueDateBasis = normalizeOverdueDateBasis(
-      body?.overdueDateBasis !== undefined ? body.overdueDateBasis : existing?.overdue_date_basis ?? DEFAULT_OVERDUE_DATE_BASIS
+      body?.overdueDateBasis !== undefined
+        ? body.overdueDateBasis
+        : (existing?.overdue_date_basis ?? DEFAULT_OVERDUE_DATE_BASIS),
     );
 
     return {
       displayName,
       watchType,
-      jql: watchType === "direct_reports" ? buildDirectReportsJql( memberNames ) : watchType === "jql" ? jql : "",
-      memberNamesJson: watchType === "direct_reports" ? JSON.stringify( memberNames ) : "[]",
-      resolvedAccountId: String( body?.resolvedAccountId ?? existing?.resolved_account_id ?? "" ).trim(),
-      sortOrder: Number( body?.sortOrder ?? existing?.sort_order ?? 0 ),
+      jql:
+        watchType === "direct_reports"
+          ? buildDirectReportsJql(memberNames)
+          : watchType === "jql"
+            ? jql
+            : "",
+      memberNamesJson:
+        watchType === "direct_reports" ? JSON.stringify(memberNames) : "[]",
+      resolvedAccountId: String(
+        body?.resolvedAccountId ?? existing?.resolved_account_id ?? "",
+      ).trim(),
+      sortOrder: Number(body?.sortOrder ?? existing?.sort_order ?? 0),
       capacity,
       overdueDateBasis,
     };
@@ -282,10 +298,9 @@ export const registerAppConfigRoutes = ( app, context ) => {
       return res.status( 404 ).json( { error: "Epic preset not found" } );
     }
 
-    const payload = normalizeEpicPresetPayload( req.body, existing );
-    if ( payload.error )
-    {
-      return res.status( 400 ).json( payload );
+    const payload = normalizeEpicPresetPayload(req.body, existing);
+    if (payload.error) {
+      return res.status(400).json(payload);
     }
 
     stmts.updateEpicPresetStmt.run( { id, ...payload } );
@@ -301,23 +316,25 @@ export const registerAppConfigRoutes = ( app, context ) => {
       return res.status( 404 ).json( { error: "Epic preset not found" } );
     }
 
-    try
-    {
-      const preset = mapEpicPresetRow( row );
-      const rawJql = await resolvePresetJql( { preset, jiraRequest } );
-      if ( !rawJql )
-      {
-        return res.status( 422 ).json( { error: "No JQL configured for this epic preset." } );
+    try {
+      const preset = mapEpicPresetRow(row);
+      const rawJql = await resolvePresetJql({ preset, jiraRequest });
+      if (!rawJql) {
+        return res
+          .status(422)
+          .json({ error: "No JQL configured for this epic preset." });
       }
-      const { scope: scopeJql } = splitTrailingOrderBy( rawJql );
-      return res.json( { scopeJql } );
-    } catch ( error )
-    {
-      log.error( `scope-jql for preset ${ id } failed`, error instanceof Error ? error.message : error );
-      return res.status( 500 ).json( {
+      const { scope: scopeJql } = splitTrailingOrderBy(rawJql);
+      return res.json({ scopeJql });
+    } catch (error) {
+      log.error(
+        `scope-jql for preset ${id} failed`,
+        errorMessage(error),
+      );
+      return res.status(500).json({
         error: "Failed to resolve preset JQL",
         message: error instanceof Error ? error.message : "Unknown error",
-      } );
+      });
     }
   }) );
 
@@ -340,7 +357,7 @@ export const registerAppConfigRoutes = ( app, context ) => {
     return res.json( {
       version: 1,
       exportedAt: new Date().toISOString(),
-      presets: items.map( ( preset ) => ( {
+      presets: items.map((preset) => ({
         presetType: preset.presetType,
         epicKey: preset.epicKey,
         epicName: preset.epicName,
@@ -356,9 +373,8 @@ export const registerAppConfigRoutes = ( app, context ) => {
     const incoming = Array.isArray( req.body?.presets ) ? req.body.presets : [];
     const mode = req.body?.mode === "replace" ? "replace" : "merge";
 
-    if ( incoming.length === 0 )
-    {
-      return res.status( 400 ).json( { error: "No presets provided" } );
+    if (incoming.length === 0) {
+      return res.status(400).json({ error: "No presets provided" });
     }
 
     const db = getDb();
@@ -368,13 +384,13 @@ export const registerAppConfigRoutes = ( app, context ) => {
       db.prepare( "DELETE FROM epic_presets" ).run();
     }
 
-    const presetFingerprint = ( preset ) =>
+    const presetFingerprint = (preset) =>
       [
-        String( preset.presetType || "" ).trim(),
-        String( preset.epicKey || "" ).trim(),
-        String( preset.jql || "" ).trim(),
-        String( preset.epicName || preset.label || "" ).trim(),
-      ].join( "|" );
+        String(preset.presetType || "").trim(),
+        String(preset.epicKey || "").trim(),
+        String(preset.jql || "").trim(),
+        String(preset.epicName || preset.label || "").trim(),
+      ].join("|");
 
     const existingFingerprints = new Set(
       mode === "merge"
@@ -385,26 +401,23 @@ export const registerAppConfigRoutes = ( app, context ) => {
     let imported = 0;
     let skipped = 0;
 
-    for ( const raw of incoming )
-    {
-      const payload = normalizeEpicPresetPayload( {
+    for (const raw of incoming) {
+      const payload = normalizeEpicPresetPayload({
         presetType: raw?.presetType,
         epicKey: raw?.epicKey,
         epicName: raw?.epicName || raw?.label,
         jiraFilterId: raw?.jiraFilterId,
         jql: raw?.jql,
         sortOrder: raw?.sortOrder,
-      } );
+      });
 
-      if ( payload.error )
-      {
+      if (payload.error) {
         skipped += 1;
         continue;
       }
 
-      const fp = presetFingerprint( payload );
-      if ( mode === "merge" && existingFingerprints.has( fp ) )
-      {
+      const fp = presetFingerprint(payload);
+      if (mode === "merge" && existingFingerprints.has(fp)) {
         skipped += 1;
         continue;
       }
@@ -414,8 +427,10 @@ export const registerAppConfigRoutes = ( app, context ) => {
       imported += 1;
     }
 
-    log.info( `preset import: ${ imported } imported, ${ skipped } skipped (mode=${ mode })` );
-    return res.json( {
+    log.info(
+      `preset import: ${imported} imported, ${skipped} skipped (mode=${mode})`,
+    );
+    return res.json({
       ok: true,
       imported,
       skipped,
@@ -429,21 +444,18 @@ export const registerAppConfigRoutes = ( app, context ) => {
       return;
     }
 
-    try
-    {
-      const result = await listAvailableJiraFilters( { jiraRequest } );
-      if ( !result.ok )
-      {
-        return res.status( result.status ).json( result.data );
+    try {
+      const result = await listAvailableJiraFilters({ jiraRequest });
+      if (!result.ok) {
+        return res.status(result.status).json(result.data);
       }
 
-      return res.json( { items: result.data?.items || [] } );
-    } catch ( error )
-    {
-      return res.status( 500 ).json( {
+      return res.json({ items: result.data?.items || [] });
+    } catch (error) {
+      return res.status(500).json({
         error: "Failed to list Jira filters",
         message: error instanceof Error ? error.message : "Unknown error",
-      } );
+      });
     }
   }) );
 
@@ -453,35 +465,31 @@ export const registerAppConfigRoutes = ( app, context ) => {
       return;
     }
 
-    const filterId = String( req.params.id || "" ).trim();
-    if ( !filterId )
-    {
-      return res.status( 400 ).json( { error: "Filter id is required" } );
+    const filterId = String(req.params.id || "").trim();
+    if (!filterId) {
+      return res.status(400).json({ error: "Filter id is required" });
     }
 
-    try
-    {
-      const result = await jiraRequest( {
-        pathWithQuery: `/rest/api/3/filter/${ encodeURIComponent( filterId ) }`,
-      } );
-      if ( !result.ok )
-      {
-        return res.status( result.status ).json( result.data );
+    try {
+      const result = await jiraRequest({
+        pathWithQuery: `/rest/api/3/filter/${encodeURIComponent(filterId)}`,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json(result.data);
       }
 
       const filter = result.data || {};
-      return res.json( {
-        id: String( filter.id || filterId ),
-        name: String( filter.name || "" ).trim(),
-        jql: String( filter.jql || "" ).trim(),
+      return res.json({
+        id: String(filter.id || filterId),
+        name: String(filter.name || "").trim(),
+        jql: String(filter.jql || "").trim(),
         owner: filter.owner?.displayName || filter.owner?.name || "",
-      } );
-    } catch ( error )
-    {
-      return res.status( 500 ).json( {
+      });
+    } catch (error) {
+      return res.status(500).json({
         error: "Failed to load Jira filter",
         message: error instanceof Error ? error.message : "Unknown error",
-      } );
+      });
     }
   }) );
 
@@ -491,17 +499,21 @@ export const registerAppConfigRoutes = ( app, context ) => {
       return;
     }
 
-    const epicPresetIds = Array.isArray( req.body?.epicPresetIds )
-      ? req.body.epicPresetIds.map( ( value ) => Number( value ) ).filter( ( value ) => value > 0 )
+    const epicPresetIds = Array.isArray(req.body?.epicPresetIds)
+      ? req.body.epicPresetIds
+          .map((value) => Number(value))
+          .filter((value) => value > 0)
       : [];
-    const includePastDue = Boolean( req.body?.includePastDue );
-    const maxResults = Math.min( 1000, Math.max( 1, Number( req.body?.maxResults || 200 ) ) );
+    const includePastDue = Boolean(req.body?.includePastDue);
+    const maxResults = Math.min(
+      1000,
+      Math.max(1, Number(req.body?.maxResults || 200)),
+    );
 
-    if ( epicPresetIds.length === 0 && !includePastDue )
-    {
-      return res.status( 400 ).json( {
+    if (epicPresetIds.length === 0 && !includePastDue) {
+      return res.status(400).json({
         error: "Select at least one epic preset or Past Due Projects",
-      } );
+      });
     }
 
     const stmts = createStatements( getDb() );
@@ -519,23 +531,21 @@ export const registerAppConfigRoutes = ( app, context ) => {
     const runs = [];
     let runIndex = 0;
 
-    for ( const preset of selectedPresets )
-    {
+    for (const preset of selectedPresets) {
       let jql = "";
       let resolveError = null;
 
-      try
-      {
-        jql = await resolvePresetJql( { preset, jiraRequest } );
-      } catch ( error )
-      {
+      try {
+        jql = await resolvePresetJql({ preset, jiraRequest });
+      } catch (error) {
         resolveError =
-          error instanceof Error ? error.message : "Failed to resolve preset JQL";
+          error instanceof Error
+            ? error.message
+            : "Failed to resolve preset JQL";
       }
 
-      if ( !jql )
-      {
-        runs.push( {
+      if (!jql) {
+        runs.push({
           index: runIndex,
           label: preset.label,
           presetId: preset.id,
@@ -543,7 +553,7 @@ export const registerAppConfigRoutes = ( app, context ) => {
           issues: [],
           total: 0,
           error: resolveError || "No JQL configured for this epic preset.",
-        } );
+        });
         runIndex += 1;
         continue;
       }
@@ -554,11 +564,11 @@ export const registerAppConfigRoutes = ( app, context ) => {
         if ( !searchResult.ok )
         {
           const message =
-            searchResult.data?.errorMessages?.join( " " ) ||
+            searchResult.data?.errorMessages?.join(" ") ||
             searchResult.data?.error ||
             searchResult.data?.message ||
             "Failed to run query";
-          runs.push( {
+          runs.push({
             index: runIndex,
             label: preset.label,
             presetId: preset.id,
@@ -566,24 +576,24 @@ export const registerAppConfigRoutes = ( app, context ) => {
             issues: [],
             total: 0,
             error: message,
-          } );
-        } else
-        {
-          runs.push( {
+          });
+        } else {
+          runs.push({
             index: runIndex,
             label: preset.label,
             presetId: preset.id,
             jql,
             issues: searchResult.data?.issues || [],
             total: Number(
-              searchResult.data?.total ?? searchResult.data?.issues?.length ?? 0
+              searchResult.data?.total ??
+                searchResult.data?.issues?.length ??
+                0,
             ),
             error: null,
-          } );
+          });
         }
-      } catch ( error )
-      {
-        runs.push( {
+      } catch (error) {
+        runs.push({
           index: runIndex,
           label: preset.label,
           presetId: preset.id,
@@ -591,21 +601,22 @@ export const registerAppConfigRoutes = ( app, context ) => {
           issues: [],
           total: 0,
           error: error instanceof Error ? error.message : "Failed to run query",
-        } );
+        });
       }
 
       runIndex += 1;
     }
 
-    if ( includePastDue )
-    {
-      const epicKeys = selectedPresets.map( ( preset ) => preset.epicKey ).filter( Boolean );
-      const jql = buildPastDueJql( {
+    if (includePastDue) {
+      const epicKeys = selectedPresets
+        .map((preset) => preset.epicKey)
+        .filter(Boolean);
+      const jql = buildPastDueJql({
         mappingsByRole,
         epicPastDueMode,
         epicKeys,
-        pastDueFloorDate: computePastDueFloorDate( 1 ),
-      } );
+        pastDueFloorDate: computePastDueFloorDate(1),
+      });
 
       try
       {
@@ -613,11 +624,11 @@ export const registerAppConfigRoutes = ( app, context ) => {
         if ( !searchResult.ok )
         {
           const message =
-            searchResult.data?.errorMessages?.join( " " ) ||
+            searchResult.data?.errorMessages?.join(" ") ||
             searchResult.data?.error ||
             searchResult.data?.message ||
             "Failed to run past-due query";
-          runs.push( {
+          runs.push({
             index: runIndex,
             label: "Past Due Projects",
             presetId: null,
@@ -625,32 +636,35 @@ export const registerAppConfigRoutes = ( app, context ) => {
             issues: [],
             total: 0,
             error: message,
-          } );
-        } else
-        {
-          runs.push( {
+          });
+        } else {
+          runs.push({
             index: runIndex,
             label: "Past Due Projects",
             presetId: null,
             jql,
             issues: searchResult.data?.issues || [],
             total: Number(
-              searchResult.data?.total ?? searchResult.data?.issues?.length ?? 0
+              searchResult.data?.total ??
+                searchResult.data?.issues?.length ??
+                0,
             ),
             error: null,
-          } );
+          });
         }
-      } catch ( error )
-      {
-        runs.push( {
+      } catch (error) {
+        runs.push({
           index: runIndex,
           label: "Past Due Projects",
           presetId: null,
           jql,
           issues: [],
           total: 0,
-          error: error instanceof Error ? error.message : "Failed to run past-due query",
-        } );
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to run past-due query",
+        });
       }
     }
 
@@ -661,8 +675,8 @@ export const registerAppConfigRoutes = ( app, context ) => {
     const { getDb } = getRequestOperationContext( _req, context );
     const items = createStatements( getDb() ).listFieldMappingsStmt.all().map( ( row ) => ( {
       role: row.role,
-      fieldId: String( row.field_id || "" ).trim(),
-      fieldName: String( row.field_name || "" ).trim(),
+      fieldId: String(row.field_id || "").trim(),
+      fieldName: String(row.field_name || "").trim(),
       updatedAt: row.updated_at,
     } ) );
     return res.json( { items } );
@@ -687,15 +701,15 @@ export const registerAppConfigRoutes = ( app, context ) => {
 
       stmts.upsertFieldMappingStmt.run( {
         role,
-        fieldId: String( item?.fieldId || "" ).trim(),
+        fieldId: String(item?.fieldId || "").trim(),
         fieldName,
-      } );
+      });
     }
 
     const items = stmts.listFieldMappingsStmt.all().map( ( row ) => ( {
       role: row.role,
-      fieldId: String( row.field_id || "" ).trim(),
-      fieldName: String( row.field_name || "" ).trim(),
+      fieldId: String(row.field_id || "").trim(),
+      fieldName: String(row.field_name || "").trim(),
       updatedAt: row.updated_at,
     } ) );
     return res.json( { items } );
@@ -707,17 +721,20 @@ export const registerAppConfigRoutes = ( app, context ) => {
       return;
     }
 
-    try
-    {
-      const result = await jiraRequest( { pathWithQuery: "/rest/api/3/field" } );
-      if ( !result.ok )
-      {
-        return res.status( result.status ).json( result.data );
+    try {
+      const result = await jiraRequest({ pathWithQuery: "/rest/api/3/field" });
+      if (!result.ok) {
+        return res.status(result.status).json(result.data);
       }
 
-      const fields = Array.isArray( result.data ) ? result.data : [];
+      const fields = Array.isArray(result.data) ? result.data : [];
       const byName = new Map(
-        fields.map( ( field ) => [ String( field.name || "" ).trim().toLowerCase(), field ] )
+        fields.map((field) => [
+          String(field.name || "")
+            .trim()
+            .toLowerCase(),
+          field,
+        ]),
       );
 
       const stmts = createStatements( getDb() );
@@ -729,26 +746,25 @@ export const registerAppConfigRoutes = ( app, context ) => {
         {
           stmts.upsertFieldMappingStmt.run( {
             role: row.role,
-            fieldId: String( match.id ),
-            fieldName: String( match.name || row.field_name ),
-          } );
+            fieldId: String(match.id),
+            fieldName: String(match.name || row.field_name),
+          });
         }
       }
 
       const items = stmts.listFieldMappingsStmt.all().map( ( mapping ) => ( {
         role: mapping.role,
-        fieldId: String( mapping.field_id || "" ).trim(),
-        fieldName: String( mapping.field_name || "" ).trim(),
+        fieldId: String(mapping.field_id || "").trim(),
+        fieldName: String(mapping.field_name || "").trim(),
         updatedAt: mapping.updated_at,
-      } ) );
+      }));
 
-      return res.json( { items, synced: true } );
-    } catch ( error )
-    {
-      return res.status( 500 ).json( {
+      return res.json({ items, synced: true });
+    } catch (error) {
+      return res.status(500).json({
         error: "Failed to sync Jira fields",
         message: error instanceof Error ? error.message : "Unknown error",
-      } );
+      });
     }
   }) );
 
@@ -758,28 +774,25 @@ export const registerAppConfigRoutes = ( app, context ) => {
       return;
     }
 
-    try
-    {
-      const result = await jiraRequest( { pathWithQuery: "/rest/api/3/field" } );
-      if ( !result.ok )
-      {
-        return res.status( result.status ).json( result.data );
+    try {
+      const result = await jiraRequest({ pathWithQuery: "/rest/api/3/field" });
+      if (!result.ok) {
+        return res.status(result.status).json(result.data);
       }
 
-      const fields = Array.isArray( result.data ) ? result.data : [];
-      return res.json( {
-        items: fields.map( ( field ) => ( {
+      const fields = Array.isArray(result.data) ? result.data : [];
+      return res.json({
+        items: fields.map((field) => ({
           id: field.id,
           name: field.name,
-          custom: Boolean( field.custom ),
-        } ) ),
-      } );
-    } catch ( error )
-    {
-      return res.status( 500 ).json( {
+          custom: Boolean(field.custom),
+        })),
+      });
+    } catch (error) {
+      return res.status(500).json({
         error: "Failed to list Jira fields",
         message: error instanceof Error ? error.message : "Unknown error",
-      } );
+      });
     }
   }) );
 
@@ -791,9 +804,8 @@ export const registerAppConfigRoutes = ( app, context ) => {
   app.put( "/api/settings", withSiteOperation(( req, res ) => {
     const { getDb } = getRequestOperationContext( req, context );
     const settings = req.body?.settings;
-    if ( !settings || typeof settings !== "object" )
-    {
-      return res.status( 400 ).json( { error: "Provide settings object" } );
+    if (!settings || typeof settings !== "object") {
+      return res.status(400).json({ error: "Provide settings object" });
     }
 
     if (req.docketReportScope === "combined-work" && Object.keys(settings).some(key =>
@@ -809,22 +821,20 @@ export const registerAppConfigRoutes = ( app, context ) => {
         continue;
       }
 
-      if ( normalizedKey === "epic_past_due_mode" )
-      {
-        const mode = String( value || "" ).trim();
-        if ( !EPIC_PAST_DUE_MODES.has( mode ) )
-        {
-          return res.status( 400 ).json( {
+      if (normalizedKey === "epic_past_due_mode") {
+        const mode = String(value || "").trim();
+        if (!EPIC_PAST_DUE_MODES.has(mode)) {
+          return res.status(400).json({
             error: "Invalid epic_past_due_mode",
-            allowed: [ ...EPIC_PAST_DUE_MODES ],
-          } );
+            allowed: [...EPIC_PAST_DUE_MODES],
+          });
         }
       }
 
       stmts.upsertSettingStmt.run( {
         key: normalizedKey,
-        value: String( value ?? "" ),
-      } );
+        value: String(value ?? ""),
+      });
     }
 
     return res.json( { settings: readSettingsMap( stmts ) } );
@@ -838,9 +848,12 @@ export const registerAppConfigRoutes = ( app, context ) => {
     const incoming = Array.isArray( req.body?.reminders ) ? req.body.reminders : [];
     const rows = Array.from( { length: REMINDER_SLOT_COUNT }, ( _, index ) => ( {
       slotIndex: index,
-      text: String( incoming[ index ]?.text || "" ).slice( 0, REMINDER_TEXT_MAX_LENGTH ),
-      done: incoming[ index ]?.done ? 1 : 0,
-    } ) );
+      text: String(incoming[index]?.text || "").slice(
+        0,
+        REMINDER_TEXT_MAX_LENGTH,
+      ),
+      done: incoming[index]?.done ? 1 : 0,
+    }));
 
     const stmts = createStatements( getDb() );
     stmts.saveRemindersTxn( rows );
@@ -874,10 +887,9 @@ export const registerAppConfigRoutes = ( app, context ) => {
       return res.status( 404 ).json( { error: "Watched assignee not found" } );
     }
 
-    const payload = normalizeWatchedPayload( req.body, existing );
-    if ( payload.error )
-    {
-      return res.status( 400 ).json( payload );
+    const payload = normalizeWatchedPayload(req.body, existing);
+    if (payload.error) {
+      return res.status(400).json(payload);
     }
 
     stmts.updateWatchedAssigneeStmt.run( { id, ...payload } );
