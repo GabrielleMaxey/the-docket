@@ -17,6 +17,7 @@ import {
   saveIssueMetadata,
 } from "../../services/jiraClient";
 import { buildDuplicateSearchJql, rankDuplicateCandidates } from "../../../shared/duplicateCandidates.mjs";
+import { extractTitleLabel, formatPrefixedTitle, stripTitleLabel } from "../../../shared/issueTitle.mjs";
 
 // Fields a child issue should inherit from its parent at creation time —
 // actual/tracked dates (startDate/completeDate) are per-issue and never cascade.
@@ -865,12 +866,29 @@ const CreateIssueModal = ({
   // AI rewrites Story titles, so the original wording is what an existing issue would share).
   // Returns true when matches were shown and the caller should stop and wait for the user.
   // Any failure falls through: the check never blocks drafting or creating.
+  // Only the "I want" answer describes the ask; the role and the benefit ("NOC technician",
+  // "my job is easier") are shared by many unrelated issues and would flood the search.
+  const duplicateIntakeText = () => {
+    if (!useAiHelper) return "";
+    const answers = normalizeAiHelperIntake(issueType, intakeValues);
+    return String(answers.iWant ?? answers.whatBroke ?? Object.values(answers)[0] ?? "");
+  };
+
+  // The title of the selected parent, used to label new issues "[Project label] ask".
+  const resolveParentTitle = () => {
+    if (parentOptions?.epic?.key && parentOptions.epic.key === parentKey) return parentOptions.epic.summary || "";
+    const story = (parentOptions?.stories || []).find((item) => item.key === parentKey);
+    if (story) return story.summary || "";
+    for (const check of [manualParentCheck, manualIssueCheck]) {
+      if (check?.issue?.issueKey === parentKey) return check.issue.summary || "";
+    }
+    return "";
+  };
+
   const runDuplicateCheck = async (action) => {
-    const intakeText = useAiHelper
-      ? Object.values(normalizeAiHelperIntake(issueType, intakeValues)).join(" ")
-      : "";
-    const searchText = `${summary} ${intakeText}`.trim();
-    const ackKey = `${projectKey}|${issueType}|${useAiHelper ? intakeText : summary}`;
+    const intakeText = duplicateIntakeText();
+    const searchText = `${stripTitleLabel(summary)} ${intakeText}`.trim();
+    const ackKey = `${projectKey}|${issueType}|${useAiHelper ? intakeText : stripTitleLabel(summary)}`;
     if (duplicateAckRef.current === ackKey) return false;
     const jql = buildDuplicateSearchJql({ projectKey, summary: searchText });
     if (!jql) return false;
@@ -889,10 +907,8 @@ const CreateIssueModal = ({
   };
 
   const continueDespiteDuplicates = () => {
-    const intakeText = useAiHelper
-      ? Object.values(normalizeAiHelperIntake(issueType, intakeValues)).join(" ")
-      : "";
-    duplicateAckRef.current = `${projectKey}|${issueType}|${useAiHelper ? intakeText : summary}`;
+    const intakeText = duplicateIntakeText();
+    duplicateAckRef.current = `${projectKey}|${issueType}|${useAiHelper ? intakeText : stripTitleLabel(summary)}`;
     setDuplicateMatches([]);
     if (duplicateAction === "draft") {
       void handleGenerateDescription({ skipDuplicateCheck: true });
@@ -960,10 +976,11 @@ const CreateIssueModal = ({
       } else {
         setClarificationQuestions([]);
       }
-      // Story titles are always rewritten to job story format; other types only get a
+      // Story titles are always rewritten to a short ask; other types only get a
       // generated title when the AI helper supplied the raw material for one.
       if ((issueType === "Story" || useAiHelper) && result?.summary) {
-        setSummary(result.summary);
+        // "[Project label] short ask", with the label taken from the parent's title.
+        setSummary(formatPrefixedTitle(extractTitleLabel(resolveParentTitle()), result.summary));
       }
       if (
         issueType === "Story" &&

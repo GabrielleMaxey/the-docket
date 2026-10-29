@@ -84,11 +84,19 @@ test("only the first 500 characters of a description are compared", () => {
   assert.deepEqual(rankDuplicateCandidates("Torchwood endpoints mediation billing", [early]).map((r) => r.key), ["E-3"]);
 });
 
-test("descriptions are searched with only the 5 most specific words; titles use all", () => {
+test("descriptions are searched with only the 8 most specific words; titles use all", () => {
   const jql = buildDuplicateSearchJql({ projectKey: "ODI", summary: "aaa bbb ccc ddd eee fff ggg longword anotherlongword mediumword" });
   assert.equal((jql.match(/summary ~/g) || []).length, 10);
+  const descCount = (jql.match(/description ~/g) || []).length;
   const desc = jql.match(/description ~ "[a-z]+"/g).map((t) => t.replace(/description ~ |"/g, ""));
-  assert.equal(desc.length, 5);
+  assert.equal(desc.length, descCount);
+  assert.equal(desc.length, 8);
   assert.ok(desc.includes("anotherlongword") && desc.includes("longword") && desc.includes("mediumword"));
   assert.ok(!jql.includes("ORDER BY"));
+});
+
+test("word forms match: lookups/lookup, networks/network, forwarding/forward", () => {
+  const existing = { key: "E-9", fields: { summary: "Voice automation", description: "Perform customer lookup in Red or Orange network and apply forward to each TN" } };
+  const out = rankDuplicateCandidates("an automation to perform the required steps to complete customer lookups in either Red or Orange networks, and apply forwarding", [existing]);
+  assert.deepEqual(out.map((r) => r.key), ["E-9"]);
 });

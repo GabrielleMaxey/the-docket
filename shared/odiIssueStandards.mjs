@@ -1,3 +1,4 @@
+import { isLabelPrefixedTitle } from "./issueTitle.mjs";
 /**
  * Jira create standards — shared by server validation, UI pre-checks, and tests.
  */
@@ -147,9 +148,9 @@ export const validateOdiIssueCreate = ({
   }
 
   if (type === "Story") {
-    if (!isJobStorySummary(summary)) {
+    if (!isJobStorySummary(summary) && !isLabelPrefixedTitle(summary)) {
       errors.push(
-        'Story title must use Job Story format: "When <situation>, I want <ask>, so I can <outcome>."'
+        'Story title must be "[Project label] short ask" or use Job Story format: "When <situation>, I want <ask>, so I can <outcome>."'
       );
     }
     if (String(assignee || "").trim()) {
