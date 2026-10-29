@@ -22,7 +22,7 @@ test("significantWords drops short and common words, dedupes, caps at 6", () => 
 test("buildDuplicateSearchJql scopes to the project, open issues and OR'd summary terms", () => {
   assert.equal(
     buildDuplicateSearchJql({ projectKey: "ODI", summary: "Coredump handling scripts" }),
-    'project = "ODI" AND statusCategory != Done AND (summary ~ "coredump" OR description ~ "coredump" OR summary ~ "handling" OR description ~ "handling" OR summary ~ "scripts" OR description ~ "scripts") ORDER BY updated DESC'
+    'project = "ODI" AND statusCategory != Done AND (summary ~ "coredump" OR description ~ "coredump" OR summary ~ "handling" OR description ~ "handling" OR summary ~ "scripts" OR description ~ "scripts")'
   );
 });
 
@@ -82,4 +82,13 @@ test("only the first 500 characters of a description are compared", () => {
   assert.deepEqual(rankDuplicateCandidates("Torchwood endpoints mediation billing", [late]), []);
   const early = { key: "E-3", fields: { summary: "Voice program", description: "torchwood endpoints mediation billing" } };
   assert.deepEqual(rankDuplicateCandidates("Torchwood endpoints mediation billing", [early]).map((r) => r.key), ["E-3"]);
+});
+
+test("descriptions are searched with only the 5 most specific words; titles use all", () => {
+  const jql = buildDuplicateSearchJql({ projectKey: "ODI", summary: "aaa bbb ccc ddd eee fff ggg longword anotherlongword mediumword" });
+  assert.equal((jql.match(/summary ~/g) || []).length, 10);
+  const desc = jql.match(/description ~ "[a-z]+"/g).map((t) => t.replace(/description ~ |"/g, ""));
+  assert.equal(desc.length, 5);
+  assert.ok(desc.includes("anotherlongword") && desc.includes("longword") && desc.includes("mediumword"));
+  assert.ok(!jql.includes("ORDER BY"));
 });

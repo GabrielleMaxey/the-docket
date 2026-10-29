@@ -4,6 +4,9 @@
 // Only the start of a description is compared: that is where an issue states what it is about.
 export const DESCRIPTION_CHECK_CHARS = 500;
 const MAX_QUERY_WORDS = 10;
+// Descriptions are long, so a common word matches far too many of them. Search them with only
+// the most specific words; titles still use all of the words.
+const MAX_DESCRIPTION_QUERY_WORDS = 5;
 const MIN_WORD_LENGTH = 3;
 const MAX_RESULTS = 5;
 const PROJECT_KEY = /^[A-Za-z][A-Za-z0-9_]*$/;
@@ -30,14 +33,14 @@ const words = (text) => {
 
 // Long text (AI helper intake answers) has more words than we search for, so keep the most
 // specific ones: longest first, original order as the tie-break and in the result.
-export const significantWords = (text) => {
+export const significantWords = (text, max = MAX_QUERY_WORDS) => {
   const all = words(text);
-  if (all.length <= MAX_QUERY_WORDS) return all;
+  if (all.length <= max) return all;
   const keep = new Set(
     all
       .map((word, index) => ({ word, index }))
       .sort((a, b) => b.word.length - a.word.length || a.index - b.index)
-      .slice(0, MAX_QUERY_WORDS)
+      .slice(0, max)
       .map((item) => item.word)
   );
   return all.filter((word) => keep.has(word));
@@ -48,8 +51,13 @@ export const buildDuplicateSearchJql = ({ projectKey, summary } = {}) => {
   if (!PROJECT_KEY.test(project)) return null;
   const terms = significantWords(summary);
   if (terms.length === 0) return null;
-  const clause = terms.map((w) => `summary ~ "${w}" OR description ~ "${w}"`).join(" OR ");
-  return `project = "${project}" AND statusCategory != Done AND (${clause}) ORDER BY updated DESC`;
+  const descriptionTerms = new Set(significantWords(summary, MAX_DESCRIPTION_QUERY_WORDS));
+  const clause = terms
+    .flatMap((w) => [`summary ~ "${w}"`, ...(descriptionTerms.has(w) ? [`description ~ "${w}"`] : [])])
+    .join(" OR ");
+  // No ORDER BY: with a text search Jira ranks by relevance, so the capped result list holds the
+  // best matches instead of whatever was updated last.
+  return `project = "${project}" AND statusCategory != Done AND (${clause})`;
 };
 
 const requiredShared = (n) => (n < 4 ? Math.ceil(n / 2) : Math.min(4, Math.max(2, Math.ceil(n * 0.25))));
