@@ -121,7 +121,7 @@ export function scoreIssue(input, options = {}) {
     const todayMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
     if (dueMs <= todayMs) {
       due = w.due.overdue;
-      reasons.push(`Overdue (+${due})`);
+      reasons.push(dueMs === todayMs ? `Due today (+${due})` : `Overdue (+${due})`);
     } else if (dueMs <= thirdBusinessDayMs(todayMs, w.due.businessDays)) {
       due = w.due.soon;
       reasons.push(`Due within ${w.due.businessDays} business days (+${due})`);

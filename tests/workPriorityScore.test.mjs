@@ -60,6 +60,15 @@ describe("scoreIssue", () => {
     assert.equal(scoreIssue({ dueDate: "2026-11-05" }, { now: friday }).components.due, 0);
   });
 
+  it("labels due-today as Due today and earlier dates as Overdue", () => {
+    const today = scoreIssue({ dueDate: "2026-10-28" }, { now });
+    assert.ok(today.reasons.includes("Due today (+25)"));
+    assert.ok(!today.reasons.some((r) => r.startsWith("Overdue")));
+    const past = scoreIssue({ dueDate: "2026-10-27" }, { now });
+    assert.ok(past.reasons.includes("Overdue (+25)"));
+    assert.ok(!past.reasons.some((r) => r.startsWith("Due today")));
+  });
+
   it("blocker flags", () => {
     assert.equal(scoreIssue({ blocks: true }, { now }).components.blocker, 30);
     assert.equal(scoreIssue({ blockedBy: true }, { now }).components.blocker, 20);
