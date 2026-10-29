@@ -8,6 +8,7 @@ import {
   fetchJiraHealth,
   fetchJiraParentCandidates,
   fetchJiraProjects,
+  fetchJiraSearch,
   generateIssueDescription,
   uploadIssueAttachments,
   fetchTeamDatesBulk,
@@ -15,6 +16,7 @@ import {
   saveTeamDate,
   saveIssueMetadata,
 } from "../../services/jiraClient";
+import { buildDuplicateSearchJql, rankDuplicateCandidates } from "../../../shared/duplicateCandidates.mjs";
 
 // Fields a child issue should inherit from its parent at creation time —
 // actual/tracked dates (startDate/completeDate) are per-issue and never cascade.
@@ -258,6 +260,7 @@ const CreateIssueModal = ({
   const [overrideDescriptionStandards, setOverrideDescriptionStandards] = React.useState(false);
   const [overrideReason, setOverrideReason] = React.useState(""); // "clarification" | "standards"
   const [success, setSuccess] = React.useState("");
+  const [duplicateMatches, setDuplicateMatches] = React.useState([]);
   const [createdIssueKey, setCreatedIssueKey] = React.useState("");
   const [attachments, setAttachments] = React.useState([]);
   const [attachmentProgress, setAttachmentProgress] = React.useState(null);
@@ -463,6 +466,7 @@ const CreateIssueModal = ({
     setOverrideDescriptionStandards(false);
     setOverrideReason("");
     setSuccess("");
+    setDuplicateMatches([]);
     setCreatedIssueKey("");
     setAttachments([]);
     setAttachmentProgress(null);
@@ -962,7 +966,13 @@ const CreateIssueModal = ({
     setError(generalErrors.length > 0 ? formatFieldErrors(generalErrors) : "");
   };
 
-  const handleSubmit = async () => {
+  // A previous "possible duplicates" result no longer applies once the inputs change.
+  React.useEffect(() => {
+    setDuplicateMatches([]);
+  }, [summary, projectKey, issueType]);
+
+  const handleSubmit = async (options) => {
+    const skipDuplicateCheck = options?.skipDuplicateCheck === true;
     setError("");
     setDescriptionError("");
     setSuccess("");
@@ -1012,6 +1022,27 @@ const CreateIssueModal = ({
       applyValidationErrors(standardsCheck.errors);
       return;
     }
+
+    // Read-only look for open issues with similar summaries in the same Jira site and project.
+    // Any failure here falls through to creating the issue; the check never blocks creation.
+    if (!skipDuplicateCheck) {
+      const jql = buildDuplicateSearchJql({ projectKey, summary });
+      if (jql) {
+        setSubmitting(true);
+        try {
+          const found = await fetchJiraSearch({ jql, maxResults: 25 });
+          const matches = rankDuplicateCandidates(summary, found?.issues);
+          if (matches.length > 0) {
+            setDuplicateMatches(matches);
+            setSubmitting(false);
+            return;
+          }
+        } catch (searchError) {
+          console.warn("Duplicate check skipped", searchError);
+        }
+      }
+    }
+    setDuplicateMatches([]);
 
     setSubmitting(true);
     let createdParentKey = "";
@@ -1179,6 +1210,29 @@ const CreateIssueModal = ({
     <Modal open={open} onClose={onClose} size="small">
       <Modal.Header>Create Jira issue</Modal.Header>
       <Modal.Content>
+        {duplicateMatches.length > 0 ? (
+          <Message warning size="small" data-testid="duplicate-matches">
+            <Message.Header>Possible existing issues</Message.Header>
+            <p>Open issues in {projectKey} with a similar summary. Check these before creating a new one.</p>
+            <ul style={{ margin: "0.25rem 0 0.5rem", paddingLeft: "1.1rem" }}>
+              {duplicateMatches.map((match) => {
+                const url = buildJiraBrowseUrl(jiraBaseUrl, match.key);
+                return (
+                  <li key={match.key}>
+                    {url ? <a href={url} target="_blank" rel="noopener noreferrer">{match.key}</a> : <strong>{match.key}</strong>}
+                    {" — "}{match.summary}{match.status ? ` (${match.status})` : ""}
+                  </li>
+                );
+              })}
+            </ul>
+            <Button size="mini" primary disabled={submitting} onClick={() => handleSubmit({ skipDuplicateCheck: true })}>
+              Create anyway
+            </Button>
+            <Button size="mini" basic onClick={() => setDuplicateMatches([])}>
+              Cancel
+            </Button>
+          </Message>
+        ) : null}
         {error ? (
           <Message negative size="small" style={{ whiteSpace: "pre-wrap" }}>{error}</Message>
         ) : null}
