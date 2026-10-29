@@ -222,6 +222,36 @@
   margin: 1.4rem 0;
 }
 
+.app-report-markdown .report-table-wrap {
+  margin: 0.8rem 0 1.1rem;
+  overflow-x: auto;
+}
+
+.app-report-markdown .report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.app-report-markdown .report-table th,
+.app-report-markdown .report-table td {
+  padding: 0.45rem 0.65rem;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.app-report-markdown .report-table th {
+  background: #f1f5f9;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.app-report-markdown .report-table tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
 .app-report-markdown .report-link {
   color: #0c93d9;
   font-weight: 600;

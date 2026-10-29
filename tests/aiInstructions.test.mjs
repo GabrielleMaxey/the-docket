@@ -215,6 +215,12 @@ describe("buildWeekPlanSystemPrompt", () => {
     assert.ok(prompt.includes("relative ordering"));
   });
 
+  it("week plan prompt never sends the reader to a key or context they cannot see", () => {
+    const prompt = buildWeekPlanSystemPrompt({ focusStyle: "balance", capacityHours: 20 });
+    assert.ok(prompt.includes("The reader cannot see the score key"));
+    assert.ok(!prompt.includes("using the score key below"));
+  });
+
   it("week plan prompt covers listed days, due dates, stale triage, blockers and estimates", () => {
     const prompt = buildWeekPlanSystemPrompt({ focusStyle: "balance", capacityHours: 20 });
     assert.ok(prompt.includes("Days to plan"));

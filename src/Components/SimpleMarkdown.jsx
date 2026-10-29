@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { createInlinePattern, parseMarkdownTable } from "../utils/reportMarkdown.js";
 
 const isSafeHref = (href) => {
   const value = String(href || "").trim();
@@ -22,8 +23,7 @@ const routerPathFromHref = (href) => {
   return null;
 };
 
-const INLINE_PATTERN =
-  /`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\n]+)\*|_([^_\n]+)_|\[([^\]]+)\]\(([^)]+)\)/g;
+const INLINE_PATTERN = createInlinePattern();
 
 const renderInline = (text, keyPrefix) => {
   const nodes = [];
@@ -113,7 +113,42 @@ const SimpleMarkdown = ({ text }) => {
     listType = null;
   };
 
-  lines.forEach((line, i) => {
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const table = parseMarkdownTable(lines, i);
+    if (table) {
+      flushList();
+      elements.push(
+        <div key={`table-${i}`} className="report-table-wrap">
+          <table className="report-table">
+            {table.header ? (
+              <thead>
+                <tr>
+                  {table.header.map((cell, c) => (
+                    <th key={c} style={table.aligns[c] ? { textAlign: table.aligns[c] } : undefined}>
+                      {renderInline(cell, `th-${i}-${c}`)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            ) : null}
+            <tbody>
+              {table.rows.map((row, r) => (
+                <tr key={r}>
+                  {row.map((cell, c) => (
+                    <td key={c} style={table.aligns[c] ? { textAlign: table.aligns[c] } : undefined}>
+                      {renderInline(cell, `td-${i}-${r}-${c}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      i = table.nextIndex - 1;
+      continue;
+    }
     const orderedMatch = line.match(/^(\d+)\.\s+(.*)$/);
     if (line.startsWith("### ")) {
       flushList();
@@ -141,7 +176,7 @@ const SimpleMarkdown = ({ text }) => {
       flushList();
       elements.push(<p key={i} className="report-p">{renderInline(line, `p-${i}`)}</p>);
     }
-  });
+  }
 
   flushList();
   return <div className="app-report-markdown">{elements}</div>;
