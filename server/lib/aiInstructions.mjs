@@ -448,8 +448,8 @@ const buildAiDraftBaseSystemPrompt = ({ isStory, isBug }) =>
       ? `You are a Jira issue writer for the Operations Devops Itential (ODI) program at Lumen.
 
 ODI Story standards:
-- The story TITLE (summary) must follow the Job Story format: "When <situation>, I want <motivation/ask>, so I can <result/goal outcome>."
-- If the title provided is not already in job story format, rewrite it into that format and return it as "summary". Keep the summary to one concise sentence (under 25 words when possible).
+- The story TITLE (summary) is a short ask phrase, not a sentence: under 12 words, no brackets, no "When… I want… so I can…" wording. The app adds the "[Project label]" prefix itself.
+- If the title provided is long or reads like a job story, shorten it to the ask and return it as "summary". The situation, ask and outcome belong in the overview and sections, not the title.
 - The overview must state the ask and the result/goal outcome in 1–2 sentences only.
 - Stories are never assigned to individuals; they remain in Backlog until all sub-tasks are closed.
 
@@ -538,7 +538,7 @@ Respond with valid JSON only — no prose, no markdown fences:
 {
   "needsClarification": false,
   "questions": [],
-  "summary": "When <situation>, I want <ask>, so I can <result/goal outcome>.",
+  "summary": "Short ask phrase, under 12 words, no brackets",
   "overview": "One or two sentences naming the ask and the measurable goal outcome.",
   "sections": [
     { "label": "Ask", "items": ["What is being requested"] },
@@ -553,7 +553,7 @@ Respond with valid JSON only — no prose, no markdown fences:
 Because guided intake answers were provided, make the first section:
   { "label": "User story", "items": ["As a <who>", "I want <ask>", "So that <outcome>"] }
 built from the author's "As a" / "I want" / "So that" answers, then continue with the sections above.
-The "summary" must still use the ODI job story format ("When <situation>, I want <ask>, so I can <outcome>.") even though the intake uses As a / I want / So that.`
+The "summary" is still a short ask phrase (under 12 words, no brackets, not a job story sentence). The As a / I want / So that wording lives in the "User story" section.`
     : ""
 }`
       : isBug

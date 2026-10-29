@@ -24,6 +24,20 @@ describe("issue type family matching", () => {
   });
 });
 
+describe("label-prefixed story titles", () => {
+  it("are accepted for Stories alongside job story titles", () => {
+    const result = validateOdiIssueCreate({
+      issueType: "Story",
+      summary: "[Ribbon_sysDump_collector] Automate customer lookups and forwarding",
+      description: "x",
+      epicKey: "ODI-1",
+      assignee: "",
+      parentRole: "epic",
+    });
+    assert.ok(!result.errors.some((item) => item.includes("Story title")));
+  });
+});
+
 describe("isJobStorySummary", () => {
   it("accepts valid job story titles", () => {
     assert.equal(

@@ -8,6 +8,7 @@ import {
   fetchJiraHealth,
   fetchJiraParentCandidates,
   fetchJiraProjects,
+  fetchJiraSearch,
   generateIssueDescription,
   uploadIssueAttachments,
   fetchTeamDatesBulk,
@@ -15,6 +16,8 @@ import {
   saveTeamDate,
   saveIssueMetadata,
 } from "../../services/jiraClient";
+import { buildDuplicateSearchJql, rankDuplicateCandidates } from "../../../shared/duplicateCandidates.mjs";
+import { extractTitleLabel, formatPrefixedTitle, stripTitleLabel } from "../../../shared/issueTitle.mjs";
 
 // Fields a child issue should inherit from its parent at creation time —
 // actual/tracked dates (startDate/completeDate) are per-issue and never cascade.
@@ -258,6 +261,9 @@ const CreateIssueModal = ({
   const [overrideDescriptionStandards, setOverrideDescriptionStandards] = React.useState(false);
   const [overrideReason, setOverrideReason] = React.useState(""); // "clarification" | "standards"
   const [success, setSuccess] = React.useState("");
+  const [duplicateMatches, setDuplicateMatches] = React.useState([]);
+  const [duplicateAction, setDuplicateAction] = React.useState("create"); // what "continue anyway" does
+  const duplicateAckRef = React.useRef("");
   const [createdIssueKey, setCreatedIssueKey] = React.useState("");
   const [attachments, setAttachments] = React.useState([]);
   const [attachmentProgress, setAttachmentProgress] = React.useState(null);
@@ -463,6 +469,8 @@ const CreateIssueModal = ({
     setOverrideDescriptionStandards(false);
     setOverrideReason("");
     setSuccess("");
+    setDuplicateMatches([]);
+    duplicateAckRef.current = "";
     setCreatedIssueKey("");
     setAttachments([]);
     setAttachmentProgress(null);
@@ -853,7 +861,64 @@ const CreateIssueModal = ({
     });
   };
 
-  const handleGenerateDescription = async () => {
+  // Read-only look for open issues with similar wording in the same Jira site and project.
+  // The text searched is the title plus, with the AI helper, the user's own intake answers (the
+  // AI rewrites Story titles, so the original wording is what an existing issue would share).
+  // Returns true when matches were shown and the caller should stop and wait for the user.
+  // Any failure falls through: the check never blocks drafting or creating.
+  // Only the "I want" answer describes the ask; the role and the benefit ("NOC technician",
+  // "my job is easier") are shared by many unrelated issues and would flood the search.
+  const duplicateIntakeText = () => {
+    if (!useAiHelper) return "";
+    const answers = normalizeAiHelperIntake(issueType, intakeValues);
+    return String(answers.iWant ?? answers.whatBroke ?? Object.values(answers)[0] ?? "");
+  };
+
+  // The title of the selected parent, used to label new issues "[Project label] ask".
+  const resolveParentTitle = () => {
+    if (parentOptions?.epic?.key && parentOptions.epic.key === parentKey) return parentOptions.epic.summary || "";
+    const story = (parentOptions?.stories || []).find((item) => item.key === parentKey);
+    if (story) return story.summary || "";
+    for (const check of [manualParentCheck, manualIssueCheck]) {
+      if (check?.issue?.issueKey === parentKey) return check.issue.summary || "";
+    }
+    return "";
+  };
+
+  const runDuplicateCheck = async (action) => {
+    const intakeText = duplicateIntakeText();
+    const searchText = `${stripTitleLabel(summary)} ${intakeText}`.trim();
+    const ackKey = `${projectKey}|${issueType}|${useAiHelper ? intakeText : stripTitleLabel(summary)}`;
+    if (duplicateAckRef.current === ackKey) return false;
+    const jql = buildDuplicateSearchJql({ projectKey, summary: searchText });
+    if (!jql) return false;
+    try {
+      const found = await fetchJiraSearch({ jql, maxResults: 25, includeDescription: true });
+      const matches = rankDuplicateCandidates(searchText, found?.issues);
+      if (matches.length > 0) {
+        setDuplicateAction(action);
+        setDuplicateMatches(matches);
+        return true;
+      }
+    } catch (searchError) {
+      console.warn("Duplicate check skipped", searchError);
+    }
+    return false;
+  };
+
+  const continueDespiteDuplicates = () => {
+    const intakeText = duplicateIntakeText();
+    duplicateAckRef.current = `${projectKey}|${issueType}|${useAiHelper ? intakeText : stripTitleLabel(summary)}`;
+    setDuplicateMatches([]);
+    if (duplicateAction === "draft") {
+      void handleGenerateDescription({ skipDuplicateCheck: true });
+    } else {
+      void handleSubmit({ skipDuplicateCheck: true });
+    }
+  };
+
+  const handleGenerateDescription = async (options) => {
+    const skipDuplicateCheck = options?.skipDuplicateCheck === true;
     if (!canEditIssueFields) {
       setError("Select and validate a parent before generating a description.");
       return;
@@ -870,6 +935,13 @@ const CreateIssueModal = ({
       setError("Enter a title before generating a description.");
       return;
     }
+    if (!skipDuplicateCheck) {
+      setGeneratingDesc(true);
+      const blocked = await runDuplicateCheck("draft");
+      setGeneratingDesc(false);
+      if (blocked) return;
+    }
+    setDuplicateMatches([]);
     setError("");
     setDescriptionError("");
     setGeneratingDesc(true);
@@ -904,10 +976,11 @@ const CreateIssueModal = ({
       } else {
         setClarificationQuestions([]);
       }
-      // Story titles are always rewritten to job story format; other types only get a
+      // Story titles are always rewritten to a short ask; other types only get a
       // generated title when the AI helper supplied the raw material for one.
       if ((issueType === "Story" || useAiHelper) && result?.summary) {
-        setSummary(result.summary);
+        // "[Project label] short ask", with the label taken from the parent's title.
+        setSummary(formatPrefixedTitle(extractTitleLabel(resolveParentTitle()), result.summary));
       }
       if (
         issueType === "Story" &&
@@ -962,7 +1035,13 @@ const CreateIssueModal = ({
     setError(generalErrors.length > 0 ? formatFieldErrors(generalErrors) : "");
   };
 
-  const handleSubmit = async () => {
+  // A previous "possible duplicates" result no longer applies once the inputs change.
+  React.useEffect(() => {
+    setDuplicateMatches([]);
+  }, [summary, projectKey, issueType, intakeValues]);
+
+  const handleSubmit = async (options) => {
+    const skipDuplicateCheck = options?.skipDuplicateCheck === true;
     setError("");
     setDescriptionError("");
     setSuccess("");
@@ -1012,6 +1091,16 @@ const CreateIssueModal = ({
       applyValidationErrors(standardsCheck.errors);
       return;
     }
+
+    if (!skipDuplicateCheck) {
+      setSubmitting(true);
+      const blocked = await runDuplicateCheck("create");
+      if (blocked) {
+        setSubmitting(false);
+        return;
+      }
+    }
+    setDuplicateMatches([]);
 
     setSubmitting(true);
     let createdParentKey = "";
@@ -1755,6 +1844,29 @@ const CreateIssueModal = ({
         </Form>
       </Modal.Content>
       <Modal.Actions>
+        {duplicateMatches.length > 0 ? (
+          <Message warning size="small" data-testid="duplicate-matches" style={{ textAlign: "left", maxHeight: "40vh", overflowY: "auto" }}>
+            <Message.Header>Possible existing issues</Message.Header>
+            <p>Open issues in {projectKey} with similar wording. Check these before {duplicateAction === "draft" ? "drafting" : "creating"} a new one.</p>
+            <ul style={{ margin: "0.25rem 0 0.5rem", paddingLeft: "1.1rem" }}>
+              {duplicateMatches.map((match) => {
+                const url = buildJiraBrowseUrl(jiraBaseUrl, match.key);
+                return (
+                  <li key={match.key}>
+                    {url ? <a href={url} target="_blank" rel="noopener noreferrer">{match.key}</a> : <strong>{match.key}</strong>}
+                    {" — "}{match.summary}{match.status ? ` (${match.status})` : ""}{match.matchedIn === "description" ? " — matched in description" : ""}
+                  </li>
+                );
+              })}
+            </ul>
+            <Button size="mini" primary disabled={submitting || generatingDesc} onClick={continueDespiteDuplicates}>
+              {duplicateAction === "draft" ? "Draft anyway" : "Create anyway"}
+            </Button>
+            <Button size="mini" basic onClick={() => setDuplicateMatches([])}>
+              Dismiss
+            </Button>
+          </Message>
+        ) : null}
         <Button onClick={onClose}>Close</Button>
         {createdIssueUrl ? (
           <Button

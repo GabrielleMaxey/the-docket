@@ -150,7 +150,7 @@ describe("AI draft prompts with guided intake", () => {
     assert.ok(withIntake.startsWith(withoutIntake));
   });
 
-  it("embeds the intake block and keeps the job story title format for Stories", () => {
+  it("embeds the intake block and asks for a short ask title for Stories", () => {
     const prompt = buildAiDraftUserPrompt({
       summary: "",
       context: "Epic: NORA feedback",
@@ -161,7 +161,8 @@ describe("AI draft prompts with guided intake", () => {
     assert.ok(prompt.includes("derive the title from the intake answers"));
     assert.ok(prompt.includes("- As a: NORA customer"));
     assert.ok(prompt.includes('"label": "User story"'));
-    assert.ok(prompt.includes("When <situation>, I want <ask>, so I can <outcome>."));
+    assert.ok(prompt.includes("short ask phrase"));
+    assert.ok(!prompt.includes("When <situation>, I want <ask>, so I can <outcome>."));
   });
 
   it("asks Bugs and Tasks for a generated title when intake is supplied", () => {
