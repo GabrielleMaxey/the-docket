@@ -125,7 +125,7 @@ const WorkWeekTasks = () => {
     teamEnabled, hydrationReady,
     jqlCount, jqlInputs, jqlLabels, jqlSharedProgramIds, jqlLoading, jqlRuns,
     showRestoredJqlBanner, jqlError, jqlMaxResults, pullLatestComment, assigneeRefreshNotice,
-    jiraNotes, jiraRowPriorities, prioritySourceByKey, selectedForPush,
+    jiraNotes, jiraRowPriorities, localRowPriorities, prioritySourceByKey, selectedForPush,
     lastPushedJiraNoteByKey, pushState, saveState,
     statusDrafts, iddDrafts, dueDateDrafts, mrdDrafts, startDateByKey, completeDateByKey,
     planningMetaByKey, expandedPlanningKey, collapsedRowKeys,
@@ -536,7 +536,7 @@ const WorkWeekTasks = () => {
           onTodoAdd={handleTodoAdd}
           onTodoClearCompleted={handleTodoClearCompleted}
           weeklyPlanPanel={
-            <WeeklyPlanPanel jqlRuns={jqlRuns} jiraRowPriorities={jiraRowPriorities} dueDateDrafts={dueDateDrafts} />
+            <WeeklyPlanPanel jqlRuns={jqlRuns} jiraRowPriorities={jiraRowPriorities} localRowPriorities={localRowPriorities} teamEnabled={teamEnabled} dueDateDrafts={dueDateDrafts} />
           }
         />
 

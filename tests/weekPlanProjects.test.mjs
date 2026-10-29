@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildWeekPlanProjects, isIssueOpen } from "../src/utils/weekPlanProjects.js";
+import { buildWeekPlanProjects, isIssueOpen, pickPlanPriorities } from "../src/utils/weekPlanProjects.js";
 
 const NOW = new Date("2026-10-28T12:00:00Z");
 const UPDATED = "2026-10-27T12:00:00Z";
@@ -131,4 +131,13 @@ test("tasks carry effective due date and open blocker keys", () => {
   assert.equal(p.tasks[0].dueDate, "2999-01-01");
   assert.deepEqual(p.tasks[0].blockedBy, ["B-1"]);
   assert.deepEqual(p.tasks[0].blocks, []);
+});
+
+test("pickPlanPriorities leaves team values out only when team mode is on and excluded", () => {
+  const merged = { "A-1": 1, "A-2": 2 };
+  const local = { "A-2": 2 };
+  assert.equal(pickPlanPriorities({ includeTeam: true, teamEnabled: true, merged, local }), merged);
+  assert.equal(pickPlanPriorities({ includeTeam: false, teamEnabled: true, merged, local }), local);
+  assert.equal(pickPlanPriorities({ includeTeam: false, teamEnabled: false, merged, local }), merged);
+  assert.deepEqual(pickPlanPriorities({ includeTeam: false, teamEnabled: true, merged, local: undefined }), {});
 });

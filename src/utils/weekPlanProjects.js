@@ -39,6 +39,11 @@ const rankOpenIssues = (run, openIssues, jiraRowPriorities, now) => {
   return rankIssues(inputs, { now });
 };
 
+// Team mode merges team priorities over the user's own (team wins). The week plan can leave the
+// team values out and rank on the user's own manual priorities only.
+export const pickPlanPriorities = ({ includeTeam, teamEnabled, merged, local }) =>
+  teamEnabled && !includeTeam ? local || {} : merged || {};
+
 export const buildWeekPlanProjects = (jqlRuns, jiraRowPriorities, options = {}) => {
   const now = options.now instanceof Date ? options.now : new Date();
   return (jqlRuns || [])
