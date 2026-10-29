@@ -1,4 +1,4 @@
-import { getSiteContext, subscribeSiteContext, getSiteRecoveryNotice } from "../utils/siteContextStore.js";
+import { getSiteContext, subscribeSiteContext } from "../utils/siteContextStore.js";
 import React from "react";
 import { activateJiraInstance, fetchJiraInstances } from "../services/jiraClient.js";
 
@@ -80,7 +80,9 @@ const JiraInstanceSwitcher = () => {
           </option>
         ))}
       </select>
-      {(error || getSiteRecoveryNotice()) && <span role="alert">{error || getSiteRecoveryNotice()}</span>}
+      {/* The recovery notice is shown by the banner under the nav (with Dismiss); rendering it here
+          too pushed the nav links off the right edge of the window. */}
+      {error && <span role="alert" className="app-nav-jira-switcher-error" title={error}>{error}</span>}
     </label>
   );
 };
