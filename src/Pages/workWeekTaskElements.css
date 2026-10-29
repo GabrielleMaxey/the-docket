@@ -2312,7 +2312,9 @@
 
 .work-week-page .ww-row-detail-panel {
   width: 100%;
-  overflow-x: auto;
+  /* Not its own scroll container: a per-row horizontal scrollbar shows up as a thick grey bar
+     under every expanded row. The table wrapper (.ww-results-table-wrap) scrolls horizontally. */
+  overflow-x: visible;
 }
 
 .work-week-page table.ww-results-table.ww-results-table--expanded-detail {
@@ -2389,6 +2391,213 @@
 .work-week-page .ww-results-table--expanded-detail td:nth-child(10) {
   width: 8%;
   min-width: 110px;
+}
+
+
+/* Combined managed tasks (extra leading "Jira site" column).
+   The outer header/rows and the nested expanded-row table share one fixed column grid
+   (header widths are sums of the expanded-row column widths), so the Key / Summary /
+   Status / Priority headers sit directly above their expanded-row columns and the
+   status + assignee box is the same size as in the single-site view. */
+.work-week-page table.ww-results-table.ww-results-table--combined {
+  table-layout: fixed;
+  min-width: 1870px;
+}
+.work-week-page .ww-results-table--combined th,
+.work-week-page .ww-results-table--combined td {
+  box-sizing: border-box; /* column widths include padding so outer + nested tables line up exactly */
+}
+.work-week-page .ww-results-table--combined td.ww-cell-source {
+  overflow-wrap: anywhere;
+}
+.work-week-page .ww-results-table--combined td.ww-cell-status > .ww-edit-cell {
+  max-width: 150px; /* same status/update box size as the expanded row and the single-site view */
+}
+.work-week-page .ww-results-table--combined td.ww-row-detail-cell {
+  padding: 0;
+}
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > thead th:nth-child(1),
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > tbody > tr > td:nth-child(1):not(.ww-row-detail-cell) {
+  width: 1.9251%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > thead th:nth-child(2),
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > tbody > tr > td:nth-child(2):not(.ww-row-detail-cell) {
+  width: 9.0909%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > thead th:nth-child(3),
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > tbody > tr > td:nth-child(3):not(.ww-row-detail-cell) {
+  width: 19.8930%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > thead th:nth-child(4),
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > tbody > tr > td:nth-child(4):not(.ww-row-detail-cell) {
+  width: 17.1123%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > thead th:nth-child(5),
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > tbody > tr > td:nth-child(5):not(.ww-row-detail-cell) {
+  width: 24.1711%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > thead th:nth-child(6),
+.work-week-page .ww-results-table.ww-results-table--combined:not(.ww-results-table--expanded-detail) > tbody > tr > td:nth-child(6):not(.ww-row-detail-cell) {
+  width: 27.8075%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(1) {
+  width: 11.0160%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(2) {
+  width: 9.6257%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(3) {
+  width: 5.1337%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(4) {
+  width: 5.1337%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(5) {
+  width: 17.1123%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(6) {
+  width: 8.8770%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(7) {
+  width: 5.1337%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(8) {
+  width: 10.1604%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(9) {
+  width: 4.2781%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(10) {
+  width: 18.1818%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(11) {
+  width: 5.3476%;
+  min-width: 0;
+}
+
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(3) {
+  padding-right: 0.5rem;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(4) {
+  white-space: nowrap;
+  padding-left: 0.5rem;
+  padding-right: 0.2rem;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--combined td:nth-child(5) {
+  padding-left: 0.3rem;
+}
+
+.work-week-page .ww-results-table--combined td.ww-cell-status-assignee {
+  display: table-cell; /* a flex td is not a table cell, so fixed column widths would not apply */
+}
+.work-week-page .ww-results-table--combined td.ww-cell-status-assignee > .ww-edit-cell:first-child {
+  margin-bottom: 0.5rem;
+}
+
+
+/* Single-site view: same shared column grid as the combined view (minus the Jira site
+   column) so the Key / Summary / Status / Priority headers sit above the expanded-row columns. */
+.work-week-page table.ww-results-table.ww-results-table--single {
+  table-layout: fixed;
+  min-width: 1664px;
+}
+.work-week-page .ww-results-table.ww-results-table--single th,
+.work-week-page .ww-results-table.ww-results-table--single td {
+  box-sizing: border-box;
+}
+.work-week-page .ww-results-table.ww-results-table--single td.ww-cell-status > .ww-edit-cell {
+  max-width: 150px;
+}
+.work-week-page .ww-results-table.ww-results-table--single td.ww-row-detail-cell {
+  padding: 0;
+}
+.work-week-page .ww-results-table.ww-results-table--single td.ww-cell-status-assignee {
+  display: table-cell; /* a flex td is not a table cell, so fixed column widths would not apply */
+}
+.work-week-page .ww-results-table.ww-results-table--single td.ww-cell-status-assignee > .ww-edit-cell:first-child {
+  margin-bottom: 0.5rem;
+}
+.work-week-page .ww-results-table.ww-results-table--single:not(.ww-results-table--expanded-detail) > thead th:nth-child(1),
+.work-week-page .ww-results-table.ww-results-table--single:not(.ww-results-table--expanded-detail) > tbody > tr > td:nth-child(1):not(.ww-row-detail-cell) {
+  width: 2.1635%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table.ww-results-table--single:not(.ww-results-table--expanded-detail) > thead th:nth-child(2),
+.work-week-page .ww-results-table.ww-results-table--single:not(.ww-results-table--expanded-detail) > tbody > tr > td:nth-child(2):not(.ww-row-detail-cell) {
+  width: 20.1923%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table.ww-results-table--single:not(.ww-results-table--expanded-detail) > thead th:nth-child(3),
+.work-week-page .ww-results-table.ww-results-table--single:not(.ww-results-table--expanded-detail) > tbody > tr > td:nth-child(3):not(.ww-row-detail-cell) {
+  width: 19.2308%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table.ww-results-table--single:not(.ww-results-table--expanded-detail) > thead th:nth-child(4),
+.work-week-page .ww-results-table.ww-results-table--single:not(.ww-results-table--expanded-detail) > tbody > tr > td:nth-child(4):not(.ww-row-detail-cell) {
+  width: 27.1635%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table.ww-results-table--single:not(.ww-results-table--expanded-detail) > thead th:nth-child(5),
+.work-week-page .ww-results-table.ww-results-table--single:not(.ww-results-table--expanded-detail) > tbody > tr > td:nth-child(5):not(.ww-row-detail-cell) {
+  width: 31.2500%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--single td:nth-child(1) {
+  width: 10.8173%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--single td:nth-child(2) {
+  width: 5.7692%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--single td:nth-child(3) {
+  width: 5.7692%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--single td:nth-child(4) {
+  width: 19.2308%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--single td:nth-child(5) {
+  width: 9.9760%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--single td:nth-child(6) {
+  width: 5.7692%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--single td:nth-child(7) {
+  width: 11.4183%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--single td:nth-child(8) {
+  width: 4.8077%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--single td:nth-child(9) {
+  width: 20.4327%;
+  min-width: 0;
+}
+.work-week-page .ww-results-table--expanded-detail.ww-results-table--single td:nth-child(10) {
+  width: 6.0096%;
+  min-width: 0;
 }
 
 .work-week-page .ww-row-detail-row > td {
