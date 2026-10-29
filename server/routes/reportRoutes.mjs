@@ -40,6 +40,7 @@ import { computeOverallRollup, normalizePastDueLookbackYears } from "../../share
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildDirectReportsJql, isCurrentUserMember, isJqlCurrentUser, looksLikeAccountId } from "../../shared/directReportsJql.mjs";
 import { fetchJiraMyself } from "../lib/jiraSearchHelpers.mjs";
+import { buildWeekPlanContext } from "../lib/weekPlanContext.mjs";
 
 const log = createLogger("report");
 
@@ -694,29 +695,12 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
 
     if (projects.length === 0) return res.status(400).json({ error: "No project data provided." });
 
-    const contextLines = [
-      "## Weekly Planning Context",
-      `- Work week capacity: ${capacityHours} hours`,
-      `- Focus approach: ${focusStyle}`,
-    ];
-    if (additionalContext) contextLines.push(`- Additional context: ${additionalContext}`);
-    contextLines.push("", "## Active Projects");
-    for (const proj of projects) {
-      contextLines.push("", `### ${proj.label}`);
-      contextLines.push(`- Total: ${proj.total} | Open: ${proj.open} | Overdue: ${proj.overdue}`);
-      if (Array.isArray(proj.tasks) && proj.tasks.length > 0) {
-        contextLines.push("Top open tasks (by priority):");
-        for (const task of proj.tasks.slice(0, 10)) {
-          const flag = task.isOverdue ? " [OVERDUE]" : "";
-          contextLines.push(`  - ${task.key}: ${task.summary} (${task.status}, assigned: ${task.assignee})${flag}`);
-        }
-      }
-    }
+    const context = buildWeekPlanContext({ projects, capacityHours, focusStyle, additionalContext });
 
     const systemPrompt = buildWeekPlanSystemPrompt({ focusStyle, capacityHours, customInstructions });
 
     try {
-      const plan = await callLLMForReport({ systemPrompt, context: contextLines.join("\n"), label: "week plan", aiPath: req.body?.aiPath });
+      const plan = await callLLMForReport({ systemPrompt, context, label: "week plan", aiPath: req.body?.aiPath });
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.WORK_WEEK,
         reportType: "week_plan",
