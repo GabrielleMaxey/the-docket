@@ -1,7 +1,7 @@
 import { toScoringInput, rankIssues } from "../../shared/workPriorityScore.mjs";
 import { getEffectiveDueDateForIssue } from "./jiraIssueDoneDates.js";
 import { isConfiguredJqlRun } from "./workWeekStorage.js";
-import { isIssueOverdueByEffectiveDueDate } from "../Pages/reportSummary.js";
+import { isIssueOverdueForMetrics } from "../../shared/dashboardMetrics.mjs";
 
 const MAX_TASKS_PER_PROJECT = 10;
 
@@ -10,11 +10,10 @@ export const isIssueOpen = (issue) => {
   return !/(closed|resolved|done)/.test(status);
 };
 
-const dueContextForRun = (run) => ({
-  dueFieldId: run.dueFieldId,
-  mrdFieldId: run.mrdFieldId,
-  parentMostRecentDoneDateByKey: run.parentMostRecentDoneDateByKey,
-});
+// Same rule as the Metrics page: only the issue's own due date counts. The "most recent done
+// date" fallback some views use is deliberately left out so the plan never calls a task overdue
+// when the Metrics page does not.
+const dueContextForRun = (run) => ({ dueFieldId: run.dueFieldId });
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -50,10 +49,9 @@ export const buildWeekPlanProjects = (jqlRuns, jiraRowPriorities, options = {}) 
     .filter((r) => isConfiguredJqlRun(r) && r.issues?.length > 0)
     .map((r) => {
       const openIssues = r.issues.filter(isIssueOpen).map((i) => withDraftDue(i, r, options.dueDateDrafts));
-      // Same overdue rule as the metrics page (effective due date strictly before today).
-      const dueContext = dueContextForRun(r);
+      const dueFieldId = String(r.dueFieldId || "").trim() || "duedate";
       const overdueKeys = new Set(
-        openIssues.filter((i) => isIssueOverdueByEffectiveDueDate(i, dueContext, isIssueOpen)).map((i) => i.key)
+        openIssues.filter((i) => isIssueOverdueForMetrics(i, dueFieldId, [], null)).map((i) => i.key)
       );
       return {
         label: r.label || `Run ${(r.index || 0) + 1}`,
