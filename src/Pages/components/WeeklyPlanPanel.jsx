@@ -23,6 +23,7 @@ import {
   saveWeekPlanState,
 } from "../../utils/pageReportPersistence";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
+import { buildWeekPlanProjects } from "../../utils/weekPlanProjects.js";
 
 const WEEKLY_PLAN_KEY = "ww-weekly-plan-open";
 
@@ -32,11 +33,6 @@ const FOCUS_OPTIONS = [
   { value: "single", label: "Focus on one project" },
   { value: "meetings", label: "Light week (lots of meetings)" },
 ];
-
-const isIssueOpen = (issue) => {
-  const status = String(issue?.fields?.status?.name || issue?.status || "").toLowerCase();
-  return !/(closed|resolved|done)/.test(status);
-};
 
 const buildWeekPlanContext = ({ fixedCommitments, additionalContext, coworkFilename, coworkContent }) => {
   const notes = [fixedCommitments.trim(), additionalContext.trim()].filter(Boolean).join(" | ");
@@ -122,25 +118,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities }) => {
     setPlanPending(true);
     setError("");
 
-    const projects = jqlRuns
-      .filter((r) => isConfiguredJqlRun(r) && r.issues?.length > 0)
-      .map((r) => ({
-        label: r.label || `Run ${(r.index || 0) + 1}`,
-        total: r.issues.length,
-        open: r.issues.filter(isIssueOpen).length,
-        overdue: r.issues.filter((i) => isIssueOpen(i) && i.isOverdue).length,
-        tasks: r.issues
-          .filter(isIssueOpen)
-          .sort((a, b) => (jiraRowPriorities[a.key] || 99) - (jiraRowPriorities[b.key] || 99))
-          .slice(0, 10)
-          .map((i) => ({
-            key: i.key,
-            summary: i.fields?.summary || i.summary || "",
-            status: i.fields?.status?.name || i.status || "",
-            assignee: i.fields?.assignee?.displayName || i.assignee || "Unassigned",
-            isOverdue: Boolean(i.isOverdue),
-          })),
-      }));
+    const projects = buildWeekPlanProjects(jqlRuns, jiraRowPriorities);
 
     const coworkFilename = selectedCoworkFilename.trim();
 
