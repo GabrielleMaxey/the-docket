@@ -25,7 +25,7 @@
 
 - A slot issue in the flattened shape the panel already tolerates (`issue.status` string, `issue.summary`, no `fields`): `toScoringInput` falls back to it instead of treating the status as unknown.
 - `jiraRowPriorities` values that are strings ("5") or out of range (0, 25): coerce with `Number`; values below 1 or non-finite give no bonus; values above 20 count as 20 (matches `clampIssuePriority`).
-- `updated` in the future (clock skew) or unparsable, and an invalid `dueDate` string such as "2026-13-45": no staleness or due component, no reason line, no throw.
+- `updated` in the future (clock skew) is treated as just updated (staleness 5, reason "Updated recently (+5)"); an unparsable `updated` or an invalid `dueDate` string such as "2026-13-45" yields no staleness or due component, no reason line, no throw.
 - A task whose `score` is `Infinity`, `NaN`, or a numeric string, or whose `why` is a string or contains newlines/control characters: server drops the suffix or sanitizes; the line stays one line.
 - A slot with zero open issues, or whose tasks all fail validation: context still renders the project header and counts, and the route does not 500.
 
