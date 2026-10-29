@@ -176,6 +176,8 @@ export function toScoringInput(issue, extras = {}) {
 
   let blocks = false;
   let blockedBy = false;
+  const blocksKeys = [];
+  const blockedByKeys = [];
   if (Array.isArray(fields.issuelinks)) {
     for (const entry of fields.issuelinks) {
       if (!isPlainObject(entry)) continue;
@@ -183,10 +185,16 @@ export function toScoringInput(issue, extras = {}) {
       const outward = textOf(type.outward).trim().toLowerCase();
       const inward = textOf(type.inward).trim().toLowerCase();
       if (isPlainObject(entry.outwardIssue) && entry.outwardIssue.key && blockNames.includes(outward)) {
-        if (isOpenLinkedIssue(entry.outwardIssue)) blocks = true;
+        if (isOpenLinkedIssue(entry.outwardIssue)) {
+          blocks = true;
+          blocksKeys.push(String(entry.outwardIssue.key));
+        }
       }
       if (isPlainObject(entry.inwardIssue) && entry.inwardIssue.key && blockedByNames.includes(inward)) {
-        if (isOpenLinkedIssue(entry.inwardIssue)) blockedBy = true;
+        if (isOpenLinkedIssue(entry.inwardIssue)) {
+          blockedBy = true;
+          blockedByKeys.push(String(entry.inwardIssue.key));
+        }
       }
     }
   }
@@ -201,6 +209,8 @@ export function toScoringInput(issue, extras = {}) {
     manualPriority: opts.manualPriority ?? null,
     blocks,
     blockedBy,
+    blocksKeys,
+    blockedByKeys,
   };
 }
 

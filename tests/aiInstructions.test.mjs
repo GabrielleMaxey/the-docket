@@ -202,4 +202,14 @@ describe("buildWeekPlanSystemPrompt", () => {
     assert.ok(prompt.includes("Only reference actual issue keys"));
     assert.ok(prompt.includes("Flag overdue items with"));
   });
+
+  it("week plan prompt covers listed days, due dates, stale triage, blockers and estimates", () => {
+    const prompt = buildWeekPlanSystemPrompt({ focusStyle: "balance", capacityHours: 20 });
+    assert.ok(prompt.includes("Days to plan"));
+    assert.ok(prompt.includes("no later than that date"));
+    assert.ok(prompt.includes("more than 90 days"));
+    assert.ok(prompt.includes("blocked by <key>"));
+    assert.ok(prompt.includes("rough guesses"));
+    assert.ok(prompt.includes("15%"));
+  });
 });

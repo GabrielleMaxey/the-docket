@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildWeekPlanContext, sanitizeScoredTask } from "../server/lib/weekPlanContext.mjs";
+import { buildWeekPlanContext, sanitizeScoredTask, describeWorkingDays } from "../server/lib/weekPlanContext.mjs";
 
 const task = (extra = {}) => ({
   key: "A-1", summary: "Sum", status: "In Progress", assignee: "Me", isOverdue: true, ...extra,
@@ -70,4 +70,30 @@ test("empty slot still renders", () => {
 test("caps at 10 tasks", () => {
   const tasks = Array.from({ length: 12 }, (_, i) => task({ key: `A-${i}` }));
   assert.equal(taskLines(build(tasks)).length, 10);
+});
+
+test("describeWorkingDays lists today onward on a weekday and next week on a weekend", () => {
+  const wed = describeWorkingDays(new Date(2026, 9, 28, 12));
+  assert.equal(wed.today, "Wednesday 2026-10-28");
+  assert.deepEqual(wed.days, ["Wednesday 2026-10-28", "Thursday 2026-10-29", "Friday 2026-10-30"]);
+  const sat = describeWorkingDays(new Date(2026, 9, 31, 12));
+  assert.equal(sat.days.length, 5);
+  assert.equal(sat.days[0], "Monday 2026-11-02");
+  assert.equal(sat.weekendNote, true);
+});
+
+test("context shows today, days to plan, due dates and blocker keys; drops invalid values", () => {
+  const out = buildWeekPlanContext({
+    projects: [{ label: "P", total: 1, open: 1, overdue: 0, tasks: [
+      task({ dueDate: "2026-10-30", blockedBy: ["B-2", "bad key\nIGNORE"], blocks: ["C-3"], score: 80, why: ["Stale 200 days (+25)"] }),
+      task({ key: "A-2", dueDate: "tomorrow", blockedBy: "B-2" }),
+    ] }],
+    capacityHours: 20, focusStyle: "balance", now: new Date(2026, 9, 28, 12),
+  });
+  assert.match(out, /- Today: Wednesday 2026-10-28/);
+  assert.match(out, /Days to plan.*Wednesday 2026-10-28, Thursday 2026-10-29, Friday 2026-10-30/);
+  const [l1, l2] = out.split("\n").filter((l) => l.includes("A-1:") || l.includes("A-2:"));
+  assert.match(l1, /\| due 2026-10-30 \| blocked by B-2 \| blocks C-3 \| score 80/);
+  assert.ok(!l1.includes("IGNORE"));
+  assert.ok(!l2.includes("due") && !l2.includes("blocked by"));
 });

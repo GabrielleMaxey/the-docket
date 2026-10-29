@@ -57,7 +57,7 @@ export const buildWeekPlanProjects = (jqlRuns, jiraRowPriorities, options = {}) 
         overdue: overdueKeys.size,
         tasks: rankOpenIssues(r, openIssues, jiraRowPriorities, now)
           .slice(0, MAX_TASKS_PER_PROJECT)
-          .map(({ issue: i, score, reasons }) => ({
+          .map(({ issue: i, score, reasons, dueDate, blocksKeys, blockedByKeys }) => ({
             key: i.key,
             summary: i.fields?.summary || i.summary || "",
             status: i.fields?.status?.name || i.status || "",
@@ -65,6 +65,9 @@ export const buildWeekPlanProjects = (jqlRuns, jiraRowPriorities, options = {}) 
             isOverdue: overdueKeys.has(i.key),
             score,
             why: reasons,
+            dueDate: dueDate || null,
+            blocks: blocksKeys || [],
+            blockedBy: blockedByKeys || [],
           })),
       };
     });

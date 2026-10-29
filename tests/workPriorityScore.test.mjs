@@ -168,6 +168,16 @@ describe("toScoringInput", () => {
     assert.equal(cat.blocks, false);
   });
 
+  it("collects open linked keys for blocks and blockedBy", () => {
+    const r = toScoringInput({ key: "A-1", fields: { issuelinks: [
+      link("inwardIssue", "is blocked by", "B-1", "Backlog"),
+      link("inwardIssue", "is blocked by", "B-2", { name: "Done", statusCategory: { key: "done" } }),
+      link("outwardIssue", "blocks", "C-1", "Backlog"),
+    ] } });
+    assert.deepEqual(r.blockedByKeys, ["B-1"]);
+    assert.deepEqual(r.blocksKeys, ["C-1"]);
+  });
+
   it("blockedBy flag", () => {
     const r = toScoringInput({ key: "A-1", fields: { issuelinks: [link("inwardIssue", " Is Blocked By ", "B-1", "Backlog")] } });
     assert.equal(r.blockedBy, true);

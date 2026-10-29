@@ -122,3 +122,13 @@ test("unsaved due date typed in the results table counts without updating Jira",
   assert.ok(p.tasks[0].why.some((w) => w.startsWith("Overdue")));
   assert.equal(a.fields.duedate, "2999-01-01"); // input not mutated
 });
+
+test("tasks carry effective due date and open blocker keys", () => {
+  const a = issue("A-1", { duedate: "2999-01-01", extra: { issuelinks: [
+    { type: { inward: "is blocked by", outward: "blocks" }, inwardIssue: { key: "B-1", fields: { status: { name: "Backlog" } } } },
+  ] } });
+  const [p] = buildWeekPlanProjects([run([a])], {}, { now: NOW });
+  assert.equal(p.tasks[0].dueDate, "2999-01-01");
+  assert.deepEqual(p.tasks[0].blockedBy, ["B-1"]);
+  assert.deepEqual(p.tasks[0].blocks, []);
+});
