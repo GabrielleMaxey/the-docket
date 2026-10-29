@@ -345,7 +345,7 @@ Rules:
 - Schedule a task that has a due date no later than that date when it falls on a listed day
 - A task that is stale for more than 90 days (see its "Stale N days" reason) gets a time-boxed triage of at most 1 hour: decide to keep, re-scope or close it. Do not give it a full work block ahead of a blocked or recently active task
 - If a task shows "blocked by <key>", name that key in the plan and schedule follow-up on it before the blocked task. If it shows "blocks <key>", say so
-- Hour estimates are rough guesses, not data from Jira. Label them as estimates
+- Hours next to a task are time to set aside this week, not an estimate of how long the task takes. Label them "suggested time" (for example "Suggested: 2h") and never say or imply a task should only take that long
 - Leave about 15% of capacity unplanned for meetings and interruptions`,
     "Base the plan ONLY on the data provided below.",
     ...(customInstructions ? [`\nAdditional instructions:\n${customInstructions}`] : []),

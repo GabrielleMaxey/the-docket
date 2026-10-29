@@ -209,7 +209,8 @@ describe("buildWeekPlanSystemPrompt", () => {
     assert.ok(prompt.includes("no later than that date"));
     assert.ok(prompt.includes("more than 90 days"));
     assert.ok(prompt.includes("blocked by <key>"));
-    assert.ok(prompt.includes("rough guesses"));
+    assert.ok(prompt.includes("suggested time"));
+    assert.ok(prompt.includes("not an estimate of how long the task takes"));
     assert.ok(prompt.includes("15%"));
   });
 });
