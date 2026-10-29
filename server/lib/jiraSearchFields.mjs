@@ -9,6 +9,7 @@ const BASE_SEARCH_FIELDS = [
   "parent",
   "duedate",
   "issuelinks",
+  "priority",
 ];
 
 const ODI_FALLBACK_FIELD_IDS = ["customfield_10008", "customfield_10009"];
