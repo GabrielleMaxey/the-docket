@@ -247,8 +247,8 @@ export const testJiraInstance = async ( id, { baseUrl, email } = {} ) =>
   postJson( `/api/jira/instances/${ encodeURIComponent( id ) }/test`, { baseUrl, email } );
 
 // Send JQL as POST JSON body to avoid URL-encoding edge cases.
-export const fetchJiraSearch = async ( { jql, maxResults = 5, siteContext, signal } ) => {
-  return postJson( "/api/jira/search", { jql, maxResults }, { siteContext, signal } );
+export const fetchJiraSearch = async ( { jql, maxResults = 5, includeDescription = false, siteContext, signal } ) => {
+  return postJson( "/api/jira/search", { jql, maxResults, ...( includeDescription ? { includeDescription: true } : {} ) }, { siteContext, signal } );
 };
 
 export const fetchJiraSearchAll = async ( { jql, maxTotal = 200, siteContext, signal } ) => {

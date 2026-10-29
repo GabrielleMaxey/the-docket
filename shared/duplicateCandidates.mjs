@@ -46,7 +46,7 @@ export const buildDuplicateSearchJql = ({ projectKey, summary } = {}) => {
   if (!PROJECT_KEY.test(project)) return null;
   const terms = significantWords(summary);
   if (terms.length === 0) return null;
-  const clause = terms.map((w) => `summary ~ "${w}"`).join(" OR ");
+  const clause = terms.map((w) => `summary ~ "${w}" OR description ~ "${w}"`).join(" OR ");
   return `project = "${project}" AND statusCategory != Done AND (${clause}) ORDER BY updated DESC`;
 };
 
@@ -61,14 +61,18 @@ export const rankDuplicateCandidates = (summary, issues, { limit = MAX_RESULTS }
     const key = issue?.key;
     const text = issue?.fields?.summary ?? issue?.summary;
     if (typeof key !== "string" || !key || typeof text !== "string") continue;
-    const candidate = new Set(words(text));
-    const shared = query.filter((w) => candidate.has(w)).length;
+    const inSummary = new Set(words(text));
+    const description = issue?.fields?.description;
+    const inDescription = typeof description === "string" ? new Set(words(description)) : new Set();
+    const summaryShared = query.filter((w) => inSummary.has(w)).length;
+    const shared = query.filter((w) => inSummary.has(w) || inDescription.has(w)).length;
     if (shared < need) continue;
     ranked.push({
       key,
       summary: text,
       status: issue?.fields?.status?.name ?? (typeof issue?.status === "string" ? issue.status : ""),
       shared,
+      matchedIn: summaryShared >= need ? "summary" : "description",
     });
   }
   ranked.sort((a, b) => b.shared - a.shared || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));

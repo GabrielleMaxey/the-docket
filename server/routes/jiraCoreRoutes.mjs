@@ -2,6 +2,7 @@ import { getRequestOperationContext } from "../lib/jiraRouteContext.mjs";
 // Core Jira endpoints: connection test and JQL search.
 
 import { getJiraSearchFields } from "../lib/jiraSearchFields.mjs";
+import { withDescriptionField, withPlainDescriptions } from "../lib/jiraSearchDescription.mjs";
 import { createLogger } from "../lib/logger.mjs";
 const log = createLogger("jira-core");
 
@@ -115,7 +116,7 @@ export const registerJiraCoreRoutes = (app, context) => {
     }
   }));
 
-  const handleJiraSearch = async (req, jql, maxResults, res) => {
+  const handleJiraSearch = async (req, jql, maxResults, res, { includeDescription = false } = {}) => {
     const { ensureEnvOrRespond, runJiraSearchRequest, getDb } = getRequestOperationContext(req, context);
     if (!ensureEnvOrRespond(res)) {
       return;
@@ -129,7 +130,9 @@ export const registerJiraCoreRoutes = (app, context) => {
       const result = await runJiraSearchRequest({
         jql,
         maxResults,
-        fields: getJiraSearchFields(getDb()),
+        fields: includeDescription
+          ? withDescriptionField(getJiraSearchFields(getDb()))
+          : getJiraSearchFields(getDb()),
       });
       if (!result.ok) {
         return res.status(result.status).json({
@@ -137,7 +140,7 @@ export const registerJiraCoreRoutes = (app, context) => {
           endpoint: JIRA_SEARCH_JQL_PATH,
         });
       }
-      return res.json(result.data);
+      return res.json(includeDescription ? withPlainDescriptions(result.data) : result.data);
     } catch (error) {
       return res.status(500).json({
         error: "Failed to call Jira search",
@@ -150,7 +153,7 @@ export const registerJiraCoreRoutes = (app, context) => {
   app.post("/api/jira/search", withSiteOperation(async (req, res) => {
     const jql = String(req.body?.jql || "").trim();
     const maxResults = Number(req.body?.maxResults || 5);
-    return handleJiraSearch(req, jql, maxResults, res);
+    return handleJiraSearch(req, jql, maxResults, res, { includeDescription: req.body?.includeDescription === true });
   }));
 
   // Paginated fetch up to maxTotal (cap 5000).

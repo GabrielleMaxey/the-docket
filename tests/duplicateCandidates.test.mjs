@@ -22,7 +22,7 @@ test("significantWords drops short and common words, dedupes, caps at 6", () => 
 test("buildDuplicateSearchJql scopes to the project, open issues and OR'd summary terms", () => {
   assert.equal(
     buildDuplicateSearchJql({ projectKey: "ODI", summary: "Coredump handling scripts" }),
-    'project = "ODI" AND statusCategory != Done AND (summary ~ "coredump" OR summary ~ "handling" OR summary ~ "scripts") ORDER BY updated DESC'
+    'project = "ODI" AND statusCategory != Done AND (summary ~ "coredump" OR description ~ "coredump" OR summary ~ "handling" OR description ~ "handling" OR summary ~ "scripts" OR description ~ "scripts") ORDER BY updated DESC'
   );
 });
 
@@ -30,8 +30,8 @@ test("buildDuplicateSearchJql neutralises quotes and JQL syntax; refuses bad pro
   const jql = buildDuplicateSearchJql({ projectKey: "ODI", summary: 'billing" OR project = "SECRET' });
   assert.ok(!jql.includes('SECRET" '));
   assert.ok(!/summary ~ "[^"a-z0-9]/.test(jql));
-  const terms = jql.match(/summary ~ "[^"]*"/g) || [];
-  assert.ok(terms.length > 0 && terms.every((t) => /^summary ~ "[a-z0-9]+"$/.test(t)));
+  const terms = jql.match(/(?:summary|description) ~ "[^"]*"/g) || [];
+  assert.ok(terms.length > 0 && terms.every((t) => /^(?:summary|description) ~ "[a-z0-9]+"$/.test(t)));
   assert.equal(buildDuplicateSearchJql({ projectKey: 'ODI" OR 1=1', summary: "billing mediation" }), null);
   assert.equal(buildDuplicateSearchJql({ projectKey: "", summary: "billing mediation" }), null);
   assert.equal(buildDuplicateSearchJql({ projectKey: "ODI", summary: "fix the new" }), null);
@@ -68,4 +68,11 @@ test("longer text needs more shared words before an issue is flagged", () => {
   const two = issue("A-1", "alpha gamma only");
   const three = issue("A-2", "alpha gamma delta only");
   assert.deepEqual(rankDuplicateCandidates(text, [two, three]).map((r) => r.key), ["A-2"]);
+});
+
+test("wording found only in an issue's description counts, and is marked", () => {
+  const epic = { key: "E-1", fields: { summary: "Voice program", status: { name: "In Progress" }, description: "Incorporate Torchwood ERR endpoints into mediation for billing" } };
+  const out = rankDuplicateCandidates("Torchwood ERR endpoints mediation", [epic, issue("A-2", "Unrelated")]);
+  assert.deepEqual(out.map((r) => [r.key, r.matchedIn]), [["E-1", "description"]]);
+  assert.equal(rankDuplicateCandidates("Torchwood ERR endpoints mediation", [issue("A-3", "Torchwood ERR endpoints")])[0].matchedIn, "summary");
 });

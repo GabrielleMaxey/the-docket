@@ -875,7 +875,7 @@ const CreateIssueModal = ({
     const jql = buildDuplicateSearchJql({ projectKey, summary: searchText });
     if (!jql) return false;
     try {
-      const found = await fetchJiraSearch({ jql, maxResults: 25 });
+      const found = await fetchJiraSearch({ jql, maxResults: 25, includeDescription: true });
       const matches = rankDuplicateCandidates(searchText, found?.issues);
       if (matches.length > 0) {
         setDuplicateAction(action);
@@ -1261,7 +1261,7 @@ const CreateIssueModal = ({
                 return (
                   <li key={match.key}>
                     {url ? <a href={url} target="_blank" rel="noopener noreferrer">{match.key}</a> : <strong>{match.key}</strong>}
-                    {" — "}{match.summary}{match.status ? ` (${match.status})` : ""}
+                    {" — "}{match.summary}{match.status ? ` (${match.status})` : ""}{match.matchedIn === "description" ? " — matched in description" : ""}
                   </li>
                 );
               })}
