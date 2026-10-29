@@ -70,7 +70,7 @@ describe("databricks provider readiness", () => {
 });
 
 describe("databricks completions", () => {
-  it("calls the serving-endpoints chat route with the endpoint name and bearer token", async () => {
+  it("calls the Unity AI Gateway chat route with the model name and bearer token", async () => {
     configureDatabricks();
     let seen;
     globalThis.fetch = async (url, options) => {
@@ -79,20 +79,26 @@ describe("databricks completions", () => {
     };
     const text = await completeLlmText({ systemPrompt: "sys", userMessage: "hi", provider: "databricks" });
     assert.equal(text, "hello");
-    assert.equal(seen.url, "https://example.cloud.databricks.com/serving-endpoints/chat/completions");
+    assert.equal(seen.url, "https://example.cloud.databricks.com/ai-gateway/mlflow/v1/chat/completions");
     assert.equal(seen.options.headers.Authorization, "Bearer dapi-test");
     assert.equal(seen.body.model, "chat-endpoint");
   });
 
-  it("accepts a bare hostname and a pasted /serving-endpoints suffix", async () => {
-    configureDatabricks({ DATABRICKS_HOST: "example.cloud.databricks.com/serving-endpoints/" });
-    let url;
-    globalThis.fetch = async (u) => {
-      url = u;
-      return jsonResponse({ choices: [{ message: { content: "ok" } }] });
-    };
-    await completeLlmText({ systemPrompt: "s", userMessage: "u", provider: "databricks" });
-    assert.equal(url, "https://example.cloud.databricks.com/serving-endpoints/chat/completions");
+  it("accepts a bare hostname and a pasted gateway or legacy serving-endpoints suffix", async () => {
+    for (const host of [
+      "example.cloud.databricks.com",
+      "example.cloud.databricks.com/ai-gateway/mlflow/v1/",
+      "example.cloud.databricks.com/serving-endpoints/",
+    ]) {
+      configureDatabricks({ DATABRICKS_HOST: host });
+      let url;
+      globalThis.fetch = async (u) => {
+        url = u;
+        return jsonResponse({ choices: [{ message: { content: "ok" } }] });
+      };
+      await completeLlmText({ systemPrompt: "s", userMessage: "u", provider: "databricks" });
+      assert.equal(url, "https://example.cloud.databricks.com/ai-gateway/mlflow/v1/chat/completions", host);
+    }
   });
 
   it("uses REPORT_DATABRICKS_ENDPOINT only for reports", async () => {
