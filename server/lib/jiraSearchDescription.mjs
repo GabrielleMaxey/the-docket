@@ -1,6 +1,5 @@
 import { adfToPlainText } from "./jiraCommentText.mjs";
-
-const MAX_DESCRIPTION_CHARS = 2000;
+import { DESCRIPTION_CHECK_CHARS } from "../../shared/duplicateCandidates.mjs";
 
 // Opt-in per search (the duplicate check): ask Jira for the description too.
 export const withDescriptionField = (fields) =>
@@ -17,7 +16,7 @@ export const withPlainDescriptions = (data) => {
         ...issue,
         fields: {
           ...issue.fields,
-          description: adfToPlainText(issue.fields.description).slice(0, MAX_DESCRIPTION_CHARS),
+          description: adfToPlainText(issue.fields.description).slice(0, DESCRIPTION_CHECK_CHARS),
         },
       };
     }),

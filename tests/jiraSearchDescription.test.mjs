@@ -9,7 +9,7 @@ test("withDescriptionField adds description once and does not mutate", () => {
   assert.deepEqual(withDescriptionField(["summary", "description"]), ["summary", "description"]);
 });
 
-test("withPlainDescriptions converts ADF to text, trims length, leaves other issues alone", () => {
+test("withPlainDescriptions converts ADF to text, trims to the first 500 characters, leaves other issues alone", () => {
   const adf = { type: "doc", version: 1, content: [{ type: "paragraph", content: [{ type: "text", text: "Move billing mediation to Torchwood" }] }] };
   const out = withPlainDescriptions({ total: 3, issues: [
     { key: "A-1", fields: { summary: "S", description: adf } },
@@ -21,7 +21,7 @@ test("withPlainDescriptions converts ADF to text, trims length, leaves other iss
   assert.match(out.issues[0].fields.description, /billing mediation to Torchwood/);
   assert.equal(out.issues[1].fields.description, "");
   assert.ok(!("description" in out.issues[2].fields));
-  assert.equal(out.issues[3].fields.description.length, 2000);
+  assert.equal(out.issues[3].fields.description.length, 500);
   assert.deepEqual(withPlainDescriptions(null), null);
   assert.deepEqual(withPlainDescriptions({ error: "x" }), { error: "x" });
 });

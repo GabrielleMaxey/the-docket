@@ -76,3 +76,10 @@ test("wording found only in an issue's description counts, and is marked", () =>
   assert.deepEqual(out.map((r) => [r.key, r.matchedIn]), [["E-1", "description"]]);
   assert.equal(rankDuplicateCandidates("Torchwood ERR endpoints mediation", [issue("A-3", "Torchwood ERR endpoints")])[0].matchedIn, "summary");
 });
+
+test("only the first 500 characters of a description are compared", () => {
+  const late = { key: "E-2", fields: { summary: "Voice program", description: `${"filler ".repeat(100)} torchwood endpoints mediation billing` } };
+  assert.deepEqual(rankDuplicateCandidates("Torchwood endpoints mediation billing", [late]), []);
+  const early = { key: "E-3", fields: { summary: "Voice program", description: "torchwood endpoints mediation billing" } };
+  assert.deepEqual(rankDuplicateCandidates("Torchwood endpoints mediation billing", [early]).map((r) => r.key), ["E-3"]);
+});

@@ -1,6 +1,8 @@
 // Possible-duplicate check for Create Issue: build a read-only JQL search from the new
 // summary, then rank the returned issues by how many meaningful words they share.
 
+// Only the start of a description is compared: that is where an issue states what it is about.
+export const DESCRIPTION_CHECK_CHARS = 500;
 const MAX_QUERY_WORDS = 10;
 const MIN_WORD_LENGTH = 3;
 const MAX_RESULTS = 5;
@@ -63,7 +65,7 @@ export const rankDuplicateCandidates = (summary, issues, { limit = MAX_RESULTS }
     if (typeof key !== "string" || !key || typeof text !== "string") continue;
     const inSummary = new Set(words(text));
     const description = issue?.fields?.description;
-    const inDescription = typeof description === "string" ? new Set(words(description)) : new Set();
+    const inDescription = typeof description === "string" ? new Set(words(description.slice(0, DESCRIPTION_CHECK_CHARS))) : new Set();
     const summaryShared = query.filter((w) => inSummary.has(w)).length;
     const shared = query.filter((w) => inSummary.has(w) || inDescription.has(w)).length;
     if (shared < need) continue;
