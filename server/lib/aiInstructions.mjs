@@ -338,7 +338,10 @@ Structure:
 Rules:
 - Only reference actual issue keys and summaries from the data below
 - Keep each day realistic given ${capacityHours}h total capacity
-- Flag overdue items with ⚠️`,
+- Flag overdue items with ⚠️
+- Tasks are pre-ranked best first, each with a score and reasons
+- Keep that order within the day-by-day plan unless fixed commitments or capacity force a change, and then say so in one clause
+- Quote a score or reason only exactly as given. Do not invent scores or reasons.`,
     "Base the plan ONLY on the data provided below.",
     ...(customInstructions ? [`\nAdditional instructions:\n${customInstructions}`] : []),
   ].join("\n\n");

@@ -7,6 +7,7 @@ import {
   STRENGTHS_GROWTH_INSTRUCTION,
   buildOneOnOneSystemPrompt,
   buildPwbSystemPrompt,
+  buildWeekPlanSystemPrompt,
   formatLumenCoreValuesBlock,
   isValidCareerReportType,
   isValidPwbPeriod,
@@ -189,5 +190,16 @@ describe("buildPwbSystemPrompt", () => {
     const prompt = buildPwbSystemPrompt({ label: "NORA", period: PWB_PERIODS.QUARTERLY, userGoals: "", companyGoals: "" });
     assert.match(prompt, /Lumen's 8 Cultural Behaviors/);
     assert.match(prompt, /Growth Mindset/);
+  });
+});
+
+describe("buildWeekPlanSystemPrompt", () => {
+  it("week plan prompt explains pre-ranked tasks", () => {
+    const prompt = buildWeekPlanSystemPrompt({ focusStyle: "balance", capacityHours: 40 });
+    assert.ok(prompt.includes("pre-ranked"));
+    assert.ok(prompt.includes("best first"));
+    assert.ok(prompt.includes("Do not invent scores or reasons"));
+    assert.ok(prompt.includes("Only reference actual issue keys"));
+    assert.ok(prompt.includes("Flag overdue items with"));
   });
 });
