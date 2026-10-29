@@ -261,6 +261,8 @@ const CreateIssueModal = ({
   const [overrideReason, setOverrideReason] = React.useState(""); // "clarification" | "standards"
   const [success, setSuccess] = React.useState("");
   const [duplicateMatches, setDuplicateMatches] = React.useState([]);
+  const [duplicateAction, setDuplicateAction] = React.useState("create"); // what "continue anyway" does
+  const duplicateAckRef = React.useRef("");
   const [createdIssueKey, setCreatedIssueKey] = React.useState("");
   const [attachments, setAttachments] = React.useState([]);
   const [attachmentProgress, setAttachmentProgress] = React.useState(null);
@@ -467,6 +469,7 @@ const CreateIssueModal = ({
     setOverrideReason("");
     setSuccess("");
     setDuplicateMatches([]);
+    duplicateAckRef.current = "";
     setCreatedIssueKey("");
     setAttachments([]);
     setAttachmentProgress(null);
@@ -857,7 +860,49 @@ const CreateIssueModal = ({
     });
   };
 
-  const handleGenerateDescription = async () => {
+  // Read-only look for open issues with similar wording in the same Jira site and project.
+  // The text searched is the title plus, with the AI helper, the user's own intake answers (the
+  // AI rewrites Story titles, so the original wording is what an existing issue would share).
+  // Returns true when matches were shown and the caller should stop and wait for the user.
+  // Any failure falls through: the check never blocks drafting or creating.
+  const runDuplicateCheck = async (action) => {
+    const intakeText = useAiHelper
+      ? Object.values(normalizeAiHelperIntake(issueType, intakeValues)).join(" ")
+      : "";
+    const searchText = `${summary} ${intakeText}`.trim();
+    const ackKey = `${projectKey}|${issueType}|${useAiHelper ? intakeText : summary}`;
+    if (duplicateAckRef.current === ackKey) return false;
+    const jql = buildDuplicateSearchJql({ projectKey, summary: searchText });
+    if (!jql) return false;
+    try {
+      const found = await fetchJiraSearch({ jql, maxResults: 25 });
+      const matches = rankDuplicateCandidates(searchText, found?.issues);
+      if (matches.length > 0) {
+        setDuplicateAction(action);
+        setDuplicateMatches(matches);
+        return true;
+      }
+    } catch (searchError) {
+      console.warn("Duplicate check skipped", searchError);
+    }
+    return false;
+  };
+
+  const continueDespiteDuplicates = () => {
+    const intakeText = useAiHelper
+      ? Object.values(normalizeAiHelperIntake(issueType, intakeValues)).join(" ")
+      : "";
+    duplicateAckRef.current = `${projectKey}|${issueType}|${useAiHelper ? intakeText : summary}`;
+    setDuplicateMatches([]);
+    if (duplicateAction === "draft") {
+      void handleGenerateDescription({ skipDuplicateCheck: true });
+    } else {
+      void handleSubmit({ skipDuplicateCheck: true });
+    }
+  };
+
+  const handleGenerateDescription = async (options) => {
+    const skipDuplicateCheck = options?.skipDuplicateCheck === true;
     if (!canEditIssueFields) {
       setError("Select and validate a parent before generating a description.");
       return;
@@ -874,6 +919,13 @@ const CreateIssueModal = ({
       setError("Enter a title before generating a description.");
       return;
     }
+    if (!skipDuplicateCheck) {
+      setGeneratingDesc(true);
+      const blocked = await runDuplicateCheck("draft");
+      setGeneratingDesc(false);
+      if (blocked) return;
+    }
+    setDuplicateMatches([]);
     setError("");
     setDescriptionError("");
     setGeneratingDesc(true);
@@ -969,7 +1021,7 @@ const CreateIssueModal = ({
   // A previous "possible duplicates" result no longer applies once the inputs change.
   React.useEffect(() => {
     setDuplicateMatches([]);
-  }, [summary, projectKey, issueType]);
+  }, [summary, projectKey, issueType, intakeValues]);
 
   const handleSubmit = async (options) => {
     const skipDuplicateCheck = options?.skipDuplicateCheck === true;
@@ -1023,23 +1075,12 @@ const CreateIssueModal = ({
       return;
     }
 
-    // Read-only look for open issues with similar summaries in the same Jira site and project.
-    // Any failure here falls through to creating the issue; the check never blocks creation.
     if (!skipDuplicateCheck) {
-      const jql = buildDuplicateSearchJql({ projectKey, summary });
-      if (jql) {
-        setSubmitting(true);
-        try {
-          const found = await fetchJiraSearch({ jql, maxResults: 25 });
-          const matches = rankDuplicateCandidates(summary, found?.issues);
-          if (matches.length > 0) {
-            setDuplicateMatches(matches);
-            setSubmitting(false);
-            return;
-          }
-        } catch (searchError) {
-          console.warn("Duplicate check skipped", searchError);
-        }
+      setSubmitting(true);
+      const blocked = await runDuplicateCheck("create");
+      if (blocked) {
+        setSubmitting(false);
+        return;
       }
     }
     setDuplicateMatches([]);
@@ -1213,7 +1254,7 @@ const CreateIssueModal = ({
         {duplicateMatches.length > 0 ? (
           <Message warning size="small" data-testid="duplicate-matches">
             <Message.Header>Possible existing issues</Message.Header>
-            <p>Open issues in {projectKey} with a similar summary. Check these before creating a new one.</p>
+            <p>Open issues in {projectKey} with similar wording. Check these before {duplicateAction === "draft" ? "drafting" : "creating"} a new one.</p>
             <ul style={{ margin: "0.25rem 0 0.5rem", paddingLeft: "1.1rem" }}>
               {duplicateMatches.map((match) => {
                 const url = buildJiraBrowseUrl(jiraBaseUrl, match.key);
@@ -1225,8 +1266,8 @@ const CreateIssueModal = ({
                 );
               })}
             </ul>
-            <Button size="mini" primary disabled={submitting} onClick={() => handleSubmit({ skipDuplicateCheck: true })}>
-              Create anyway
+            <Button size="mini" primary disabled={submitting || generatingDesc} onClick={continueDespiteDuplicates}>
+              {duplicateAction === "draft" ? "Draft anyway" : "Create anyway"}
             </Button>
             <Button size="mini" basic onClick={() => setDuplicateMatches([])}>
               Cancel

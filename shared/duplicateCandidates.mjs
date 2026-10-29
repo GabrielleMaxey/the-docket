@@ -1,7 +1,7 @@
 // Possible-duplicate check for Create Issue: build a read-only JQL search from the new
 // summary, then rank the returned issues by how many meaningful words they share.
 
-const MAX_QUERY_WORDS = 6;
+const MAX_QUERY_WORDS = 10;
 const MIN_WORD_LENGTH = 3;
 const MAX_RESULTS = 5;
 const PROJECT_KEY = /^[A-Za-z][A-Za-z0-9_]*$/;
@@ -11,6 +11,8 @@ const STOPWORDS = new Set([
   "were", "has", "have", "had", "not", "but", "all", "any", "can", "per", "via", "new", "add", "use",
   "make", "get", "set", "update", "create", "fix", "issue", "task", "story", "bug", "when", "then",
   "than", "its", "our", "your", "their", "should", "would", "could", "will", "need", "needs",
+  "want", "wants", "wanted", "able", "ability", "also", "just", "about", "there", "here", "what",
+  "which", "who", "how", "why", "been", "being", "does", "like", "some", "more", "than", "very",
 ]);
 
 const words = (text) => {
@@ -24,7 +26,20 @@ const words = (text) => {
   return out;
 };
 
-export const significantWords = (summary) => words(summary).slice(0, MAX_QUERY_WORDS);
+// Long text (AI helper intake answers) has more words than we search for, so keep the most
+// specific ones: longest first, original order as the tie-break and in the result.
+export const significantWords = (text) => {
+  const all = words(text);
+  if (all.length <= MAX_QUERY_WORDS) return all;
+  const keep = new Set(
+    all
+      .map((word, index) => ({ word, index }))
+      .sort((a, b) => b.word.length - a.word.length || a.index - b.index)
+      .slice(0, MAX_QUERY_WORDS)
+      .map((item) => item.word)
+  );
+  return all.filter((word) => keep.has(word));
+};
 
 export const buildDuplicateSearchJql = ({ projectKey, summary } = {}) => {
   const project = String(projectKey ?? "").trim();
@@ -35,7 +50,7 @@ export const buildDuplicateSearchJql = ({ projectKey, summary } = {}) => {
   return `project = "${project}" AND statusCategory != Done AND (${clause}) ORDER BY updated DESC`;
 };
 
-const requiredShared = (n) => (n < 4 ? Math.ceil(n / 2) : 2);
+const requiredShared = (n) => (n < 4 ? Math.ceil(n / 2) : Math.min(4, Math.max(2, Math.ceil(n * 0.25))));
 
 export const rankDuplicateCandidates = (summary, issues, { limit = MAX_RESULTS } = {}) => {
   const query = significantWords(summary);

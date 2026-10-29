@@ -6,7 +6,14 @@ const issue = (key, summary, status = "In Progress") => ({ key, fields: { summar
 
 test("significantWords drops short and common words, dedupes, caps at 6", () => {
   assert.deepEqual(significantWords("Fix the PSX coredump handling for SIPE cores"), ["psx", "coredump", "handling", "sipe", "cores"]);
-  assert.deepEqual(significantWords("alpha beta gamma delta epsilon zeta theta iota"), ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"]);
+  const long = "alpha beta gamma delta epsilon zeta theta iota kappa lambda sigma omega";
+  assert.equal(significantWords(long).length, 10);
+  // longest words are kept and original order preserved
+  assert.deepEqual(
+    significantWords("aaa bbb ccc ddd eee fff ggg hhh iii jjj longword anotherlongword"),
+    ["aaa", "bbb", "ccc", "ddd", "eee", "fff", "ggg", "hhh", "longword", "anotherlongword"]
+  );
+  assert.deepEqual(significantWords("I want to be able to export billing records"), ["export", "billing", "records"]);
   assert.deepEqual(significantWords("Billing billing BILLING"), ["billing"]);
   assert.deepEqual(significantWords(""), []);
   assert.deepEqual(significantWords(null), []);
@@ -54,4 +61,11 @@ test("ranked by shared words then key, capped at 5, tolerant of bad input", () =
   assert.deepEqual(rankDuplicateCandidates("alpha beta", null), []);
   assert.deepEqual(rankDuplicateCandidates("alpha beta", [null, {}, { key: "A-1" }, { key: "A-2", fields: {} }]), []);
   assert.deepEqual(rankDuplicateCandidates("", [issue("A-1", "alpha")]), []);
+});
+
+test("longer text needs more shared words before an issue is flagged", () => {
+  const text = "alpha beta gamma delta epsilon zeta theta kappa lambda sigma omega rhoxx";
+  const two = issue("A-1", "alpha gamma only");
+  const three = issue("A-2", "alpha gamma delta only");
+  assert.deepEqual(rankDuplicateCandidates(text, [two, three]).map((r) => r.key), ["A-2"]);
 });
