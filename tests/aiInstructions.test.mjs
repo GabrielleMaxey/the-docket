@@ -240,6 +240,7 @@ describe("buildWeekPlanSystemPrompt", () => {
     const prompt = buildWeekPlanSystemPrompt({ focusStyle: "balance", capacityHours: 20 });
     assert.ok(prompt.includes("The reader cannot see the score key"));
     assert.ok(!prompt.includes("using the score key below"));
+    assert.ok(prompt.includes('"How the score works" section at the end of the plan'));
   });
 
   it("week plan prompt covers listed days, due dates, stale triage, blockers and estimates", () => {
