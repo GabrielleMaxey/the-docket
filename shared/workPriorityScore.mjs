@@ -66,6 +66,12 @@ const thirdBusinessDayMs = (todayMs, count) => {
   return ms;
 };
 
+const normalizeManualPriority = (value, max) => {
+  if (value === null || value === undefined || value === "") return null;
+  const p = Number(value);
+  return Number.isFinite(p) && p >= 1 ? Math.min(p, max) : null;
+};
+
 export function scoreIssue(input, options = {}) {
   const issue = isPlainObject(input) ? input : {};
   const now = options.now instanceof Date ? options.now : new Date(options.now);
@@ -135,9 +141,8 @@ export function scoreIssue(input, options = {}) {
 
   // Manual priority
   let manual = 0;
-  const p = Number(issue.manualPriority);
-  if (issue.manualPriority !== null && issue.manualPriority !== undefined && Number.isFinite(p) && p >= 1) {
-    const clamped = Math.min(p, w.manual.maxPriority);
+  const clamped = normalizeManualPriority(issue.manualPriority, w.manual.maxPriority);
+  if (clamped !== null) {
     manual = Math.round((w.manual.max * (w.manual.maxPriority + 1 - clamped)) / w.manual.maxPriority);
     if (manual) reasons.push(`Manual priority ${clamped} (+${manual})`);
   }
@@ -145,4 +150,85 @@ export function scoreIssue(input, options = {}) {
   const components = { priority, status, staleness, due, blocker, manual };
   const score = priority + status + staleness + due + blocker + manual;
   return { score, components, reasons };
+}
+
+const isOpenLinkedIssue = (linked) => {
+  const status = linked?.fields?.status;
+  if (status?.statusCategory?.key === "done") return false;
+  const name = typeof status?.name === "string" ? status.name : "";
+  return !/(closed|resolved|done)/i.test(name);
+};
+
+const normalizeNames = (names) =>
+  Array.isArray(names)
+    ? names.filter((n) => typeof n === "string").map((n) => n.trim().toLowerCase())
+    : [];
+
+const textOf = (v) => (typeof v === "string" ? v : "");
+
+export function toScoringInput(issue, extras = {}) {
+  const src = isPlainObject(issue) ? issue : {};
+  const opts = isPlainObject(extras) ? extras : {};
+  const fields = isPlainObject(src.fields) ? src.fields : {};
+  const names = mergeWeights(opts.weights).blockerLinkNames;
+  const blockNames = normalizeNames(names.blocks);
+  const blockedByNames = normalizeNames(names.blockedBy);
+
+  let blocks = false;
+  let blockedBy = false;
+  if (Array.isArray(fields.issuelinks)) {
+    for (const entry of fields.issuelinks) {
+      if (!isPlainObject(entry)) continue;
+      const type = isPlainObject(entry.type) ? entry.type : {};
+      const outward = textOf(type.outward).trim().toLowerCase();
+      const inward = textOf(type.inward).trim().toLowerCase();
+      if (isPlainObject(entry.outwardIssue) && entry.outwardIssue.key && blockNames.includes(outward)) {
+        if (isOpenLinkedIssue(entry.outwardIssue)) blocks = true;
+      }
+      if (isPlainObject(entry.inwardIssue) && entry.inwardIssue.key && blockedByNames.includes(inward)) {
+        if (isOpenLinkedIssue(entry.inwardIssue)) blockedBy = true;
+      }
+    }
+  }
+
+  const status = fields.status?.name ?? (typeof src.status === "string" ? src.status : src.status?.name);
+  return {
+    key: src.key,
+    jiraPriority: fields.priority?.name ?? (typeof src.priority === "string" ? src.priority : src.priority?.name),
+    status,
+    updated: fields.updated ?? src.updated,
+    dueDate: opts.effectiveDueDate ?? null,
+    manualPriority: opts.manualPriority ?? null,
+    blocks,
+    blockedBy,
+  };
+}
+
+const compareRanked = (a, b, maxPriority) => {
+  if (a.score !== b.score) return b.score - a.score;
+  const ma = normalizeManualPriority(a.manualPriority, maxPriority);
+  const mb = normalizeManualPriority(b.manualPriority, maxPriority);
+  if (ma !== mb) {
+    if (ma === null) return 1;
+    if (mb === null) return -1;
+    return ma - mb;
+  }
+  const da = parseDueDate(a.dueDate);
+  const db = parseDueDate(b.dueDate);
+  if (da !== db) {
+    if (da === null) return 1;
+    if (db === null) return -1;
+    return da - db;
+  }
+  const ka = String(a.key ?? "");
+  const kb = String(b.key ?? "");
+  return ka < kb ? -1 : ka > kb ? 1 : 0;
+};
+
+export function rankIssues(inputs, options = {}) {
+  if (!Array.isArray(inputs)) return [];
+  const maxPriority = mergeWeights(options.weights).manual.maxPriority;
+  return inputs
+    .map((input) => ({ ...input, ...scoreIssue(input, options) }))
+    .sort((a, b) => compareRanked(a, b, maxPriority));
 }
