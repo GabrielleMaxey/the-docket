@@ -1,50 +1,110 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="930" viewBox="0 0 1440 930" role="img" aria-labelledby="title desc">
-<title id="title">Help me plan my week: your issues in suggested order</title><desc id="desc">Illustrative week plan. Only issues assigned to the signed-in user are planned, ordered by a suggested-order score with reasons, with suggested working time and a score key.</desc>
-<defs><linearGradient id="nav"><stop stop-color="#054d78"/><stop offset="1" stop-color="#16b0f2"/></linearGradient></defs>
-<g font-family="Arial, Helvetica, sans-serif">
-<rect x="0" y="0" width="1440" height="930" fill="#f4f7fa"/>
-<rect x="0" y="0" width="1440" height="62" fill="url(#nav)"/>
-<text x="32" y="41" font-size="27" fill="#fdd219" font-weight="700">The Docket</text>
-<text x="360" y="39" font-size="19" fill="#fdd219" font-weight="600">Task Management</text>
-<rect x="360" y="53" width="221" height="3" fill="#fdd219"/>
-<text x="604" y="39" font-size="19" fill="white" font-weight="600">Metrics</text>
-<text x="729" y="39" font-size="19" fill="white" font-weight="600">Project Managers</text>
-<text x="965" y="39" font-size="19" fill="white" font-weight="600">Past Reports</text>
-<text x="1146" y="39" font-size="19" fill="white" font-weight="600">Chat</text>
-<text x="1239" y="39" font-size="19" fill="white" font-weight="600">Settings</text>
-<rect x="32" y="82" width="1376" height="40" rx="4" fill="#fff5d5" stroke="#eddfaa"/>
-<text x="49" y="109" font-size="17" fill="#6e5720" font-weight="700">DOCUMENTATION MOCKUP  •  SYNTHETIC DATA  •  SIMPLIFIED LAYOUT</text>
-<text x="40" y="170" font-size="30" fill="#223447" font-weight="700">Help me plan my week: your issues, in suggested order</text>
-<rect x="40" y="195" width="1360" height="150" rx="8" fill="white" stroke="#dce4ec"/>
-<text x="66" y="232" font-size="22" fill="#223447" font-weight="700">Plan inputs</text>
-<text x="66" y="270" font-size="20" fill="#223447" font-weight="400">Approach: Balance across projects  ·  Hours available: 32  ·  Fixed commitments: Deployment Thursday</text>
-<rect x="66" y="292" width="22" height="22" rx="3" fill="#16b0f2"/><path d="M71 303 l5 5 l10 -11" stroke="white" stroke-width="3" fill="none"/>
-<text x="100" y="310" font-size="19" fill="#526779" font-weight="400">Include team priorities  (shown only when Use team DB is on)</text>
-<rect x="1150" y="262" width="230" height="52" rx="6" fill="#16b0f2"/>
-<text x="1176" y="296" font-size="19" fill="white" font-weight="700">Generate week plan</text>
-<rect x="40" y="365" width="1360" height="530" rx="8" fill="white" stroke="#dce4ec"/>
-<rect x="66" y="385" width="1308" height="64" rx="5" fill="#eaf6fd" stroke="#bfe0f3"/>
-<text x="80" y="411" font-size="18" fill="#185f89" font-weight="400">Tasks are ordered by a suggested-order score (higher means do sooner). Hours shown are suggested working time,</text>
-<text x="80" y="436" font-size="18" fill="#185f89" font-weight="400">not an estimate of how long a task takes. About 15% of your hours are left free for meetings and interruptions.</text>
-<text x="66" y="490" font-size="22" fill="#223447" font-weight="700">Wednesday  ·  Suggested: 6h working time</text>
-<rect x="66" y="500" width="1308" height="92" rx="6" fill="#f8fafc" stroke="#e1e8ef"/>
-<text x="84" y="526" font-size="20" fill="#185f89" font-weight="700">ODI-1042</text>
-<text x="200" y="526" font-size="20" fill="#223447" font-weight="600">Add retry to ingest job</text>
-<text x="760" y="526" font-size="18" fill="#526779" font-weight="400">⚠️ Overdue · In Progress</text>
-<text x="1230" y="526" font-size="19" fill="#223447" font-weight="700">Score 150</text>
-<text x="84" y="560" font-size="16" fill="#526779" font-weight="400">Highest +50 · In Progress +20 · Stale 31 days +25 · Overdue +25 · Blocks another issue +30</text>
-<rect x="66" y="608" width="1308" height="92" rx="6" fill="#f8fafc" stroke="#e1e8ef"/>
-<text x="84" y="634" font-size="20" fill="#185f89" font-weight="700">ODI-1177</text>
-<text x="200" y="634" font-size="20" fill="#223447" font-weight="600">Update onboarding runbook</text>
-<text x="760" y="634" font-size="18" fill="#526779" font-weight="400">Due Fri · To Do</text>
-<text x="1230" y="634" font-size="19" fill="#223447" font-weight="700">Score 95</text>
-<text x="84" y="668" font-size="16" fill="#526779" font-weight="400">High +40 · Other open status +5 · Stale 9 days +10 · Due within 3 business days +15 · Manual priority 3 +25</text>
-<rect x="66" y="716" width="1308" height="92" rx="6" fill="#f8fafc" stroke="#e1e8ef"/>
-<text x="84" y="742" font-size="20" fill="#185f89" font-weight="700">ODI-0931</text>
-<text x="200" y="742" font-size="20" fill="#223447" font-weight="600">Clean up old feature flags</text>
-<text x="760" y="742" font-size="18" fill="#526779" font-weight="400">Stale 120 days</text>
-<text x="1230" y="742" font-size="19" fill="#223447" font-weight="700">Triage ≤ 1h</text>
-<text x="84" y="776" font-size="16" fill="#526779" font-weight="400">Keep, re-scope or close it. Not given a full work block.</text>
-<text x="66" y="850" font-size="19" fill="#223447" font-weight="600">Key Risks: ODI-1042 is overdue and blocks ODI-1190 (schedule follow-up on it first).</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1080" viewBox="0 0 1100 1080" role="img" aria-labelledby="title desc">
+<title id="title">Help me plan my week: your issues in suggested order</title><desc id="desc">Illustrative week plan inside Task Management: summary chips, the generated plan with a task table, and the expanded How the score works section.</desc>
+<g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<rect x="0" y="0" width="1100" height="1080" fill="#fff"/>
+<defs><linearGradient id="nav" x1="0" y1="0" x2="1" y2="0.2"><stop offset="0" stop-color="#054d78"/><stop offset="0.52" stop-color="#0c93d9"/><stop offset="1" stop-color="#16b0f2"/></linearGradient><linearGradient id="joke" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FDD219"/><stop offset="0.55" stop-color="#FB9429"/><stop offset="1" stop-color="#F95E4A"/></linearGradient></defs>
+<rect x="0" y="0" width="1100" height="56" rx="0" fill="url(#nav)" stroke="none" stroke-width="1" />
+<rect x="0" y="54" width="1100" height="2" rx="0" fill="#e1c24a" stroke="none" stroke-width="1" />
+<rect x="24" y="10" width="34" height="34" rx="8" fill="#f5833a" stroke="none" stroke-width="1" />
+<rect x="31" y="17" width="20" height="20" rx="4" fill="#fff2e0" stroke="none" stroke-width="1" />
+<rect x="34" y="24" width="14" height="3" rx="1" fill="#f5833a" stroke="none" stroke-width="1" />
+<rect x="34" y="30" width="14" height="3" rx="1" fill="#f5833a" stroke="none" stroke-width="1" />
+<text x="68" y="35" font-size="19" fill="#FDD219" font-weight="800" text-anchor="start">The Docket</text>
+<text x="261" y="33" font-size="10" fill="#fff" font-weight="700" text-anchor="start">SITE</text>
+<rect x="289" y="18" width="140" height="22" rx="11" fill="#f3f4f6" stroke="none" stroke-width="1" />
+<text x="300" y="33" font-size="12" fill="#222" font-weight="700" text-anchor="start">Demo Operations</text>
+<path d="M414 27 l3 4 l3 -4" fill="#333"/>
+<rect x="439" y="0" width="160" height="54" rx="0" fill="rgba(253,210,25,0.12)" stroke="none" stroke-width="1" />
+<rect x="439" y="51" width="160" height="3" rx="0" fill="#FDD219" stroke="none" stroke-width="1" />
+<text x="449" y="34" font-size="16" fill="#FDD219" font-weight="600" text-anchor="start">Task Management</text>
+<text x="615" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Metrics</text>
+<text x="705" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Project Managers</text>
+<text x="870" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Past Reports</text>
+<text x="995" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Chat</text>
+<circle cx="1060" cy="28" r="7" fill="none" stroke="#fff" stroke-width="2"/>
+<rect x="24" y="80" width="1052" height="38" rx="8" fill="#f1f5f9" stroke="#d9dee5" stroke-width="1" />
+<text x="38" y="104" font-size="14" fill="#0f172a" font-weight="700" text-anchor="start">🗓️ Help me plan my week</text>
+<path d="M1052 97 l4 4 l4 -4" stroke="#6b7785" stroke-width="1.5" fill="none" transform="rotate(180 1056 99)"/>
+<rect x="24" y="118" width="1052" height="930" rx="0" fill="#fff" stroke="#d9dee5" stroke-width="1" />
+<rect x="40" y="134" width="180.07999999999998" height="22" rx="11" fill="#e6e9f2" stroke="none" stroke-width="1" />
+<text x="50" y="149" font-size="12" fill="#475569" font-weight="600" text-anchor="start">Balance across projects</text>
+<rect x="228.07999999999998" y="134" width="110.47999999999999" height="22" rx="11" fill="#e6e9f2" stroke="none" stroke-width="1" />
+<text x="238.07999999999998" y="149" font-size="12" fill="#475569" font-weight="600" text-anchor="start">40h available</text>
+<rect x="346.55999999999995" y="134" width="61.76" height="22" rx="11" fill="#e6e9f2" stroke="none" stroke-width="1" />
+<text x="356.55999999999995" y="149" font-size="12" fill="#475569" font-weight="600" text-anchor="start">✎ Edit</text>
+<rect x="40" y="172" width="150" height="34" rx="4" fill="#2185d0" stroke="none" stroke-width="1" />
+<text x="115.0" y="193.9" font-size="14" fill="#fff" font-weight="700" text-anchor="middle">Generate week plan</text>
+<rect x="202" y="172" width="100" height="34" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="252.0" y="193.9" font-size="14" fill="#444" font-weight="600" text-anchor="middle">Start over</text>
+<rect x="40" y="224" width="1020" height="800" rx="8" fill="#f9fafc" stroke="#d9dee5" stroke-width="1" />
+<text x="56" y="252" font-size="13" fill="#222" font-weight="600" text-anchor="start">Week plan</text>
+<rect x="780" y="238" width="90" height="26" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="825.0" y="254.85" font-size="11" fill="#444" font-weight="600" text-anchor="middle">Clear report</text>
+<rect x="876" y="238" width="60" height="26" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="906.0" y="254.85" font-size="11" fill="#444" font-weight="600" text-anchor="middle">Copy</text>
+<rect x="942" y="238" width="100" height="26" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="992.0" y="254.85" font-size="11" fill="#444" font-weight="600" text-anchor="middle">↓ Download .md</text>
+<rect x="40" y="274" width="1020" height="750" rx="0" fill="#fff" stroke="#d9dee5" stroke-width="1" />
+<text x="60" y="312" font-size="18" fill="#0f172a" font-weight="700" text-anchor="start">Weekly Work Plan: Thu Oct 29 – Fri Oct 30, 2026</text>
+<rect x="60" y="322" width="980" height="2" rx="0" fill="#0c93d9" stroke="none" stroke-width="1" />
+<text x="60" y="348" font-size="12.5" fill="#1e293b" font-weight="600" text-anchor="start">Tasks are ordered by a suggested-order score where higher means do sooner. The “How the score works” section at</text>
+<text x="60" y="366" font-size="12.5" fill="#1e293b" font-weight="600" text-anchor="start">the end of the plan explains it.</text>
+<text x="60" y="390" font-size="12.5" fill="#1e293b" font-weight="600" text-anchor="start">Hours are suggested time to spend working on each task, not how long it should take to complete.</text>
+<text x="60" y="414" font-size="12.5" fill="#1e293b" font-weight="400" text-anchor="start">Total available capacity: ~16 hours (2 days × 8h), minus ~15% buffer = ~13.5 hours planned.</text>
+<line x1="60" y1="430" x2="1040" y2="430" stroke="#e2e8f0" stroke-width="1"/>
+<text x="60" y="458" font-size="15" fill="#0f172a" font-weight="700" text-anchor="start">Thursday, October 29</text>
+<rect x="60" y="470" width="980" height="28" rx="0" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1" />
+<text x="70" y="489" font-size="12" fill="#0f172a" font-weight="700" text-anchor="start">#</text>
+<text x="100" y="489" font-size="12" fill="#0f172a" font-weight="700" text-anchor="start">Issue</text>
+<text x="200" y="489" font-size="12" fill="#0f172a" font-weight="700" text-anchor="start">Task</text>
+<text x="590" y="489" font-size="12" fill="#0f172a" font-weight="700" text-anchor="start">Suggested working time</text>
+<text x="760" y="489" font-size="12" fill="#0f172a" font-weight="700" text-anchor="start">Notes</text>
+<rect x="60" y="498" width="980" height="34" rx="0" fill="#fff" stroke="#e2e8f0" stroke-width="1" />
+<text x="70" y="519" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">1</text>
+<text x="100" y="519" font-size="12" fill="#1b1c1d" font-weight="700" text-anchor="start">DEMO-101</text>
+<text x="200" y="519" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">[Billing - Automation] Build IAP workflow</text>
+<text x="590" y="519" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">2h</text>
+<text x="760" y="519" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">Score 75. Blocked by DEMO-099: check it first.</text>
+<rect x="60" y="532" width="980" height="34" rx="0" fill="#f9fafc" stroke="#e2e8f0" stroke-width="1" />
+<text x="70" y="553" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">2</text>
+<text x="100" y="553" font-size="12" fill="#1b1c1d" font-weight="700" text-anchor="start">DEMO-204</text>
+<text x="200" y="553" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">[Voice - Reporting] Add per-tech prompt report</text>
+<text x="590" y="553" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">2.5h</text>
+<text x="760" y="553" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">Score 65. Stale 49 days.</text>
+<rect x="60" y="566" width="980" height="34" rx="0" fill="#fff" stroke="#e2e8f0" stroke-width="1" />
+<text x="70" y="587" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">3</text>
+<text x="100" y="587" font-size="12" fill="#1b1c1d" font-weight="700" text-anchor="start">DEMO-117</text>
+<text x="200" y="587" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">[Maint - Dumps] Extra commands for SIPE cores</text>
+<text x="590" y="587" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">1h triage</text>
+<text x="760" y="587" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">Stale 139 days: keep, re-scope or close.</text>
+<text x="60" y="626" font-size="12.5" fill="#1b1c1d" font-weight="700" text-anchor="start">Thursday total planned: ~5.5h</text>
+<text x="60" y="662" font-size="15" fill="#0f172a" font-weight="700" text-anchor="start">Key Risks</text>
+<text x="60" y="686" font-size="12.5" fill="#1b1c1d" font-weight="400" text-anchor="start">DEMO-099 blocks DEMO-101. If it is still open, re-route that time to DEMO-204.</text>
+<rect x="60" y="712" width="980" height="350" rx="6" fill="#f9fafc" stroke="#e2e8f0" stroke-width="1" />
+<text x="74" y="731" font-size="13" fill="#1b1c1d" font-weight="700" text-anchor="start">▼  How the score works</text>
+<text x="74" y="758" font-size="12.5" fill="#1b1c1d" font-weight="400" text-anchor="start">Each task gets a suggested-order score. Higher means do sooner. The factors add up:</text>
+<rect x="74" y="770" width="952" height="28" rx="0" fill="#fff" stroke="#d9dee5" stroke-width="1" />
+<text x="86" y="789" font-size="12" fill="#1b1c1d" font-weight="700" text-anchor="start">Factor</text>
+<text x="330" y="789" font-size="12" fill="#1b1c1d" font-weight="700" text-anchor="start">Points</text>
+<rect x="74" y="798" width="952" height="32" rx="0" fill="#fff" stroke="#d9dee5" stroke-width="1" />
+<text x="86" y="818" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">Jira priority</text>
+<text x="330" y="818" font-size="11.5" fill="#1b1c1d" font-weight="400" text-anchor="start">Highest 50, High 40, Medium 30, Low 20, Lowest 10 (unset counts as 30)</text>
+<rect x="74" y="830" width="952" height="32" rx="0" fill="#f9fafc" stroke="#d9dee5" stroke-width="1" />
+<text x="86" y="850" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">Status</text>
+<text x="330" y="850" font-size="11.5" fill="#1b1c1d" font-weight="400" text-anchor="start">20 for active work (In Progress, Analyzing, Ready for Verification); 5 for other open statuses</text>
+<rect x="74" y="862" width="952" height="32" rx="0" fill="#fff" stroke="#d9dee5" stroke-width="1" />
+<text x="86" y="882" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">Staleness (days since last update)</text>
+<text x="330" y="882" font-size="11.5" fill="#1b1c1d" font-weight="400" text-anchor="start">25 at 30+ days, 20 at 15+, 15 at 7+, 10 at 3+, 5 under 3 (capped at 10 for non-active)</text>
+<rect x="74" y="894" width="952" height="32" rx="0" fill="#f9fafc" stroke="#d9dee5" stroke-width="1" />
+<text x="86" y="914" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">Due date</text>
+<text x="330" y="914" font-size="11.5" fill="#1b1c1d" font-weight="400" text-anchor="start">+25 if due today or overdue; +15 if due within 3 business days</text>
+<rect x="74" y="926" width="952" height="32" rx="0" fill="#fff" stroke="#d9dee5" stroke-width="1" />
+<text x="86" y="946" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">Blockers</text>
+<text x="330" y="946" font-size="11.5" fill="#1b1c1d" font-weight="400" text-anchor="start">+30 if it blocks another open issue; +20 if an open issue blocks it</text>
+<rect x="74" y="958" width="952" height="32" rx="0" fill="#f9fafc" stroke="#d9dee5" stroke-width="1" />
+<text x="86" y="978" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">Your priority (P1 to P20)</text>
+<text x="330" y="978" font-size="11.5" fill="#1b1c1d" font-weight="400" text-anchor="start">Up to +30, highest for P1</text>
+<text x="74" y="1014" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">The score is a relative ordering for this list, not a measure of effort or importance on its own.</text>
+<text x="24" y="1068" font-size="12" fill="#7a8794" font-weight="400" text-anchor="start">Documentation mockup. Synthetic data; simplified layout.</text>
 </g>
 </svg>

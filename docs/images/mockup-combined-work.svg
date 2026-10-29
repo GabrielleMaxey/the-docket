@@ -1,92 +1,106 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1170" viewBox="0 0 1440 1170" role="img" aria-labelledby="title desc">
-<title id="title">Combined Work — editable tasks and My Metrics</title><desc id="desc">Simplified documentation mockup of the existing Combined Open Work preset, two synthetic saved sites, expanded My Metrics, and one mixed editable task table with separate local notes and planning.</desc>
-<defs><linearGradient id="nav"><stop stop-color="#054d78"/><stop offset="1" stop-color="#16b0f2"/></linearGradient></defs>
-<g font-family="Arial, Helvetica, sans-serif">
-<rect x="0" y="0" width="1440" height="1170" rx="0" fill="#f4f7fa" stroke="#f4f7fa"/>
-<rect x="0" y="0" width="1440" height="62" rx="0" fill="url(#nav)" stroke="none"/>
-<text x="32" y="41" font-size="27" fill="#fdd219" font-weight="700">The Docket</text>
-<text x="360" y="39" font-size="19" fill="#fdd219" font-weight="600">Task Management</text>
-<rect x="360" y="53" width="221" height="3" rx="0" fill="#fdd219" stroke="none"/>
-<text x="604" y="39" font-size="19" fill="white" font-weight="600">Metrics</text>
-<text x="729" y="39" font-size="19" fill="white" font-weight="600">Project Managers</text>
-<text x="965" y="39" font-size="19" fill="white" font-weight="600">Past Reports</text>
-<text x="1146" y="39" font-size="19" fill="white" font-weight="600">Chat</text>
-<text x="1239" y="39" font-size="19" fill="white" font-weight="600">Settings</text>
-<rect x="32" y="82" width="1376" height="40" rx="4" fill="#fff5d5" stroke="#eddfaa"/>
-<text x="49" y="109" font-size="17" fill="#6e5720" font-weight="700">DOCUMENTATION MOCKUP  •  SYNTHETIC DATA  •  SIMPLIFIED LAYOUT</text>
-<text x="40" y="167" font-size="30" fill="#223447" font-weight="700">Task Management</text>
-<rect x="40" y="189" width="192" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="54" y="217" font-size="18" fill="#263d52" font-weight="600">My Open Work</text>
-<rect x="242" y="189" width="240" height="42" rx="5" fill="#147fbc" stroke="#147fbc"/>
-<text x="256" y="217" font-size="18" fill="white" font-weight="600">Combined Open Work</text>
-<text x="40" y="277" font-size="28" fill="#223447" font-weight="700">Combined Open Work</text>
-<text x="40" y="308" font-size="20" fill="#223447" font-weight="400">Open issues assigned to the account configured for each selected Jira site.</text>
-<rect x="40" y="330" width="1360" height="66" rx="8" fill="white" stroke="#dce4ec"/>
-<text x="58" y="355" font-size="17" fill="#526779" font-weight="600">Jira sites</text>
-<rect x="190" y="350" width="22" height="22" rx="3" fill="#147fbc" stroke="#b6c4d2"/>
-<path d="M195 361 l5 5 l8 -11" fill="none" stroke="white" stroke-width="3"/>
-<text x="223" y="368" font-size="20" fill="#263d52" font-weight="400">Demo Operations (ops.example.test)</text>
-<rect x="690" y="350" width="22" height="22" rx="3" fill="#147fbc" stroke="#b6c4d2"/>
-<path d="M695 361 l5 5 l8 -11" fill="none" stroke="white" stroke-width="3"/>
-<text x="723" y="368" font-size="20" fill="#263d52" font-weight="400">Demo Platform (platform.example.test)</text>
-<rect x="40" y="412" width="130" height="42" rx="5" fill="#147fbc" stroke="#147fbc"/>
-<text x="54" y="440" font-size="18" fill="white" font-weight="600">Refresh</text>
-<rect x="40" y="474" width="1360" height="260" rx="8" fill="white" stroke="#dce4ec"/>
-<text x="60" y="509" font-size="25" fill="#223447" font-weight="700">▾  My Metrics</text>
-<text x="1245" y="509" font-size="20" fill="#147fbc" font-weight="700">3 open</text>
-<rect x="60" y="525" width="120" height="33" rx="16" fill="#eaf4fb" stroke="none"/>
-<text x="75" y="548" font-size="17" fill="#185f89" font-weight="600">3 total</text>
-<rect x="195" y="525" width="120" height="33" rx="16" fill="#eaf4fb" stroke="none"/>
-<text x="210" y="548" font-size="17" fill="#185f89" font-weight="600">3 open</text>
-<rect x="330" y="525" width="180" height="33" rx="16" fill="#eaf4fb" stroke="none"/>
-<text x="345" y="548" font-size="17" fill="#185f89" font-weight="600">0 resolved (0%)</text>
-<text x="60" y="590" font-size="21" fill="#223447" font-weight="700">My Capacity</text>
-<text x="265" y="590" font-size="20" fill="#223447" font-weight="400">Total open: 3 / 12</text>
-<rect x="465" y="575" width="270" height="16" rx="8" fill="#e6edf3" stroke="none"/>
-<rect x="465" y="575" width="68" height="16" rx="8" fill="#3e98cf" stroke="none"/>
-<text x="775" y="590" font-size="20" fill="#223447" font-weight="400">In Progress: 1 / 4</text>
-<text x="60" y="634" font-size="21" fill="#223447" font-weight="700">Reports</text>
-<rect x="180" y="608" width="156" height="42" rx="5" fill="#147fbc" stroke="#147fbc"/>
-<text x="194" y="636" font-size="18" fill="white" font-weight="600">Status Report</text>
-<rect x="348" y="608" width="142" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="362" y="636" font-size="18" fill="#263d52" font-weight="600">1:1 Prep</text>
-<rect x="502" y="608" width="148" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="516" y="636" font-size="18" fill="#263d52" font-weight="600">PWB Review</text>
-<text x="60" y="695" font-size="20" fill="#526779" font-weight="400">Current results or assigned-work history • Goals, copy/download and a Combined Work archive</text>
-<rect x="40" y="755" width="175" height="42" rx="5" fill="#147fbc" stroke="#147fbc"/>
-<text x="54" y="783" font-size="18" fill="white" font-weight="600">Managed tasks</text>
-<rect x="215" y="755" width="80" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="229" y="783" font-size="18" fill="#263d52" font-weight="600">List</text>
-<rect x="40" y="815" width="1360" height="263" rx="8" fill="white" stroke="#dce4ec"/>
-<rect x="41" y="816" width="1358" height="43" rx="0" fill="#eaf1f7" stroke="none"/>
-<text x="60" y="844" font-size="18" fill="#223447" font-weight="700">Jira site</text>
-<text x="290" y="844" font-size="18" fill="#223447" font-weight="700">Key</text>
-<text x="465" y="844" font-size="18" fill="#223447" font-weight="700">Summary</text>
-<text x="1010" y="844" font-size="18" fill="#223447" font-weight="700">Status</text>
-<text x="1245" y="844" font-size="18" fill="#223447" font-weight="700">Priority</text>
-<text x="60" y="888" font-size="19" fill="#223447" font-weight="400">Demo Operations</text>
-<text x="290" y="888" font-size="19" fill="#147fbc" font-weight="600">DEMO-101</text>
-<text x="465" y="888" font-size="20" fill="#223447" font-weight="400">Review the deployment checklist</text>
-<rect x="1000" y="859" width="190" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="1014" y="887" font-size="18" fill="#263d52" font-weight="600">In Progress ▾</text>
-<rect x="1235" y="859" width="120" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="1249" y="887" font-size="18" fill="#263d52" font-weight="600">P2 ▾</text>
-<text x="60" y="952" font-size="19" fill="#223447" font-weight="400">Demo Platform</text>
-<text x="290" y="952" font-size="19" fill="#147fbc" font-weight="600">DEMO-202</text>
-<text x="465" y="952" font-size="20" fill="#223447" font-weight="400">Prepare service handoff</text>
-<rect x="1000" y="923" width="190" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="1014" y="951" font-size="18" fill="#263d52" font-weight="600">To Do ▾</text>
-<rect x="1235" y="923" width="120" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="1249" y="951" font-size="18" fill="#263d52" font-weight="600">P4 ▾</text>
-<text x="60" y="1016" font-size="19" fill="#223447" font-weight="400">Demo Operations</text>
-<text x="290" y="1016" font-size="19" fill="#147fbc" font-weight="600">DEMO-103</text>
-<text x="465" y="1016" font-size="20" fill="#223447" font-weight="400">Update the support guide</text>
-<rect x="1000" y="987" width="190" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="1014" y="1015" font-size="18" fill="#263d52" font-weight="600">To Do ▾</text>
-<rect x="1235" y="987" width="120" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="1249" y="1015" font-size="18" fill="#263d52" font-weight="600">P6 ▾</text>
-<text x="60" y="1061" font-size="18" fill="#526779" font-weight="400">Expand a task for local notes, Jira updates and Local / Team planning.</text>
-<text x="40" y="1115" font-size="20" fill="#223447" font-weight="600">Distinct tasks count once in metrics; saved entries keep their own local notes and planning.</text>
-<text x="40" y="1144" font-size="18" fill="#526779" font-weight="400">Reference: Task Management → Combined Open Work. Actual controls and spacing vary with expanded rows.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="840" viewBox="0 0 1100 840" role="img" aria-labelledby="title desc">
+<title id="title">Task Management: Combined Open Work</title><desc id="desc">Illustrative Task Management page on the Combined Open Work tab: selected Jira sites, My Metrics, report card and the Managed tasks table with filters.</desc>
+<g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<rect x="0" y="0" width="1100" height="840" fill="#fff"/>
+<defs><linearGradient id="nav" x1="0" y1="0" x2="1" y2="0.2"><stop offset="0" stop-color="#054d78"/><stop offset="0.52" stop-color="#0c93d9"/><stop offset="1" stop-color="#16b0f2"/></linearGradient><linearGradient id="joke" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FDD219"/><stop offset="0.55" stop-color="#FB9429"/><stop offset="1" stop-color="#F95E4A"/></linearGradient></defs>
+<rect x="0" y="0" width="1100" height="56" rx="0" fill="url(#nav)" stroke="none" stroke-width="1" />
+<rect x="0" y="54" width="1100" height="2" rx="0" fill="#e1c24a" stroke="none" stroke-width="1" />
+<rect x="24" y="10" width="34" height="34" rx="8" fill="#f5833a" stroke="none" stroke-width="1" />
+<rect x="31" y="17" width="20" height="20" rx="4" fill="#fff2e0" stroke="none" stroke-width="1" />
+<rect x="34" y="24" width="14" height="3" rx="1" fill="#f5833a" stroke="none" stroke-width="1" />
+<rect x="34" y="30" width="14" height="3" rx="1" fill="#f5833a" stroke="none" stroke-width="1" />
+<text x="68" y="35" font-size="19" fill="#FDD219" font-weight="800" text-anchor="start">The Docket</text>
+<text x="261" y="33" font-size="10" fill="#fff" font-weight="700" text-anchor="start">SITE</text>
+<rect x="289" y="18" width="140" height="22" rx="11" fill="#f3f4f6" stroke="none" stroke-width="1" />
+<text x="300" y="33" font-size="12" fill="#222" font-weight="700" text-anchor="start">Demo Operations</text>
+<path d="M414 27 l3 4 l3 -4" fill="#333"/>
+<rect x="439" y="0" width="160" height="54" rx="0" fill="rgba(253,210,25,0.12)" stroke="none" stroke-width="1" />
+<rect x="439" y="51" width="160" height="3" rx="0" fill="#FDD219" stroke="none" stroke-width="1" />
+<text x="449" y="34" font-size="16" fill="#FDD219" font-weight="600" text-anchor="start">Task Management</text>
+<text x="615" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Metrics</text>
+<text x="705" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Project Managers</text>
+<text x="870" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Past Reports</text>
+<text x="995" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Chat</text>
+<circle cx="1060" cy="28" r="7" fill="none" stroke="#fff" stroke-width="2"/>
+<rect x="24" y="76" width="100" height="24" rx="12" fill="#fff" stroke="#9aa6b2" stroke-width="1" />
+<text x="74" y="92" font-size="12" fill="#333" font-weight="700" text-anchor="middle">My Work</text>
+<rect x="132" y="76" width="150" height="24" rx="12" fill="#e8f4fd" stroke="#2185d0" stroke-width="1" />
+<text x="207" y="92" font-size="12" fill="#0c6fb0" font-weight="700" text-anchor="middle">Combined Open Work</text>
+<line x1="24" y1="116" x2="1076" y2="116" stroke="#e2e8f0" stroke-width="1"/>
+<text x="24" y="150" font-size="22" fill="#1b1c1d" font-weight="700" text-anchor="start">Combined Open Work</text>
+<text x="24" y="176" font-size="13" fill="#1b1c1d" font-weight="400" text-anchor="start">Open issues assigned to the account configured for each selected Jira site. Open means the status category is not Done.</text>
+<rect x="24" y="196" width="1052" height="78" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<rect x="34" y="188" width="70" height="14" rx="0" fill="#fff" stroke="none" stroke-width="1" />
+<text x="38" y="199" font-size="12" fill="#555" font-weight="400" text-anchor="start">Jira sites</text>
+<rect x="34" y="214" width="15" height="15" rx="3" fill="#2185d0" stroke="none" stroke-width="1" />
+<path d="M37.5 221.5 l3 3 l5.5 -6.5" stroke="#fff" stroke-width="2" fill="none"/>
+<text x="58" y="227" font-size="13" fill="#1b1c1d" font-weight="400" text-anchor="start">Demo Operations (ops.example.test)</text>
+<rect x="34" y="242" width="15" height="15" rx="3" fill="#2185d0" stroke="none" stroke-width="1" />
+<path d="M37.5 249.5 l3 3 l5.5 -6.5" stroke="#fff" stroke-width="2" fill="none"/>
+<text x="58" y="255" font-size="13" fill="#1b1c1d" font-weight="400" text-anchor="start">Demo Platform (platform.example.test)</text>
+<rect x="24" y="292" width="86" height="36" rx="4" fill="#2185d0" stroke="none" stroke-width="1" />
+<text x="67.0" y="314.9" font-size="14" fill="#fff" font-weight="700" text-anchor="middle">Refresh</text>
+<rect x="24" y="348" width="1052" height="40" rx="8" fill="#f1f5f9" stroke="#d9dee5" stroke-width="1" />
+<text x="38" y="373" font-size="14" fill="#0f172a" font-weight="700" text-anchor="start">📊 My Metrics</text>
+<rect x="970" y="357" width="70" height="22" rx="11" fill="#fff" stroke="#d9dee5" stroke-width="1" />
+<text x="1005" y="372" font-size="12" fill="#334155" font-weight="600" text-anchor="middle">3 open</text>
+<text x="1058" y="374" font-size="13" fill="#6b7785" font-weight="400" text-anchor="middle">⌃</text>
+<rect x="24" y="388" width="1052" height="78" rx="0" fill="#fff" stroke="#d9dee5" stroke-width="1" />
+<text x="40" y="414" font-size="14" fill="#1b1c1d" font-weight="700" text-anchor="start">Combined Work</text>
+<rect x="40" y="424" width="68.72" height="22" rx="11" fill="#e2e6f1" stroke="none" stroke-width="1" />
+<text x="50" y="439" font-size="12" fill="#334155" font-weight="600" text-anchor="start">3 total</text>
+<rect x="116.72" y="424" width="61.76" height="22" rx="11" fill="#e2e6f1" stroke="none" stroke-width="1" />
+<text x="126.72" y="439" font-size="12" fill="#334155" font-weight="600" text-anchor="start">3 open</text>
+<rect x="186.48" y="424" width="124.39999999999999" height="22" rx="11" fill="#e0fce6" stroke="none" stroke-width="1" />
+<text x="196.48" y="439" font-size="12" fill="#16a34a" font-weight="600" text-anchor="start">0 resolved (0%)</text>
+<rect x="318.88" y="424" width="82.63999999999999" height="22" rx="11" fill="#f5e3e3" stroke="none" stroke-width="1" />
+<text x="328.88" y="439" font-size="12" fill="#b91c1c" font-weight="600" text-anchor="start">1 overdue</text>
+<text x="40" y="466" font-size="1" fill="#1b1c1d" font-weight="400" text-anchor="start"></text>
+<rect x="24" y="482" width="1052" height="38" rx="8" fill="#f1f5f9" stroke="#d9dee5" stroke-width="1" />
+<text x="38" y="506" font-size="14" fill="#0f172a" font-weight="700" text-anchor="start">📄 Combined Work Report</text>
+<text x="1058" y="507" font-size="13" fill="#6b7785" font-weight="400" text-anchor="middle">⌄</text>
+<rect x="24" y="538" width="232" height="34" rx="4" fill="#dfe0e2" stroke="none" stroke-width="1" />
+<rect x="24" y="538" width="130" height="34" rx="0" fill="#e8e9ea" stroke="none" stroke-width="1" />
+<text x="89" y="560" font-size="14" fill="#333" font-weight="700" text-anchor="middle">Managed tasks</text>
+<text x="205" y="560" font-size="14" fill="#555" font-weight="600" text-anchor="middle">List</text>
+<text x="24" y="606" font-size="13" fill="#1b1c1d" font-weight="700" text-anchor="start">Combined managed tasks</text>
+<text x="24" y="628" font-size="12" fill="#444" font-weight="400" text-anchor="start">Loaded 3 of 3 matched</text>
+<text x="24" y="652" font-size="11" fill="#555" font-weight="400" text-anchor="start">Search</text>
+<rect x="62" y="640" width="150" height="22" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="72" y="654.85" font-size="11" fill="#9aa3ad" font-weight="400" text-anchor="start">keyword or phrase</text>
+<text x="224" y="652" font-size="11" fill="#555" font-weight="400" text-anchor="start">Filter by key</text>
+<rect x="290" y="640" width="140" height="22" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="300" y="654.85" font-size="11" fill="#9aa3ad" font-weight="400" text-anchor="start">e.g. DEMO-123 or 123</text>
+<text x="442" y="652" font-size="11" fill="#555" font-weight="400" text-anchor="start">Status</text>
+<rect x="480" y="640" width="130" height="22" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="490" y="654.85" font-size="11" fill="#333" font-weight="400" text-anchor="start">All statuses</text>
+<path d="M592 649.0 l4 4 l4 -4" stroke="#555" stroke-width="1.6" fill="none"/>
+<text x="622" y="652" font-size="11" fill="#555" font-weight="400" text-anchor="start">Assignee</text>
+<rect x="670" y="640" width="140" height="22" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="680" y="654.85" font-size="11" fill="#333" font-weight="400" text-anchor="start">All assignees</text>
+<path d="M792 649.0 l4 4 l4 -4" stroke="#555" stroke-width="1.6" fill="none"/>
+<rect x="822" y="644" width="12" height="12" rx="3" fill="#fff" stroke="#8c96a3" stroke-width="1" />
+<text x="840" y="653" font-size="11" fill="#555" font-weight="400" text-anchor="start">Sub-tasks &amp; Bugs only</text>
+<rect x="24" y="674" width="70" height="24" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="59.0" y="689.85" font-size="11" fill="#444" font-weight="600" text-anchor="middle">Expand all</text>
+<rect x="100" y="674" width="80" height="24" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="140.0" y="689.85" font-size="11" fill="#444" font-weight="600" text-anchor="middle">Collapse all</text>
+<rect x="24" y="704" width="1052" height="28" rx="0" fill="#f9fafc" stroke="#d9dee5" stroke-width="1" />
+<text x="36" y="723" font-size="12" fill="#1b1c1d" font-weight="700" text-anchor="start">Jira site</text>
+<text x="200" y="723" font-size="12" fill="#1b1c1d" font-weight="700" text-anchor="start">Key</text>
+<text x="420" y="723" font-size="12" fill="#1b1c1d" font-weight="700" text-anchor="start">Summary</text>
+<text x="800" y="723" font-size="12" fill="#1b1c1d" font-weight="700" text-anchor="start">Status</text>
+<text x="36" y="756" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">Demo Operations</text>
+<text x="36" y="772" font-size="12" fill="#5f6b7a" font-weight="400" text-anchor="start">ops.example.test</text>
+<text x="190" y="756" font-size="10" fill="#1d4ed8" font-weight="700" text-anchor="start">▾ Plan ▸</text>
+<text x="238" y="756" font-size="14" fill="#2563eb" font-weight="600" text-anchor="start">DEMO-101</text>
+<text x="330" y="756" font-size="12" fill="#555" font-weight="400" text-anchor="start">Task</text>
+<text x="420" y="756" font-size="12" fill="#1b1c1d" font-weight="400" text-anchor="start">Review the deployment checklist</text>
+<rect x="800" y="742" width="130" height="22" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="810" y="757.2" font-size="12" fill="#333" font-weight="400" text-anchor="start">In Progress</text>
+<path d="M912 751.0 l4 4 l4 -4" stroke="#555" stroke-width="1.6" fill="none"/>
+<rect x="800" y="768" width="130" height="20" rx="10" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="865.0" y="781.85" font-size="11" fill="#444" font-weight="600" text-anchor="middle">Update Status</text>
+<text x="24" y="826" font-size="12" fill="#7a8794" font-weight="400" text-anchor="start">Documentation mockup. Synthetic data; simplified layout.</text>
 </g>
 </svg>

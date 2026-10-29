@@ -1,6 +1,6 @@
 # Documentation images
 
-The main [README](../../README.md), [end-user guide](../END_USER_GUIDE.md) and [Jira setup guide](../JIRA_SETUP.md) use the current mockups below. These are **documentation mockups with synthetic data and simplified layouts**, not screenshots of a live Jira connection or proof of a browser test. Labels and behavior were checked against the implementation on 2026-10-16; the week-plan and duplicate-check mockups on 2026-10-29.
+The main [README](../../README.md), [end-user guide](../END_USER_GUIDE.md) and [Jira setup guide](../JIRA_SETUP.md) use the current mockups below. These are **documentation mockups with synthetic data and simplified layouts**, not screenshots of a live Jira connection or proof of a browser test. Labels and behavior were checked against the implementation on 2026-10-16; all mockups were redrawn on 2026-10-29 from the running app (navigation bar, panel headers, buttons, filters and the Create Jira issue modal), keeping only the controls each document needs.
 
 ## Current mockups
 

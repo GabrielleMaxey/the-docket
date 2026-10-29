@@ -1,33 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="765" viewBox="0 0 1440 765" role="img" aria-labelledby="title desc">
-<title id="title">Dismiss the older-browser-data notice</title><desc id="desc">Illustrative before-and-after view of the recovery notice and its Dismiss button. Dismissal remembers acknowledgement in this browser and leaves older data unchanged.</desc>
-<defs><linearGradient id="nav"><stop stop-color="#054d78"/><stop offset="1" stop-color="#16b0f2"/></linearGradient></defs>
-<g font-family="Arial, Helvetica, sans-serif">
-<rect x="0" y="0" width="1440" height="765" rx="0" fill="#f4f7fa" stroke="#f4f7fa"/>
-<rect x="0" y="0" width="1440" height="62" rx="0" fill="url(#nav)" stroke="none"/>
-<text x="32" y="41" font-size="27" fill="#fdd219" font-weight="700">The Docket</text>
-<text x="360" y="39" font-size="19" fill="#fdd219" font-weight="600">Task Management</text>
-<rect x="360" y="53" width="221" height="3" rx="0" fill="#fdd219" stroke="none"/>
-<text x="604" y="39" font-size="19" fill="white" font-weight="600">Metrics</text>
-<text x="729" y="39" font-size="19" fill="white" font-weight="600">Project Managers</text>
-<text x="965" y="39" font-size="19" fill="white" font-weight="600">Past Reports</text>
-<text x="1146" y="39" font-size="19" fill="white" font-weight="600">Chat</text>
-<text x="1239" y="39" font-size="19" fill="white" font-weight="600">Settings</text>
-<rect x="32" y="82" width="1376" height="40" rx="4" fill="#fff5d5" stroke="#eddfaa"/>
-<text x="49" y="109" font-size="17" fill="#6e5720" font-weight="700">DOCUMENTATION MOCKUP  •  SYNTHETIC DATA  •  SIMPLIFIED LAYOUT</text>
-<text x="40" y="170" font-size="30" fill="#223447" font-weight="700">Older browser data: acknowledge without deleting</text>
-<text x="40" y="222" font-size="22" fill="#223447" font-weight="700">Before dismissal</text>
-<rect x="40" y="245" width="1360" height="176" rx="8" fill="white" stroke="#dce4ec"/>
-<text x="66" y="286" font-size="22" fill="#223447" font-weight="400">Older browser data has an unknown Jira site. It is preserved for recovery</text>
-<text x="66" y="320" font-size="22" fill="#223447" font-weight="400">and has not been loaded into this site.</text>
-<rect x="66" y="349" width="122" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="80" y="377" font-size="18" fill="#263d52" font-weight="600">Dismiss</text>
-<text x="222" y="377" font-size="19" fill="#526779" font-weight="400">Acknowledge this notice in the current browser.</text>
-<text x="40" y="470" font-size="22" fill="#223447" font-weight="700">After dismissal</text>
-<rect x="40" y="490" width="1360" height="144" rx="8" fill="white" stroke="#dce4ec"/>
-<text x="66" y="531" font-size="26" fill="#223447" font-weight="700">Task Management</text>
-<text x="66" y="572" font-size="22" fill="#223447" font-weight="400">The notice is hidden. Your current site and saved work remain available.</text>
-<text x="66" y="606" font-size="20" fill="#526779" font-weight="400">Older records are still preserved; Dismiss does not import, reassign or erase them.</text>
-<text x="40" y="680" font-size="23" fill="#185f89" font-weight="700">Do not clear browser storage to dismiss this notice.</text>
-<text x="40" y="739" font-size="18" fill="#526779" font-weight="400">Acknowledgement survives reloads. If browser storage is blocked, dismissal lasts for the current session.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520" role="img" aria-labelledby="title desc">
+<title id="title">Dismiss the older-browser-data notice</title><desc id="desc">Illustrative before and after view of the older browser data notice and its Dismiss button. Dismissal leaves older data unchanged.</desc>
+<g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<rect x="0" y="0" width="1100" height="520" fill="#fff"/>
+<defs><linearGradient id="nav" x1="0" y1="0" x2="1" y2="0.2"><stop offset="0" stop-color="#054d78"/><stop offset="0.52" stop-color="#0c93d9"/><stop offset="1" stop-color="#16b0f2"/></linearGradient><linearGradient id="joke" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FDD219"/><stop offset="0.55" stop-color="#FB9429"/><stop offset="1" stop-color="#F95E4A"/></linearGradient></defs>
+<rect x="0" y="0" width="1100" height="56" rx="0" fill="url(#nav)" stroke="none" stroke-width="1" />
+<rect x="0" y="54" width="1100" height="2" rx="0" fill="#e1c24a" stroke="none" stroke-width="1" />
+<rect x="24" y="10" width="34" height="34" rx="8" fill="#f5833a" stroke="none" stroke-width="1" />
+<rect x="31" y="17" width="20" height="20" rx="4" fill="#fff2e0" stroke="none" stroke-width="1" />
+<rect x="34" y="24" width="14" height="3" rx="1" fill="#f5833a" stroke="none" stroke-width="1" />
+<rect x="34" y="30" width="14" height="3" rx="1" fill="#f5833a" stroke="none" stroke-width="1" />
+<text x="68" y="35" font-size="19" fill="#FDD219" font-weight="800" text-anchor="start">The Docket</text>
+<text x="261" y="33" font-size="10" fill="#fff" font-weight="700" text-anchor="start">SITE</text>
+<rect x="289" y="18" width="140" height="22" rx="11" fill="#f3f4f6" stroke="none" stroke-width="1" />
+<text x="300" y="33" font-size="12" fill="#222" font-weight="700" text-anchor="start">Demo Operations</text>
+<path d="M414 27 l3 4 l3 -4" fill="#333"/>
+<rect x="439" y="0" width="160" height="54" rx="0" fill="rgba(253,210,25,0.12)" stroke="none" stroke-width="1" />
+<rect x="439" y="51" width="160" height="3" rx="0" fill="#FDD219" stroke="none" stroke-width="1" />
+<text x="449" y="34" font-size="16" fill="#FDD219" font-weight="600" text-anchor="start">Task Management</text>
+<text x="615" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Metrics</text>
+<text x="705" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Project Managers</text>
+<text x="870" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Past Reports</text>
+<text x="995" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Chat</text>
+<circle cx="1060" cy="28" r="7" fill="none" stroke="#fff" stroke-width="2"/>
+<text x="24" y="96" font-size="18" fill="#1b1c1d" font-weight="700" text-anchor="start">Older browser data notice</text>
+<text x="24" y="118" font-size="13" fill="#5f6b7a" font-weight="400" text-anchor="start">A plain status line under the navigation bar. Dismiss hides it; no older data is deleted or imported.</text>
+<text x="24" y="156" font-size="13" fill="#0c6fb0" font-weight="700" text-anchor="start">Before dismissal</text>
+<rect x="24" y="168" width="1052" height="120" rx="6" fill="#fff" stroke="#d9dee5" stroke-width="1" />
+<text x="36" y="198" font-size="13" fill="#1b1c1d" font-weight="400" text-anchor="start">Older browser data has an unknown Jira site. It is preserved for recovery and has not been loaded into this site.</text>
+<rect x="36" y="226" width="66" height="24" rx="3" fill="#efefef" stroke="#767676" stroke-width="1" />
+<text x="69" y="242" font-size="12" fill="#000" font-weight="400" text-anchor="middle">Dismiss</text>
+<text x="36" y="270" font-size="12" fill="#5f6b7a" font-weight="400" text-anchor="start">Task Management page content continues below.</text>
+<text x="24" y="322" font-size="13" fill="#0c6fb0" font-weight="700" text-anchor="start">After dismissal</text>
+<rect x="24" y="334" width="1052" height="80" rx="6" fill="#fff" stroke="#d9dee5" stroke-width="1" />
+<text x="36" y="366" font-size="13" fill="#1b1c1d" font-weight="400" text-anchor="start">The notice is hidden. Reloading and switching sites keep it hidden in this browser.</text>
+<text x="36" y="388" font-size="13" fill="#5f6b7a" font-weight="400" text-anchor="start">Older records are still preserved. Dismiss does not import, reassign or erase them.</text>
+<text x="24" y="446" font-size="13" fill="#1b1c1d" font-weight="700" text-anchor="start">Do not clear browser storage to dismiss this notice. If storage is blocked, dismissal lasts for the current session.</text>
+<text x="24" y="500" font-size="12" fill="#7a8794" font-weight="400" text-anchor="start">Documentation mockup. Synthetic data; simplified layout.</text>
 </g>
 </svg>
