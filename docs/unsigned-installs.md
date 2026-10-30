@@ -7,4 +7,4 @@ Use a local project checkout with Node, dependencies, and a configured project `
 - `npm run dev:all` starts the browser UI and local API.
 - `npm run desktop:dev` starts the local Electron app and its API.
 
-See the [quick start and native SQLite recovery](../README.md#quick-start) or [Jira setup](./JIRA_SETUP.md). If device policy blocks Electron, use browser mode and optionally [install the browser UI as its own application window](./END_USER_GUIDE.md#install-as-its-own-application-window).
+See the [quick start and native SQLite recovery](../README.md#quick-start) or [Jira setup](JIRA_SETUP.md). If device policy blocks Electron, use browser mode and optionally [install the browser UI as its own application window](user/getting-started.md#install-as-its-own-application-window).

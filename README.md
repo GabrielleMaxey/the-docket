@@ -4,57 +4,18 @@
 
 ---
 
-## Current workflow mockups
+## Documentation
 
-**Combined Open Work — Managed tasks, My Metrics, and source-aware editing**
-![Combined Open Work documentation mockup](./docs/images/mockup-combined-work.png)
-*Documentation mockup — synthetic data; simplified layout.*
+| I want to… | Read |
+|---|---|
+| Use the app day to day | [User guide](docs/END_USER_GUIDE.md) |
+| Connect Jira, set presets and AI providers | [Jira setup](docs/JIRA_SETUP.md) |
+| Understand or change the code | [Developer guide](docs/DEVELOPER_GUIDE.md) |
+| Run the optional team database | [Team database guide](docs/TEAM_DATABASE.md) |
+| See the screens | [Screenshots and mockups](docs/GALLERY.md) |
 
-**Settings → Team data — explicit, optional team database access**
-![Team database settings documentation mockup](./docs/images/mockup-team-db-settings.png)
-*Documentation mockup — synthetic data; simplified layout.*
-
-**Older browser data — dismiss the notice while preserving the original data**
-![Recovery notice documentation mockup](./docs/images/mockup-recovery-notice.png)
-*Documentation mockup — synthetic data; simplified layout.*
-
-**Help me plan my week — your issues only, in suggested order, with a score key**
-![Week plan documentation mockup](./docs/images/mockup-week-plan.png)
-*Documentation mockup — synthetic data; simplified layout.*
-
-**Create Issue — possible existing issues shown above Close / Create**
-![Possible existing issues documentation mockup](./docs/images/mockup-duplicate-check.png)
-*Documentation mockup — synthetic data; simplified layout.*
-
-[Mockup sources and provenance](./docs/images/README.md).
-
-<details>
-<summary>Historical reference screenshots — earlier application layouts</summary>
-
-These older captures remain useful for orientation. They do not show the current Combined Work, Team DB opt-in, or recovery-notice behavior.
-
-**Task Management — daily JQL runs with inline status updates, priorities, and notes**
-![Task Management table](./docs/images/screenshot-task-table.png)
-
-**My Metrics — IC capacity tracking with WIP limit and open-issue breakdown by status**
-![My Metrics — My Capacity](./docs/images/screenshot-metrics.png)
-
-**Metrics — overall project health at a glance**
-![Overall Status](./docs/images/screenshot-overall-status.png)
-
-**Metrics — per-project breakdown with status distribution charts**
-![Project Metrics](./docs/images/screenshot-project-metrics.png)
-
-**Project Managers — capacity planning with contributor workload by status**
-![Project Managers](./docs/images/screenshot-project-managers.png)
-
-**Chat — natural-language Jira questions backed by loaded data**
-![Chat](./docs/images/screenshot-chat.png)
-
-**Settings — Jira connection, presets, date fields, and contributor configuration**
-![Settings](./docs/images/screenshot-settings.png)
-
-</details>
+![Combined Open Work documentation mockup](docs/images/mockup-combined-work.png)
+*Documentation mockup — synthetic data; simplified layout. More in the [gallery](docs/GALLERY.md).*
 
 ---
 
@@ -83,7 +44,7 @@ The server reads credentials from its environment and authenticates requests to 
 
 **Project Managers** turns Contributor Metrics entries into a capacity view. It compares open issue counts against optional capacity targets, highlights overdue/blocked/stale work, and exports planning summaries. The **Asks** tab tracks exec or product-owner requests: create a Jira task from an ask (it links the new key and marks the ask done), or mark it done or canceled.
 
-**Week plans** cover only issues assigned to you, ranked by a transparent suggested-order score (priority, status, staleness, due date, blockers, your own P1–P20). **Create Issue** checks for possible existing issues before it creates or drafts, and titles under a bracketed parent follow `[Project - Area] short ask`. Generated reports follow fixed writing-style rules (exact figures, no vague verbs, no filler). Details are in the [end-user guide](./docs/END_USER_GUIDE.md#help-me-plan-my-week).
+**Week plans** cover only issues assigned to you, ranked by a transparent suggested-order score (priority, status, staleness, due date, blockers, your own P1–P20). **Create Issue** checks for possible existing issues before it creates or drafts, and titles under a bracketed parent follow `[Project - Area] short ask`. Generated reports follow fixed writing-style rules (exact figures, no vague verbs, no filler). Details are in the [end-user guide](docs/user/week-plan.md#help-me-plan-my-week).
 
 **Past Reports** is the local archive for generated Task Management reports, week plans, Metrics reports, and Chat replies saved with **Save to Past Reports**.
 
@@ -144,7 +105,7 @@ npm run dev:all
 npm run desktop:dev
 ```
 
-Some corporate secure laptops may block Electron windows, local desktop apps, or the embedded proxy. If `npm run desktop:dev` is unavailable, run `npm run dev:all` and install the browser UI as its own desktop-style app window; see [END_USER_GUIDE.md](./docs/END_USER_GUIDE.md#install-as-its-own-application-window).
+Some corporate secure laptops may block Electron windows, local desktop apps, or the embedded proxy. If `npm run desktop:dev` is unavailable, run `npm run dev:all` and install the browser UI as its own desktop-style app window; see [END_USER_GUIDE.md](docs/user/getting-started.md#install-as-its-own-application-window).
 
 Packaged installers, including unsigned Mac `.dmg` and Windows NSIS installers, are unsupported. Both supported launch workflows require the project checkout, Node, installed dependencies, and the local `.env` setup above. `npm run build` builds the browser assets; `npm run desktop:build` remains an alias for that build.
 
@@ -176,92 +137,19 @@ Electron runs its renderer in a sandbox with context isolation and no Node integ
 
 Application and Vite responses carry a Content Security Policy. Production scripts come from the app itself. Development permits only the exact hashed React refresh preamble, the local Vite HMR socket at port 5173, and the actual local API port. Semantic UI and existing inline styles require `style-src 'unsafe-inline'`; fonts use only `fonts.googleapis.com` and `fonts.gstatic.com`. Images permit the app, blobs and data URLs; development also permits the local API image endpoint. The existing joke ticker connects only to `icanhazdadjoke.com` and `v2.jokeapi.dev`. AI and Rovo API calls remain server-side, so they receive no renderer script or connection allowance. CSP blocks plugins/objects, base URL injection, and embedding the app in another page.
 
-Full setup details → **[JIRA_SETUP.md](./docs/JIRA_SETUP.md)**
-Code architecture → **[DEVELOPER_GUIDE.md](./docs/DEVELOPER_GUIDE.md)**
-Day-to-day usage → **[END_USER_GUIDE.md](./docs/END_USER_GUIDE.md)**
+Full setup details → **[JIRA_SETUP.md](docs/JIRA_SETUP.md)**
+Code architecture → **[DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)**
+Day-to-day usage → **[END_USER_GUIDE.md](docs/END_USER_GUIDE.md)**
 
 ---
 
 ## Pull-request validation
 
-The read-only pull-request/manual workflow runs `npm ci`, the Jira client export check, `npm test`, `npm run test:team-db`, and `npm run build` with Node from `.nvmrc`. It uses a disposable PostgreSQL 16 service with synthetic data; no `.env`, Jira credentials, company secrets or installer artifacts are required.
-
-`npm test` explicitly skips real PostgreSQL cases when `DOCKET_TEST_DATABASE_URL` is absent. `npm run test:team-db` instead fails immediately without that variable and runs all database integration files, including migration repeatability, transactional rollback, import conflicts and Team export. Database files run sequentially because they share fixture tables; the intentional race tests still exercise concurrent transactions. Use an explicitly disposable loopback database named `docket_test_*` and an explicit port; every SQL fixture validates this boundary before destructive cleanup. Never point this test command at a shared database. For example, with your own disposable service:
-
-```sh
-DOCKET_TEST_DATABASE_URL=postgresql://docket_test:synthetic_test_only@127.0.0.1:5432/docket_test_ci npm run test:team-db
-```
-
-The missing-database command regression uses npm’s `npm_execpath` to run its JavaScript CLI through the current Node executable on every platform. Run tests through npm; for a focused `node --test` invocation, explicitly set `npm_execpath` to your installed `npm-cli.js`.
-
-Unit and PostgreSQL results are reported separately in CI. Company SonarQube remains a required pre-merge gate with no newly introduced Major/Critical findings; local tests and the CI workflow do not replace it. See the [implementation handoff](docs/superpowers/2026-10-14-implementation-handoff.md) for actual verification, recovery instructions and outstanding checks.
+CI runs install, tests, the PostgreSQL integration suite and the build. Commands and details are in the [developer guide](docs/dev/contributing.md#pull-request-validation).
 
 ## Optional shared team data (PostgreSQL)
 
-Local SQLite works without a team database. **Settings → Team data → Use team DB** defaults to off, even when a database URL is configured. This preference is saved app-wide across Jira sites and server restarts. To enable shared data, have the database owner provide an approved PostgreSQL database and set server-only `TEAM_PRIORITY_DATABASE_URL` (explicit user, hostname and database). Optionally set `TEAM_PRIORITY_DATABASE_CA_FILE` to an absolute PEM trust-file path. Keep credentials out of browser settings, source control and exported files.
-
-Remote connections always verify TLS against the system trust roots or the supplied CA. Remove SSL options from the URL when providing a CA; conflicting URL options are rejected. URLs may contain only `sslmode=verify-full`, or `sslmode=disable` for explicit loopback development/test hosts. TLS-free access is allowed only for `localhost`, `127.0.0.1` or `::1` outside production. Production requires verified TLS even on loopback. The pool opens lazily, has at most five connections, a five-second connect timeout and a thirty-second statement timeout.
-
-With that server environment exported, run:
-
-```sh
-npm run team-db:migrate
-npm run dev:all
-```
-
-The migration CLI reads the exported environment; it does not read `.env`. The API also supports its normal server `.env`. Migrations run only when explicitly requested. Version records in `team_schema_versions` and a transaction-level migration lock make repeated/concurrent runs safe. A failed migration rolls back; correct the reported setup problem and rerun. Before an upgrade, use your approved database backup process; restore that backup into a separate database for recovery. Do not edit an applied migration or drop shared tables as a recovery shortcut.
-
-After configuring the server and running migrations, restart the API, open **Settings → Team data**, select **Use team DB**, and click **Refresh status** to confirm the connection. Configuration alone does not enable Team access.
-
-The warning **Team data not configured — set TEAM_PRIORITY_DATABASE_URL** appears only after a successful status check says Team is enabled and unconfigured. Off, loading, failed checks, and configured-but-disconnected states have separate messages. Turning Team off preserves local work and Team drafts; explicit Team imports, exports, and saves remain Team actions and are blocked rather than redirected to Local. Already dispatched work may finish. Other open browser tabs may need a refresh.
-
-Settings → **Team data** shows enabled/configured/connected status. An absent schema is unavailable with `npm run team-db:migrate` guidance, rather than an empty shared-data result. Individual priority/date edits and explicit priority push/pull remain available. Settings → **Import metadata** opens an editable CSV preview: fix values, exclude rows, add/remove supported columns, and review old/new values before **Approve changes**. **Save locally** and **Save to team** are equally primary choices for priority, note, Now/Next, requestor, planned start/finish, actual start and decision note. Team saving requires an enabled, configured, connected database and never falls back to local saving. Changing the destination reads that destination's values and requires fresh approval. Existing notes are protected unless replacement is checked for that row. Empty CSV cells preserve saved values; clearing an edited field is explicit. Importing never changes Jira or note images. Re-run your task query after saving.
-
-`POST /api/jira/issue-metadata/import/preview` accepts `{destination:'local'|'team',csvText?,rows?,supersedesPreviewId?}` with exactly one input. Edited rows are `{rowId,issueKey,selected,patch,replaceNote}`. Responses contain `previewId,siteContext,destination,rows,diff,errors,ignoredHeaders,expiresAt`; diff includes supported saved values and approved old/new changes. `supersedesPreviewId` replaces only an uncommitted, unexpired preview bound to the same accepted site context; invalid replacement retains the old preview. Five live previews can wait for at most 15 minutes. Approval alone writes nothing; `POST /api/jira/issue-metadata/import/commit` accepts only the reviewed `previewId` for saving. Authoritative patches/expected values remain private on the server. Conflicts reject the whole batch and require a new preview; site switching or API restart also requires re-review. Up to five successful results are retained separately for 60 seconds for duplicate-submit confirmation. A network failure has an unknown outcome: retry the same save before starting another destination. The obsolete `/api/jira/issue-metadata/import` and `/api/team-priority/import-csv` mutation endpoints return 409 `IMPORT_PREVIEW_REQUIRED` with Settings guidance. Full team reads remain at `POST /api/team-priority/metadata/bulk`.
-
-Shared identity is the accepted server Jira hostname plus issue key. The browser never selects a hostname through a payload. Priority zero clears only priority. Clearing date tracking clears start/complete/planned dates and PM override, preserving notes, follow-up, requestor, open-decision information, pin and priority. SQL DATE values cross the store boundary as `YYYY-MM-DD` strings or null; legacy date reads retain empty-string clears. Note images and local image paths are not stored in team rows. Compatibility date reads include only explicitly shared tracking records, so shared priority alone does not override personal planning inheritance. Explicit false/empty tracking writes retain shared presence. Deliberate date-tracking deletion removes that presence when requestor/open-decision note are empty and the decision flag is false; retained requestor/decision data keeps it. The internal marker is not returned as metadata. Older consolidated false-only/cleared rows lack recoverable provenance: the migration backfills meaningful nondefaults only, and intentionally shared empty records need manual re-saving. Shared programs retain source-qualified epic roots and are returned only for the accepted site; there are no built-in seed programs.
-
-### Explicit migration of old demo exports
-
-There is no automatic MongoDB/Atlas connection or startup migration. Preserve the original JSON exports unchanged. Prepare a separate annotated JSON copy containing the old collection arrays below, with a `source` identifier on every issue row. Old issue keys alone do not establish a Jira site. Convert each program epic string into an explicit `{ "source": "old-demo-a", "issueKey": "ABC-1" }` reference using verified source knowledge; do not guess. Supply a separate source-to-canonical-hostname mapping file. Missing or unknown source mappings and unknown collections fail before a transaction opens.
-
-`annotated-demo.json` (synthetic example):
-
-```json
-{
-  "team_issue_priorities": [
-    { "_id": "ABC-1", "source": "old-demo-a", "priority": 4 }
-  ],
-  "team_issue_dates": [
-    { "_id": "ABC-1", "source": "old-demo-a", "startDate": "2026-10-01", "plannedFinish": "2026-10-05", "requestor": "Synthetic requestor" }
-  ],
-  "shared_programs": [
-    { "slug": "synthetic", "displayName": "Synthetic", "enabled": true,
-      "epicRoots": [{ "source": "old-demo-a", "issueKey": "ABC-1" }] }
-  ]
-}
-```
-
-`site-map.json`:
-
-```json
-{ "old-demo-a": "jira.example.test" }
-```
-
-```sh
-npm run team-db:import-demo -- annotated-demo.json site-map.json
-```
-
-Issue records accept `_id` or `issueKey`. Date records preserve the existing `startDate`, `completeDate`, `hasOpenDecision`, `plannedStart`, `plannedFinish`, `pmOverride`, `requestor`, and `openDecisionNote` fields. Export-only IDs/audit fields are not imported; writes are attributed to `explicit-demo-migration`. Program display/enabled settings are upserted and explicitly mapped roots are merged. All collections commit together or roll back together, and input files are read only. Repeating the same import does not duplicate program roots. Review the annotated copy and mapping before running; this explicit command writes team data immediately.
-
-### Team database validation
-
-```sh
-node --test tests/teamPriorityPostgres.test.mjs tests/teamPriorityRoutes.test.mjs
-DOCKET_TEST_DATABASE_URL=postgresql://docket_test@127.0.0.1:55432/docket_test_application_review node --test tests/teamPriorityPostgres.test.mjs tests/teamPriorityRoutes.test.mjs
-```
-
-The first command skips SQL integration cases. The second requires your own disposable `docket_test_*` database, explicit loopback host/port and PostgreSQL server; it must never target a company or personal database. Tests verify real SQL site isolation, fields, clears, conflicts, migrations and rollback. CI's PostgreSQL 16 job must set the URL and reject skipped integration cases. Local PostgreSQL 14.1 fixture evidence does not establish production/CI compatibility. Company SonarQube remains a required pre-merge gate; no Ruff substitution applies to this JavaScript code.
+Local SQLite works without a team database, and **Use team DB** defaults to off. Setup, TLS, migrations, backup and recovery are in the [Team database guide](docs/TEAM_DATABASE.md).
 
 ## Excel task export API
 
