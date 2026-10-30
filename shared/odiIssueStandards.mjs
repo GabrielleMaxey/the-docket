@@ -1,5 +1,5 @@
 // Source: ODI Confluence page "Jira Standards" (ODI Project Space Standards),
-// which references the Mountain Goat Software story-building method.
+// which references the Job Story format: https://www.mountaingoatsoftware.com/agile/job-stories-offer-a-viable-alternative-to-user-stories
 import { isLabelPrefixedTitle } from "./issueTitle.mjs";
 /**
  * Jira create standards — shared by server validation, UI pre-checks, and tests.
