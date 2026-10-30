@@ -55,7 +55,7 @@ Generate the report or week plan first on Task Management or Metrics, then ask C
 **Clear report** removes the report from the Task Management or Metrics page (and its browser cache). **Past Reports** keeps everything saved to the local database when you generated a report/plan, or when you clicked **Save to Past Reports** on a Chat reply. Clearing on-page does not delete archived rows.
 
 **Chat says it's not ready**
-For Anthropic/OpenAI/Ollama: set `CHAT_PROVIDER` and the matching API key in `.env` on the proxy host. For Rovo: set OAuth vars, sign in with Atlassian from Chat, or configure an LLM fallback key. See [JIRA_SETUP.md](../JIRA_SETUP.md) §8.
+For Anthropic/OpenAI/Ollama: set `CHAT_PROVIDER` and the matching API key in `.env` on the proxy host. For Rovo: set OAuth vars, sign in with Atlassian from Chat, or configure an LLM fallback key. See [Chat, reports and AI providers](../setup/chat-and-ai.md).
 
 **Metrics look stale**
 Click **Refresh status** after changing presets, due-date options, or watched people. A banner appears when filters differ from the stored snapshot.
