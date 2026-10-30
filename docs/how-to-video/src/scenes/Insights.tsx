@@ -606,11 +606,27 @@ const PlanBar: React.FC<{ at: number; row: (typeof GANTT_ROWS)[number]; width: n
   );
 };
 
-const Gantt: React.FC<{ at: number }> = ({ at }) => {
+const Gantt: React.FC<{ at: number; pinned?: boolean; highlight?: string }> = ({ at, pinned, highlight }) => {
   const W = 600;
   return (
     <Panel style={{ position: "relative" }}>
       <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 12, fontSize: 15 }}>
+        <span
+          style={{
+            padding: "4px 10px",
+            borderRadius: 6,
+            fontWeight: 700,
+            marginRight: 8,
+            height: 28,
+            boxSizing: "border-box",
+            display: "inline-flex",
+            alignItems: "center",
+            border: `1px solid ${pinned ? colors.orange : colors.border}`,
+            background: pinned ? `${colors.yellow}33` : "white",
+          }}
+        >
+          {pinned ? "📌 Pinned Issues" : "Mobile Checkout"} ▾
+        </span>
         {["30 day", "3 mo", "6 mo", "1 yr", "All"].map((z) => (
           <span
             key={z}
@@ -637,7 +653,7 @@ const Gantt: React.FC<{ at: number }> = ({ at }) => {
         <div style={{ width: 300, flexShrink: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 900, color: colors.muted, height: 26 }}>Task</div>
           {GANTT_ROWS.map((r) => (
-            <div key={r.key} style={{ height: 50, display: "flex", alignItems: "center", gap: 8, fontSize: 17, whiteSpace: "nowrap", overflow: "hidden" }}>
+            <div key={r.key} style={{ height: 50, display: "flex", alignItems: "center", gap: 8, fontSize: 17, background: r.key === highlight ? `${colors.yellow}55` : undefined, borderRadius: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
               <b style={{ color: colors.blue }}>{r.key}</b>
               <span style={{ color: colors.muted }}>{r.who}</span>
               <span>{r.summary}</span>
@@ -665,15 +681,74 @@ const Gantt: React.FC<{ at: number }> = ({ at }) => {
   );
 };
 
+// The "Plan ▸" panel from a Task Management row: the dates that drive the Gantt.
+const PlanPanel: React.FC<{ at: number; fillAt: number; pinAt: number }> = ({ at, fillAt, pinAt }) => {
+  const t = useSeconds();
+  const fields: [string, string, string][] = [
+    ["Planned start", "10/09/2026", "dashed bar"],
+    ["Start", "10/14/2026", "solid bar"],
+    ["Planned finish", "11/11/2026", "dashed bar"],
+    ["Complete", "mm/dd/yyyy", "solid bar"],
+    ["Requestor", "VP Product", ""],
+  ];
+  return (
+    <Appear at={at} style={{ marginTop: 14 }}>
+      <Panel title={<>Task Management · <span style={{ color: colors.blue }}>APP-150</span> · Plan ▾</>}>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
+          {fields.map(([label, value, hint], i) => (
+            <div key={label} style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: colors.muted }}>{label}</div>
+              <div
+                style={{
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 8,
+                  padding: "7px 10px",
+                  fontSize: 16,
+                  marginTop: 4,
+                  background: "white",
+                  color: t > fillAt + i * 0.4 && value !== "mm/dd/yyyy" ? colors.text : colors.grey,
+                }}
+              >
+                {t > fillAt + i * 0.4 ? value : "—"}
+              </div>
+              <div style={{ fontSize: 12, color: colors.muted, height: 16, marginTop: 3 }}>{hint}</div>
+            </div>
+          ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, paddingBottom: 26, whiteSpace: "nowrap" }}>
+            <span
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: 4,
+                border: `2px solid ${colors.blue}`,
+                background: t > pinAt ? colors.blue : "white",
+                color: "white",
+                fontSize: 14,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {t > pinAt ? "✓" : ""}
+            </span>
+            Pin to Gantt
+          </div>
+        </div>
+      </Panel>
+    </Appear>
+  );
+};
+
 export const ProjectManagersAsksScene: React.FC = () => {
   // Cues follow the narration: s[0] "own tab, three views", s[1] Capacity,
-  // s[2] save/download, s[3] Gantt, s[4] export / SharePoint report,
-  // s[5] Asks → Jira issue, s[6] asks CSV.
+  // s[2] save/download, s[3] Gantt, s[4] Plan panel, s[5] dates + Pin to Gantt,
+  // s[6] export / SharePoint report, s[7] Asks → Jira issue, s[8] asks CSV.
   const s = sentenceStarts("pmAsks");
   const t = useSeconds();
-  const view = t > s[5] - 0.2 ? "Asks" : t > s[3] - 0.2 ? "Gantt" : "Capacity";
-  const report = t > s[4] + 0.9;
-  const asked = t > s[5] + 4.6;
+  const view = t > s[7] - 0.2 ? "Asks" : t > s[3] - 0.2 ? "Gantt" : "Capacity";
+  const report = t > s[6] + 0.9;
+  const asked = t > s[7] + 4.6;
+  const pinned = t > s[5] + 2.6;
   return (
     <TutorialScene
       step="Plan capacity"
@@ -682,9 +757,9 @@ export const ProjectManagersAsksScene: React.FC = () => {
       lines={[
         { at: s[1], text: <><b>Capacity</b> vs. target, with risk flags.</> },
         { at: s[2], text: <>Save to <Key>Past Reports</Key> or download .md / .csv.</> },
-        { at: s[3], text: <><b>Gantt</b>: overdue in red, plans dashed.</> },
-        { at: s[4], text: <>Export it, or build a <Key>SharePoint report</Key>.</> },
-        { at: s[5], text: <><b>Asks</b> become Jira issues; download as CSV.</> },
+        { at: s[3], text: <><b>Gantt</b> dates come from each issue&apos;s <Key>Plan ▸</Key> panel.</> },
+        { at: s[6], text: <>Export it, or build a <Key>SharePoint report</Key>.</> },
+        { at: s[7], text: <><b>Asks</b> become Jira issues; download as CSV.</> },
       ]}
     >
       <AppWindow active="Project Managers">
@@ -720,10 +795,10 @@ export const ProjectManagersAsksScene: React.FC = () => {
               <div style={{ display: "flex", gap: 8 }}>
                 <Button variant="ghost" style={{ fontSize: 15, padding: "7px 12px" }}>Export (.md)</Button>
                 <Button variant="ghost" style={{ fontSize: 15, padding: "7px 12px" }}>Export (.csv)</Button>
-                <Button pressed={t > s[4] + 0.5 && t < s[4] + 0.8} style={{ fontSize: 15, padding: "7px 12px" }}>SharePoint report…</Button>
+                <Button pressed={t > s[6] + 0.5 && t < s[6] + 0.8} style={{ fontSize: 15, padding: "7px 12px" }}>SharePoint report…</Button>
               </div>
             ) : (
-              <Button variant="ghost" pressed={t > s[6] + 0.4 && t < s[6] + 0.7} style={{ fontSize: 15, padding: "7px 12px" }}>Download CSV</Button>
+              <Button variant="ghost" pressed={t > s[8] + 0.4 && t < s[8] + 0.7} style={{ fontSize: 15, padding: "7px 12px" }}>Download CSV</Button>
             )}
           </div>
 
@@ -753,13 +828,14 @@ export const ProjectManagersAsksScene: React.FC = () => {
             </>
           ) : view === "Gantt" ? (
             <div style={{ position: "relative" }}>
-              <Gantt at={s[3]} />
+              <Gantt at={s[3]} pinned={pinned} highlight={t > s[4] && t < s[6] ? "APP-150" : undefined} />
+              <PlanPanel at={s[4] + 0.3} fillAt={s[5]} pinAt={s[5] + 2.4} />
               {report ? (
                 <Appear
-                  at={s[4] + 0.9}
+                  at={s[6] + 0.9}
                   style={{ position: "absolute", right: -6, top: 30, width: 520, zIndex: 5, boxShadow: "0 30px 70px rgba(15,49,51,0.3)", borderRadius: 12 }}
                 >
-                  <Panel title="SharePoint Report — Mobile Checkout">
+                  <Panel title="SharePoint Report — Pinned Issues">
                     <div style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 10 }}>
                       • 6 total issues · 1 done · 2 in progress
                       <br />• 3 to do · <span style={{ color: "#dc2626", fontWeight: 700 }}>1 overdue</span>
@@ -767,12 +843,12 @@ export const ProjectManagersAsksScene: React.FC = () => {
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: colors.muted }}>Summary</div>
                     <div style={{ border: `1px solid ${colors.border}`, borderRadius: 8, padding: "8px 10px", fontSize: 16, minHeight: 48, margin: "6px 0 14px" }}>
-                      <Typed text="On track for the December demo. API retries are 6 days late; QA starts Dec 1." from={s[4] + 1.4} to={s[4] + 3.4} />
+                      <Typed text="On track for the December demo. API retries are 6 days late; QA starts Dec 1." from={s[6] + 1.4} to={s[6] + 3.4} />
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                       <Button variant="ghost" style={{ fontSize: 14, padding: "6px 10px" }}>Download HTML</Button>
                       <Button variant="ghost" style={{ fontSize: 14, padding: "6px 10px" }}>Copy HTML</Button>
-                      <Button pressed={t > s[4] + 3.8 && t < s[4] + 4.1} style={{ fontSize: 14, padding: "6px 10px" }}>Download chart PNG</Button>
+                      <Button pressed={t > s[6] + 3.8 && t < s[6] + 4.1} style={{ fontSize: 14, padding: "6px 10px" }}>Download chart PNG</Button>
                     </div>
                   </Panel>
                 </Appear>
@@ -780,7 +856,7 @@ export const ProjectManagersAsksScene: React.FC = () => {
             </div>
           ) : (
             <>
-              <Appear at={s[5]}>
+              <Appear at={s[7]}>
                 <Panel title="Asks">
                   <div style={{ display: "flex", gap: 14, fontSize: 15, fontWeight: 900, color: colors.muted, paddingBottom: 8 }}>
                     <span style={{ flex: 1 }}>Title</span>
@@ -802,7 +878,7 @@ export const ProjectManagersAsksScene: React.FC = () => {
                       </span>
                       <span style={{ width: 90, fontWeight: 700, color: colors.blue }}>{key}</span>
                       <span style={{ width: 140 }}>
-                        <Button variant="ghost" pressed={t > s[5] + 4.2 && t < s[5] + 4.5 && title.startsWith("Exec")} style={{ fontSize: 14, padding: "6px 10px" }}>
+                        <Button variant="ghost" pressed={t > s[7] + 4.2 && t < s[7] + 4.5 && title.startsWith("Exec")} style={{ fontSize: 14, padding: "6px 10px" }}>
                           Create a task
                         </Button>
                       </span>
@@ -810,7 +886,7 @@ export const ProjectManagersAsksScene: React.FC = () => {
                   ))}
                 </Panel>
               </Appear>
-              <Downloaded at={s[6] + 0.8} file="asks_2026-10-30.csv" />
+              <Downloaded at={s[8] + 0.8} file="asks_2026-10-30.csv" />
             </>
           )}
         </div>

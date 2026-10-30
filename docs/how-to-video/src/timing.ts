@@ -20,7 +20,7 @@ export const SCENE_LIST = [
   { key: "createIssue", seconds: 28, chapter: "Create Issue and duplicate check" },
   { key: "weekPlan", seconds: 28, chapter: "Plan your week" },
   { key: "reports", seconds: 32, chapter: "Reports" },
-  { key: "pmAsks", seconds: 37, chapter: "Project Managers and Asks" },
+  { key: "pmAsks", seconds: 40, chapter: "Project Managers and Asks" },
   { key: "chat", seconds: 15, chapter: "Chat" },
   { key: "dataSecurity", seconds: 46, chapter: "Data security" },
   { key: "recap", seconds: 21, chapter: "Where to start" },

@@ -1,6 +1,6 @@
 # The Docket how-to video: chapters
 
-Total length: 8:42
+Total length: 8:54
 
 | Time | Chapter |
 | --- | --- |
@@ -20,10 +20,10 @@ Total length: 8:42
 | 5:29 | Plan your week |
 | 5:56 | Reports |
 | 6:29 | Project Managers and Asks |
-| 7:08 | Chat |
-| 7:24 | Data security |
-| 8:10 | Where to start |
-| 8:32 | Wrap-up |
+| 7:20 | Chat |
+| 7:35 | Data security |
+| 8:22 | Where to start |
+| 8:44 | Wrap-up |
 
 Paste-ready list:
 
@@ -44,8 +44,8 @@ Paste-ready list:
 5:29 Plan your week
 5:56 Reports
 6:29 Project Managers and Asks
-7:08 Chat
-7:24 Data security
-8:10 Where to start
-8:32 Wrap-up
+7:20 Chat
+7:35 Data security
+8:22 Where to start
+8:44 Wrap-up
 ```

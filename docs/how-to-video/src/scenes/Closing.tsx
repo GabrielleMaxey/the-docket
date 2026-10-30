@@ -82,7 +82,7 @@ export const RecapScene: React.FC = () => (
         color="#2563EB"
         steps={[
           "Run your “My Work” query each morning",
-          "Push notes to Jira instead of writing status emails",
+          "Push notes to Jira instead of constantly switching tasks and tabs in Jira",
           "Generate 1:1 Prep before every check-in",
         ]}
       />
