@@ -64,7 +64,7 @@ Hard cap: **5** sites total. Settings stores site URLs and emails, not new API t
 
 ### Combined Open Work setup
 
-Combined Open Work uses enabled saved Jira entries, including when you normally use only one site. Add entries in **Settings → Jira sites**, test their connections, then open **Task Management → Combined Open Work**, select the entries and click **Load open work**. The active Jira site stays unchanged. **Managed tasks** supports source-bound editing; **List** provides an overview. My Metrics, report goals, and the **Past Reports → Combined Work** archive use a separate Combined Work scope. See the [user guide](./END_USER_GUIDE.md#combined-open-work).
+Combined Open Work uses enabled saved Jira entries, including when you normally use only one site. Add entries in **Settings → Jira sites**, test their connections, then open **Task Management → Combined Open Work**, select the entries and click **Load open work**. The active Jira site stays unchanged. **Managed tasks** supports source-bound editing; **List** provides an overview. My Metrics, report goals, and the **Past Reports → Combined Work** archive use a separate Combined Work scope. See the [user guide](user/combined-work.md#combined-open-work).
 
 ### Optional team database (PostgreSQL)
 
@@ -75,16 +75,16 @@ Local work does not require a company database. **Settings → Team data → Use
 3. Restart the API using your normal browser or desktop workflow after changing its environment.
 4. Open **Settings → Team data**, select **Use team DB**, and click **Refresh status**. Confirm **Connected to the team database.** before Team saves, imports, or exports.
 
-Remote PostgreSQL requires verified TLS; optional CA and URL restrictions, backup guidance, and explicit old-demo import steps are in [README → Optional shared team data](../README.md#optional-shared-team-data-postgresql). Do not place database credentials in browser settings or commit them.
+Remote PostgreSQL requires verified TLS; optional CA and URL restrictions, backup guidance, and explicit old-demo import steps are in [Team database guide](TEAM_DATABASE.md). Do not place database credentials in browser settings or commit them.
 
 The warning **Team data not configured — set TEAM_PRIORITY_DATABASE_URL** appears only after a successful check confirms enabled + unconfigured. Off, loading, failed checks, and configured-but-disconnected states are distinct. A missing schema requires the migration command. Turning Team off keeps local work and Team drafts; explicit Team actions are blocked without switching their destination to Local. Work already dispatched may finish. Refresh other browser tabs to see the current preference.
 
-![Team DB opt-in and status](./images/mockup-team-db-settings.png)
+![Team DB opt-in and status](images/mockup-team-db-settings.png)
 *Documentation mockup — synthetic data; simplified layout.*
 
 ### Local data and recovery
 
-Saved-entry notes, presets, and ordinary archives use `data/workweek-<instanceId>.sqlite`; legacy single-site data uses `data/workweek.sqlite`. The registry and Team preference use `data/instances-meta.sqlite`, personal To Dos use `data/personal-todos.sqlite`, and Combined Work goals/archive use `data/docket-combined.sqlite`. Keep those distinct stores when planning a backup; the [developer guide](./DEVELOPER_GUIDE.md#local-stores-and-request-context) describes their scope.
+Saved-entry notes, presets, and ordinary archives use `data/workweek-<instanceId>.sqlite`; legacy single-site data uses `data/workweek.sqlite`. The registry and Team preference use `data/instances-meta.sqlite`, personal To Dos use `data/personal-todos.sqlite`, and Combined Work goals/archive use `data/docket-combined.sqlite`. Keep those distinct stores when planning a backup; the [developer guide](dev/data-and-storage.md#local-stores-and-request-context) describes their scope.
 
 An **Older browser data has an unknown Jira site** banner means original unscoped browser records were preserved without being assigned to a site. **Dismiss** acknowledges the notice in this browser without deleting or importing records; if browser storage is blocked it lasts for the session. Do not infer ownership from an issue key alone. Personal To Do migration has a separate recovery notice for ambiguous source records.
 
@@ -152,7 +152,7 @@ npm run dev:all
 npm run desktop:dev
 ```
 
-Some corporate secure laptops may block Electron windows or local desktop app execution. If this option is unavailable, run browser mode with `npm run dev:all`, then set the browser UI up as its own desktop-style app window from Chrome or Edge; see [END_USER_GUIDE.md](./END_USER_GUIDE.md#install-as-its-own-application-window).
+Some corporate secure laptops may block Electron windows or local desktop app execution. If this option is unavailable, run browser mode with `npm run dev:all`, then set the browser UI up as its own desktop-style app window from Chrome or Edge; see [END_USER_GUIDE.md](user/getting-started.md#install-as-its-own-application-window).
 
 If `better-sqlite3` still fails after `npm install`:
 ```bash
@@ -370,7 +370,7 @@ npm run desktop:dev
 
 Electron starts the local proxy and loads the Vite UI at `http://localhost:5173`. Local development uses the project `.env` and `data/` folder. If a native SQLite ABI error persists, stop the app and run `npm run desktop:doctor` to rebuild for Electron and relaunch.
 
-For browser mode, stop the desktop workflow and run `npm run dev:all`; its API startup rebuilds SQLite for Node. If needed, run `npm rebuild better-sqlite3` first. On devices that block Electron, use browser mode and optionally [install the browser UI as its own application window](./END_USER_GUIDE.md#install-as-its-own-application-window).
+For browser mode, stop the desktop workflow and run `npm run dev:all`; its API startup rebuilds SQLite for Node. If needed, run `npm rebuild better-sqlite3` first. On devices that block Electron, use browser mode and optionally [install the browser UI as its own application window](user/getting-started.md#install-as-its-own-application-window).
 
 ---
 
