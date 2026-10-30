@@ -4,6 +4,7 @@
 //   node scripts/voiceover.mjs                 # ElevenLabs if ELEVENLABS_API_KEY is set, else macOS `say`
 //   node scripts/voiceover.mjs --say           # force the local macOS voice (free placeholder)
 //   node scripts/voiceover.mjs --durations     # only re-measure existing MP3s
+//   node scripts/voiceover.mjs --only intro,overview   # redo just these scenes
 //
 // Needs ffmpeg/ffprobe on PATH.
 import { execFileSync } from "node:child_process";
@@ -20,6 +21,11 @@ const narration = Object.fromEntries(
 );
 
 const args = new Set(process.argv.slice(2));
+const onlyArg = process.argv.find((a, i) => process.argv[i - 1] === "--only");
+const only = onlyArg ? new Set(onlyArg.split(",")) : null;
+
+// Spoken spellings, so the voice says the name right ("DOCK-it", not "DECK-et").
+const pronounce = (text) => text.replace(/\bDocket\b/g, "Dockit");
 const useSay = args.has("--say") || !process.env.ELEVENLABS_API_KEY;
 mkdirSync(outDir, { recursive: true });
 
@@ -46,10 +52,11 @@ const say = (text, file) => {
 
 if (!args.has("--durations")) {
   for (const [key, text] of Object.entries(narration)) {
+    if (only && !only.has(key)) continue;
     const file = join(outDir, `${key}.mp3`);
     console.log(`${useSay ? "say" : "elevenlabs"} → ${key}`);
-    if (useSay) say(text, file);
-    else await elevenlabs(text, file);
+    if (useSay) say(pronounce(text), file);
+    else await elevenlabs(pronounce(text), file);
   }
 }
 
