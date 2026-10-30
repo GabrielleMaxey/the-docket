@@ -57,3 +57,6 @@ MiscFIles/
 
 # Disposable local planning and mockups
 .superpowers/
+
+# How-to video project — kept local only, not published
+docs/how-to-video/
