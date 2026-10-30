@@ -40,7 +40,7 @@ Each task gets a **suggested-order score**; the plan lists the highest scores fi
 | Blockers | +30 if it blocks another open issue; +20 if an open issue blocks it |
 | Your priority (P1–P20) | Up to +30, highest for P1 |
 
-The scoring model is ported from the `jira-work-priority` skill in the ATS AI Toolkit and adapted for The Docket (it also reads your own P1–P20 priorities). The score is a relative ordering, not a measure of effort. The plan opens with one line saying tasks are ordered by this score (higher means do sooner), and each task lists the reasons behind its score.
+The scoring model is ported from the `jira-work-priority` skill in the [ATS AI Toolkit](https://github.com/LumenTech-Prod/service-assurance-ip-ats-agents-specs-prompts) and adapted for The Docket (it also reads your own P1–P20 priorities). The score is a relative ordering, not a measure of effort. The plan opens with one line saying tasks are ordered by this score (higher means do sooner), and each task lists the reasons behind its score.
 
 **How the plan treats time**
 

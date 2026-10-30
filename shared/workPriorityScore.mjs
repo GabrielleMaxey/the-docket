@@ -1,5 +1,5 @@
 // Read-only "suggested order" scorer. Pure: no I/O, no clock reads, inputs never mutated.
-// Ported from the ATS AI Toolkit `jira-work-priority` skill and adapted (adds the manual P1-P20 input).
+// Ported from the ATS AI Toolkit `jira-work-priority` skill (https://github.com/LumenTech-Prod/service-assurance-ip-ats-agents-specs-prompts) and adapted (adds the manual P1-P20 input).
 
 const deepFreeze = (value) => {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
