@@ -486,6 +486,7 @@ export const buildAiDraftSystemPrompt = ({ isStory, isBug, hasIntake = false }) 
   return hasIntake ? `${base}\n\n${AI_HELPER_INTAKE_RULES}` : base;
 };
 
+// ODI Story/Bug standards below come from the ODI Confluence page "Jira Standards" (ODI Project Space Standards).
 const buildAiDraftBaseSystemPrompt = ({ isStory, isBug }) =>
     isStory
       ? `You are a Jira issue writer for the Operations Devops Itential (ODI) program at Lumen.

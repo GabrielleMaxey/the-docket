@@ -117,7 +117,7 @@ Settings UI: **Export team pack** / **Import team pack**. Align with `npm run se
 
 ## Create Issue (`CreateIssueModal.jsx` + `jiraIssueRoutes.mjs`)
 
-Task Management **Create Issue** creates Story, Task, or Bug issues in your Jira project with client and server validation against `shared/odiIssueStandards.mjs`.
+Task Management **Create Issue** creates Story, Task, or Bug issues in your Jira project with client and server validation against `shared/odiIssueStandards.mjs`. The ODI issue rules (Story, Task and Bug fields, priorities, unassigned Stories) come from the **Jira Standards** page (ODI Project Space Standards) in the ODI Confluence space, not from the ATS toolkit.
 
 **Parent selection (three paths):**
 

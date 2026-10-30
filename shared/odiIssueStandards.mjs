@@ -1,3 +1,4 @@
+// Source: ODI Confluence page "Jira Standards" (ODI Project Space Standards).
 import { isLabelPrefixedTitle } from "./issueTitle.mjs";
 /**
  * Jira create standards — shared by server validation, UI pre-checks, and tests.
