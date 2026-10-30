@@ -20,6 +20,8 @@ For each tab: pick a row → **View** → expand the report to read, copy, or do
 
 **CoWork weekly plans:** When Claude CoWork writes `weekly-plan-<date>.md` into the app's `data/` folder, those files show under **Files**. Content is read live from disk until you click **Save to archive**, which copies it into the local Past Reports database as a week plan (so it remains after the file is moved or deleted).
 
+**How reports display:** the report viewer shows markdown tables as tables (wide ones scroll sideways) and collapsible sections that open on click. Week plans end with a collapsible **How the score works** section, see [Help me plan my week](./week-plan.md). Underscores inside names such as `config__value__here` are shown as written, not turned into italics.
+
 **Clear report** on Task Management or Metrics removes the on-page copy and browser cache only — it does **not** delete items already listed here.
 
 ---

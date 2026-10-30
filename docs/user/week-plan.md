@@ -42,6 +42,10 @@ Each task gets a **suggested-order score**; the plan lists the highest scores fi
 
 The score is a relative ordering, not a measure of effort. The plan opens with one line saying tasks are ordered by this score (higher means do sooner), and each task lists the reasons behind its score.
 
+**The score key is built into the plan.** The app adds a collapsible **How the score works** section at the very end of every week plan. It contains the table above in the same words, so you never have to look anywhere else to understand an order. Click its title to expand or collapse it; it starts collapsed. The saved copy in **Past Reports** and a downloaded `.md` file include the same section.
+
+**Tables display as tables.** The plan's day-by-day task tables render as real tables in the viewer. Wide tables scroll sideways inside their box rather than stretching the page.
+
 **How the plan treats time**
 
 - Hours shown against tasks are **suggested working time**, not a Jira estimate, and the plan says so at the top.

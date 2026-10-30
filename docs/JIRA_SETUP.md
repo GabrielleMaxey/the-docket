@@ -37,6 +37,8 @@ Open `.env` in any text editor and fill in the values below. Use the `.env` in t
 | `JIRA_API_TOKEN` | `ATATTxxx...` | From step 1 |
 | `API_PORT` | `8787` | Optional; default is `8787` |
 | `LOG_LEVEL` | `info` | Optional; controls server log verbosity — `error`, `warn`, `info` (default), or `debug` |
+| `DOCKET_OPEN_WORK_MAX_ROWS_PER_SITE` | `5000` | Optional; max rows collected per saved site for Combined Open Work (default and cap 5000) |
+| `DOCKET_OPEN_WORK_TIMEOUT_MS` | `120000` | Optional; Combined Open Work collection deadline in ms (cap 600000). Invalid values use the default |
 
 ### Single site (legacy) vs multiple sites
 
@@ -64,7 +66,7 @@ Hard cap: **5** sites total. Settings stores site URLs and emails, not new API t
 
 ### Combined Open Work setup
 
-Combined Open Work uses enabled saved Jira entries, including when you normally use only one site. Add entries in **Settings → Jira sites**, test their connections, then open **Task Management → Combined Open Work**, select the entries and click **Load open work**. The active Jira site stays unchanged. **Managed tasks** supports source-bound editing; **List** provides an overview. My Metrics, report goals, and the **Past Reports → Combined Work** archive use a separate Combined Work scope. See the [user guide](user/combined-work.md#combined-open-work).
+Combined Open Work reads every enabled saved Jira entry, including when you normally use only one site. Add and test entries in **Settings → Jira sites**; how to load, edit and report on the combined view is in the [user guide](./user/combined-work.md). The two `DOCKET_OPEN_WORK_*` variables above bound its size and run time; reaching a bound marks returned rows partial.
 
 ### Optional team database (PostgreSQL)
 
@@ -77,16 +79,13 @@ Local work does not require a company database. **Settings → Team data → Use
 
 Remote PostgreSQL requires verified TLS; optional CA and URL restrictions, backup guidance, and explicit old-demo import steps are in [Team database guide](TEAM_DATABASE.md). Do not place database credentials in browser settings or commit them.
 
-The warning **Team data not configured — set TEAM_PRIORITY_DATABASE_URL** appears only after a successful check confirms enabled + unconfigured. Off, loading, failed checks, and configured-but-disconnected states are distinct. A missing schema requires the migration command. Turning Team off keeps local work and Team drafts; explicit Team actions are blocked without switching their destination to Local. Work already dispatched may finish. Refresh other browser tabs to see the current preference.
-
-![Team DB opt-in and status](images/mockup-team-db-settings.png)
-*Documentation mockup — synthetic data; simplified layout.*
+What each Team data state looks like, and what the warning messages mean, is in the [user guide](./user/getting-started.md#optional-team-database).
 
 ### Local data and recovery
 
 Saved-entry notes, presets, and ordinary archives use `data/workweek-<instanceId>.sqlite`; legacy single-site data uses `data/workweek.sqlite`. The registry and Team preference use `data/instances-meta.sqlite`, personal To Dos use `data/personal-todos.sqlite`, and Combined Work goals/archive use `data/docket-combined.sqlite`. Keep those distinct stores when planning a backup; the [developer guide](dev/data-and-storage.md#local-stores-and-request-context) describes their scope.
 
-An **Older browser data has an unknown Jira site** banner means original unscoped browser records were preserved without being assigned to a site. **Dismiss** acknowledges the notice in this browser without deleting or importing records; if browser storage is blocked it lasts for the session. Do not infer ownership from an issue key alone. Personal To Do migration has a separate recovery notice for ambiguous source records.
+If an **Older browser data has an unknown Jira site** notice appears, nothing is lost: see [what Dismiss does](./user/getting-started.md#older-browser-data-notice). Do not infer record ownership from an issue key alone.
 
 ### Chat & AI (explicit opt-in)
 
@@ -276,6 +275,7 @@ Only use if your Jira Cloud org has Rovo MCP enabled.
 | `ATLASSIAN_OAUTH_CLIENT_ID` | From Atlassian developer console |
 | `ATLASSIAN_OAUTH_CLIENT_SECRET` | OAuth client secret |
 | `CHAT_OAUTH_REDIRECT_URI` | `http://localhost:8787/api/chat/auth/callback` (match port/host in production) |
+| `ROVO_REQUEST_TIMEOUT_MS` | Optional; Rovo MCP request deadline in ms, including the streamed response (default `30000`). Raise it for longer answers |
 
 **OAuth scopes** (requested by the proxy on sign-in):
 
