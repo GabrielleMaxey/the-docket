@@ -18,6 +18,14 @@
 ![Recovery notice documentation mockup](./docs/images/mockup-recovery-notice.png)
 *Documentation mockup — synthetic data; simplified layout.*
 
+**Help me plan my week — your issues only, in suggested order, with a score key**
+![Week plan documentation mockup](./docs/images/mockup-week-plan.png)
+*Documentation mockup — synthetic data; simplified layout.*
+
+**Create Issue — possible existing issues shown above Close / Create**
+![Possible existing issues documentation mockup](./docs/images/mockup-duplicate-check.png)
+*Documentation mockup — synthetic data; simplified layout.*
+
 [Mockup sources and provenance](./docs/images/README.md).
 
 <details>
@@ -74,6 +82,8 @@ The server reads credentials from its environment and authenticates requests to 
 **Metrics** is the project view. Pick saved Epic/JQL presets, refresh a Jira snapshot, review overall/project/contributor metrics, inspect due-date lists, and generate leadership or team-facing reports.
 
 **Project Managers** turns Contributor Metrics entries into a capacity view. It compares open issue counts against optional capacity targets, highlights overdue/blocked/stale work, and exports planning summaries. The **Asks** tab tracks exec or product-owner requests: create a Jira task from an ask (it links the new key and marks the ask done), or mark it done or canceled.
+
+**Week plans** cover only issues assigned to you, ranked by a transparent suggested-order score (priority, status, staleness, due date, blockers, your own P1–P20). **Create Issue** checks for possible existing issues before it creates or drafts, and titles under a bracketed parent follow `[Project - Area] short ask`. Generated reports follow fixed writing-style rules (exact figures, no vague verbs, no filler). Details are in the [end-user guide](./docs/END_USER_GUIDE.md#help-me-plan-my-week).
 
 **Past Reports** is the local archive for generated Task Management reports, week plans, Metrics reports, and Chat replies saved with **Save to Past Reports**.
 

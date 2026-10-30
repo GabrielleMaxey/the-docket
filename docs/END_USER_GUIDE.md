@@ -146,7 +146,7 @@ This is the main screen for managing your open work.
 │    Per-query summary + AI report     │
 ├──────────────────────────────────────┤
 │  🗓️ Help me plan my week [collapsible]│
-│    4 questions → AI day-by-day plan  │
+│    questions → plan for YOUR issues  │
 ├──────────────────────────────────────┤
 │  Results table                       │
 └──────────────────────────────────────┘
@@ -188,6 +188,8 @@ Combined Work has one set of personal and company/team report goals across sourc
    - **Story**: AI rewrites the title into Job Story format ("When… I want… so I can…") if it isn't already, and generates a description that expands on the situation, motivation, and desired outcome. 2–5 suggested sub-tasks appear as editable checkboxes; uncheck any you don't want before clicking Create.
    - **Bug**: AI generates a structured description covering what is broken, steps to reproduce, expected vs actual, environment, and any known workaround. A suggested priority (Low / Medium / High / Critical) appears based on project severity definitions.
    - **Task**: AI generates a plain description.
+   - **Titles under a bracketed parent**: when the parent's title starts with a label such as `[Project Name - Area]`, new titles are formatted `[Project Name - Area] short ask`. The short ask is a few words (under 12), not the full job story — the job story stays in the description.
+   - **Possible existing issues**: before **Create** or **✦ AI Draft** does anything, the app looks for open issues that may already cover the same work. See [Possible existing issues](#create-issue).
    - The **Create** button label updates to show "Create + N subtasks" when Story sub-tasks are selected. Sub-tasks are created as **Task** type with the new story as parent (linked in the Task → Story → Epic chain); the success message lists each with its issue key and a link to open the new issue in Jira.
 
 ### Create Issue
@@ -229,6 +231,18 @@ The modal pre-selects a preset when you open it from an active Task Management J
 - **Priority** (Bug only) — required on create.
 - **Assignee** — optional for Task/Bug. Stories stay unassigned; when AI Draft suggests sub-tasks, a **Subtask assignee** field appears and applies to all checked sub-tasks.
 
+**Possible existing issues (duplicate check)**
+
+When you click **Create** or **✦ AI Draft**, the app first searches the Jira site you are working in (the active site only) for open issues in the same project that look like what you are about to create:
+
+- It compares your title and, with the AI helper on, your **I want** answer. A leading `[label]` is ignored, and word endings are normalised (so "reporting" matches "reports").
+- It looks at each issue's **summary** and the **first 500 characters of its description**, and ignores Done issues.
+- If it finds likely matches, a **Possible existing issues** panel appears **above the Close and Create buttons**, so you never have to scroll up for it. It lists up to 5 issues, each with its key (a link to open it in Jira), summary and status, and a note when the match was in the description rather than the summary.
+- To carry on anyway, click **Create anyway** (or **Draft anyway** for AI Draft). The app will not ask again for the same text. **Dismiss** only hides the panel; clicking **Create** again runs the check again.
+- If the search fails, the app lets you continue without the check. It never blocks creation.
+
+The check is a prompt to look, not a verdict. Matches are ranked by shared words, so a hit can be unrelated and a real duplicate worded very differently can be missed.
+
 **4. After create**
 
 On success, use **Add more detail in Jira** to open the new issue in your browser. Story sub-tasks you left checked are created under the new story (parent-linked as Task → Story → Epic) and listed in the success message.
@@ -250,6 +264,7 @@ Appears after you Run JQL and get results. Shows:
   - **PWB Review** — first-person self-assessment prose for a quarterly, mid-year, or yearly PWB review (choose the period once selected)
   - For 1:1 Prep and PWB Review, you can optionally add **your goals** and/or your **company/team goals** — the report will note where your work supports them, and honestly flag anything that seems disconnected. All three report types can reference your organization's cultural behaviors where the work genuinely demonstrates one, never as a forced checklist. Goals you enter are saved automatically (on this machine) so you don't have to retype them next time — each field shows a **Clear** button once it has text, for removing a saved value.
   - **Status hygiene check:** all three report types check whether any of your top-priority Backlog items have a Jira comment within the last 14 days — a sign real work is happening even though the status was never updated. When that happens, the report names the item and suggests updating its status, so workload snapshots and self-assessments (this one and future ones) read accurately at a glance.
+- **Writing style:** generated reports (Status Report, 1:1 Prep, PWB Review and the Metrics audience reports) follow fixed style rules: exact figures instead of "about 12", no vague verbs such as "worked on", every activity paired with its outcome or current status, no filler phrases, and no details that are not in the data. If a report reads vaguely, the data behind it is probably thin.
 - When a report is showing, use **Clear report** in the report header to remove it from this page only (does not delete copies in **Past Reports**)
 
 > The badge in the **📊 My Metrics** header shows your total open issue count at a glance.
@@ -268,7 +283,39 @@ Click **🗓️ Help me plan my week** to expand. Answer a few questions:
 
 Question 5 lists CoWork files already in the app data folder (same as **Past Reports → Files**). If you pick one, its content is sent as prior-plan context so the new plan can refine it against your current JQL tasks.
 
-Click **Continue →**, then **Generate week plan**. The result is a Monday–Friday plan using your actual issue keys. Copy, download, **Clear report** (removes the plan text from this page only), or **Start over** to reset the questions.
+When **Use team DB** is on, an **Include team priorities** checkbox appears. Checked (the default), the plan ranks with team priorities layered over your own. Unchecked, it ranks on your own priorities only.
+
+Click **Continue →**, then **Generate week plan**. The result is a plan for the working days left in the week (starting today) using your actual issue keys. Copy, download, **Clear report** (removes the plan text from this page only), or **Start over** to reset the questions.
+
+![Week plan with suggested order and score key](./images/mockup-week-plan.png)
+*Documentation mockup — synthetic data; simplified layout.*
+
+**What data the plan uses**
+
+- **Only your issues.** The plan covers open issues **assigned to you** in your Task Management tabs. Issues assigned to teammates or unassigned are left out, and **drill-down tabs** (which show someone else's issues) are never included.
+- **If the app can't identify you** (the Jira profile lookup fails), the plan falls back to every open issue in your tabs and starts with a **Data used** note saying so and listing the tabs and open counts. Drill-down tabs are still excluded.
+- **Due dates** are the issue's own due date, plus any date you have typed into the table but not yet saved to Jira. An issue is **overdue** by the same rule as the Metrics page: its own due date is before today (your local date). The Metrics **Compare against** setting does not change the plan.
+
+**How tasks are ordered**
+
+Each task gets a **suggested-order score**; the plan lists the highest scores first (up to 10 per tab) and shows each task's score and reasons.
+
+| Factor | Points |
+|--------|--------|
+| Jira priority | Highest 50, High 40, Medium 30, Low 20, Lowest 10, unset 30 |
+| Status | 20 for In Progress, Analyzing or Ready for Verification; 5 for other open statuses |
+| Staleness (days since last update) | 25 at 30+ days, 20 at 15+, 15 at 7+, 10 at 3+, 5 under 3 (capped at 10 for non-active statuses) |
+| Due date | +25 if due today or overdue; +15 if due within 3 business days |
+| Blockers | +30 if it blocks another open issue; +20 if an open issue blocks it |
+| Your priority (P1–P20) | Up to +30, highest for P1 |
+
+The score is a relative ordering, not a measure of effort. The plan opens with one line saying tasks are ordered by this score (higher means do sooner), and each task lists the reasons behind its score.
+
+**How the plan treats time**
+
+- Hours shown against tasks are **suggested working time**, not a Jira estimate, and the plan says so at the top.
+- It schedules around due dates, names the blocking issue keys, and keeps roughly 15% of your hours free as buffer.
+- Items untouched for more than 90 days are put in a short triage block (under an hour) rather than given full working time.
 
 ### Results table
 
