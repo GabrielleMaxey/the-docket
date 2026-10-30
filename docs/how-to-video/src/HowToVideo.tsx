@@ -3,10 +3,11 @@ import { linearTiming, TransitionSeries } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import { slide } from "@remotion/transitions/slide";
 import { Audio } from "@remotion/media";
-import { staticFile, useVideoConfig } from "remotion";
+import { interpolate, staticFile, useVideoConfig } from "remotion";
 import { TimeScaleContext } from "./ui";
 import { SCENE_COMPONENTS } from "./sceneMap";
 import {
+  audioDuration,
   hasAudio,
   SCENE_LIST,
   SCENES,
@@ -24,7 +25,19 @@ export const Voiced: React.FC<{ scene: SceneKey; children: React.ReactNode }> = 
     <TimeScaleContext.Provider value={scale}>
       {children}
       {hasAudio(scene) ? (
-        <Audio src={staticFile(`voiceover/${scene}.mp3`)} from={Math.round(VOICE_LEAD * fps)} premountFor={fps} />
+        <Audio
+          src={staticFile(`voiceover/${scene}.mp3`)}
+          from={Math.round(VOICE_LEAD * fps)}
+          premountFor={fps}
+          // Short fades hide any click or breath at the clip edges.
+          volume={(f) => {
+            const end = Math.round((audioDuration(scene) ?? 0) * fps);
+            return interpolate(f, [0, 5, Math.max(6, end - 9), Math.max(7, end)], [0, 1, 1, 0], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            });
+          }}
+        />
       ) : null}
     </TimeScaleContext.Provider>
   );

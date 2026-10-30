@@ -38,6 +38,7 @@ export const VOICE_TAIL = 0.9;
 const audioSeconds = (key: SceneKey): number | undefined =>
   (voiceoverDurations as Partial<Record<SceneKey, number>>)[key];
 
+export const audioDuration = audioSeconds;
 export const hasAudio = (key: SceneKey) => audioSeconds(key) !== undefined;
 
 export const sceneSeconds = (key: SceneKey) => {
