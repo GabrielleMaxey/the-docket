@@ -6,7 +6,7 @@
 
 The markdown files in `docs/` are canonical for GitHub, local desktop development, and non-Cursor editors.
 
-The [`Cursor canvas mirror`](../canvases/task-manager-docs.canvas.tsx) is historical reference and does not describe the current Combined Work, PostgreSQL, or source-scoped storage model. Use this guide and the [user guide](../END_USER_GUIDE.md) as the current references; see [canvas status](../canvases/README.md).
+This guide and the [user guide](../END_USER_GUIDE.md) are the current references for Combined Work, PostgreSQL and source-scoped storage.
 
 **PR write-ups:** Cursor agents follow [`.cursor/rules/pr-writeups.mdc`](../../.cursor/rules/pr-writeups.mdc). Human process and template → [§ PR write-ups](#pr-write-ups) below.
 
@@ -77,7 +77,6 @@ Feature and fix branches should include a short write-up under [`docs/PR_WriteUp
 | **When** | Multi-commit or reviewable change sets (features, non-trivial bug fixes). Skip for typo-only / formatting-only commits unless you want a record. |
 | **Where** | `docs/PR_WriteUps/PR_<TOPIC>.md` (`SCREAMING_SNAKE_CASE`) |
 | **Cursor** | [`.cursor/rules/pr-writeups.mdc`](../../.cursor/rules/pr-writeups.mdc) (`alwaysApply`) — agents create/update the write-up when committing, pushing, or opening a PR for substantive work |
-| **Examples** | [`PR_CREATE_ISSUE_FIXES.md`](../PR_WriteUps/PR_CREATE_ISSUE_FIXES.md), [`PR_COLLECT_DUE_BY_DEDUPE.md`](../PR_WriteUps/PR_COLLECT_DUE_BY_DEDUPE.md) |
 
 ### Template
 
