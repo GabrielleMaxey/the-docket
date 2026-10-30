@@ -63,8 +63,8 @@ const COMBINED_ROWS = [
 
 export const CombinedWorkScene: React.FC = () => {
   const t = useSeconds();
-  const loaded = t > 5.0;
-  const list = t > 11.5 && t < 15.5;
+  const loaded = t > 9.8;
+  const list = t > 17.8 && t < 20.2;
   const cols = list ? "110px 100px 1fr 140px" : "110px 100px 1fr 140px 64px 76px";
   return (
     <TutorialScene
@@ -72,10 +72,10 @@ export const CombinedWorkScene: React.FC = () => {
       title="Combined Open Work"
       who={["Developers", "Project Managers"]}
       lines={[
-        { at: 0.8, text: <>Task Management → <Key>Combined Open Work</Key>: everything assigned to you, across saved Jira sites.</> },
-        { at: 6.5, text: <>One editable table with a Site column — or switch to List.</> },
-        { at: 15.5, text: <>A partial or failed site means the list isn&apos;t complete.</> },
-        { at: 19.5, text: <>Rank with Docket priority and flag <b>Now</b> or <b>Next</b> — planning signals that don&apos;t change Jira.</> },
+        { at: 2.4, text: <>Task Management → <Key>Combined Open Work</Key>: everything assigned to you, across saved Jira sites.</> },
+        { at: 12.4, text: <>One editable table with a Site column — or switch to List.</> },
+        { at: 22.0, text: <>A partial or failed site means the list isn&apos;t complete.</> },
+        { at: 25.7, text: <>Rank with Docket priority and flag <b>Now</b> or <b>Next</b> — planning signals that don&apos;t change Jira.</> },
       ]}
     >
       <AppWindow active="Task Management">
@@ -88,18 +88,18 @@ export const CombinedWorkScene: React.FC = () => {
               <span style={{ display: "flex", gap: 8, alignItems: "center" }}><Check on /> Platform</span>
               <span style={{ display: "flex", gap: 8, alignItems: "center" }}><Check on={false} /> Partner</span>
               <div style={{ flex: 1 }} />
-              <Button pressed={t > 3.2 && t < 3.5}>{loaded ? "Refresh" : t > 3.5 ? "Loading…" : "Load open work"}</Button>
+              <Button pressed={t > 8.1 && t < 8.4}>{loaded ? "Refresh" : t > 8.4 ? "Loading…" : "Load open work"}</Button>
             </div>
           </Panel>
           {loaded ? (
-            <Appear at={5.0}>
+            <Appear at={9.8}>
               <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
                 <Pill color={colors.green} style={{ fontSize: 17 }}>✓ Mobile · 2 open</Pill>
                 <Pill
-                  color={t > 15.5 ? colors.coral : colors.green}
-                  style={{ fontSize: 17, background: t > 15.5 ? `${colors.coral}1F` : undefined }}
+                  color={t > 22.2 ? colors.coral : colors.green}
+                  style={{ fontSize: 17, background: t > 22.2 ? `${colors.coral}1F` : undefined }}
                 >
-                  {t > 15.5 ? "⚠ Platform · partial (2 loaded)" : "✓ Platform · 2 open"}
+                  {t > 22.2 ? "⚠ Platform · partial (2 loaded)" : "✓ Platform · 2 open"}
                 </Pill>
                 <div style={{ flex: 1 }} />
                 <div style={{ display: "flex", border: `1px solid ${colors.border}`, borderRadius: 8, overflow: "hidden" }}>
@@ -141,7 +141,7 @@ export const CombinedWorkScene: React.FC = () => {
                   {!list ? <span>Flag</span> : null}
                 </div>
                 {COMBINED_ROWS.map((r, i) => (
-                  <Appear key={r.key} at={5.2 + i * 0.15}>
+                  <Appear key={r.key} at={10.0 + i * 0.15}>
                     <div
                       style={{
                         display: "grid",
@@ -158,10 +158,10 @@ export const CombinedWorkScene: React.FC = () => {
                       <span style={{ color: colors.blue, fontWeight: 700 }}>{r.key}</span>
                       <span>{r.summary}</span>
                       <span>{r.status}</span>
-                      {!list ? <span style={{ fontWeight: 900 }}>{t > 20 ? r.pri : "—"}</span> : null}
+                      {!list ? <span style={{ fontWeight: 900 }}>{t > 26.0 ? r.pri : "—"}</span> : null}
                       {!list ? (
                         <span>
-                          {r.flag && t > 21 + i * 0.4 ? (
+                          {r.flag && t > 28.6 + i * 0.4 ? (
                             <Pill color={r.flag === "Now" ? colors.coral : colors.orange} style={{ fontSize: 15 }}>
                               {r.flag}
                             </Pill>

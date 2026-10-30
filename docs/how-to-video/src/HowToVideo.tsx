@@ -35,7 +35,7 @@ const Narration: React.FC<{ scene: SceneKey }> = ({ scene }) => {
         const from = Math.round((VOICE_LEAD + start + shift) * fps);
         shift += pauses[i]?.seconds ?? 0;
         return (
-          <Sequence key={i} from={from} durationInFrames={segFrames} premountFor={fps}>
+          <Sequence key={i} from={from} durationInFrames={segFrames} premountFor={50}>
             <Audio
               src={staticFile(`voiceover/${scene}.mp3`)}
               trimBefore={Math.round(start * fps)}

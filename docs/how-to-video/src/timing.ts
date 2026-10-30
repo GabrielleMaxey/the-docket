@@ -6,7 +6,7 @@ import { NARRATION } from "./narration";
 // shown on screen and in CHAPTERS.md are all derived from these numbers.
 export const SCENE_LIST = [
   { key: "intro", seconds: 8, chapter: "Welcome" },
-  { key: "contents", seconds: 20, chapter: "Chapters (this list)" },
+  { key: "contents", seconds: 13, chapter: "Chapters (this list)" },
   { key: "overview", seconds: 30, chapter: "What The Docket does" },
   { key: "multiSpace", seconds: 24, chapter: "Many Jira spaces, one workspace" },
   { key: "install", seconds: 25, chapter: "Install the app" },
@@ -20,7 +20,7 @@ export const SCENE_LIST = [
   { key: "createIssue", seconds: 28, chapter: "Create Issue and duplicate check" },
   { key: "weekPlan", seconds: 28, chapter: "Plan your week" },
   { key: "reports", seconds: 32, chapter: "Reports" },
-  { key: "pmAsks", seconds: 22, chapter: "Project Managers and Asks" },
+  { key: "pmAsks", seconds: 37, chapter: "Project Managers and Asks" },
   { key: "chat", seconds: 15, chapter: "Chat" },
   { key: "dataSecurity", seconds: 46, chapter: "Data security" },
   { key: "recap", seconds: 21, chapter: "Where to start" },
@@ -34,7 +34,7 @@ export const SCENES = Object.fromEntries(SCENE_LIST.map((s) => [s.key, s.seconds
 export const TRANSITION_SECONDS = 0.6;
 // Narration starts after the incoming transition and leaves a beat at the end.
 export const VOICE_LEAD = 0.6;
-export const VOICE_TAIL = 0.9;
+export const VOICE_TAIL = 0.6;
 
 // Extra pauses inside a scene's narration, without touching the MP3.
 // `at` = seconds into the clip where the pause starts, `seconds` = pause length.
@@ -87,7 +87,7 @@ export const formatTime = (seconds: number) => {
 
 // Scenes whose on-screen cues follow the narration sentence by sentence.
 // They run in real seconds (no stretching), so cues never drift from the voice.
-export const SYNCED = new Set<SceneKey>(["overview"]);
+export const SYNCED = new Set<SceneKey>(["overview", "pmAsks"]);
 
 // Start time (scene seconds) of each sentence of a scene's narration, from the
 // real clip length, so highlights can appear as each sentence is spoken.

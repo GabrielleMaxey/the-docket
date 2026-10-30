@@ -2,8 +2,10 @@ import React from "react";
 import { colors, monoFamily } from "../theme";
 import { Appear, Background, Logo } from "../ui";
 
-const Column: React.FC<{ at: number; role: string; icon: string; color: string; steps: string[] }> = ({
+// `stepsAt` (optional) sets when each step appears; otherwise they follow `at` 0.6s apart.
+const Column: React.FC<{ at: number; role: string; icon: string; color: string; steps: string[]; stepsAt?: number[] }> = ({
   at,
+  stepsAt,
   role,
   icon,
   color,
@@ -24,7 +26,7 @@ const Column: React.FC<{ at: number; role: string; icon: string; color: string; 
         {icon} {role}
       </div>
       {steps.map((s, i) => (
-        <Appear key={s} at={at + 0.6 + i * 0.6}>
+        <Appear key={s} at={stepsAt?.[i] ?? at + 0.6 + i * 0.6}>
           <div style={{ display: "flex", gap: 16, fontSize: 31, lineHeight: 1.3, marginBottom: 22 }}>
             <span
               style={{
@@ -73,7 +75,8 @@ export const RecapScene: React.FC = () => (
     </div>
     <div style={{ position: "absolute", left: 100, right: 100, top: 320, display: "flex", gap: 36 }}>
       <Column
-        at={1.0}
+        at={2.0}
+        stepsAt={[2.8, 5.7, 7.2]}
         role="Developers"
         icon="👩‍💻"
         color="#2563EB"
@@ -84,7 +87,8 @@ export const RecapScene: React.FC = () => (
         ]}
       />
       <Column
-        at={3.4}
+        at={8.8}
+        stepsAt={[10.1, 12.3, 13.0]}
         role="Project Managers"
         icon="🧭"
         color="#C2410C"
@@ -95,7 +99,8 @@ export const RecapScene: React.FC = () => (
         ]}
       />
       <Column
-        at={5.8}
+        at={13.9}
+        stepsAt={[14.8, 16.4, 17.6]}
         role="Executives"
         icon="📊"
         color="#7C3AED"
@@ -106,7 +111,7 @@ export const RecapScene: React.FC = () => (
         ]}
       />
     </div>
-    <Appear at={9.4} style={{ position: "absolute", left: 100, right: 100, bottom: 70, textAlign: "center" }}>
+    <Appear at={19.2} style={{ position: "absolute", left: 100, right: 100, bottom: 70, textAlign: "center" }}>
       <div style={{ fontSize: 32, color: colors.muted }}>
         🔒 Runs on your machine · Jira credentials live only in your local <b>.env</b> file
       </div>

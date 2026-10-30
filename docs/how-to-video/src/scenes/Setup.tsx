@@ -54,7 +54,7 @@ export const InstallScene: React.FC = () => (
     who={["Developers", "Admins"]}
     lines={[
       {
-        at: 0.8,
+        at: 3.5,
         text: (
           <>
             You need <Key>Node 22</Key> and a copy of the project folder.
@@ -62,7 +62,7 @@ export const InstallScene: React.FC = () => (
         ),
       },
       {
-        at: 2.4,
+        at: 7.8,
         text: (
           <>
             Open Terminal (PowerShell on Windows) in that folder and run four
@@ -71,7 +71,7 @@ export const InstallScene: React.FC = () => (
         ),
       },
       {
-        at: 12.5,
+        at: 19.2,
         text: (
           <>
             <b>Not technical?</b> Ask a developer to do this once with you — it
@@ -117,28 +117,28 @@ export const InstallScene: React.FC = () => (
         <TermLine
           comment="1. Use the pinned Node version"
           cmd="nvm install && nvm use"
-          from={3.4}
-          to={4.6}
+          from={11.8}
+          to={13.2}
           output={["✓ Now using node v22"]}
         />
         <TermLine
           comment="2. Install dependencies"
           cmd="npm install"
-          from={5.6}
-          to={6.3}
+          from={13.4}
+          to={14.2}
           output={["added 412 packages in 18s"]}
         />
         <TermLine
           comment="3. Create your settings file (Windows: Copy-Item .env.example .env)"
           cmd="cp .env.example .env"
-          from={7.4}
-          to={8.4}
+          from={14.6}
+          to={16.0}
         />
         <TermLine
           comment="4. Start the app (browser)"
           cmd="npm run dev:all"
-          from={9.3}
-          to={10.2}
+          from={17.5}
+          to={18.6}
           output={[
             "[ui]  ➜  Local: http://localhost:5173/",
             "[api] ✓ Jira proxy listening on 127.0.0.1:8787",
@@ -236,7 +236,7 @@ export const CredentialsScene: React.FC = () => {
       who={["Everyone"]}
       lines={[
         {
-          at: 0.8,
+          at: 1.8,
           text: (
             <>
               Create an <Key>API token</Key> at id.atlassian.com → Security → API tokens.
@@ -244,29 +244,29 @@ export const CredentialsScene: React.FC = () => {
           ),
         },
         {
-          at: 5.4,
+          at: 6.3,
           text: (
             <>
               Open <Code>.env</Code> in the project folder and fill in three values.
             </>
           ),
         },
-        { at: 13.0, text: <>🔒 Keep it private: never commit it or share your token — even with support.</> },
-        { at: 16.5, text: <>Changed <Code>.env</Code>? Stop and restart the app.</> },
+        { at: 23.5, text: <>🔒 Keep it private: never commit it or share your token — even with support.</> },
+        { at: 28.0, text: <>Changed <Code>.env</Code>? Stop and restart the app.</> },
       ]}
     >
       <div style={{ position: "relative", width: 1040, height: 760 }}>
         <EditorWindow title=".env — the-docket (project folder, next to package.json)">
           <div style={{ marginTop: -10, marginBottom: 18 }}>
-            <Tag at={5.8}>file name is exactly .env — not .env.txt</Tag>
+            <Tag at={12.0}>file name is exactly .env — not .env.txt</Tag>
           </div>
-          <EnvRow note="Your Jira Cloud site" k="JIRA_BASE_URL" v="https://acme.atlassian.net" from={6.4} to={7.8} />
+          <EnvRow note="Your Jira Cloud site" k="JIRA_BASE_URL" v="https://acme.atlassian.net" from={17.8} to={19.4} />
           <div style={{ marginTop: -12, marginBottom: 18 }}>
-            <Tag at={8.0}>no trailing slash /</Tag>
+            <Tag at={19.8}>no trailing slash /</Tag>
           </div>
-          <EnvRow note="The email you sign in to Jira with" k="JIRA_EMAIL" v="you@acme.com" from={9.0} to={9.8} />
-          <EnvRow note="Token from id.atlassian.com (keep it secret)" k="JIRA_API_TOKEN" v="••••••••••••••••••••" from={10.4} to={11.6} />
-          <Appear at={16.5}>
+          <EnvRow note="The email you sign in to Jira with" k="JIRA_EMAIL" v="you@acme.com" from={21.2} to={22.2} />
+          <EnvRow note="Token from id.atlassian.com (keep it secret)" k="JIRA_API_TOKEN" v="••••••••••••••••••••" from={22.6} to={23.6} />
+          <Appear at={28.6}>
             <div
               style={{
                 marginTop: 30,
@@ -286,8 +286,8 @@ export const CredentialsScene: React.FC = () => {
           </Appear>
         </EditorWindow>
         <Appear
-          at={1.4}
-          out={5.0}
+          at={2.0}
+          out={6.8}
           style={{
             position: "absolute",
             right: 40,
@@ -306,7 +306,7 @@ export const CredentialsScene: React.FC = () => {
           <div style={{ fontSize: 20, color: colors.muted, marginBottom: 22 }}>
             Label: <b style={{ color: colors.text }}>The Docket</b>
           </div>
-          <Button pressed={t > 2.9 && t < 3.2}>Create API token</Button>
+          <Button pressed={t > 4.6 && t < 4.9}>Create API token</Button>
         </Appear>
       </div>
     </TutorialScene>
@@ -353,16 +353,16 @@ export const EnvOptionsScene: React.FC = () => (
     who={["Developers", "Admins"]}
     lines={[
       { at: 0.8, text: <>Everything below the three Jira values is optional.</> },
-      { at: 3.4, text: <><b>Several Jira sites?</b> Add up to five — they share one API token.</> },
-      { at: 10.4, text: <><b>Chat &amp; AI:</b> use your company&apos;s <Key>approved model</Key> via the <Code>MANAGED_AI_*</Code> values.</> },
-      { at: 19.0, text: <>Also: API port, log level, and an optional shared team database.</> },
+      { at: 3.7, text: <><b>Several Jira sites?</b> Add up to five — they share one API token.</> },
+      { at: 13.7, text: <><b>Chat &amp; AI:</b> use your company&apos;s <Key>approved model</Key> via the <Code>MANAGED_AI_*</Code> values.</> },
+      { at: 24.0, text: <>Also: API port, log level, and an optional shared team database.</> },
     ]}
   >
     <div style={{ position: "relative", width: 1040, height: 780 }}>
       <EditorWindow title=".env — optional settings (see .env.example for all of them)">
         <EnvBlock
-          at={2.6}
-          active={[3.4, 10.4]}
+          at={3.4}
+          active={[3.7, 13.7]}
           title="Multiple Jira sites (max 5) — all use JIRA_API_TOKEN"
           rows={[
             ["JIRA_INSTANCE_1_NAME", "Mobile"],
@@ -372,8 +372,8 @@ export const EnvOptionsScene: React.FC = () => (
           ]}
         />
         <EnvBlock
-          at={9.8}
-          active={[10.4, 19.0]}
+          at={15.6}
+          active={[15.6, 24.0]}
           title="Company AI — approved, governed model (default when set)"
           rows={[
             ["MANAGED_AI_BASE_URL", "https://<company-ai-gateway>/v1"],
@@ -383,8 +383,8 @@ export const EnvOptionsScene: React.FC = () => (
           ]}
         />
         <EnvBlock
-          at={18.4}
-          active={[19.0, 40]}
+          at={23.6}
+          active={[24.0, 40]}
           title="Other (defaults shown)"
           rows={[
             ["API_PORT", "8787"],

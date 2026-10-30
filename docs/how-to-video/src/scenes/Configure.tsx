@@ -129,7 +129,9 @@ const tabInfo: Record<string, { icon: string; title: string; text: string }> = {
 export const NavigateScene: React.FC = () => {
   const t = useSeconds();
   const order = [...TABS, "Settings"];
-  const idx = Math.min(order.length - 1, Math.max(0, Math.floor((t - 1.2) / 2.1)));
+  // When the narration names each tab (scene seconds), same order as `order`.
+  const starts = [2.6, 5.1, 7.1, 10.3, 13.5, 16.2];
+  const idx = Math.max(0, starts.filter((s) => t >= s).length - 1);
   const current = order[idx];
   const info = tabInfo[current];
   return (
@@ -138,7 +140,7 @@ export const NavigateScene: React.FC = () => {
       title="Six tabs, one top bar"
       who={["Everyone"]}
       lines={order.map((o, i) => ({
-        at: 1.2 + i * 2.1,
+        at: starts[i],
         text: (
           <span style={{ fontWeight: o === current ? 900 : 400, color: o === current ? colors.teal : colors.muted }}>
             {tabInfo[o].icon} {o}
@@ -146,7 +148,7 @@ export const NavigateScene: React.FC = () => {
         ),
       }))}
     >
-      <AppWindow active={current} tabHighlight={t > 1.2 ? current : undefined}>
+      <AppWindow active={current} tabHighlight={t > starts[0] ? current : undefined}>
         <div
           style={{
             position: "absolute",

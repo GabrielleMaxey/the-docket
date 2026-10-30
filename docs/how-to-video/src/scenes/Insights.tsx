@@ -1,5 +1,6 @@
 import React from "react";
 import { colors } from "../theme";
+import { sentenceStarts } from "../timing";
 import {
   AppWindow,
   Appear,
@@ -521,26 +522,176 @@ export const PastReportsScene: React.FC = () => (
   </TutorialScene>
 );
 
+// A downloaded-file chip, shown after an export button is pressed.
+const Downloaded: React.FC<{ at: number; file: string }> = ({ at, file }) => (
+  <Appear at={at}>
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        fontSize: 16,
+        fontWeight: 700,
+        padding: "8px 14px",
+        borderRadius: 999,
+        background: colors.teal,
+        color: "white",
+      }}
+    >
+      <span style={{ color: colors.cyan }}>⬇</span> {file}
+    </div>
+  </Appear>
+);
+
+// Gantt mock: one row per issue, Oct 1 → Jan 31, today line on Oct 30.
+const GANTT_DAYS = 123;
+const TODAY = 29;
+const GANTT_ROWS: {
+  key: string;
+  who: string;
+  summary: string;
+  start: number;
+  end: number;
+  color: string;
+  planned?: [number, number];
+}[] = [
+  { key: "APP-153", who: "Sam", summary: "Order history screen", start: 0, end: 17, color: colors.green },
+  { key: "APP-142", who: "Priya", summary: "Checkout API retries", start: 5, end: 23, color: "#dc2626", planned: [5, 20] },
+  { key: "APP-150", who: "Marcus", summary: "Payment sheet UI", start: 13, end: 50, color: colors.blue, planned: [9, 42] },
+  { key: "APP-151", who: "Dana", summary: "Address autocomplete", start: 33, end: 58, color: colors.grey },
+  { key: "APP-158", who: "Priya", summary: "Release QA pass", start: 61, end: 79, color: colors.grey, planned: [61, 79] },
+  { key: "APP-160", who: "Marcus", summary: "Exec demo build", start: 68, end: 100, color: colors.grey },
+];
+
+const PlanBar: React.FC<{ at: number; row: (typeof GANTT_ROWS)[number]; width: number }> = ({ at, row, width }) => {
+  const p = useProgress(at, at + 0.8);
+  const x = (d: number) => (d / GANTT_DAYS) * width;
+  return (
+    <div style={{ position: "relative", height: 50 }}>
+      {row.planned ? (
+        <div
+          style={{
+            position: "absolute",
+            left: x(row.planned[0]),
+            width: x(row.planned[1] - row.planned[0]),
+            top: 5,
+            height: 40,
+            borderRadius: 6,
+            border: `2px dashed ${colors.muted}`,
+            opacity: p,
+          }}
+        />
+      ) : null}
+      <div
+        style={{
+          position: "absolute",
+          left: x(row.start),
+          width: x(row.end - row.start) * p,
+          top: 11,
+          height: 28,
+          borderRadius: 6,
+          background: row.color,
+          color: "white",
+          fontSize: 15,
+          fontWeight: 700,
+          lineHeight: "28px",
+          paddingLeft: 8,
+          overflow: "hidden",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {row.key}
+      </div>
+    </div>
+  );
+};
+
+const Gantt: React.FC<{ at: number }> = ({ at }) => {
+  const W = 600;
+  return (
+    <Panel style={{ position: "relative" }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 12, fontSize: 15 }}>
+        {["30 day", "3 mo", "6 mo", "1 yr", "All"].map((z) => (
+          <span
+            key={z}
+            style={{
+              padding: "4px 10px",
+              borderRadius: 6,
+              fontWeight: 700,
+              border: `1px solid ${z === "All" ? colors.blue : colors.border}`,
+              color: z === "All" ? colors.blue : colors.muted,
+            }}
+          >
+            {z}
+          </span>
+        ))}
+        <span style={{ marginLeft: 14, color: colors.muted }}>Group by</span>
+        <span style={{ fontWeight: 700 }}>Status ▾</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ display: "inline-block", width: 14, height: 10, borderRadius: 3, background: "#dc2626" }} />
+        <span style={{ color: colors.muted }}>Overdue</span>
+        <span style={{ display: "inline-block", width: 18, height: 10, borderRadius: 3, border: `2px dashed ${colors.muted}`, marginLeft: 8 }} />
+        <span style={{ color: colors.muted }}>Planned (dashed)</span>
+      </div>
+      <div style={{ display: "flex" }}>
+        <div style={{ width: 300, flexShrink: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 900, color: colors.muted, height: 26 }}>Task</div>
+          {GANTT_ROWS.map((r) => (
+            <div key={r.key} style={{ height: 50, display: "flex", alignItems: "center", gap: 8, fontSize: 17, whiteSpace: "nowrap", overflow: "hidden" }}>
+              <b style={{ color: colors.blue }}>{r.key}</b>
+              <span style={{ color: colors.muted }}>{r.who}</span>
+              <span>{r.summary}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ position: "relative", width: W }}>
+          <div style={{ display: "flex", height: 26, fontSize: 14, fontWeight: 700, color: colors.muted }}>
+            {[["Oct", 31], ["Nov", 30], ["Dec", 31], ["Jan", 31]].map(([m, d]) => (
+              <div key={m} style={{ width: ((d as number) / GANTT_DAYS) * W, borderLeft: `1px solid ${colors.border}`, paddingLeft: 6 }}>
+                {m}
+              </div>
+            ))}
+          </div>
+          {GANTT_ROWS.map((r, i) => (
+            <PlanBar key={r.key} at={at + 0.4 + i * 0.35} row={r} width={W} />
+          ))}
+          <Appear at={at + 0.3} style={{ position: "absolute", left: (TODAY / GANTT_DAYS) * W, top: 20, bottom: 0 }}>
+            <div style={{ position: "absolute", top: 0, height: 306, width: 2, background: colors.coral }} />
+            <div style={{ position: "absolute", top: 310, left: -20, fontSize: 13, fontWeight: 900, color: colors.coral }}>Today</div>
+          </Appear>
+        </div>
+      </div>
+    </Panel>
+  );
+};
+
 export const ProjectManagersAsksScene: React.FC = () => {
+  // Cues follow the narration: s[0] "own tab, three views", s[1] Capacity,
+  // s[2] save/download, s[3] Gantt, s[4] export / SharePoint report,
+  // s[5] Asks → Jira issue, s[6] asks CSV.
+  const s = sentenceStarts("pmAsks");
   const t = useSeconds();
-  const asks = t > 13.0;
+  const view = t > s[5] - 0.2 ? "Asks" : t > s[3] - 0.2 ? "Gantt" : "Capacity";
+  const report = t > s[4] + 0.9;
+  const asked = t > s[5] + 4.6;
   return (
     <TutorialScene
       step="Plan capacity"
       title="Project Managers and Asks"
       who={["Project Managers"]}
       lines={[
-        { at: 0.8, text: <>Compare each person&apos;s open work to a <b>capacity target</b>.</> },
-        { at: 4.2, text: <>Spot <b>overdue</b>, <b>blocked</b> and <b>stale</b> tickets; open the <Key>Gantt</Key> timeline.</> },
-        { at: 12.6, text: <><Key>Asks</Key> keeps stakeholder requests in one place.</> },
-        { at: 17.0, text: <>Turn an ask into a Jira issue when it is ready.</> },
+        { at: s[1], text: <><b>Capacity</b> vs. target, with risk flags.</> },
+        { at: s[2], text: <>Save to <Key>Past Reports</Key> or download .md / .csv.</> },
+        { at: s[3], text: <><b>Gantt</b>: overdue in red, plans dashed.</> },
+        { at: s[4], text: <>Export it, or build a <Key>SharePoint report</Key>.</> },
+        { at: s[5], text: <><b>Asks</b> become Jira issues; download as CSV.</> },
       ]}
     >
       <AppWindow active="Project Managers">
-        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16, height: "100%", boxSizing: "border-box" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             {["Capacity", "Gantt", "Asks"].map((tab) => {
-              const on = asks ? tab === "Asks" : t > 8.2 ? tab === "Gantt" : tab === "Capacity";
+              const on = tab === view;
               return (
                 <div
                   key={tab}
@@ -558,41 +709,109 @@ export const ProjectManagersAsksScene: React.FC = () => {
                 </div>
               );
             })}
+            <div style={{ flex: 1 }} />
+            {view === "Capacity" ? (
+              <Appear at={s[2]} style={{ display: "flex", gap: 8 }}>
+                <Button variant="ghost" pressed={t > s[2] + 0.6 && t < s[2] + 0.9} style={{ fontSize: 15, padding: "7px 12px" }}>Save to Reports</Button>
+                <Button variant="ghost" style={{ fontSize: 15, padding: "7px 12px" }}>Download (.md)</Button>
+                <Button variant="ghost" pressed={t > s[2] + 2.4 && t < s[2] + 2.7} style={{ fontSize: 15, padding: "7px 12px" }}>Download (.csv)</Button>
+              </Appear>
+            ) : view === "Gantt" ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                <Button variant="ghost" style={{ fontSize: 15, padding: "7px 12px" }}>Export (.md)</Button>
+                <Button variant="ghost" style={{ fontSize: 15, padding: "7px 12px" }}>Export (.csv)</Button>
+                <Button pressed={t > s[4] + 0.5 && t < s[4] + 0.8} style={{ fontSize: 15, padding: "7px 12px" }}>SharePoint report…</Button>
+              </div>
+            ) : (
+              <Button variant="ghost" pressed={t > s[6] + 0.4 && t < s[6] + 0.7} style={{ fontSize: 15, padding: "7px 12px" }}>Download CSV</Button>
+            )}
           </div>
-          {!asks ? (
+
+          {view === "Capacity" ? (
             <>
               <div style={{ display: "flex", gap: 14 }}>
-                <Cap at={1.2} name="Priya Shah" open={12} cap={10} flags={["2 overdue", "1 blocked"]} />
-                <Cap at={1.6} name="Marcus Lee" open={7} cap={10} flags={[]} />
+                <Cap at={s[1] + 0.2} name="Priya Shah" open={12} cap={10} flags={["2 overdue", "1 blocked"]} />
+                <Cap at={s[1] + 0.6} name="Marcus Lee" open={7} cap={10} flags={[]} />
               </div>
               <div style={{ display: "flex", gap: 14 }}>
-                <Cap at={2.0} name="Dana Ortiz" open={9} cap={10} flags={["3 stale"]} />
-                <Cap at={2.4} name="Sam Okafor" open={5} cap={8} flags={[]} />
+                <Cap at={s[1] + 1.0} name="Dana Ortiz" open={9} cap={10} flags={["3 stale"]} />
+                <Cap at={s[1] + 1.4} name="Sam Okafor" open={5} cap={8} flags={[]} />
               </div>
-              <Appear at={4.6}>
+              <Appear at={s[1] + 3.2}>
                 <Panel title="⚠ Risk signals">
                   <div style={{ fontSize: 19, lineHeight: 1.6 }}>
                     Priya is 20% over capacity · APP-142 blocked 4 days · 3 tickets untouched for 14+ days
                   </div>
                 </Panel>
               </Appear>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <Appear at={s[2] + 0.9} out={s[2] + 2.3}>
+                  <Pill color={colors.green}>✓ Saved to Reports.</Pill>
+                </Appear>
+                <Downloaded at={s[2] + 2.7} file="capacity_planning_2026-10-30.csv" />
+              </div>
             </>
+          ) : view === "Gantt" ? (
+            <div style={{ position: "relative" }}>
+              <Gantt at={s[3]} />
+              {report ? (
+                <Appear
+                  at={s[4] + 0.9}
+                  style={{ position: "absolute", right: -6, top: 30, width: 520, zIndex: 5, boxShadow: "0 30px 70px rgba(15,49,51,0.3)", borderRadius: 12 }}
+                >
+                  <Panel title="SharePoint Report — Mobile Checkout">
+                    <div style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 10 }}>
+                      • 6 total issues · 1 done · 2 in progress
+                      <br />• 3 to do · <span style={{ color: "#dc2626", fontWeight: 700 }}>1 overdue</span>
+                      <br />• Timeline: Oct 1 – Jan 8
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: colors.muted }}>Summary</div>
+                    <div style={{ border: `1px solid ${colors.border}`, borderRadius: 8, padding: "8px 10px", fontSize: 16, minHeight: 48, margin: "6px 0 14px" }}>
+                      <Typed text="On track for the December demo. API retries are 6 days late; QA starts Dec 1." from={s[4] + 1.4} to={s[4] + 3.4} />
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <Button variant="ghost" style={{ fontSize: 14, padding: "6px 10px" }}>Download HTML</Button>
+                      <Button variant="ghost" style={{ fontSize: 14, padding: "6px 10px" }}>Copy HTML</Button>
+                      <Button pressed={t > s[4] + 3.8 && t < s[4] + 4.1} style={{ fontSize: 14, padding: "6px 10px" }}>Download chart PNG</Button>
+                    </div>
+                  </Panel>
+                </Appear>
+              ) : null}
+            </div>
           ) : (
-            <Appear at={13.0}>
-              <Panel title="Asks">
-                {[
-                  ["Exec demo of mobile checkout", "VP Product", t > 18.5 ? "Done · APP-160" : "Open"],
-                  ["Dark mode for reports", "PO – Platform", "Open"],
-                ].map(([title, who, status]) => (
-                  <div key={title} style={{ display: "flex", gap: 14, alignItems: "center", fontSize: 20, padding: "10px 0", borderTop: `1px solid ${colors.border}` }}>
-                    <span style={{ flex: 1, fontWeight: 700 }}>{title}</span>
-                    <span style={{ color: colors.muted }}>{who}</span>
-                    <Pill color={String(status).startsWith("Done") ? colors.green : colors.orange}>{status}</Pill>
-                    <Button variant="ghost" pressed={t > 17.6 && t < 17.9 && title.startsWith("Exec")}>Create a task</Button>
+            <>
+              <Appear at={s[5]}>
+                <Panel title="Asks">
+                  <div style={{ display: "flex", gap: 14, fontSize: 15, fontWeight: 900, color: colors.muted, paddingBottom: 8 }}>
+                    <span style={{ flex: 1 }}>Title</span>
+                    <span style={{ width: 130 }}>Who asked</span>
+                    <span style={{ width: 90 }}>Status</span>
+                    <span style={{ width: 90 }}>Jira key</span>
+                    <span style={{ width: 140 }} />
                   </div>
-                ))}
-              </Panel>
-            </Appear>
+                  {[
+                    ["Exec demo of mobile checkout", "VP Product", asked ? "Done" : "Open", asked ? "APP-160" : "—"],
+                    ["Dark mode for reports", "PO – Platform", "Open", "—"],
+                    ["Q1 capacity forecast", "Director Eng", "Open", "—"],
+                  ].map(([title, who, status, key]) => (
+                    <div key={title} style={{ display: "flex", gap: 14, alignItems: "center", fontSize: 18, padding: "10px 0", borderTop: `1px solid ${colors.border}` }}>
+                      <span style={{ flex: 1, fontWeight: 700 }}>{title}</span>
+                      <span style={{ width: 130, color: colors.muted }}>{who}</span>
+                      <span style={{ width: 90 }}>
+                        <Pill color={status === "Done" ? colors.green : colors.orange}>{status}</Pill>
+                      </span>
+                      <span style={{ width: 90, fontWeight: 700, color: colors.blue }}>{key}</span>
+                      <span style={{ width: 140 }}>
+                        <Button variant="ghost" pressed={t > s[5] + 4.2 && t < s[5] + 4.5 && title.startsWith("Exec")} style={{ fontSize: 14, padding: "6px 10px" }}>
+                          Create a task
+                        </Button>
+                      </span>
+                    </div>
+                  ))}
+                </Panel>
+              </Appear>
+              <Downloaded at={s[6] + 0.8} file="asks_2026-10-30.csv" />
+            </>
           )}
         </div>
       </AppWindow>

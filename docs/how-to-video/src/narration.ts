@@ -33,7 +33,7 @@ export const NARRATION = {
   reports:
     "Reports are where The Docket saves you the most time. In My Metrics, generate a Status Report, one-on-one prep, or a P W B review, written from your real issues. On Metrics, create Executive, Project Manager, and Developer summaries in one click. Combined Open Work has its own report across every Jira site. Everything you generate is saved to Past Reports, where you can read, copy, or download it. You can also download a task workbook, with one sheet per Jira site.",
   pmAsks:
-    "Project managers get two more tools. The Project Managers tab compares each person's open work to a capacity target, flags overdue, blocked, and stale tickets, and lays out a Gantt timeline. The Asks tab keeps requests from executives in one place, and turns an ask into a Jira issue when it's ready.",
+    "Project managers get their own tab, with three views. Capacity compares each person's open work to a target, and flags overdue, blocked, and stale tickets. Save it to Past Reports, or download it as Markdown or CSV. Gantt lays your issues out on a timeline, colored by status, with overdue work in red and planned dates dashed. Export the plan, or build a SharePoint report with an executive summary and a chart image. Asks keeps requests from executives in one place, and turns an ask into a Jira issue when it's ready. Your asks download as a CSV, too.",
   chat:
     "Chat lets anyone ask questions in plain English — like, what's at risk for the November launch? Answers draw on the data you've already loaded, and it tells you when it doesn't know. Save a useful answer to Past Reports with one click.",
   dataSecurity:
