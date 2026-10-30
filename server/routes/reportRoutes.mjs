@@ -31,6 +31,7 @@ import {
   buildPwbSystemPrompt,
   buildStatusReportSystemPrompt,
   buildWeekPlanSystemPrompt,
+  appendScoreExplainer,
   isValidCareerReportType,
   isValidPwbPeriod,
   AUDIENCE_CONFIGS,
@@ -702,7 +703,9 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
     const systemPrompt = buildWeekPlanSystemPrompt({ focusStyle, capacityHours, customInstructions });
 
     try {
-      const plan = await callLLMForReport({ systemPrompt, context, label: "week plan", aiPath: req.body?.aiPath });
+      const plan = appendScoreExplainer(
+        await callLLMForReport({ systemPrompt, context, label: "week plan", aiPath: req.body?.aiPath })
+      );
       const archiveId = insertGeneratedReport(db, {
         source: REPORT_SOURCES.WORK_WEEK,
         reportType: "week_plan",

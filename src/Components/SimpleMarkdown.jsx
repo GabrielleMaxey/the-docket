@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { createInlinePattern, parseMarkdownTable } from "../utils/reportMarkdown.js";
+import { createInlinePattern, parseDetailsBlock, parseMarkdownTable } from "../utils/reportMarkdown.js";
 
 const isSafeHref = (href) => {
   const value = String(href || "").trim();
@@ -115,6 +115,18 @@ const SimpleMarkdown = ({ text }) => {
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
+    const details = parseDetailsBlock(lines, i);
+    if (details) {
+      flushList();
+      elements.push(
+        <details key={`details-${i}`} className="report-details">
+          <summary>{renderInline(details.summary, `sum-${i}`)}</summary>
+          <SimpleMarkdown text={details.body} />
+        </details>
+      );
+      i = details.nextIndex - 1;
+      continue;
+    }
     const table = parseMarkdownTable(lines, i);
     if (table) {
       flushList();

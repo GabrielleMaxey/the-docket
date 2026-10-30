@@ -85,3 +85,29 @@ export const parseMarkdownTable = (lines, start) => {
     nextIndex: next,
   };
 };
+
+// <details> / <summary> block (collapsed by default in the viewer; plain markdown elsewhere).
+//   <details>
+//   <summary>Title</summary>
+//   ...markdown body...
+//   </details>
+// Returns null unless lines[start] is a bare <details> line with a matching </details>.
+export const parseDetailsBlock = (lines, start) => {
+  if (String(lines[start] ?? "").trim().toLowerCase() !== "<details>") return null;
+  let end = -1;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (String(lines[i] ?? "").trim().toLowerCase() === "</details>") {
+      end = i;
+      break;
+    }
+  }
+  if (end === -1) return null;
+  let summary = "Details";
+  let bodyStart = start + 1;
+  const m = /^<summary>(.*)<\/summary>$/i.exec(String(lines[bodyStart] ?? "").trim());
+  if (m) {
+    summary = m[1].trim() || summary;
+    bodyStart += 1;
+  }
+  return { summary, body: lines.slice(bodyStart, end).join("\n"), nextIndex: end + 1 };
+};

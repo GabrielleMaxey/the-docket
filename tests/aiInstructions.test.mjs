@@ -11,6 +11,8 @@ import {
   buildOneOnOneSystemPrompt,
   buildPwbSystemPrompt,
   buildWeekPlanSystemPrompt,
+  buildScoreExplainerMarkdown,
+  appendScoreExplainer,
   formatLumenCoreValuesBlock,
   isValidCareerReportType,
   isValidPwbPeriod,
@@ -215,10 +217,30 @@ describe("buildWeekPlanSystemPrompt", () => {
     assert.ok(prompt.includes("relative ordering"));
   });
 
+  it("score explainer is a collapsible block built from the real weights", () => {
+    const md = buildScoreExplainerMarkdown();
+    assert.ok(md.startsWith("<details>\n<summary>How the score works</summary>"));
+    assert.ok(md.trimEnd().endsWith("</details>"));
+    assert.ok(md.includes("| Factor | Points |"));
+    assert.ok(md.includes("Highest 50, High 40, Medium 30, Low 20, Lowest 10 (unset counts as 30)"));
+    assert.ok(md.includes("+30 if it blocks another open issue; +20 if an open issue blocks it"));
+    assert.ok(md.includes("+25 if due today or overdue; +15 if due within 3 business days"));
+    assert.ok(md.includes("Up to +30, highest for P1"));
+  });
+
+  it("appendScoreExplainer adds the block once, after the plan text", () => {
+    const once = appendScoreExplainer("# Plan\n\nDo the thing.\n\n");
+    assert.ok(once.startsWith("# Plan\n\nDo the thing.\n\n<details>"));
+    assert.equal(once.split("<details>").length - 1, 1);
+    assert.equal(appendScoreExplainer(once), once);
+    assert.ok(appendScoreExplainer("").includes("<details>"));
+  });
+
   it("week plan prompt never sends the reader to a key or context they cannot see", () => {
     const prompt = buildWeekPlanSystemPrompt({ focusStyle: "balance", capacityHours: 20 });
     assert.ok(prompt.includes("The reader cannot see the score key"));
     assert.ok(!prompt.includes("using the score key below"));
+    assert.ok(prompt.includes('"How the score works" section at the end of the plan'));
   });
 
   it("week plan prompt covers listed days, due dates, stale triage, blockers and estimates", () => {

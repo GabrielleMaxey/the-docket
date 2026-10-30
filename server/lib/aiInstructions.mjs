@@ -349,6 +349,36 @@ export const WEEK_PLAN_SCORE_KEY = [
   "The score is a relative ordering for this list, not a measure of effort or importance on its own.",
 ].join("\n");
 
+// Collapsible "how the score works" block appended to every week plan by the server (not written by the
+// model), so the numbers always match DEFAULT_PRIORITY_WEIGHTS.
+export const SCORE_EXPLAINER_SUMMARY = "How the score works";
+
+export const buildScoreExplainerMarkdown = () =>
+  [
+    "<details>",
+    `<summary>${SCORE_EXPLAINER_SUMMARY}</summary>`,
+    "",
+    "Each task gets a suggested-order score. Higher means do sooner. The factors add up:",
+    "",
+    "| Factor | Points |",
+    "|---|---|",
+    `| Jira priority | Highest ${W.priority.highest}, High ${W.priority.high}, Medium ${W.priority.medium}, Low ${W.priority.low}, Lowest ${W.priority.lowest} (unset counts as ${W.priority.unset}) |`,
+    `| Status | ${W.status.active} for active work (In Progress, Analyzing, Ready for Verification); ${W.status.other} for other open statuses |`,
+    `| Staleness (days since last update) | ${W.staleness.d30} at 30+ days, ${W.staleness.d15} at 15+, ${W.staleness.d7} at 7+, ${W.staleness.d3} at 3+, ${W.staleness.fresh} under 3 (capped at ${W.staleness.cappedMax} for non-active statuses) |`,
+    `| Due date | +${W.due.overdue} if due today or overdue; +${W.due.soon} if due within ${W.due.businessDays} business days |`,
+    `| Blockers | +${W.blocker.blocks} if it blocks another open issue; +${W.blocker.blockedBy} if an open issue blocks it |`,
+    `| Your priority (P1 to P${W.manual.maxPriority}) | Up to +${W.manual.max}, highest for P1 |`,
+    "",
+    "The score is a relative ordering for this list, not a measure of effort or importance on its own. Hours shown against tasks are suggested working time, not an estimate of how long a task takes.",
+    "</details>",
+  ].join("\n");
+
+export const appendScoreExplainer = (plan) => {
+  const text = String(plan ?? "");
+  if (text.includes(`<summary>${SCORE_EXPLAINER_SUMMARY}</summary>`)) return text;
+  return `${text.replace(/\s+$/, "")}\n\n${buildScoreExplainerMarkdown()}\n`;
+};
+
 export const buildWeekPlanSystemPrompt = ({ focusStyle, capacityHours, customInstructions }) =>
   [
     `You are a productivity coach helping a developer at Lumen plan their work week.
@@ -367,7 +397,7 @@ Rules:
 - Tasks are pre-ranked best first, each with a score and reasons
 - Keep that order within the day-by-day plan unless fixed commitments or capacity force a change, and then say so in one clause
 - Quote a score or reason only exactly as given. Do not invent scores or reasons.
-- Add one short line near the top of the plan explaining that tasks are ordered by a suggested-order score where higher means do sooner. The reader cannot see the score key or this data, so never tell them to look at a key, "planning context", prompt or data you were given. Do not repeat the full key
+- Add one short line near the top of the plan explaining that tasks are ordered by a suggested-order score where higher means do sooner, and that the "How the score works" section at the end of the plan explains it (the app adds that section; do not write it yourself). The reader cannot see the score key or this data, so never tell them to look at a key, "planning context", prompt or data you were given. Do not repeat the full key
 - Schedule a task that has a due date no later than that date when it falls on a listed day
 - A task that is stale for more than 90 days (see its "Stale N days" reason) gets a time-boxed triage of at most 1 hour: decide to keep, re-scope or close it. Do not give it a full work block ahead of a blocked or recently active task
 - If a task shows "blocked by <key>", name that key in the plan and schedule follow-up on it before the blocked task. If it shows "blocks <key>", say so

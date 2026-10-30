@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   createInlinePattern,
   isTableSeparator,
+  parseDetailsBlock,
   parseMarkdownTable,
   splitTableRow,
 } from "../src/utils/reportMarkdown.js";
@@ -63,4 +64,18 @@ test("underscores inside identifiers are not italic or bold, but standalone ones
   assert.equal(find("an _emphasised_ word")?.[5], "emphasised");
   assert.equal(find("a __strong__ word")?.[3], "strong");
   assert.equal(find("**bold** stays")?.[2], "bold");
+});
+
+test("parses a details block with summary and markdown body", () => {
+  const lines = ["<details>", "<summary>How it works</summary>", "", "| a | b |", "|---|---|", "| 1 | 2 |", "</details>", "after"];
+  const d = parseDetailsBlock(lines, 0);
+  assert.equal(d.summary, "How it works");
+  assert.ok(d.body.includes("| a | b |"));
+  assert.equal(d.nextIndex, 7);
+});
+
+test("details block without summary gets a default and unterminated blocks are ignored", () => {
+  assert.equal(parseDetailsBlock(["<details>", "text", "</details>"], 0).summary, "Details");
+  assert.equal(parseDetailsBlock(["<details>", "<summary>x</summary>", "text"], 0), null);
+  assert.equal(parseDetailsBlock(["not details"], 0), null);
 });
