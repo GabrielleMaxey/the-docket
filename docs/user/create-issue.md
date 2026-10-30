@@ -49,7 +49,7 @@ When you click **Create** or **✦ AI Draft**, the app first searches the Jira s
 - To carry on anyway, click **Create anyway** (or **Draft anyway** for AI Draft). The app will not ask again for the same text. **Dismiss** only hides the panel; clicking **Create** again runs the check again.
 - If the search fails, the app lets you continue without the check. It never blocks creation.
 
-The check is a prompt to look, not a verdict. Matches are ranked by shared words, so a hit can be unrelated and a real duplicate worded very differently can be missed.
+The duplicate-check approach comes from the [ATS AI Toolkit](https://github.com/LumenTech-Prod/service-assurance-ip-ats-agents-specs-prompts). The check is a prompt to look, not a verdict. Matches are ranked by shared words, so a hit can be unrelated and a real duplicate worded very differently can be missed.
 
 **4. After create**
 

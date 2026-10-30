@@ -194,6 +194,7 @@ The separate **Older browser data has an unknown Jira site** notice concerns uns
 ## Acknowledgments
 
 - The week-plan suggested-order scoring is ported from the `jira-work-priority` skill in the [ATS AI Toolkit](https://github.com/LumenTech-Prod/service-assurance-ip-ats-agents-specs-prompts).
+- The Create Issue duplicate check (looking for existing issues before creating one) follows the approach in the same repository.
 - The report writing-style rules are adapted from the ATS jira-comment standards in the same repository.
 
 ## Tech stack
