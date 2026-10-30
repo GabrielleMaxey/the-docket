@@ -25,31 +25,3 @@
 *Documentation mockup — synthetic data; simplified layout.*
 
 [Mockup sources and provenance](images/README.md).
-
-<details>
-<summary>Historical reference screenshots — earlier application layouts</summary>
-
-These older captures remain useful for orientation. They do not show the current Combined Work, Team DB opt-in, or recovery-notice behavior.
-
-**Task Management — daily JQL runs with inline status updates, priorities, and notes**
-![Task Management table](images/screenshot-task-table.png)
-
-**My Metrics — IC capacity tracking with WIP limit and open-issue breakdown by status**
-![My Metrics — My Capacity](images/screenshot-metrics.png)
-
-**Metrics — overall project health at a glance**
-![Overall Status](images/screenshot-overall-status.png)
-
-**Metrics — per-project breakdown with status distribution charts**
-![Project Metrics](images/screenshot-project-metrics.png)
-
-**Project Managers — capacity planning with contributor workload by status**
-![Project Managers](images/screenshot-project-managers.png)
-
-**Chat — natural-language Jira questions backed by loaded data**
-![Chat](images/screenshot-chat.png)
-
-**Settings — Jira connection, presets, date fields, and contributor configuration**
-![Settings](images/screenshot-settings.png)
-
-</details>

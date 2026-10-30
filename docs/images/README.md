@@ -30,4 +30,3 @@ All new names, issue keys, counts and `.example.test` hosts are illustrative. Ex
 
 ## Older screenshots
 
-The existing `screenshot-*.png` files are retained as historical interface references. Their provenance and capture dates were not re-established during this update. The main README places them in a collapsed gallery marked as older screenshots; they should not be used to establish current behavior, current test coverage or current data handling.
