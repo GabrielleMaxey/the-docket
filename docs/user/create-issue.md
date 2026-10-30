@@ -30,6 +30,7 @@ The modal pre-selects a preset when you open it from an active Task Management J
   - **Task** — what needs doing and why it matters are required; definition of done, constraints, and components touched are optional.
 
   Only the basic ask is required — leave any optional prompt blank and the AI omits that section rather than guessing. Blank prompts are listed back to you as a reminder to finish them on the Jira issue after it is created. With the helper on, **Title** becomes optional: click **✦ AI Draft** and the AI writes the title (Job Story format for Stories) and description from your answers. Everything it produces stays editable before you create.
+- **ODI standards** — the required fields and rules for Stories, Tasks and Bugs come from the **Jira Standards** page (ODI Project Space Standards) in the ODI Confluence space. The Job Story format they require follows Mountain Goat Software's article [Job Stories Offer a Viable Alternative to User Stories](https://www.mountaingoatsoftware.com/agile/job-stories-offer-a-viable-alternative-to-user-stories).
 - **Title** — required unless the AI helper is on. Stories should use Job Story format; AI Draft can rewrite and ask 2–3 clarification questions if the ask/goal is unclear.
 - **Components**, **Vertical Components** — choose from the dropdown. **Components** must already exist on your Jira project (free-text names are rejected).
 - **BUG Tracking** (Bug only) — optional. Options load from your project's `BUG Tracking-…` components and are added to the issue alongside any regular Component. Click **×** on any Components, Vertical Components, or BUG Tracking dropdown to clear it.
@@ -49,7 +50,7 @@ When you click **Create** or **✦ AI Draft**, the app first searches the Jira s
 - To carry on anyway, click **Create anyway** (or **Draft anyway** for AI Draft). The app will not ask again for the same text. **Dismiss** only hides the panel; clicking **Create** again runs the check again.
 - If the search fails, the app lets you continue without the check. It never blocks creation.
 
-The check is a prompt to look, not a verdict. Matches are ranked by shared words, so a hit can be unrelated and a real duplicate worded very differently can be missed.
+The duplicate-check approach comes from the [ATS AI Toolkit](https://github.com/LumenTech-Prod/service-assurance-ip-ats-agents-specs-prompts). The check is a prompt to look, not a verdict. Matches are ranked by shared words, so a hit can be unrelated and a real duplicate worded very differently can be missed.
 
 **4. After create**
 

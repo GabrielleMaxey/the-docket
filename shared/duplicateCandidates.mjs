@@ -1,3 +1,4 @@
+// Duplicate-check approach follows the ATS AI Toolkit (https://github.com/LumenTech-Prod/service-assurance-ip-ats-agents-specs-prompts).
 // Possible-duplicate check for Create Issue: build a read-only JQL search from the new
 // summary, then rank the returned issues by how many meaningful words they share.
 

@@ -8,6 +8,8 @@
 Written **from the assignee's perspective**, second person ("you have", "your open items"). Tone: supportive colleague, not manager status update. Covers: overall tracking %, key open items, overdue concerns, recommended next steps. Flowing prose, no bullet lists.
 
 ### Writing style rules (all report prompts)
+Adapted from the ATS jira-comment standards in the [ATS AI Toolkit](https://github.com/LumenTech-Prod/service-assurance-ip-ats-agents-specs-prompts) (concrete banned patterns with rewrites).
+
 `REPORT_WRITING_STYLE_RULES` in `server/lib/aiInstructions.mjs` is appended to the Status Report, 1:1 Prep and PWB Review prompt builders (`STATUS_REPORT_PROMPT_BODY` is split out so it can be appended) and to the dashboard audience `systemParts` in `server/routes/reportRoutes.mjs`. It bans hedged numbers, vague verbs, activity without an outcome, filler phrases and details not in the data. Add new report prompts to the same list so they inherit it; `tests/aiInstructions.test.mjs` covers the builders.
 
 ### `/api/report/generate` (Dashboard — Generate Report)
