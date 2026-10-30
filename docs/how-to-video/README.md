@@ -2,6 +2,8 @@
 
 A narrated onboarding video (1920×1080, 30 fps) built with [Remotion](https://www.remotion.dev). It opens with a clickable-time chapter list, then covers what The Docket does, managing work across multiple Jira spaces, the `.env` and Jira setup, the main tabs, duplicate-checked Create Issue, the week plan and reports. All UI is mocked in React with fictional data (ACME / `APP-142` etc.) — no real Jira content.
 
+See [CHEATSHEET.md](CHEATSHEET.md) for the everyday commands (preview, render, narration, ffmpeg).
+
 ## Preview and edit
 
 ```bash
