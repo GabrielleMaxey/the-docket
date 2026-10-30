@@ -1,6 +1,6 @@
 import React from "react";
 import { colors, monoFamily } from "../theme";
-import { chapterStarts, formatTime } from "../timing";
+import { chapterStarts, formatTime, sentenceStarts } from "../timing";
 import { AppWindow, Appear, Background, Key, Logo, Panel, Pill, TutorialScene, useSeconds } from "../ui";
 
 // Chapter list with start times, computed from the real scene lengths.
@@ -28,7 +28,7 @@ export const ContentsScene: React.FC = () => {
           {cols.map((col, c) => (
             <div key={c} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
               {col.map((r, i) => (
-                <Appear key={r.key} at={1.4 + (c * half + i) * 0.28}>
+                <Appear key={r.key} at={1.4 + (c * half + i) * 0.45}>
                   <div
                     style={{
                       display: "flex",
@@ -91,59 +91,67 @@ const Arrow: React.FC<{ at: number; label: string }> = ({ at, label }) => (
   </Appear>
 );
 
-export const OverviewScene: React.FC = () => (
-  <TutorialScene
-    step="The big picture"
-    title="What The Docket does"
-    who={["Everyone"]}
-    lines={[
-      { at: 1.0, text: <>Runs on <b>your computer</b>; talks to Jira through a small local server.</> },
-      { at: 6.5, text: <>Saved searches become <b>one editable table</b>.</> },
-      { at: 11.0, text: <>Edits save straight to Jira; priorities and notes stay with you.</> },
-      { at: 17.5, text: <>The app writes your <b>reports and plans</b>.</> },
-    ]}
-  >
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <Box at={1.4} title="Jira" sub="Your sites, issues and projects" color={colors.blue} w={230}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {["Demo Operations", "Demo Platform"].map((s) => (
-            <Pill key={s} color={colors.blue}>{s}</Pill>
+export const OverviewScene: React.FC = () => {
+  // Cues follow the narration: s[0] "for engineers...", s[1] "runs on your
+  // computer", s[2] "saved search... table", s[3] "change a status...",
+  // s[4] "priorities and notes", s[5] "reports".
+  const s = sentenceStarts("overview");
+  return (
+    <TutorialScene
+      step="The big picture"
+      title="What The Docket does"
+      who={["Everyone"]}
+      lines={[
+        { at: s[0], text: <>Built for engineers and project managers who live in Jira.</> },
+        { at: s[1], text: <>Runs on <b>your computer</b>; talks to Jira through a small local server.</> },
+        { at: s[2], text: <>Saved searches become <b>one editable table</b>.</> },
+        { at: s[3], text: <>Edits save straight to Jira.</> },
+        { at: s[4], text: <>Priorities and notes stay with you.</> },
+        { at: s[5], text: <>The app writes your <b>reports and plans</b>.</> },
+      ]}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Box at={s[0]} title="Jira" sub="Your sites, issues and projects" color={colors.blue} w={230}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {["Demo Operations", "Demo Platform"].map((x) => (
+              <Pill key={x} color={colors.blue}>{x}</Pill>
+            ))}
+          </div>
+        </Box>
+        <Arrow at={s[1]} label="your API token" />
+        <Box at={s[1] + 0.5} title="The Docket" sub="Local server, notes and priorities on this machine" color={colors.coral} w={260}>
+          <Logo size={64} />
+        </Box>
+        <Arrow at={s[2]} label="" />
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {[
+            [s[2], "Editable table", colors.teal],
+            [s[4], "Priorities & notes", colors.orange],
+            [s[5], "Reports & plans", "#7C3AED"],
+          ].map(([at, label, color]) => (
+            <Appear key={label as string} at={at as number}>
+              <div
+                style={{
+                  fontSize: 26,
+                  fontWeight: 900,
+                  color: color as string,
+                  background: "white",
+                  border: `3px solid ${color}`,
+                  borderRadius: 16,
+                  padding: "16px 22px",
+                  width: 270,
+                  boxShadow: "0 14px 34px rgba(15,49,51,0.12)",
+                }}
+              >
+                {label}
+              </div>
+            </Appear>
           ))}
         </div>
-      </Box>
-      <Arrow at={3.0} label="your API token" />
-      <Box at={3.4} title="The Docket" sub="Local server, notes and priorities on this machine" color={colors.coral} w={260}>
-        <Logo size={64} />
-      </Box>
-      <Arrow at={5.8} label="" />
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {[
-          [6.6, "Editable table", colors.teal],
-          [11.4, "Priorities & notes", colors.orange],
-          [17.8, "Reports & plans", "#7C3AED"],
-        ].map(([at, label, color]) => (
-          <Appear key={label as string} at={at as number}>
-            <div
-              style={{
-                fontSize: 26,
-                fontWeight: 900,
-                color: color as string,
-                background: "white",
-                border: `3px solid ${color}`,
-                borderRadius: 16,
-                padding: "16px 22px",
-                width: 270,
-                boxShadow: "0 14px 34px rgba(15,49,51,0.12)",
-              }}
-            >
-              {label}
-            </div>
-          </Appear>
-        ))}
       </div>
-    </div>
-  </TutorialScene>
-);
+    </TutorialScene>
+  );
+};
 
 const SITES = [
   { name: "Demo Operations", host: "ops.example.test", color: colors.blue },

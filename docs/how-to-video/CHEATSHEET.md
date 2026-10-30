@@ -39,19 +39,29 @@ node scripts/voiceover.mjs --say                         # free macOS voice (pla
 
 - Text: `src/narration.ts`. Audio: `public/voiceover/<scene>.mp3`. Lengths: `src/voiceoverDurations.json`.
 - Spoken spellings (for example Docket → Dockit) live in `pronounce()` in `scripts/voiceover.mjs`.
-- Mid-sentence pause when re-recording: add `<break time="1.0s" />` to that scene's text, then re-record it with `--only`.
+- Pauses: prefer `PAUSES` in `src/timing.ts` (no re-record). Alternatively add `<break time="1.0s" />` to the scene's text and re-record it with `--only`.
 - Never commit `.env.local` (the API key).
 
-## Timing and pauses
+## Timing and pauses (no audio editing needed)
 
 All in `src/timing.ts`:
 
-- `VOICE_LEAD` (0.6 s): silence before each narration starts.
-- `VOICE_TAIL` (0.9 s): silence after each narration ends. Raise it for a longer pause between scenes.
-- `SCENE_LIST` `seconds`: minimum scene length. A scene is never shorter than this, so raise it to hold a scene on screen longer than its narration.
-- `TRANSITION_SECONDS` (0.6 s): crossfade/slide length.
+- `PAUSES`: add a pause inside a scene's narration. `at` is seconds into the clip, `seconds` is the pause length. The scene gets longer, and animations and chapter times adjust.
+  ```ts
+  export const PAUSES = {
+    credentials: [{ at: 12.5, seconds: 1 }, { at: 20, seconds: 0.8 }],
+    reports: [{ at: 8, seconds: 1.2 }],
+  };
+  ```
+  Find `at` by playing the clip in Studio, or with `ffprobe`. A pause is cut cleanly, with a short fade on each side.
+- `SCENE_LIST` `seconds`: the minimum scene length. Raise it to keep a scene on screen longer after the voice ends (the Chapters list uses this).
+- `VOICE_LEAD` (0.6 s) and `VOICE_TAIL` (0.9 s): silence before and after every narration.
+- `TRANSITION_SECONDS` (0.6 s): crossfade or slide length.
+- `SYNCED` and `sentenceStarts("scene")`: for scenes whose highlights should appear as each sentence is spoken (used by `overview`). Cues come from the narration text and the real clip length, so they stay in step after a re-record.
 
-After changing timing or audio, refresh the chapter list, then render:
+Most scenes stretch their animations to fit the narration length. If highlights drift from the voice in a scene, ask for it to be synced the way `overview` is.
+
+After changing timing, pauses or audio, refresh the chapter list, then preview and render:
 
 ```bash
 npx --yes tsx scripts/chapters.mjs      # rewrites CHAPTERS.md, prints the paste-ready list
