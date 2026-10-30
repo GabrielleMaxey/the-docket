@@ -143,7 +143,6 @@ taskManager/
 │   ├── unsigned-installs.md  # Unsupported installers + local launch guidance
 │   ├── PR_WriteUps/          # Per-PR summaries for review
 │   ├── specs/                # Feature specs (e.g. team priority sync)
-│   ├── canvases/             # Cursor docs-canvas mirror
 │   └── examples/             # Sample reports / prompts
 ├── data/                     # Separate local stores and note-image folders (git-ignored)
 ├── .env                      # Credentials — never commit
