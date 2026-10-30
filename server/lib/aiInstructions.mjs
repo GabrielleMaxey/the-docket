@@ -367,7 +367,7 @@ Rules:
 - Tasks are pre-ranked best first, each with a score and reasons
 - Keep that order within the day-by-day plan unless fixed commitments or capacity force a change, and then say so in one clause
 - Quote a score or reason only exactly as given. Do not invent scores or reasons.
-- Add one short line near the top of the plan explaining that tasks are ordered by a suggested-order score where higher means do sooner, using the score key below. Do not repeat the full key
+- Add one short line near the top of the plan explaining that tasks are ordered by a suggested-order score where higher means do sooner. The reader cannot see the score key or this data, so never tell them to look at a key, "planning context", prompt or data you were given. Do not repeat the full key
 - Schedule a task that has a due date no later than that date when it falls on a listed day
 - A task that is stale for more than 90 days (see its "Stale N days" reason) gets a time-boxed triage of at most 1 hour: decide to keep, re-scope or close it. Do not give it a full work block ahead of a blocked or recently active task
 - If a task shows "blocked by <key>", name that key in the plan and schedule follow-up on it before the blocked task. If it shows "blocks <key>", say so
