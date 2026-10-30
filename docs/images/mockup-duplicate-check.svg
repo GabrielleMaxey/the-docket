@@ -1,43 +1,78 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="840" viewBox="0 0 1440 840" role="img" aria-labelledby="title desc">
-<title id="title">Create Issue: possible existing issues</title><desc id="desc">Illustrative Create Issue modal. A Possible existing issues panel sits above the Close and Create buttons, listing open issues with similar wording and offering Create anyway or Dismiss.</desc>
-<defs><linearGradient id="nav"><stop stop-color="#054d78"/><stop offset="1" stop-color="#16b0f2"/></linearGradient></defs>
-<g font-family="Arial, Helvetica, sans-serif">
-<rect x="0" y="0" width="1440" height="840" fill="#f4f7fa"/>
-<rect x="0" y="0" width="1440" height="62" fill="url(#nav)"/>
-<text x="32" y="41" font-size="27" fill="#fdd219" font-weight="700">The Docket</text>
-<text x="360" y="39" font-size="19" fill="#fdd219" font-weight="600">Task Management</text>
-<rect x="360" y="53" width="221" height="3" fill="#fdd219"/>
-<text x="604" y="39" font-size="19" fill="white" font-weight="600">Metrics</text>
-<text x="729" y="39" font-size="19" fill="white" font-weight="600">Project Managers</text>
-<text x="965" y="39" font-size="19" fill="white" font-weight="600">Past Reports</text>
-<text x="1146" y="39" font-size="19" fill="white" font-weight="600">Chat</text>
-<text x="1239" y="39" font-size="19" fill="white" font-weight="600">Settings</text>
-<rect x="32" y="82" width="1376" height="40" rx="4" fill="#fff5d5" stroke="#eddfaa"/>
-<text x="49" y="109" font-size="17" fill="#6e5720" font-weight="700">DOCUMENTATION MOCKUP  •  SYNTHETIC DATA  •  SIMPLIFIED LAYOUT</text>
-<text x="40" y="170" font-size="30" fill="#223447" font-weight="700">Create Issue: possible existing issues appear above Close / Create</text>
-<rect x="140" y="195" width="1160" height="615" rx="10" fill="white" stroke="#cfd9e3"/>
-<text x="170" y="236" font-size="24" fill="#223447" font-weight="700">Create Issue</text>
-<text x="170" y="276" font-size="19" fill="#526779" font-weight="400">Parent: [Reporting Revamp - Exports] (Epic)  ·  Type: Story</text>
-<text x="170" y="316" font-size="18" fill="#526779" font-weight="700">Title</text>
-<rect x="170" y="326" width="1100" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="184" y="355" font-size="19" fill="#223447" font-weight="400">[Reporting Revamp - Exports] Schedule weekly CSV export</text>
-<text x="170" y="402" font-size="18" fill="#526779" font-weight="700">Description  (✦ AI Draft)</text>
-<rect x="170" y="412" width="1100" height="86" rx="5" fill="#f8fafc" stroke="#ccd6e1"/>
-<text x="184" y="444" font-size="18" fill="#526779" font-weight="400">When a manager reviews progress, I want a scheduled CSV export so I can share it without</text>
-<text x="184" y="472" font-size="18" fill="#526779" font-weight="400">opening the app…</text>
-<rect x="170" y="518" width="1100" height="196" rx="8" fill="#fff8e1" stroke="#e7d28a"/>
-<text x="190" y="550" font-size="20" fill="#6e5720" font-weight="700">Possible existing issues</text>
-<text x="190" y="578" font-size="17" fill="#6e5720" font-weight="400">Open issues in ODI with similar wording. Check these before creating a new one.</text>
-<text x="200" y="610" font-size="18" fill="#185f89" font-weight="600">• ODI-2210 — Scheduled CSV export of metrics (In Progress)</text>
-<text x="200" y="640" font-size="18" fill="#185f89" font-weight="600">• ODI-1984 — Weekly report email — matched in description (To Do)</text>
-<rect x="190" y="660" width="150" height="38" rx="5" fill="#16b0f2"/>
-<text x="212" y="685" font-size="17" fill="white" font-weight="700">Create anyway</text>
-<rect x="354" y="660" width="100" height="38" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="376" y="685" font-size="17" fill="#263d52" font-weight="600">Dismiss</text>
-<rect x="1060" y="740" width="100" height="42" rx="5" fill="white" stroke="#ccd6e1"/>
-<text x="1085" y="768" font-size="18" fill="#263d52" font-weight="600">Close</text>
-<rect x="1175" y="740" width="95" height="42" rx="5" fill="#16b0f2"/>
-<text x="1196" y="768" font-size="18" fill="white" font-weight="700">Create</text>
-<text x="170" y="798" font-size="15" fill="#526779" font-weight="400">Same panel appears for ✦ AI Draft (button reads Draft anyway). Search covers summary and the first 500 characters of description.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="940" viewBox="0 0 1100 940" role="img" aria-labelledby="title desc">
+<title id="title">Create Issue: possible existing issues</title><desc id="desc">Illustrative Create Jira issue modal. The Possible existing issues panel sits above the Close and Create buttons, with Create anyway and Dismiss.</desc>
+<g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<rect x="0" y="0" width="1100" height="940" fill="#fff"/>
+<defs><linearGradient id="nav" x1="0" y1="0" x2="1" y2="0.2"><stop offset="0" stop-color="#054d78"/><stop offset="0.52" stop-color="#0c93d9"/><stop offset="1" stop-color="#16b0f2"/></linearGradient><linearGradient id="joke" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FDD219"/><stop offset="0.55" stop-color="#FB9429"/><stop offset="1" stop-color="#F95E4A"/></linearGradient></defs>
+<rect x="0" y="0" width="1100" height="56" rx="0" fill="url(#nav)" stroke="none" stroke-width="1" />
+<rect x="0" y="54" width="1100" height="2" rx="0" fill="#e1c24a" stroke="none" stroke-width="1" />
+<rect x="24" y="10" width="34" height="34" rx="8" fill="#f5833a" stroke="none" stroke-width="1" />
+<rect x="31" y="17" width="20" height="20" rx="4" fill="#fff2e0" stroke="none" stroke-width="1" />
+<rect x="34" y="24" width="14" height="3" rx="1" fill="#f5833a" stroke="none" stroke-width="1" />
+<rect x="34" y="30" width="14" height="3" rx="1" fill="#f5833a" stroke="none" stroke-width="1" />
+<text x="68" y="35" font-size="19" fill="#FDD219" font-weight="800" text-anchor="start">The Docket</text>
+<text x="261" y="33" font-size="10" fill="#fff" font-weight="700" text-anchor="start">SITE</text>
+<rect x="289" y="18" width="140" height="22" rx="11" fill="#f3f4f6" stroke="none" stroke-width="1" />
+<text x="300" y="33" font-size="12" fill="#222" font-weight="700" text-anchor="start">Demo Operations</text>
+<path d="M414 27 l3 4 l3 -4" fill="#333"/>
+<rect x="439" y="0" width="160" height="54" rx="0" fill="rgba(253,210,25,0.12)" stroke="none" stroke-width="1" />
+<rect x="439" y="51" width="160" height="3" rx="0" fill="#FDD219" stroke="none" stroke-width="1" />
+<text x="449" y="34" font-size="16" fill="#FDD219" font-weight="600" text-anchor="start">Task Management</text>
+<text x="615" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Metrics</text>
+<text x="705" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Project Managers</text>
+<text x="870" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Past Reports</text>
+<text x="995" y="34" font-size="16" fill="rgba(255,255,255,0.92)" font-weight="600" text-anchor="start">Chat</text>
+<circle cx="1060" cy="28" r="7" fill="none" stroke="#fff" stroke-width="2"/>
+<rect x="0" y="56" width="1100" height="884" rx="0" fill="#262626" stroke="none" stroke-width="1" />
+<rect x="270" y="76" width="560" height="800" rx="6" fill="#fff" stroke="none" stroke-width="1" />
+<text x="290" y="112" font-size="16" fill="#1b1c1d" font-weight="700" text-anchor="start">Create Jira issue</text>
+<line x1="270" y1="130" x2="830" y2="130" stroke="#e5e7eb" stroke-width="1"/>
+<text x="290" y="160" font-size="12" fill="#333" font-weight="700" text-anchor="start">Project</text>
+<rect x="290" y="166" width="520" height="30" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="300" y="185.55" font-size="13" fill="#333" font-weight="400" text-anchor="start">DEMO — Demo Operations</text>
+<path d="M792 179.0 l4 4 l4 -4" stroke="#555" stroke-width="1.6" fill="none"/>
+<text x="290" y="212" font-size="12" fill="#333" font-weight="700" text-anchor="start">Issue type</text>
+<rect x="290" y="218" width="520" height="30" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="300" y="237.55" font-size="13" fill="#333" font-weight="400" text-anchor="start">Story</text>
+<path d="M792 231.0 l4 4 l4 -4" stroke="#555" stroke-width="1.6" fill="none"/>
+<text x="290" y="264" font-size="12" fill="#333" font-weight="700" text-anchor="start">Epic preset</text>
+<text x="366.6" y="263" font-size="12" fill="#db2828" font-weight="700" text-anchor="start">*</text>
+<rect x="290" y="270" width="520" height="30" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="300" y="289.55" font-size="13" fill="#333" font-weight="400" text-anchor="start">[Reporting Revamp - Exports] (Epic)</text>
+<path d="M792 283.0 l4 4 l4 -4" stroke="#555" stroke-width="1.6" fill="none"/>
+<rect x="290" y="302" width="13" height="13" rx="3" fill="#fff" stroke="#8c96a3" stroke-width="1" />
+<text x="312" y="314" font-size="12" fill="#222" font-weight="700" text-anchor="start">Use AI helper</text>
+<text x="402" y="314" font-size="11" fill="#5f6b7a" font-weight="400" text-anchor="start">— guided questions, then AI Draft writes the title and description</text>
+<text x="290" y="342" font-size="12" fill="#333" font-weight="700" text-anchor="start">Title</text>
+<text x="327.0" y="341" font-size="12" fill="#db2828" font-weight="700" text-anchor="start">*</text>
+<rect x="290" y="348" width="520" height="30" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="300" y="367.55" font-size="13" fill="#222" font-weight="400" text-anchor="start">[Reporting Revamp - Exports] Schedule weekly CSV export</text>
+<text x="290" y="392" font-size="10.5" fill="#5f6b7a" font-weight="400" text-anchor="start">ODI standard: Job Story with a clear ask and goal outcome.</text>
+<text x="290" y="414" font-size="12" fill="#333" font-weight="700" text-anchor="start">Description</text>
+<rect x="740" y="402" width="70" height="22" rx="4" fill="#cfe3f5" stroke="none" stroke-width="1" />
+<text x="775.0" y="416.85" font-size="11" fill="#fff" font-weight="600" text-anchor="middle">✦ AI Draft</text>
+<rect x="290" y="420" width="520" height="96" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="300" y="442" font-size="12" fill="#222" font-weight="400" text-anchor="start">When a manager reviews progress, I want a scheduled CSV export, so I can share</text>
+<text x="300" y="460" font-size="12" fill="#222" font-weight="400" text-anchor="start">it without opening the app.</text>
+<line x1="270" y1="612" x2="830" y2="612" stroke="#e5e7eb" stroke-width="1"/>
+<rect x="290" y="626" width="520" height="168" rx="4" fill="#fffaf3" stroke="#c9ba9b" stroke-width="1" />
+<text x="304" y="652" font-size="13" fill="#794b02" font-weight="700" text-anchor="start">Possible existing issues</text>
+<text x="304" y="674" font-size="11.5" fill="#794b02" font-weight="400" text-anchor="start">Open issues in DEMO with similar wording. Check these before creating a new one.</text>
+<text x="312" y="702" font-size="12" fill="#794b02" font-weight="400" text-anchor="start">•</text>
+<text x="324" y="702" font-size="12" fill="#2563eb" font-weight="600" text-anchor="start">DEMO-210</text>
+<text x="390" y="702" font-size="12" fill="#794b02" font-weight="400" text-anchor="start">— Scheduled CSV export of metrics (In Progress)</text>
+<text x="312" y="724" font-size="12" fill="#794b02" font-weight="400" text-anchor="start">•</text>
+<text x="324" y="724" font-size="12" fill="#2563eb" font-weight="600" text-anchor="start">DEMO-198</text>
+<text x="390" y="724" font-size="12" fill="#794b02" font-weight="400" text-anchor="start">— Weekly report email (To Do) — matched in description</text>
+<rect x="304" y="750" width="104" height="28" rx="4" fill="#2185d0" stroke="none" stroke-width="1" />
+<text x="356.0" y="768.2" font-size="12" fill="#fff" font-weight="700" text-anchor="middle">Create anyway</text>
+<rect x="416" y="750" width="70" height="28" rx="4" fill="#fff" stroke="#c7ced6" stroke-width="1" />
+<text x="451.0" y="768.2" font-size="12" fill="#444" font-weight="600" text-anchor="middle">Dismiss</text>
+<rect x="638" y="810" width="78" height="36" rx="4" fill="#e0e1e2" stroke="none" stroke-width="1" />
+<text x="677.0" y="832.9" font-size="14" fill="#555" font-weight="600" text-anchor="middle">Close</text>
+<rect x="724" y="810" width="86" height="36" rx="4" fill="#2185d0" stroke="none" stroke-width="1" />
+<text x="767.0" y="832.9" font-size="14" fill="#fff" font-weight="700" text-anchor="middle">Create</text>
+<text x="550.0" y="870" font-size="1" fill="#1b1c1d" font-weight="400" text-anchor="start"></text>
+<rect x="0" y="908" width="1100" height="32" rx="0" fill="#fff" stroke="none" stroke-width="1" />
+<text x="24" y="929" font-size="12" fill="#7a8794" font-weight="400" text-anchor="start">Documentation mockup. Synthetic data; simplified layout.</text>
 </g>
 </svg>
