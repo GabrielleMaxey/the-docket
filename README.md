@@ -191,6 +191,11 @@ Site SQLite means `data/workweek-<instanceId>.sqlite` for registered entries, or
 
 The separate **Older browser data has an unknown Jira site** notice concerns unscoped browser records. **Dismiss** hides that notice for this browser across reloads and site switches without importing, assigning, or deleting the original data. If browser storage is blocked, dismissal lasts for the current session.
 
+## Acknowledgments
+
+- The week-plan suggested-order scoring is ported from the `jira-work-priority` skill in the ATS AI Toolkit.
+- The report writing-style rules are adapted from the ATS jira-comment standards.
+
 ## Tech stack
 
 - **Frontend**: React 18, Vite 8, Semantic UI React, React Router
