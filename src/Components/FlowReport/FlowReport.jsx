@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { flowLinkFor } from '../../../shared/flowMetrics.mjs';
 import './FlowReport.css';
 
 /**
@@ -74,7 +75,7 @@ function FlowChart({ months, created, resolved }) {
 
 const SORT_DEFAULT_DESC = new Set(['age', 'idle']);
 
-function OpenTable({ rows, baseUrl, stalledDays, showAssignee = false }) {
+function OpenTable({ rows, link, stalledDays, showAssignee = false }) {
   const [filter, setFilter] = useState('all');
   const [sortKey, setSortKey] = useState('idle');
   const [dir, setDir] = useState(-1);
@@ -126,11 +127,11 @@ function OpenTable({ rows, baseUrl, stalledDays, showAssignee = false }) {
               const stalled = r.idle >= stalledDays;
               return (
                 <tr key={r.key}>
-                  <td><a href={baseUrl + r.key} target="_blank" rel="noreferrer">{r.key}</a></td>
+                  <td><a href={link(r.key)} target="_blank" rel="noreferrer">{r.key}</a></td>
                   <td>{r.summary}</td>
                   <td><span className={`fr-pill ${r.status === 'In Progress' ? 'fr-ip' : 'fr-bl'}`}>{r.status}</span></td>
                   {showAssignee && <td>{r.assignee}</td>}
-                  <td>{r.parent && <a href={baseUrl + r.parent} target="_blank" rel="noreferrer">{r.parent}</a>}</td>
+                  <td>{r.parent && <a href={link(r.parent)} target="_blank" rel="noreferrer">{r.parent}</a>}</td>
                   <td className="fr-n">{r.age}</td>
                   <td className="fr-n">{r.idle}</td>
                   <td><span className={`fr-pill ${stalled ? 'fr-stl' : 'fr-ok'}`}>{stalled ? 'Stalled' : 'Active'}</span></td>
@@ -170,7 +171,7 @@ function Controls({ controls }) {
 
 export default function FlowReport({ data, controls, className = '' }) {
   const d = data;
-  const baseUrl = d.baseUrl;
+  const link = (key) => flowLinkFor(d, key);
   const stalledDays = d.stalledDays ?? 30;
   const statusTotal = d.status.reduce((s, x) => s + x.count, 0);
 
@@ -237,7 +238,7 @@ export default function FlowReport({ data, controls, className = '' }) {
         <div className="fr-card">
           <h2>Open work: aging and stalled items</h2>
           <p className="fr-sub">"Stalled" means {d.stalledDefinition ?? `no update for ${stalledDays}+ days`}. Click a column header to sort.</p>
-          <OpenTable rows={d.open} baseUrl={baseUrl} stalledDays={stalledDays} showAssignee={Boolean(d.meta?.allAssignees || d.meta?.includeHandedOn)} />
+          <OpenTable rows={d.open} link={link} stalledDays={stalledDays} showAssignee={Boolean(d.meta?.allAssignees || d.meta?.includeHandedOn)} />
         </div>
       </section>
 
@@ -250,7 +251,7 @@ export default function FlowReport({ data, controls, className = '' }) {
             const t = pct === 100 ? 'green' : pct === 0 ? 'red' : 'blue';
             return (
               <div className="fr-hrow fr-hrow-parent" key={p.key}>
-                <span><a href={baseUrl + p.key} target="_blank" rel="noreferrer">{p.key}</a> <span className="fr-note">{p.name}</span></span>
+                <span><a href={link(p.key)} target="_blank" rel="noreferrer">{p.key}</a> <span className="fr-note">{p.name}</span></span>
                 <div className="fr-track"><div className={`fr-fill fr-bg-${t}`} style={{ width: `${pct}%` }} /></div>
                 <span className="fr-hval">{p.done}/{p.total}</span>
               </div>
@@ -265,7 +266,7 @@ export default function FlowReport({ data, controls, className = '' }) {
                 <b>{t.lead}:</b> {t.text}
                 {t.keys?.length > 0 && (
                   <> {t.keys.map((k, j) => (
-                    <React.Fragment key={k}>{j > 0 && ', '}<a href={baseUrl + k} target="_blank" rel="noreferrer">{k}</a></React.Fragment>
+                    <React.Fragment key={k}>{j > 0 && ', '}<a href={link(k)} target="_blank" rel="noreferrer">{k}</a></React.Fragment>
                   ))}</>
                 )}
               </li>

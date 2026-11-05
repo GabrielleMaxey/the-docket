@@ -5,7 +5,7 @@ import FlowReport from "./FlowReport.jsx";
 import { useReportClipboard } from "../../hooks/useReportClipboard";
 import { buildFlowReportMarkdown, buildStandaloneFlowHtml, flowReportFileName } from "../../../shared/flowMetrics.mjs";
 import flowReportCss from "./FlowReport.css?raw";
-import { archiveFlowReport, generateFlowNarrative, generateFlowReport } from "../../services/jiraClient";
+import { archiveFlowReport, generateCombinedFlowReport, generateFlowNarrative, generateFlowReport } from "../../services/jiraClient";
 
 const WINDOW_OPTIONS = [
   { key: 3, text: "Past 3 months", value: 3 },
@@ -23,6 +23,7 @@ const scopeKeyOf = (presetIds) => (Array.isArray(presetIds) ? [...presetIds].map
  */
 const FlowReportSection = ({
   presetIds,
+  instanceIds,
   presetOptions,
   onPresetIdsChange,
   allAssignees = false,
@@ -38,8 +39,9 @@ const FlowReportSection = ({
   const [includeHandedOn, setIncludeHandedOn] = React.useState(false);
   const [narrativeLoading, setNarrativeLoading] = React.useState(false);
   const reportRef = React.useRef(null);
-  const currentScopeKey = scopeKeyOf(presetIds);
-  const scoped = Array.isArray(presetIds);
+  const combined = Array.isArray(instanceIds);
+  const currentScopeKey = scopeKeyOf(combined ? instanceIds : presetIds);
+  const scoped = combined || Array.isArray(presetIds);
   const requestSeq = React.useRef(0);
 
   const clipboardReport = React.useMemo(
@@ -54,7 +56,9 @@ const FlowReportSection = ({
     setError("");
     setSaveState("idle");
     try {
-      const result = await generateFlowReport({ windowMonths, presetIds: scoped ? presetIds : [], allAssignees: scoped && allAssignees, includeHandedOn: !allAssignees && includeHandedOn });
+      const result = combined
+        ? await generateCombinedFlowReport({ instanceIds, windowMonths, includeHandedOn })
+        : await generateFlowReport({ windowMonths, presetIds: scoped ? presetIds : [], allAssignees: scoped && allAssignees, includeHandedOn: !allAssignees && includeHandedOn });
       if (seq !== requestSeq.current) return; // a newer Generate superseded this one
       if (!result?.data) throw new Error("The server returned no report data.");
       setReport({ data: result.data, markdown: result.markdown || "", scopeKey: currentScopeKey });
@@ -132,7 +136,7 @@ const FlowReportSection = ({
             disabled={loading}
           />
         ) : null}
-        <Button primary size="small" loading={loading} disabled={loading} onClick={handleGenerate}>
+        <Button primary size="small" loading={loading} disabled={loading || (combined && instanceIds.length === 0)} onClick={handleGenerate}>
           {report ? "Regenerate" : "Generate report"}
         </Button>
         {report ? (
@@ -149,7 +153,7 @@ const FlowReportSection = ({
           </>
         ) : null}
       </div>
-      {scoped && Array.isArray(presetOptions) && onPresetIdsChange ? (
+      {!combined && scoped && Array.isArray(presetOptions) && onPresetIdsChange ? (
         <div style={{ marginBottom: 12 }}>
           <Dropdown
             multiple
@@ -164,7 +168,13 @@ const FlowReportSection = ({
           />
         </div>
       ) : null}
-      {scoped ? (
+      {combined ? (
+        <p className="ww-inline-hint" style={{ margin: "0 0 12px" }}>
+          {instanceIds.length
+            ? `Covers your issues across the ${instanceIds.length} Jira site${instanceIds.length === 1 ? "" : "s"} selected above. Project filters do not apply.`
+            : "Select at least one Jira site above."}
+        </p>
+      ) : scoped ? (
         <p className="ww-inline-hint" style={{ margin: "0 0 12px" }}>
           {currentScopeKey
             ? `Covers ${allAssignees ? "all issues" : "your issues"} in the ${presetIds.length} project option${presetIds.length === 1 ? "" : "s"} selected above.`
@@ -173,7 +183,7 @@ const FlowReportSection = ({
       ) : null}
       {report && scoped && report.scopeKey !== currentScopeKey ? (
         <Message warning size="small">
-          The project selection has changed since this report was generated. Select Regenerate to apply it.
+          The selection above has changed since this report was generated. Select Regenerate to apply it.
         </Message>
       ) : null}
       {error ? <Message negative size="small">{error}</Message> : null}

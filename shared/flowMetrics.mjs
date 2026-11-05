@@ -264,6 +264,12 @@ export const computeFlowReport = (issues, options = {}) => {
     if (!entry.name && e.issue.parentSummary) entry.name = String(e.issue.parentSummary).replace(/^\[[^\]]*\]\s*/, "").slice(0, 40) || String(e.issue.parentSummary).slice(0, 40);
     parentMap.set(key, entry);
   }
+  // Combined-site reports carry a link per key (the same key can exist on several sites).
+  const urls = {};
+  for (const e of scope) {
+    if (e.issue.url) urls[e.issue.key] = e.issue.url;
+    if (e.issue.parent && e.issue.parentUrl) urls[e.issue.parent] = e.issue.parentUrl;
+  }
   const parents = [...parentMap.values()].filter((p) => p.total >= 2).sort((a, b) => b.total - a.total || a.key.localeCompare(b.key)).slice(0, 6);
 
   // ── KPIs
@@ -330,10 +336,11 @@ export const computeFlowReport = (issues, options = {}) => {
 
   return {
     baseUrl: options.baseUrl || "",
+    ...(Object.keys(urls).length ? { urls } : {}),
     title: options.allAssignees ? `Flow Report: ${windowLabel}` : `${who} Assigned Work: ${windowLabel}`,
     subtitle: `Jira issues ${options.allAssignees ? "for all assignees" : `assigned to ${options.personName || "you"}${options.includeHandedOn ? " now or earlier" : ""}`} that were created or resolved between ${windowStart} and ${windowEnd}${options.scopeLabel ? ", limited to the selected projects" : ""}`,
     chips: [
-      ...(options.siteLabel ? [`Site: ${options.siteLabel}`] : []),
+      ...(options.siteLabel ? [`${options.siteCount > 1 ? "Sites" : "Site"}: ${options.siteLabel}`] : []),
       ...(options.scopeLabel ? [`Projects: ${options.scopeLabel}`] : []),
       ...(options.includeHandedOn ? ["Includes work handed on"] : []),
       `${plural(total, "issue")}${projects.length ? ` · ${projects.length === 1 ? `all in ${projects[0]}` : projects.join(", ")}` : ""}`,
@@ -388,6 +395,13 @@ export const buildFlowNarrativeContext = (data) => {
   return lines.join("\n").slice(0, 8000);
 };
 
+/** Link for an issue key: a per-key url (combined sites) wins over the shared base url. */
+export const flowLinkFor = (data, key) => {
+  if (!key) return "";
+  if (data?.urls?.[key]) return data.urls[key];
+  return data?.baseUrl ? `${data.baseUrl}${key}` : "";
+};
+
 const escapeHtml = (value) =>
   String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -419,7 +433,7 @@ const mdTable = (headers, rows) =>
 
 export const buildFlowReportMarkdown = (data) => {
   if (!data || typeof data !== "object") return "";
-  const link = (key) => (key ? (data.baseUrl ? `[${key}](${data.baseUrl}${key})` : key) : "");
+  const link = (key) => { const url = flowLinkFor(data, key); return key ? (url ? `[${key}](${url})` : key) : ""; };
   const lines = [`# ${data.title}`, "", data.subtitle, "", (data.chips || []).join(" · "), ""];
 
   lines.push("## Summary", "", mdTable(["Metric", "Value", "Detail"], (data.kpis || []).map((k) => [k.label, k.value, k.sub || ""])), "");
