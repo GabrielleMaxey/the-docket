@@ -89,7 +89,7 @@ const countBy = (items, keyFn) => {
   return [...map.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 };
 
-const monthKeys = (startDay, endDay) => {
+export const monthKeys = (startDay, endDay) => {
   const keys = [];
   let [y, m] = startDay.slice(0, 7).split("-").map(Number);
   const [ey, em] = endDay.slice(0, 7).split("-").map(Number);
@@ -101,7 +101,7 @@ const monthKeys = (startDay, endDay) => {
   return keys;
 };
 
-const monthLabel = (key, isFirst) => {
+export const monthLabel = (key, isFirst) => {
   const [y, m] = key.split("-").map(Number);
   const name = MONTH_NAMES[m - 1];
   return isFirst || m === 1 ? `${name} '${String(y).slice(2)}` : name;
