@@ -948,6 +948,7 @@ const GanttChart = () => {
       />
 
       <GanttSharepointReportPanel
+        slug={ slug }
         open={ spPanelOpen }
         onClose={ () => setSpPanelOpen( false ) }
         displayName={ data?.displayName || slug }

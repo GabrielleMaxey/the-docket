@@ -3,7 +3,7 @@ import { computeGanttSharepointMetrics, isGanttIssueOverdue } from "./ganttShare
 import { computeGanttPlanHealth } from "../../../shared/ganttPlanHealth.mjs";
 import { buildGanttSharepointHtml } from "./ganttSharepointHtml";
 import { buildGanttPng } from "./ganttSharepointPng";
-import { fetchChatStatus, generateGanttSharepointSummary } from "../../services/jiraClient";
+import { archiveGanttPlanHealth, fetchChatStatus, generateGanttSharepointSummary } from "../../services/jiraClient";
 
 const downloadBlob = ( content, filename, type ) => {
   const blob = new Blob( [ content ], { type } );
@@ -17,9 +17,10 @@ const downloadBlob = ( content, filename, type ) => {
   URL.revokeObjectURL( url );
 };
 
-const GanttSharepointReportPanel = ( { open, onClose, displayName, viewIssues, allIssues, jiraBaseUrl } ) => {
+const GanttSharepointReportPanel = ( { open, onClose, slug, displayName, viewIssues, allIssues, jiraBaseUrl } ) => {
   const [ includeAll, setIncludeAll ] = React.useState( false );
   const [ includePlanHealth, setIncludePlanHealth ] = React.useState( false );
+  const [ saving, setSaving ] = React.useState( false );
   const [ summary, setSummary ] = React.useState( "" );
   const [ copyMsg, setCopyMsg ] = React.useState( "" );
   const [ aiReady, setAiReady ] = React.useState( false );
@@ -52,6 +53,24 @@ const GanttSharepointReportPanel = ( { open, onClose, displayName, viewIssues, a
   );
   const html = buildGanttSharepointHtml( { displayName, generatedAt, metrics, summary, issues: scopeIssues, jiraBaseUrl, planHealth } );
   const disabled = scopeIssues.length === 0;
+
+  // Saves a plan-health snapshot of the current scope (plus this report's summary) so due-date changes can be tracked.
+  const handleSaveArchive = async () => {
+    setSaving( true );
+    try {
+      const snapshot = computeGanttPlanHealth( scopeIssues, {
+        today: new Date(), displayName, scopeLabel: includeAll ? "Entire plan" : "Current view", baseUrl: jiraBaseUrl,
+      } );
+      if ( summary.trim() ) snapshot.narrative = summary.trim();
+      await archiveGanttPlanHealth( snapshot, slug || displayName );
+      setCopyMsg( "Saved to Report Archive" );
+    } catch ( err ) {
+      setCopyMsg( err?.message || "Save failed" );
+    } finally {
+      setSaving( false );
+      setTimeout( () => setCopyMsg( "" ), 3000 );
+    }
+  };
 
   const handleDownload = () => {
     const slug = ( displayName || "gantt" ).replace( /[^a-z0-9]+/gi, "_" ).toLowerCase();
@@ -192,6 +211,9 @@ const GanttSharepointReportPanel = ( { open, onClose, displayName, viewIssues, a
             </button>
             <button type="button" className="pm-gantt-refresh" onClick={ handleCopy } disabled={ disabled }>
               Copy HTML
+            </button>
+            <button type="button" className="pm-gantt-refresh" onClick={ handleSaveArchive } disabled={ disabled || saving }>
+              { saving ? "Saving…" : "Save to archive" }
             </button>
             <button type="button" className="pm-gantt-refresh" onClick={ handleDownloadPng } disabled={ disabled }>
               Download chart PNG
