@@ -30,6 +30,7 @@ const FlowReportSection = ({
   title = "My Flow report",
   subtitle = "Throughput, lead and cycle time, aging and stalled work for issues assigned to you",
   storageKey = "dashboard-flow-report-open",
+  defaultOpen = true,
 }) => {
   const [windowMonths, setWindowMonths] = React.useState(12);
   const [loading, setLoading] = React.useState(false);
@@ -124,7 +125,7 @@ const FlowReportSection = ({
       title={title}
       subtitle={subtitle}
       storageKey={storageKey}
-      defaultOpen
+      defaultOpen={defaultOpen}
     >
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
         <Dropdown selection compact options={WINDOW_OPTIONS} value={windowMonths} onChange={(_, d) => setWindowMonths(d.value)} disabled={loading} />

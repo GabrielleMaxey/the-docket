@@ -2,6 +2,7 @@ import React from "react";
 import CollapsibleSection from "../../Components/CollapsibleSection";
 import JqlRunMetrics from "./JqlRunMetrics";
 import ProjectReportPanel from "./ProjectReportPanel";
+import FlowReportSection from "../../Components/FlowReport/FlowReportSection.jsx";
 
 const MY_METRICS_KEY = "ww-my-metrics-open";
 
@@ -31,6 +32,8 @@ const MyMetricsSection = ({ run, jiraRowPriorities, jqlRuns, scope, combinedMetr
         <JqlRunMetrics run={run} jiraRowPriorities={jiraRowPriorities} scope={scope} combinedMetrics={combinedMetrics} />
         <ProjectReportPanel run={run} jiraRowPriorities={jiraRowPriorities} jqlRuns={jqlRuns} scope={scope} combinedSites={combinedSites} />
       </div>
+      {/* Flow report lives inside the card (collapsed by default) so it adds no extra row above the task list. */}
+      {scope !== "combined-work" ? <FlowReportSection storageKey="ww-flow-report-open" defaultOpen={false} /> : null}
     </CollapsibleSection>
   );
 };
