@@ -95,7 +95,8 @@ describe("buildGanttSharepointHtml plan health section", () => {
     attention: [{ key: "PROJ-9", summary: "Late <thing>", status: "In Progress", assignee: "Ann", dueDate: "2026-01-05", overdueDays: 12, pushedDays: 4 }],
     noSchedule: [{ key: "PROJ-7", summary: "Unplanned", status: "To Do", assignee: "" }],
     takeaways: [{ lead: "Overdue work", text: "2 open issues are past due.", keys: ["PROJ-9"] }],
-    narrative: "",
+    months: ["Jan", "Feb"], planned: [2, 0], completed: [1, 3],
+    flowNote: "Planned vs completed note.", footnote: "Footnote text here.", narrative: "",
   };
   const build = (extra) => buildGanttSharepointHtml({ displayName: "P", generatedAt: "x", metrics: BASE_METRICS, issues: BASE_ISSUES, jiraBaseUrl: "https://j.example", ...extra });
 
@@ -112,6 +113,15 @@ describe("buildGanttSharepointHtml plan health section", () => {
     assert.ok(html.includes("Late &lt;thing&gt;"));
     assert.ok(html.includes("PROJ-7"));
     assert.ok(html.includes("2 open issues are past due."));
+  });
+
+  it("includes the full report: monthly chart, gap details, footnote, no layout divs that SharePoint may strip", () => {
+    const html = build({ planHealth });
+    const section = html.slice(html.indexOf("Plan health"), html.indexOf("<div class=\"timeline-wrap\">"));
+    for (const text of ["Jan", "Feb", "Planned finishes", "Completed", "Planned vs completed note.", "Schedule gaps", "Unplanned", "To Do", "Footnote text here.", "Key takeaways"]) {
+      assert.ok(section.includes(text), `missing: ${text}`);
+    }
+    assert.ok(!/<div/.test(section), "layout should use tables, not divs");
   });
 
   it("places plan health before the timeline table", () => {

@@ -41,38 +41,71 @@ const TONE_COLORS = { red: "#dc2626", amber: "#d97706", green: "#16a34a" };
 const SLIP_TONES = { "Early": "green", "On time": "green", "1–7 d late": "amber", "8–30 d late": "red", "31+ d late": "red" };
 const OVERDUE_TONES = { "1–7 d": "amber", "8–30 d": "red", "31–90 d": "red", "90+ d": "red" };
 
+const bar = ( px, color ) => `<table style="border-collapse:collapse;"><tr><td style="width:${ Math.max( 1, px ) }px;height:12px;padding:0;background:${ color };"></td></tr></table>`;
+
+// Tables and spans only (no layout divs) so the section survives SharePoint's HTML sanitiser.
 const buildPlanHealthSection = ( data, jiraBaseUrl ) => {
   if ( !data ) return "";
   const link = ( key ) => ( jiraBaseUrl
     ? `<a href="${ esc( jiraBaseUrl ) }/browse/${ esc( key ) }" style="color:#2563eb;">${ esc( key ) }</a>`
     : esc( key ) );
-  const kpis = ( data.kpis || [] ).map( ( k ) => `<td style="${ TD }vertical-align:top;min-width:110px;">
-      <div style="font-size:11px;color:#6b7280;">${ esc( k.label ) }</div>
-      <div style="font-size:20px;font-weight:600;color:${ TONE_COLORS[ k.tone ] || "#111827" };">${ esc( k.value ) }</div>
-      <div style="font-size:11px;color:#6b7280;">${ esc( k.sub ) }</div></td>` ).join( "" );
+  const head = ( cols ) => `<thead><tr>${ cols.map( ( h ) => `<th style="${ TH }">${ esc( h ) }</th>` ).join( "" ) }</tr></thead>`;
+  const sub = ( text ) => `<h3 style="font-size:13px;margin:16px 0 4px;">${ esc( text ) }</h3>`;
+  const note = ( text ) => `<p style="font-size:12px;color:#6b7280;margin:2px 0 6px;">${ esc( text ) }</p>`;
+
+  const kpiCells = ( data.kpis || [] ).map( ( k ) => `<td style="${ TD }vertical-align:top;width:25%;">
+      <span style="display:block;font-size:11px;color:#6b7280;">${ esc( k.label ) }</span>
+      <span style="display:block;font-size:20px;font-weight:600;color:${ TONE_COLORS[ k.tone ] || "#111827" };">${ esc( k.value ) }</span>
+      <span style="display:block;font-size:11px;color:#6b7280;">${ esc( k.sub ) }</span></td>` );
+  const kpiRows = [];
+  for ( let i = 0; i < kpiCells.length; i += 4 ) kpiRows.push( `<tr>${ kpiCells.slice( i, i + 4 ).join( "" ) }</tr>` );
+
+  const takeaways = ( data.takeaways || [] ).map( ( t ) => `<li style="margin:2px 0;"><b>${ esc( t.lead ) }:</b> ${ esc( t.text ) }${ t.keys?.length ? " " + t.keys.map( link ).join( ", " ) : "" }</li>` ).join( "" );
+
   const buckets = ( title, rows, tones ) => {
     const max = Math.max( 1, ...( rows || [] ).map( ( r ) => r.count ) );
     const body = ( rows || [] ).map( ( r ) => `<tr><td style="${ TD }">${ esc( r.label ) }</td>
-      <td style="${ TD }width:220px;"><div style="height:12px;width:${ Math.round( ( r.count / max ) * 200 ) }px;background:${ TONE_COLORS[ tones[ r.label ] ] || "#3b82f6" };border-radius:2px;"></div></td>
+      <td style="${ TD }width:220px;">${ bar( Math.round( ( r.count / max ) * 200 ), TONE_COLORS[ tones[ r.label ] ] || "#3b82f6" ) }</td>
       <td style="${ TD }text-align:right;">${ esc( r.count ) }</td></tr>` ).join( "" );
-    return `<table style="margin:8px 24px 8px 0;display:inline-table;vertical-align:top;"><thead><tr><th style="${ TH }" colspan="3">${ esc( title ) }</th></tr></thead><tbody>${ body }</tbody></table>`;
+    return `<table style="border-collapse:collapse;width:100%;">${ head( [ title, "", "Issues" ] ) }<tbody>${ body }</tbody></table>`;
   };
-  const attention = ( data.attention || [] ).length
-    ? `<table style="margin:8px 0;"><thead><tr>${ [ "Issue", "Summary", "Status", "Assignee", "Due", "Overdue (d)", "Pushed (d)" ].map( ( h ) => `<th style="${ TH }">${ h }</th>` ).join( "" ) }</tr></thead><tbody>
-      ${ data.attention.map( ( r ) => `<tr><td style="${ TD }">${ link( r.key ) }</td><td style="${ TD }">${ esc( r.summary ) }</td><td style="${ TD }">${ esc( r.status ) }</td><td style="${ TD }">${ esc( r.assignee ) }</td><td style="${ TD }">${ esc( r.dueDate ) }</td><td style="${ TD }text-align:right;">${ esc( r.overdueDays ) }</td><td style="${ TD }text-align:right;">${ r.pushedDays == null ? "" : "+" + esc( r.pushedDays ) }</td></tr>` ).join( "" ) }</tbody></table>`
-    : `<p style="font-size:12px;color:#6b7280;">No open issues are past due.</p>`;
-  const gaps = ( data.noSchedule || [] ).length
-    ? `<p style="font-size:12px;margin:8px 0 2px;"><b>No due date or planned finish:</b> ${ data.noSchedule.map( ( r ) => link( r.key ) ).join( ", " ) }</p>`
+
+  const months = data.months || [];
+  const monthMax = Math.max( 1, ...( data.planned || [] ), ...( data.completed || [] ) );
+  const monthRows = months.map( ( m, i ) => `<tr><td style="${ TD }white-space:nowrap;">${ esc( m ) }</td>
+      <td style="${ TD }">${ bar( Math.round( ( ( data.planned || [] )[ i ] || 0 ) / monthMax * 160 ), "#7c3aed" ) }</td>
+      <td style="${ TD }text-align:right;">${ esc( ( data.planned || [] )[ i ] || 0 ) }</td>
+      <td style="${ TD }">${ bar( Math.round( ( ( data.completed || [] )[ i ] || 0 ) / monthMax * 160 ), "#16a34a" ) }</td>
+      <td style="${ TD }text-align:right;">${ esc( ( data.completed || [] )[ i ] || 0 ) }</td></tr>` ).join( "" );
+  const monthTable = months.length
+    ? `${ sub( "Planned finishes vs. completions by month" ) }${ data.flowNote ? note( data.flowNote ) : "" }
+<table style="border-collapse:collapse;">${ head( [ "Month", "Planned finishes", "", "Completed", "" ] ) }<tbody>${ monthRows }</tbody></table>`
     : "";
-  const takeaways = ( data.takeaways || [] ).map( ( t ) => `<li style="margin:2px 0;"><b>${ esc( t.lead ) }:</b> ${ esc( t.text ) }${ t.keys?.length ? " " + t.keys.map( link ).join( ", " ) : "" }</li>` ).join( "" );
+
+  const attention = ( data.attention || [] ).length
+    ? `<table style="border-collapse:collapse;width:100%;">${ head( [ "Issue", "Summary", "Status", "Assignee", "Due", "Overdue (d)", "Pushed (d)" ] ) }<tbody>
+      ${ data.attention.map( ( r ) => `<tr><td style="${ TD }">${ link( r.key ) }</td><td style="${ TD }">${ esc( r.summary ) }</td><td style="${ TD }">${ esc( r.status ) }</td><td style="${ TD }">${ esc( r.assignee ) }</td><td style="${ TD }">${ esc( r.dueDate ) }</td><td style="${ TD }text-align:right;">${ esc( r.overdueDays ) }</td><td style="${ TD }text-align:right;">${ r.pushedDays == null ? "" : "+" + esc( r.pushedDays ) }</td></tr>` ).join( "" ) }</tbody></table>`
+    : note( "No open issues are past due." );
+
+  const gaps = ( data.noSchedule || [] ).length
+    ? `<table style="border-collapse:collapse;width:100%;">${ head( [ "Issue", "Summary", "Status", "Assignee" ] ) }<tbody>
+      ${ data.noSchedule.map( ( r ) => `<tr><td style="${ TD }">${ link( r.key ) }</td><td style="${ TD }">${ esc( r.summary ) }</td><td style="${ TD }">${ esc( r.status ) }</td><td style="${ TD }">${ esc( r.assignee ) }</td></tr>` ).join( "" ) }</tbody></table>`
+    : note( "Every open issue has a due date or planned finish." );
+
   return `<section style="margin:16px 0 24px;">
 <h2 style="font-size:16px;margin:0 0 8px;">Plan health</h2>
-<table style="border-collapse:collapse;margin-bottom:8px;"><tr>${ kpis }</tr></table>
-${ takeaways ? `<ul style="margin:8px 0;padding-left:20px;font-size:13px;">${ takeaways }</ul>` : "" }
-<div>${ buckets( "Completion vs. planned finish", data.slipBuckets, SLIP_TONES ) }${ buckets( "Open work past due", data.overdueBuckets, OVERDUE_TONES ) }</div>
-<h3 style="font-size:13px;margin:12px 0 0;">Needing attention</h3>
+<table style="border-collapse:collapse;width:100%;margin-bottom:8px;">${ kpiRows.join( "" ) }</table>
+${ takeaways ? `${ sub( "Key takeaways" ) }<ul style="margin:4px 0;padding-left:20px;font-size:13px;">${ takeaways }</ul>` : "" }
+${ monthTable }
+${ sub( "Completion vs. planned finish" ) }
+${ buckets( "Finished work vs. planned finish", data.slipBuckets, SLIP_TONES ) }
+${ sub( "Open work past due" ) }
+${ buckets( "Days past the current due date", data.overdueBuckets, OVERDUE_TONES ) }
+${ sub( "Needing attention" ) }
 ${ attention }
+${ sub( "Schedule gaps" ) }
 ${ gaps }
+${ data.footnote ? `<p style="font-size:11px;color:#6b7280;margin:12px 0 0;">${ esc( data.footnote ) }</p>` : "" }
 </section>`;
 };
 
