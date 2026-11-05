@@ -5,6 +5,7 @@ import "./combinedOpenWork.css";
 import CombinedSiteEditor from "./components/CombinedSiteEditor.jsx";
 import JiraResultsTable from "./components/JiraResultsTable.jsx";
 import MyMetricsSection from "./components/MyMetricsSection.jsx";
+import FlowReportSection from "../Components/FlowReport/FlowReportSection.jsx";
 import { STATUS_OPTIONS } from "./hooks/useTaskManagerJira.js";
 import { buildCombinedTableModel, buildCombinedMetrics } from "./combinedWorkModel.js";
 import { useBackgroundJobs } from "../hooks/useBackgroundJobs.js";
@@ -135,6 +136,14 @@ export default function CombinedOpenWork() {
         <button type="button" className="ui primary button" disabled={!selected.length || loading || saving} onClick={load}>{result ? "Refresh" : "Load open work"}</button>
         {loading && <button type="button" className="ui button" onClick={cancel}>Cancel</button>}
       </>}
+      {sites?.length > 0 && (
+        <FlowReportSection
+          instanceIds={selected}
+          title="Combined Flow report"
+          subtitle="Throughput, lead and cycle time, aging and stalled work for your issues across the selected Jira sites"
+          storageKey="ww-combined-flow-report-open"
+        />
+      )}
       {loading && <p role="status">Loading open work…</p>}
       {result && <>
         {editableSites.map((site) => <CombinedSiteEditor key={`${result.fetchedAt}:${site.instanceId}`} site={site} onModel={onModel}

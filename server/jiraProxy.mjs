@@ -23,6 +23,7 @@ import { registerTeamPriorityRoutes } from "./routes/teamPriorityRoutes.mjs";
 import { registerPmAsksRoutes } from "./routes/pmAsksRoutes.mjs";
 import { registerTaskExportRoutes } from "./routes/taskExportRoutes.mjs";
 import { registerCombinedOpenWorkRoutes } from "./routes/combinedOpenWorkRoutes.mjs";
+import { registerCombinedFlowReportRoute } from "./routes/combinedFlowReportRoute.mjs";
 import { registerTodoRoutes } from "./routes/todoRoutes.mjs";
 import { registerAttachmentRoutes } from "./routes/attachmentRoutes.mjs";
 import { createLogger } from "./lib/logger.mjs";
@@ -282,6 +283,7 @@ const routeCtx = {
 
 registerTaskExportRoutes(app, routeCtx);
 registerCombinedOpenWorkRoutes(app, routeCtx);
+registerCombinedFlowReportRoute(app, routeCtx);
 registerJiraInstanceRoutes(app, routeCtx);
 registerJiraCoreRoutes(app, routeCtx);
 registerJiraIssueRoutes(app, routeCtx);

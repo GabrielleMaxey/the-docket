@@ -1,10 +1,11 @@
 import React from "react";
-import { Button, Dropdown, Message } from "semantic-ui-react";
+import { Button, Checkbox, Dropdown, Message } from "semantic-ui-react";
 import CollapsibleSection from "../CollapsibleSection";
 import FlowReport from "./FlowReport.jsx";
 import { useReportClipboard } from "../../hooks/useReportClipboard";
-import { buildFlowReportMarkdown } from "../../../shared/flowMetrics.mjs";
-import { archiveFlowReport, generateFlowNarrative, generateFlowReport } from "../../services/jiraClient";
+import { buildFlowReportMarkdown, buildStandaloneFlowHtml, flowReportFileName } from "../../../shared/flowMetrics.mjs";
+import flowReportCss from "./FlowReport.css?raw";
+import { archiveFlowReport, generateCombinedFlowReport, generateFlowNarrative, generateFlowReport } from "../../services/jiraClient";
 
 const WINDOW_OPTIONS = [
   { key: 3, text: "Past 3 months", value: 3 },
@@ -22,21 +23,26 @@ const scopeKeyOf = (presetIds) => (Array.isArray(presetIds) ? [...presetIds].map
  */
 const FlowReportSection = ({
   presetIds,
+  instanceIds,
   presetOptions,
   onPresetIdsChange,
   allAssignees = false,
   title = "My Flow report",
   subtitle = "Throughput, lead and cycle time, aging and stalled work for issues assigned to you",
   storageKey = "dashboard-flow-report-open",
+  defaultOpen = true,
 }) => {
   const [windowMonths, setWindowMonths] = React.useState(12);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [report, setReport] = React.useState(null);
   const [saveState, setSaveState] = React.useState("idle");
+  const [includeHandedOn, setIncludeHandedOn] = React.useState(false);
   const [narrativeLoading, setNarrativeLoading] = React.useState(false);
-  const currentScopeKey = scopeKeyOf(presetIds);
-  const scoped = Array.isArray(presetIds);
+  const reportRef = React.useRef(null);
+  const combined = Array.isArray(instanceIds);
+  const currentScopeKey = scopeKeyOf(combined ? instanceIds : presetIds);
+  const scoped = combined || Array.isArray(presetIds);
   const requestSeq = React.useRef(0);
 
   const clipboardReport = React.useMemo(
@@ -51,7 +57,9 @@ const FlowReportSection = ({
     setError("");
     setSaveState("idle");
     try {
-      const result = await generateFlowReport({ windowMonths, presetIds: scoped ? presetIds : [], allAssignees: scoped && allAssignees });
+      const result = combined
+        ? await generateCombinedFlowReport({ instanceIds, windowMonths, includeHandedOn })
+        : await generateFlowReport({ windowMonths, presetIds: scoped ? presetIds : [], allAssignees: scoped && allAssignees, includeHandedOn: !allAssignees && includeHandedOn });
       if (seq !== requestSeq.current) return; // a newer Generate superseded this one
       if (!result?.data) throw new Error("The server returned no report data.");
       setReport({ data: result.data, markdown: result.markdown || "", scopeKey: currentScopeKey });
@@ -60,6 +68,23 @@ const FlowReportSection = ({
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
+  };
+
+  const handleDownloadHtml = () => {
+    const root = reportRef.current;
+    if (!root || !report?.data) return;
+    // Static copy: drop the interactive table filters, which cannot work without the app.
+    const copy = root.cloneNode(true);
+    copy.querySelectorAll(".fr-filters").forEach((node) => node.remove());
+    const html = buildStandaloneFlowHtml({ title: report.data.title, bodyHtml: copy.innerHTML, css: flowReportCss });
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = flowReportFileName(report.data.title, new Date().toISOString().slice(0, 10), "html");
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
   };
 
   const handleNarrative = async () => {
@@ -100,11 +125,19 @@ const FlowReportSection = ({
       title={title}
       subtitle={subtitle}
       storageKey={storageKey}
-      defaultOpen
+      defaultOpen={defaultOpen}
     >
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
         <Dropdown selection compact options={WINDOW_OPTIONS} value={windowMonths} onChange={(_, d) => setWindowMonths(d.value)} disabled={loading} />
-        <Button primary size="small" loading={loading} disabled={loading} onClick={handleGenerate}>
+        {!allAssignees ? (
+          <Checkbox
+            label="Include work I've handed on"
+            checked={includeHandedOn}
+            onChange={(_, d) => setIncludeHandedOn(Boolean(d.checked))}
+            disabled={loading}
+          />
+        ) : null}
+        <Button primary size="small" loading={loading} disabled={loading || (combined && instanceIds.length === 0)} onClick={handleGenerate}>
           {report ? "Regenerate" : "Generate report"}
         </Button>
         {report ? (
@@ -117,10 +150,11 @@ const FlowReportSection = ({
             </Button>
             <Button basic size="small" onClick={handleCopy}>{copied ? "✓ Copied" : "Copy markdown"}</Button>
             <Button basic size="small" onClick={handleDownload}>⤓ Download .md</Button>
+            <Button basic size="small" onClick={handleDownloadHtml}>⤓ Download .html</Button>
           </>
         ) : null}
       </div>
-      {scoped && Array.isArray(presetOptions) && onPresetIdsChange ? (
+      {!combined && scoped && Array.isArray(presetOptions) && onPresetIdsChange ? (
         <div style={{ marginBottom: 12 }}>
           <Dropdown
             multiple
@@ -135,7 +169,13 @@ const FlowReportSection = ({
           />
         </div>
       ) : null}
-      {scoped ? (
+      {combined ? (
+        <p className="ww-inline-hint" style={{ margin: "0 0 12px" }}>
+          {instanceIds.length
+            ? `Covers your issues across the ${instanceIds.length} Jira site${instanceIds.length === 1 ? "" : "s"} selected above. Project filters do not apply.`
+            : "Select at least one Jira site above."}
+        </p>
+      ) : scoped ? (
         <p className="ww-inline-hint" style={{ margin: "0 0 12px" }}>
           {currentScopeKey
             ? `Covers ${allAssignees ? "all issues" : "your issues"} in the ${presetIds.length} project option${presetIds.length === 1 ? "" : "s"} selected above.`
@@ -144,13 +184,13 @@ const FlowReportSection = ({
       ) : null}
       {report && scoped && report.scopeKey !== currentScopeKey ? (
         <Message warning size="small">
-          The project selection has changed since this report was generated. Select Regenerate to apply it.
+          The selection above has changed since this report was generated. Select Regenerate to apply it.
         </Message>
       ) : null}
       {error ? <Message negative size="small">{error}</Message> : null}
       {report ? (
         <>
-          <FlowReport key={report.data?.meta?.generatedAt || "report"} data={report.data} />
+          <div ref={reportRef}><FlowReport key={report.data?.meta?.generatedAt || "report"} data={report.data} /></div>
           {report.data?.meta?.jql ? (
             <details style={{ marginTop: 12 }}>
               <summary className="ww-inline-hint" style={{ cursor: "pointer" }}>Query used</summary>

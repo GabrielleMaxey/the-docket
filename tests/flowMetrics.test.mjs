@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { addDays, buildFlowNarrativeContext, buildFlowReportMarkdown, computeFlowReport, dayStr, daysBetween, median } from "../shared/flowMetrics.mjs";
+import { addDays, buildFlowNarrativeContext, buildFlowReportMarkdown, buildStandaloneFlowHtml, flowReportFileName, flowLinkFor, computeFlowReport, dayStr, daysBetween, median } from "../shared/flowMetrics.mjs";
 
 const NOW = "2026-11-05";
 const OPTS = { now: NOW, windowStart: "2025-11-05", windowEnd: "2026-11-05", baseUrl: "https://example.atlassian.net/browse/", siteLabel: "example.atlassian.net", personName: "" };
@@ -172,6 +172,13 @@ describe("assignee on open work", () => {
     assert.equal(data.meta.allAssignees, true);
   });
 
+  it("treats handed-on reports like all-assignee reports for the Assignee column", () => {
+    const data = computeFlowReport(issues, { ...OPTS, includeHandedOn: true });
+    assert.equal(data.meta.includeHandedOn, true);
+    assert.match(buildFlowReportMarkdown(data), /\| Status \| Assignee \|/);
+    assert.match(data.subtitle, /now or earlier/);
+  });
+
   it("adds an Assignee column to the markdown only for all-assignee reports", () => {
     const all = buildFlowReportMarkdown(computeFlowReport(issues, { ...OPTS, allAssignees: true }));
     assert.match(all, /\| Issue \| Summary \| Status \| Assignee \| Parent \|/);
@@ -203,5 +210,61 @@ describe("AI narrative support", () => {
     assert.doesNotMatch(buildFlowReportMarkdown(data), /AI summary/);
     const md = buildFlowReportMarkdown({ ...data, narrative: "Work is mostly stalled." });
     assert.match(md, /## AI summary\n\nWork is mostly stalled\./);
+  });
+});
+
+describe("standalone html export", () => {
+  it("wraps the rendered report and css in a self-contained document with an escaped title", () => {
+    const html = buildStandaloneFlowHtml({ title: 'Flow <Report> & "more"', bodyHtml: '<div class="flow-report">X</div>', css: ".flow-report{color:red}" });
+    assert.match(html, /^<!doctype html>/i);
+    assert.match(html, /<title>Flow &lt;Report&gt; &amp; &quot;more&quot;<\/title>/);
+    assert.match(html, /<style>\.flow-report\{color:red\}<\/style>/);
+    assert.ok(html.includes('<div class="flow-report">X</div>'));
+    assert.doesNotMatch(html, /<script/i);
+    assert.doesNotMatch(html, /(href|src)="https?:\/\/[^"]*\.(css|js)"/, "no external assets");
+  });
+
+  it("neutralises a closing style tag inside the css", () => {
+    const html = buildStandaloneFlowHtml({ title: "t", bodyHtml: "", css: "a{}</style><script>alert(1)</script>" });
+    assert.doesNotMatch(html, /<script/i);
+  });
+
+  it("builds a safe dated file name", () => {
+    assert.equal(flowReportFileName("Flow Report: Past 12 months", "2026-11-05", "html"), "Flow_Report_Past_12_months_2026-11-05.html");
+    assert.equal(flowReportFileName("", "2026-11-05", "md"), "flow-report_2026-11-05.md");
+  });
+});
+
+describe("per-issue links (combined sites)", () => {
+  const issue = (key, url, parent = "", parentUrl = "") => ({ key, summary: key, status: "In Progress", statusCategory: "indeterminate", type: "Task", priority: "", parent, parentSummary: "P", created: "2026-09-01T10:00:00.000+0000", updated: "2026-09-02T10:00:00.000+0000", resolved: null, dueDate: null, assignee: "", transitions: [], url, parentUrl });
+  const issues = [
+    issue("Alpha: ODI-1", "https://alpha.test/browse/ODI-1", "Alpha: ODI-9", "https://alpha.test/browse/ODI-9"),
+    issue("Alpha: ODI-2", "https://alpha.test/browse/ODI-2", "Alpha: ODI-9", "https://alpha.test/browse/ODI-9"),
+    issue("Beta: ODI-1", "https://beta.test/browse/ODI-1", "Beta: ODI-9", "https://beta.test/browse/ODI-9"),
+    issue("Beta: ODI-2", "https://beta.test/browse/ODI-2", "Beta: ODI-9", "https://beta.test/browse/ODI-9"),
+  ];
+  const data = computeFlowReport(issues, { ...OPTS, baseUrl: "" });
+
+  it("collects a url for every key that can be linked", () => {
+    assert.equal(data.urls["Alpha: ODI-1"], "https://alpha.test/browse/ODI-1");
+    assert.equal(data.urls["Beta: ODI-9"], "https://beta.test/browse/ODI-9");
+    assert.equal(data.parents.length, 2, "same parent key on two sites stays separate");
+  });
+
+  it("flowLinkFor prefers the per-key url, then the base url, else nothing", () => {
+    assert.equal(flowLinkFor(data, "Alpha: ODI-1"), "https://alpha.test/browse/ODI-1");
+    assert.equal(flowLinkFor({ baseUrl: "https://x.test/browse/" }, "ODI-5"), "https://x.test/browse/ODI-5");
+    assert.equal(flowLinkFor({}, "ODI-5"), "");
+  });
+
+  it("uses per-key urls in the markdown", () => {
+    const md = buildFlowReportMarkdown(data);
+    assert.match(md, /\[Alpha: ODI-1\]\(https:\/\/alpha\.test\/browse\/ODI-1\)/);
+    assert.match(md, /\[Beta: ODI-1\]\(https:\/\/beta\.test\/browse\/ODI-1\)/);
+  });
+
+  it("leaves single-site reports without a urls map", () => {
+    const single = computeFlowReport(issues.map(({ url, parentUrl, ...rest }) => rest), OPTS);
+    assert.equal(single.urls, undefined);
   });
 });
