@@ -1,6 +1,6 @@
 import React from "react";
 import GanttPlanHealth from "../../Components/FlowReport/GanttPlanHealth.jsx";
-import { buildGanttPlanHealthMarkdown, compareGanttSnapshots, computeGanttPlanHealth } from "../../../shared/ganttPlanHealth.mjs";
+import { buildGanttPlanHealthMarkdown, compareGanttSnapshots, computeGanttPlanHealth, isComparableSnapshot } from "../../../shared/ganttPlanHealth.mjs";
 import { buildStandaloneFlowHtml, flowReportFileName } from "../../../shared/flowMetrics.mjs";
 import flowReportCss from "../../Components/FlowReport/FlowReport.css?raw";
 import { archiveGanttPlanHealth, fetchLatestGanttPlanHealth } from "../../services/jiraClient";
@@ -21,6 +21,7 @@ const GanttPlanHealthPanel = ( { open, onClose, slug, displayName, viewIssues, a
   const [ previous, setPrevious ] = React.useState( null );
   const [ status, setStatus ] = React.useState( "" );
   const [ saving, setSaving ] = React.useState( false );
+  const [ reloadTick, setReloadTick ] = React.useState( 0 );
   const reportRef = React.useRef( null );
 
   const scopeIssues = includeAll ? allIssues : viewIssues;
@@ -30,7 +31,7 @@ const GanttPlanHealthPanel = ( { open, onClose, slug, displayName, viewIssues, a
     [ open, scopeIssues, displayName, scopeLabel, jiraBaseUrl ]
   );
 
-  // Last saved snapshot for this plan, used to show which due dates moved. Only meaningful for the entire plan.
+  // Last saved snapshot for this plan and scope, used to show which due dates moved.
   React.useEffect( () => {
     if ( !open || !slug ) return undefined;
     let cancelled = false;
@@ -39,10 +40,10 @@ const GanttPlanHealthPanel = ( { open, onClose, slug, displayName, viewIssues, a
       .then( ( r ) => { if ( !cancelled ) setPrevious( r?.report || null ); } )
       .catch( () => { if ( !cancelled ) setPrevious( null ); } );
     return () => { cancelled = true; };
-  }, [ open, slug ] );
+  }, [ open, slug, reloadTick ] );
 
   const comparison = React.useMemo( () => {
-    if ( !data || !previous?.data ) return null;
+    if ( !data || !previous?.data || !isComparableSnapshot( previous.data, data ) ) return null;
     return { ...compareGanttSnapshots( previous.data, data ), previousAt: previous.createdAt };
   }, [ data, previous ] );
 
@@ -52,12 +53,14 @@ const GanttPlanHealthPanel = ( { open, onClose, slug, displayName, viewIssues, a
 
   const flash = ( msg ) => { setStatus( msg ); setTimeout( () => setStatus( "" ), 3000 ); };
 
+  const incomparable = Boolean( data && previous?.data && !comparison );
+
   const handleSave = async () => {
     setSaving( true );
     try {
       await archiveGanttPlanHealth( data, slug );
       flash( "Saved to Report Archive" );
-      setPrevious( { id: null, createdAt: previous?.createdAt, data: previous?.data } );
+      setReloadTick( ( n ) => n + 1 );
     } catch ( err ) {
       flash( err?.message || "Save failed" );
     } finally {
@@ -104,6 +107,11 @@ const GanttPlanHealthPanel = ( { open, onClose, slug, displayName, viewIssues, a
           </div>
           { disabled
             ? <p className="pm-sp-empty">No issues in scope — adjust filters or scope selection.</p>
+            : null }
+          { !disabled && incomparable && (
+            <p className="pm-sp-ai-hint">The last saved snapshot covers a different scope, so changes are not compared. Save one for “{ scopeLabel }” to start tracking.</p>
+          ) }
+          { disabled ? null
             : <div ref={ reportRef }><GanttPlanHealth data={ data } comparison={ comparison } /></div> }
         </div>
       </div>

@@ -176,6 +176,10 @@ export const isGanttPlanHealthData = (data) =>
   && Array.isArray(data.kpis) && Array.isArray(data.items) && Array.isArray(data.slipBuckets) && Boolean(data.meta) && typeof data.meta === "object";
 
 /** Which issues changed between two saved snapshots (their compact `items`). */
+/** Snapshots are only comparable when they cover the same scope (entire plan vs a filtered view). */
+export const isComparableSnapshot = (previous, current) =>
+  Boolean(previous?.meta && current?.meta) && (previous.meta.scope || "") === (current.meta.scope || "");
+
 export const compareGanttSnapshots = (previous, current) => {
   const empty = { moved: [], finished: [], added: [], removed: [] };
   if (!previous?.items || !current?.items) return empty;

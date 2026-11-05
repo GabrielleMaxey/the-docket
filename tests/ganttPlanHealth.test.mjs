@@ -164,3 +164,12 @@ describe("compareGanttSnapshots", () => {
     assert.deepEqual(compareGanttSnapshots(null, curr), { moved: [], finished: [], added: [], removed: [] });
   });
 });
+
+import { isComparableSnapshot } from "../shared/ganttPlanHealth.mjs";
+describe("isComparableSnapshot", () => {
+  it("only compares snapshots of the same scope", () => {
+    assert.equal(isComparableSnapshot({ meta: { scope: "Entire plan" } }, { meta: { scope: "Entire plan" } }), true);
+    assert.equal(isComparableSnapshot({ meta: { scope: "Entire plan" } }, { meta: { scope: "Current view" } }), false);
+    assert.equal(isComparableSnapshot(null, { meta: { scope: "Entire plan" } }), false);
+  });
+});

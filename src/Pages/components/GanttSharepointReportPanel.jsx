@@ -26,6 +26,15 @@ const GanttSharepointReportPanel = ( { open, onClose, displayName, viewIssues, a
   const [ aiLoading, setAiLoading ] = React.useState( false );
   const [ aiError, setAiError ] = React.useState( "" );
   const [ refineInstruction, setRefineInstruction ] = React.useState( "" );
+  // An AI summary describes the scope it was generated for; drop it when the scope changes so it can't go stale.
+  const scopeRef = React.useRef( includeAll );
+  scopeRef.current = includeAll;
+  const [ summaryIsAi, setSummaryIsAi ] = React.useState( false );
+  React.useEffect( () => {
+    if ( summaryIsAi ) { setSummary( "" ); setSummaryIsAi( false ); }
+    setAiError( "" );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ includeAll ] );
 
   React.useEffect( () => {
     if ( !open ) return;
@@ -70,6 +79,7 @@ const GanttSharepointReportPanel = ( { open, onClose, displayName, viewIssues, a
   };
 
   const callAi = async ( mode ) => {
+    const requestedScope = includeAll;
     setAiLoading( true );
     setAiError( "" );
     try {
@@ -91,7 +101,8 @@ const GanttSharepointReportPanel = ( { open, onClose, displayName, viewIssues, a
         instruction: refineInstruction,
       };
       const result = await generateGanttSharepointSummary( payload );
-      if ( result?.summary ) setSummary( result.summary );
+      if ( scopeRef.current !== requestedScope ) return; // scope changed mid-request: result is for the old scope
+      if ( result?.summary ) { setSummary( result.summary ); setSummaryIsAi( true ); }
     } catch ( err ) {
       setAiError( err?.message || "AI generation failed." );
     } finally {
@@ -139,7 +150,7 @@ const GanttSharepointReportPanel = ( { open, onClose, displayName, viewIssues, a
             className="pm-sp-summary"
             placeholder="Add an executive summary…"
             value={ summary }
-            onChange={ ( e ) => setSummary( e.target.value ) }
+            onChange={ ( e ) => { setSummary( e.target.value ); setSummaryIsAi( false ); } }
             rows={ 3 }
           />
 
