@@ -20,7 +20,7 @@ export const windowStartForMonths = (endDay, months) => {
   return target.toISOString().slice(0, 10);
 };
 
-export const buildFlowJql = ({ windowStart, scopeJql = "", allAssignees = false }) => {
+export const buildFlowJql = ({ windowStart, scopeJql = "", allAssignees = false, includeHandedOn = false }) => {
   const start = dayStr(windowStart);
   if (!start) throw new Error("A valid windowStart (YYYY-MM-DD) is required");
   // scopeJql must already be an ORDER BY-free union scope (see buildUnionScopeFromJqls).
@@ -31,7 +31,8 @@ export const buildFlowJql = ({ windowStart, scopeJql = "", allAssignees = false 
     return `(created >= "${start}" OR resolved >= "${start}") AND (${scope}) ORDER BY created DESC`;
   }
   const scopeClause = scope ? ` AND (${scope})` : "";
-  return `assignee = currentUser() AND (created >= "${start}" OR resolved >= "${start}")${scopeClause} ORDER BY created DESC`;
+  const assigneeClause = includeHandedOn ? "(assignee = currentUser() OR assignee WAS currentUser())" : "assignee = currentUser()";
+  return `${assigneeClause} AND (created >= "${start}" OR resolved >= "${start}")${scopeClause} ORDER BY created DESC`;
 };
 
 const MAX_PRESETS = 50;

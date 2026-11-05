@@ -286,7 +286,8 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
       }
 
       const allAssignees = req.body?.allAssignees === true && Boolean(scope.scopeJql);
-      const jql = buildFlowJql({ windowStart, scopeJql: scope.scopeJql, allAssignees });
+      const includeHandedOn = req.body?.includeHandedOn === true && !allAssignees;
+      const jql = buildFlowJql({ windowStart, scopeJql: scope.scopeJql, allAssignees, includeHandedOn });
       const { issues, total, completeness, isComplete } = await fetchFlowIssues({ jql, jiraRequest });
       const baseUrl = String(getCredentials?.()?.baseUrl || "").replace(/\/+$/, "");
       const siteLabel = String(getSiteContext?.()?.siteHost || "") || (baseUrl ? new URL(baseUrl).host : "");
@@ -299,6 +300,7 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
         siteLabel,
         scopeLabel: scope.scopeLabel,
         allAssignees,
+        includeHandedOn,
         baseUrl: baseUrl ? `${baseUrl}/browse/` : "",
       });
       data.meta = { ...data.meta, windowMonths: months, jiraTotal: total, completeness, isComplete, jql, presetCount: scope.names.length };

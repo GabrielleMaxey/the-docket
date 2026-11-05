@@ -1,9 +1,10 @@
 import React from "react";
-import { Button, Dropdown, Message } from "semantic-ui-react";
+import { Button, Checkbox, Dropdown, Message } from "semantic-ui-react";
 import CollapsibleSection from "../CollapsibleSection";
 import FlowReport from "./FlowReport.jsx";
 import { useReportClipboard } from "../../hooks/useReportClipboard";
-import { buildFlowReportMarkdown } from "../../../shared/flowMetrics.mjs";
+import { buildFlowReportMarkdown, buildStandaloneFlowHtml, flowReportFileName } from "../../../shared/flowMetrics.mjs";
+import flowReportCss from "./FlowReport.css?raw";
 import { archiveFlowReport, generateFlowNarrative, generateFlowReport } from "../../services/jiraClient";
 
 const WINDOW_OPTIONS = [
@@ -34,7 +35,9 @@ const FlowReportSection = ({
   const [error, setError] = React.useState("");
   const [report, setReport] = React.useState(null);
   const [saveState, setSaveState] = React.useState("idle");
+  const [includeHandedOn, setIncludeHandedOn] = React.useState(false);
   const [narrativeLoading, setNarrativeLoading] = React.useState(false);
+  const reportRef = React.useRef(null);
   const currentScopeKey = scopeKeyOf(presetIds);
   const scoped = Array.isArray(presetIds);
   const requestSeq = React.useRef(0);
@@ -51,7 +54,7 @@ const FlowReportSection = ({
     setError("");
     setSaveState("idle");
     try {
-      const result = await generateFlowReport({ windowMonths, presetIds: scoped ? presetIds : [], allAssignees: scoped && allAssignees });
+      const result = await generateFlowReport({ windowMonths, presetIds: scoped ? presetIds : [], allAssignees: scoped && allAssignees, includeHandedOn: !allAssignees && includeHandedOn });
       if (seq !== requestSeq.current) return; // a newer Generate superseded this one
       if (!result?.data) throw new Error("The server returned no report data.");
       setReport({ data: result.data, markdown: result.markdown || "", scopeKey: currentScopeKey });
@@ -60,6 +63,23 @@ const FlowReportSection = ({
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
+  };
+
+  const handleDownloadHtml = () => {
+    const root = reportRef.current;
+    if (!root || !report?.data) return;
+    // Static copy: drop the interactive table filters, which cannot work without the app.
+    const copy = root.cloneNode(true);
+    copy.querySelectorAll(".fr-filters").forEach((node) => node.remove());
+    const html = buildStandaloneFlowHtml({ title: report.data.title, bodyHtml: copy.innerHTML, css: flowReportCss });
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = flowReportFileName(report.data.title, new Date().toISOString().slice(0, 10), "html");
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
   };
 
   const handleNarrative = async () => {
@@ -104,6 +124,14 @@ const FlowReportSection = ({
     >
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
         <Dropdown selection compact options={WINDOW_OPTIONS} value={windowMonths} onChange={(_, d) => setWindowMonths(d.value)} disabled={loading} />
+        {!allAssignees ? (
+          <Checkbox
+            label="Include work I've handed on"
+            checked={includeHandedOn}
+            onChange={(_, d) => setIncludeHandedOn(Boolean(d.checked))}
+            disabled={loading}
+          />
+        ) : null}
         <Button primary size="small" loading={loading} disabled={loading} onClick={handleGenerate}>
           {report ? "Regenerate" : "Generate report"}
         </Button>
@@ -117,6 +145,7 @@ const FlowReportSection = ({
             </Button>
             <Button basic size="small" onClick={handleCopy}>{copied ? "✓ Copied" : "Copy markdown"}</Button>
             <Button basic size="small" onClick={handleDownload}>⤓ Download .md</Button>
+            <Button basic size="small" onClick={handleDownloadHtml}>⤓ Download .html</Button>
           </>
         ) : null}
       </div>
@@ -150,7 +179,7 @@ const FlowReportSection = ({
       {error ? <Message negative size="small">{error}</Message> : null}
       {report ? (
         <>
-          <FlowReport key={report.data?.meta?.generatedAt || "report"} data={report.data} />
+          <div ref={reportRef}><FlowReport key={report.data?.meta?.generatedAt || "report"} data={report.data} /></div>
           {report.data?.meta?.jql ? (
             <details style={{ marginTop: 12 }}>
               <summary className="ww-inline-hint" style={{ cursor: "pointer" }}>Query used</summary>

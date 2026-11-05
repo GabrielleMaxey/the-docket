@@ -331,10 +331,11 @@ export const computeFlowReport = (issues, options = {}) => {
   return {
     baseUrl: options.baseUrl || "",
     title: options.allAssignees ? `Flow Report: ${windowLabel}` : `${who} Assigned Work: ${windowLabel}`,
-    subtitle: `Jira issues ${options.allAssignees ? "for all assignees" : `assigned to ${options.personName || "you"}`} that were created or resolved between ${windowStart} and ${windowEnd}${options.scopeLabel ? ", limited to the selected projects" : ""}`,
+    subtitle: `Jira issues ${options.allAssignees ? "for all assignees" : `assigned to ${options.personName || "you"}${options.includeHandedOn ? " now or earlier" : ""}`} that were created or resolved between ${windowStart} and ${windowEnd}${options.scopeLabel ? ", limited to the selected projects" : ""}`,
     chips: [
       ...(options.siteLabel ? [`Site: ${options.siteLabel}`] : []),
       ...(options.scopeLabel ? [`Projects: ${options.scopeLabel}`] : []),
+      ...(options.includeHandedOn ? ["Includes work handed on"] : []),
       `${plural(total, "issue")}${projects.length ? ` · ${projects.length === 1 ? `all in ${projects[0]}` : projects.join(", ")}` : ""}`,
       `Data as of ${nowDay}`,
     ],
@@ -357,9 +358,10 @@ export const computeFlowReport = (issues, options = {}) => {
     open,
     parents,
     takeaways,
-    footnote: `${idleNote} ${cycleNote} ${options.allAssignees ? "Issues for all assignees in the selected projects are included." : "Only issues currently assigned to the person are included."}`,
+    footnote: `${idleNote} ${cycleNote} ${options.allAssignees ? "Issues for all assignees in the selected projects are included." : options.includeHandedOn ? "Includes issues that were assigned to the person earlier and handed on; the Assignee column shows who holds them now." : "Only issues currently assigned to the person are included."}`,
     meta: {
       allAssignees: Boolean(options.allAssignees),
+      includeHandedOn: Boolean(options.includeHandedOn),
       generatedAt: new Date().toISOString(),
       windowStart,
       windowEnd,
@@ -384,6 +386,32 @@ export const buildFlowNarrativeContext = (data) => {
   if ((data.takeaways || []).length) lines.push("## Computed takeaways", ...data.takeaways.map((t) => `- ${t.lead}: ${t.text}`), "");
   if (data.footnote) lines.push(`Note: ${data.footnote}`);
   return lines.join("\n").slice(0, 8000);
+};
+
+const escapeHtml = (value) =>
+  String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** Self-contained, script-free HTML page for a rendered report (static: sorting and filters are not kept). */
+export const buildStandaloneFlowHtml = ({ title, bodyHtml, css }) => {
+  const safeCss = String(css || "").replace(/<\/style/gi, "<\\/style").replace(/<script/gi, "<\\script");
+  return [
+    "<!doctype html>",
+    '<html lang="en">',
+    "<head>",
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    `<title>${escapeHtml(title || "Flow report")}</title>`,
+    `<style>body{margin:0;background:#f4f6fa;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}</style>`,
+    `<style>${safeCss}</style>`,
+    "</head>",
+    `<body>${String(bodyHtml || "")}</body>`,
+    "</html>",
+  ].join("\n");
+};
+
+export const flowReportFileName = (title, day, extension) => {
+  const base = String(title || "").replace(/[^A-Za-z0-9]+/g, " ").trim().replace(/\s+/g, "_") || "flow-report";
+  return `${base}_${day}.${extension}`;
 };
 
 const mdTable = (headers, rows) =>
@@ -412,7 +440,7 @@ export const buildFlowReportMarkdown = (data) => {
     data.dueNote || "", ""
   );
   const stalledRows = (data.open || []).slice(0, 25);
-  const showAssignee = Boolean(data.meta?.allAssignees);
+  const showAssignee = Boolean(data.meta?.allAssignees || data.meta?.includeHandedOn);
   lines.push(
     "## Open work (most idle first)", "",
     `"Stalled" means ${data.stalledDefinition || "no recent update"}.`, "",

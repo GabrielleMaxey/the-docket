@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { addDays, buildFlowNarrativeContext, buildFlowReportMarkdown, computeFlowReport, dayStr, daysBetween, median } from "../shared/flowMetrics.mjs";
+import { addDays, buildFlowNarrativeContext, buildFlowReportMarkdown, buildStandaloneFlowHtml, flowReportFileName, computeFlowReport, dayStr, daysBetween, median } from "../shared/flowMetrics.mjs";
 
 const NOW = "2026-11-05";
 const OPTS = { now: NOW, windowStart: "2025-11-05", windowEnd: "2026-11-05", baseUrl: "https://example.atlassian.net/browse/", siteLabel: "example.atlassian.net", personName: "" };
@@ -172,6 +172,13 @@ describe("assignee on open work", () => {
     assert.equal(data.meta.allAssignees, true);
   });
 
+  it("treats handed-on reports like all-assignee reports for the Assignee column", () => {
+    const data = computeFlowReport(issues, { ...OPTS, includeHandedOn: true });
+    assert.equal(data.meta.includeHandedOn, true);
+    assert.match(buildFlowReportMarkdown(data), /\| Status \| Assignee \|/);
+    assert.match(data.subtitle, /now or earlier/);
+  });
+
   it("adds an Assignee column to the markdown only for all-assignee reports", () => {
     const all = buildFlowReportMarkdown(computeFlowReport(issues, { ...OPTS, allAssignees: true }));
     assert.match(all, /\| Issue \| Summary \| Status \| Assignee \| Parent \|/);
@@ -203,5 +210,27 @@ describe("AI narrative support", () => {
     assert.doesNotMatch(buildFlowReportMarkdown(data), /AI summary/);
     const md = buildFlowReportMarkdown({ ...data, narrative: "Work is mostly stalled." });
     assert.match(md, /## AI summary\n\nWork is mostly stalled\./);
+  });
+});
+
+describe("standalone html export", () => {
+  it("wraps the rendered report and css in a self-contained document with an escaped title", () => {
+    const html = buildStandaloneFlowHtml({ title: 'Flow <Report> & "more"', bodyHtml: '<div class="flow-report">X</div>', css: ".flow-report{color:red}" });
+    assert.match(html, /^<!doctype html>/i);
+    assert.match(html, /<title>Flow &lt;Report&gt; &amp; &quot;more&quot;<\/title>/);
+    assert.match(html, /<style>\.flow-report\{color:red\}<\/style>/);
+    assert.ok(html.includes('<div class="flow-report">X</div>'));
+    assert.doesNotMatch(html, /<script/i);
+    assert.doesNotMatch(html, /(href|src)="https?:\/\/[^"]*\.(css|js)"/, "no external assets");
+  });
+
+  it("neutralises a closing style tag inside the css", () => {
+    const html = buildStandaloneFlowHtml({ title: "t", bodyHtml: "", css: "a{}</style><script>alert(1)</script>" });
+    assert.doesNotMatch(html, /<script/i);
+  });
+
+  it("builds a safe dated file name", () => {
+    assert.equal(flowReportFileName("Flow Report: Past 12 months", "2026-11-05", "html"), "Flow_Report_Past_12_months_2026-11-05.html");
+    assert.equal(flowReportFileName("", "2026-11-05", "md"), "flow-report_2026-11-05.md");
   });
 });

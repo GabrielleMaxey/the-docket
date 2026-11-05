@@ -237,7 +237,7 @@ export default function FlowReport({ data, controls, className = '' }) {
         <div className="fr-card">
           <h2>Open work: aging and stalled items</h2>
           <p className="fr-sub">"Stalled" means {d.stalledDefinition ?? `no update for ${stalledDays}+ days`}. Click a column header to sort.</p>
-          <OpenTable rows={d.open} baseUrl={baseUrl} stalledDays={stalledDays} showAssignee={Boolean(d.meta?.allAssignees)} />
+          <OpenTable rows={d.open} baseUrl={baseUrl} stalledDays={stalledDays} showAssignee={Boolean(d.meta?.allAssignees || d.meta?.includeHandedOn)} />
         </div>
       </section>
 

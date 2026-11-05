@@ -986,8 +986,8 @@ export const saveAdHocReport = async ({
   });
 };
 
-export const generateFlowReport = async ({ windowMonths = 12, stalledDays = 30, presetIds = [], allAssignees = false } = {}) =>
-  postJson("/api/reports/flow", { windowMonths, stalledDays, presetIds, allAssignees });
+export const generateFlowReport = async ({ windowMonths = 12, stalledDays = 30, presetIds = [], allAssignees = false, includeHandedOn = false } = {}) =>
+  postJson("/api/reports/flow", { windowMonths, stalledDays, presetIds, allAssignees, includeHandedOn });
 
 export const generateFlowNarrative = async (data) => postJson("/api/reports/flow/narrative", { data });
 

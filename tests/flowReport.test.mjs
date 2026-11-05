@@ -159,6 +159,18 @@ describe("flow report routes", () => {
     }, { issues, presets, requests });
   });
 
+  it("adds handed-on work, labels it, and shows who holds each issue now", async () => {
+    const requests = [];
+    await withServer(async ({ post }) => {
+      const { data } = await (await post("/api/reports/flow", { includeHandedOn: true })).json();
+      assert.match(JSON.stringify(requests.map((r) => r.body)), /assignee WAS currentUser\(\)/);
+      assert.ok(data.chips.includes("Includes work handed on"));
+      assert.equal(data.meta.includeHandedOn, true);
+      assert.equal(data.open[0].assignee, "Pat Lee");
+      assert.match(data.footnote, /handed on/i);
+    }, { issues, requests });
+  });
+
   it("keeps the report to my own issues when no all-assignees flag is sent", async () => {
     const requests = [];
     const presets = { 5: { id: 5, preset_type: "jql", epic_name: "Alpha", jql: "project = ALPHA" } };
@@ -243,6 +255,17 @@ describe("flow report project scope", () => {
     const jql = buildFlowJql({ windowStart: "2025-11-05", scopeJql: "project = A", allAssignees: true });
     assert.equal(jql, '(created >= "2025-11-05" OR resolved >= "2025-11-05") AND (project = A) ORDER BY created DESC');
     assert.match(buildFlowJql({ windowStart: "2025-11-05", scopeJql: "project = A" }), /^assignee = currentUser\(\)/);
+  });
+
+  it("includes issues I was assigned earlier when asked", () => {
+    const jql = buildFlowJql({ windowStart: "2025-11-05", includeHandedOn: true });
+    assert.equal(jql, '(assignee = currentUser() OR assignee WAS currentUser()) AND (created >= "2025-11-05" OR resolved >= "2025-11-05") ORDER BY created DESC');
+    const scoped = buildFlowJql({ windowStart: "2025-11-05", includeHandedOn: true, scopeJql: "project = A" });
+    assert.match(scoped, /^\(assignee = currentUser\(\) OR assignee WAS currentUser\(\)\) AND .* AND \(project = A\) ORDER BY created DESC$/);
+  });
+
+  it("ignores handed-on for all-assignees reports", () => {
+    assert.doesNotMatch(buildFlowJql({ windowStart: "2025-11-05", scopeJql: "project = A", allAssignees: true, includeHandedOn: true }), /WAS|currentUser/);
   });
 
   it("refuses an unscoped all-assignees query", () => {
