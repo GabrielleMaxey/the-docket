@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { addDays, buildFlowReportMarkdown, computeFlowReport, dayStr, daysBetween, median } from "../shared/flowMetrics.mjs";
+import { addDays, buildFlowNarrativeContext, buildFlowReportMarkdown, computeFlowReport, dayStr, daysBetween, median } from "../shared/flowMetrics.mjs";
 
 const NOW = "2026-11-05";
 const OPTS = { now: NOW, windowStart: "2025-11-05", windowEnd: "2026-11-05", baseUrl: "https://example.atlassian.net/browse/", siteLabel: "example.atlassian.net", personName: "" };
@@ -178,5 +178,30 @@ describe("assignee on open work", () => {
     assert.match(all, /Pat Lee/);
     const mine = buildFlowReportMarkdown(computeFlowReport(issues, OPTS));
     assert.doesNotMatch(mine, /Assignee/);
+  });
+});
+
+describe("AI narrative support", () => {
+  const issues = Array.from({ length: 14 }, (_, i) => ({
+    key: `ODI-${i + 1}`, summary: `Item ${i + 1}`, status: "In Progress", statusCategory: "indeterminate", type: "Task", priority: "", parent: "", parentSummary: "",
+    created: "2026-01-01T10:00:00.000+0000", updated: `2026-0${(i % 9) + 1}-15T10:00:00.000+0000`, resolved: null, dueDate: null, assignee: `P${i}`, transitions: [],
+  }));
+  const data = computeFlowReport(issues, { ...OPTS, scopeLabel: "Alpha", allAssignees: true });
+
+  it("builds a compact grounded context: title, KPIs, scope, the 10 most idle items and takeaways", () => {
+    const ctx = buildFlowNarrativeContext(data);
+    assert.match(ctx, new RegExp(data.title.replace(/[()]/g, "\\$&")));
+    for (const k of data.kpis) assert.ok(ctx.includes(k.label), `missing KPI ${k.label}`);
+    assert.match(ctx, /Projects: Alpha/);
+    const listed = data.open.slice(0, 10).map((r) => r.key);
+    for (const key of listed) assert.ok(ctx.includes(key));
+    assert.ok(!ctx.includes(data.open[10].key), "only the 10 most idle items are listed");
+    assert.ok(ctx.length < 6000);
+  });
+
+  it("adds the narrative to the markdown only when present", () => {
+    assert.doesNotMatch(buildFlowReportMarkdown(data), /AI summary/);
+    const md = buildFlowReportMarkdown({ ...data, narrative: "Work is mostly stalled." });
+    assert.match(md, /## AI summary\n\nWork is mostly stalled\./);
   });
 });

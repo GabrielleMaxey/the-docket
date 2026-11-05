@@ -183,6 +183,13 @@ export default function FlowReport({ data, controls, className = '' }) {
         <Controls controls={controls} />
       </header>
 
+      {d.narrative ? (
+        <section className="fr-card fr-narrative">
+          <h3>AI summary</h3>
+          {String(d.narrative).split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
+        </section>
+      ) : null}
+
       <section className="fr-grid fr-kpis">
         {d.kpis.map((k) => <Kpi key={k.label} {...k} />)}
       </section>

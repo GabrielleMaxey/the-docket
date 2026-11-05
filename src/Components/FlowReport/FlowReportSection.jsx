@@ -3,7 +3,8 @@ import { Button, Dropdown, Message } from "semantic-ui-react";
 import CollapsibleSection from "../CollapsibleSection";
 import FlowReport from "./FlowReport.jsx";
 import { useReportClipboard } from "../../hooks/useReportClipboard";
-import { archiveFlowReport, generateFlowReport } from "../../services/jiraClient";
+import { buildFlowReportMarkdown } from "../../../shared/flowMetrics.mjs";
+import { archiveFlowReport, generateFlowNarrative, generateFlowReport } from "../../services/jiraClient";
 
 const WINDOW_OPTIONS = [
   { key: 3, text: "Past 3 months", value: 3 },
@@ -33,6 +34,7 @@ const FlowReportSection = ({
   const [error, setError] = React.useState("");
   const [report, setReport] = React.useState(null);
   const [saveState, setSaveState] = React.useState("idle");
+  const [narrativeLoading, setNarrativeLoading] = React.useState(false);
   const currentScopeKey = scopeKeyOf(presetIds);
   const scoped = Array.isArray(presetIds);
   const requestSeq = React.useRef(0);
@@ -57,6 +59,27 @@ const FlowReportSection = ({
       if (seq === requestSeq.current) setError(err instanceof Error ? err.message : "Unable to generate the flow report.");
     } finally {
       if (seq === requestSeq.current) setLoading(false);
+    }
+  };
+
+  const handleNarrative = async () => {
+    if (!report?.data) return;
+    const target = report.data.meta?.generatedAt;
+    setNarrativeLoading(true);
+    setError("");
+    try {
+      const result = await generateFlowNarrative(report.data);
+      if (!result?.narrative) throw new Error("The server returned no summary.");
+      setReport((prev) => {
+        if (!prev || prev.data?.meta?.generatedAt !== target) return prev; // report was regenerated meanwhile
+        const data = { ...prev.data, narrative: result.narrative };
+        return { ...prev, data, markdown: buildFlowReportMarkdown(data) };
+      });
+      setSaveState("idle");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to write the AI summary.");
+    } finally {
+      setNarrativeLoading(false);
     }
   };
 
@@ -86,6 +109,9 @@ const FlowReportSection = ({
         </Button>
         {report ? (
           <>
+            <Button basic size="small" loading={narrativeLoading} disabled={narrativeLoading || loading} onClick={handleNarrative}>
+              {report.data?.narrative ? "Rewrite AI summary" : "Add AI summary"}
+            </Button>
             <Button basic size="small" onClick={handleSave} disabled={saveState !== "idle"}>
               {saveState === "saved" ? "✓ Saved to archive" : saveState === "saving" ? "Saving…" : "Save to archive"}
             </Button>

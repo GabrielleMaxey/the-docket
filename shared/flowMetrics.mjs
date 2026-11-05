@@ -371,6 +371,21 @@ export const computeFlowReport = (issues, options = {}) => {
 };
 
 const mdCell = (value) => String(value ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+/** Compact, number-only context for the AI summary. Everything the model may say must be in here. */
+export const buildFlowNarrativeContext = (data) => {
+  const lines = [`# ${data.title}`, data.subtitle || "", (data.chips || []).join(" | "), ""];
+  lines.push("## Key metrics", ...(data.kpis || []).map((k) => `- ${k.label}: ${k.value}${k.sub ? ` (${k.sub})` : ""}`), "");
+  if (data.flowNote) lines.push("## Created vs resolved", data.flowNote, "");
+  const bucketLine = (title, rows) => (rows?.length ? [`${title}: ${rows.map((r) => `${r.label} = ${r.count}`).join("; ")}`] : []);
+  lines.push("## Distribution", ...bucketLine("Open issue age", data.aging), ...bucketLine("Idle time", data.idleBuckets), ...bucketLine("Lead time", data.leadBuckets), ...bucketLine("Status", data.status), "");
+  lines.push(`## Most idle open items (showing ${Math.min(10, (data.open || []).length)} of ${(data.open || []).length}; stalled = ${data.stalledDefinition || "no recent update"})`);
+  for (const r of (data.open || []).slice(0, 10)) lines.push(`- ${r.key} "${r.summary}" | ${r.status} | ${r.assignee || "Unassigned"} | age ${r.age}d | idle ${r.idle}d`);
+  lines.push("");
+  if ((data.takeaways || []).length) lines.push("## Computed takeaways", ...data.takeaways.map((t) => `- ${t.lead}: ${t.text}`), "");
+  if (data.footnote) lines.push(`Note: ${data.footnote}`);
+  return lines.join("\n").slice(0, 8000);
+};
+
 const mdTable = (headers, rows) =>
   [`| ${headers.join(" | ")} |`, `| ${headers.map(() => "---").join(" | ")} |`, ...rows.map((r) => `| ${r.map(mdCell).join(" | ")} |`)].join("\n");
 
@@ -414,6 +429,7 @@ export const buildFlowReportMarkdown = (data) => {
     lines.push("## Key takeaways", "", ...data.takeaways.map((t) => `- **${t.lead}:** ${t.text}${t.keys?.length ? ` ${t.keys.map(link).join(", ")}` : ""}`), "");
   }
   if (data.footnote) lines.push(`_${data.footnote}_`, "");
+  if (data.narrative) lines.splice(4, 0, "## AI summary", "", String(data.narrative), "");
   return lines.join("\n");
 };
 

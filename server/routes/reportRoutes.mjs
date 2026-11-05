@@ -42,8 +42,8 @@ import { computeOverallRollup, normalizePastDueLookbackYears } from "../../share
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildDirectReportsJql, isCurrentUserMember, isJqlCurrentUser, looksLikeAccountId } from "../../shared/directReportsJql.mjs";
 import { fetchJiraMyself } from "../lib/jiraSearchHelpers.mjs";
-import { buildFlowJql, fetchFlowIssues, resolveFlowScope, resolveFlowWindow } from "../lib/flowReport.mjs";
-import { FLOW_REPORT_TYPE, buildFlowReportMarkdown, computeFlowReport, isFlowReportData } from "../../shared/flowMetrics.mjs";
+import { FLOW_NARRATIVE_SYSTEM_PROMPT, buildFlowJql, fetchFlowIssues, resolveFlowScope, resolveFlowWindow } from "../lib/flowReport.mjs";
+import { FLOW_REPORT_TYPE, buildFlowNarrativeContext, buildFlowReportMarkdown, computeFlowReport, isFlowReportData } from "../../shared/flowMetrics.mjs";
 import { buildWeekPlanContext } from "../lib/weekPlanContext.mjs";
 
 const log = createLogger("report");
@@ -262,7 +262,7 @@ const createStatements = (db) => ({
   ),
 });
 
-export const registerReportRoutes = (app, { withSiteOperation = (handler) => handler, getDb, dataDir, jiraRequest, getCredentials, getSiteContext, ensureEnvOrRespond = () => true }) => {
+export const registerReportRoutes = (app, { withSiteOperation = (handler) => handler, getDb, dataDir, jiraRequest, getCredentials, getSiteContext, ensureEnvOrRespond = () => true, completeNarrative = callLLMForReport }) => {
   // ─── Flow report: how a person's assigned work moves (throughput, lead/cycle time, aging) ─────
   app.post("/api/reports/flow", withSiteOperation(async (req, res) => {
     if (!ensureEnvOrRespond(res)) return;
@@ -309,6 +309,26 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
     } catch (error) {
       log.error("flow report failed", errorMessage(error));
       return res.status(500).json({ error: "Unable to build the flow report.", message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  }));
+
+  app.post("/api/reports/flow/narrative", withSiteOperation(async (req, res) => {
+    const data = req.body?.data;
+    if (!isFlowReportData(data)) {
+      return res.status(400).json({ error: "Missing or invalid flow report data" });
+    }
+    try {
+      const text = await completeNarrative({
+        systemPrompt: FLOW_NARRATIVE_SYSTEM_PROMPT,
+        context: buildFlowNarrativeContext(data),
+        label: "flow report summary",
+      });
+      const narrative = String(text || "").trim();
+      if (!narrative) return res.status(502).json({ error: "The AI provider returned an empty summary." });
+      return res.json({ narrative });
+    } catch (error) {
+      log.error("flow report summary failed", errorMessage(error));
+      return res.status(502).json({ error: error instanceof Error ? error.message : "Unable to write the AI summary." });
     }
   }));
 

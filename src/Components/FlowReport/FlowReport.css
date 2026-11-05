@@ -115,3 +115,8 @@
 .flow-report .fr-ins { padding-left: 18px; margin: 0; }
 .flow-report .fr-ins li { margin: 6px 0; }
 
+
+.flow-report .fr-narrative { margin-bottom: 16px; border-left: 4px solid var(--fr-accent, #0b5fff); }
+.flow-report .fr-narrative h3 { margin: 0 0 8px; font-size: 14px; }
+.flow-report .fr-narrative p { margin: 0 0 8px; line-height: 1.5; }
+.flow-report .fr-narrative p:last-child { margin-bottom: 0; }

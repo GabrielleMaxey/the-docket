@@ -147,3 +147,11 @@ export const resolveFlowWindow = ({ now = new Date(), windowMonths = 12 } = {}) 
 };
 
 export { addDays };
+
+export const FLOW_NARRATIVE_SYSTEM_PROMPT = [
+  "You write a short narrative summary of a Jira flow report for an engineering lead.",
+  "Use only the numbers, issue keys and facts given in the report data. Do not invent causes, people, dates or trends that the data does not show; if something cannot be known from the data, leave it out.",
+  "Write 2 to 4 short paragraphs of plain prose (no markdown, bullets, headings or tables), under 180 words in total.",
+  "Cover: how much work is moving (throughput and the created-versus-resolved balance), how healthy the open work is (age, idle time, stalled items), and what to look at first, naming at most three issue keys from the list.",
+  "State caveats from the note when they affect how much to trust the numbers (for example an incomplete fetch or idle time based on last update).",
+].join("\n");

@@ -105,7 +105,7 @@ describe("fetchFlowIssues", () => {
 });
 
 describe("flow report routes", () => {
-  const withServer = async (testFn, { issues, presets = {}, requests = [] } = {}) => {
+  const withServer = async (testFn, { issues, presets = {}, requests = [], completeNarrative } = {}) => {
     const inserts = [];
     const db = { prepare: () => ({ run: (params) => { inserts.push(params); return { lastInsertRowid: 7 }; }, get: (id) => presets[id] }) };
     const app = express();
@@ -114,6 +114,7 @@ describe("flow report routes", () => {
       getDb: () => db,
       dataDir: ".",
       ensureEnvOrRespond: () => true,
+      ...(completeNarrative ? { completeNarrative } : {}),
       getCredentials: () => ({ baseUrl: "https://example.atlassian.net/" }),
       getSiteContext: () => ({ siteHost: "example.atlassian.net" }),
       jiraRequest: async (req) => { requests.push(req); return { ok: true, status: 200, data: { issues, isLast: true } }; },
@@ -183,6 +184,32 @@ describe("flow report routes", () => {
       assert.equal(response.status, 400);
       assert.match((await response.json()).error, /no usable JQL/);
     }, { issues });
+  });
+
+  it("writes an AI summary for report data and returns it trimmed", async () => {
+    const calls = [];
+    const completeNarrative = async (args) => { calls.push(args); return "  Throughput is steady.\n\nThree items are stalled.  "; };
+    await withServer(async ({ post }) => {
+      const { data } = await (await post("/api/reports/flow", {})).json();
+      const response = await post("/api/reports/flow/narrative", { data });
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).narrative, "Throughput is steady.\n\nThree items are stalled.");
+      assert.equal(calls.length, 1);
+      assert.match(calls[0].context, /ODI-2/);
+      assert.match(calls[0].systemPrompt, /only the numbers/i);
+    }, { issues, completeNarrative });
+  });
+
+  it("rejects invalid data for the AI summary and surfaces provider failures", async () => {
+    await withServer(async ({ post }) => {
+      assert.equal((await post("/api/reports/flow/narrative", { data: { title: "x" } })).status, 400);
+    }, { issues, completeNarrative: async () => "never" });
+    await withServer(async ({ post }) => {
+      const { data } = await (await post("/api/reports/flow", {})).json();
+      const response = await post("/api/reports/flow/narrative", { data });
+      assert.equal(response.status, 502);
+      assert.match((await response.json()).error, /No AI provider/);
+    }, { issues, completeNarrative: async () => { throw new Error("No AI provider configured."); } });
   });
 
   it("saves a report to the archive as flow_report with the data in meta", async () => {
