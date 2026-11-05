@@ -121,7 +121,7 @@ const requestJson = async ( path, options = {} ) => {
     }
   }
   const run = () => requestJsonNow( path, { ...options, siteContext: context } );
-  const isSave = ["PUT", "PATCH", "DELETE"].includes( method ) || ( method === "POST" && path !== "/api/jira/issue-metadata/import/preview" && !/\/(search|resolve-bulk|bulk|parent-candidates|generate-description|generate|refresh|project|gantt-summary|week|test|scope-jql|run)(\/all)?$/.test( path ) );
+  const isSave = ["PUT", "PATCH", "DELETE"].includes( method ) || ( method === "POST" && path !== "/api/jira/issue-metadata/import/preview" && !/\/(search|resolve-bulk|bulk|parent-candidates|generate-description|generate|refresh|project|gantt-summary|week|test|scope-jql|run|flow)(\/all)?$/.test( path ) );
   return isSave ? runBackgroundJob( `site-save:${method}:${path}`, {
     instanceId: context.instanceId, siteContext: context, siteSave: true, queue: true, label: "Saving Jira changes", run,
   } ) : run();
@@ -985,6 +985,12 @@ export const saveAdHocReport = async ({
     ...getLocalTimestampPayload(),
   });
 };
+
+export const generateFlowReport = async ({ windowMonths = 12, stalledDays = 30, presetIds = [], allAssignees = false } = {}) =>
+  postJson("/api/reports/flow", { windowMonths, stalledDays, presetIds, allAssignees });
+
+export const archiveFlowReport = async (data) =>
+  postJson("/api/reports/flow/archive", { data, ...getLocalTimestampPayload() });
 
 export const fetchCoworkWeeklyPlans = async () => {
   const data = await requestJson("/api/reports/cowork-files");

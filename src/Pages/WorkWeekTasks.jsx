@@ -13,6 +13,7 @@ import CreateIssueModal from "./components/CreateIssueModal";
 import JqlControlsPanel from "./components/JqlControlsPanel";
 import WeeklyPlanPanel from "./components/WeeklyPlanPanel";
 import MyMetricsSection from "./components/MyMetricsSection";
+import FlowReportSection from "../Components/FlowReport/FlowReportSection.jsx";
 import { useEpicFilters } from "../context/EpicFiltersContext.jsx";
 import { useJokeTicker } from "./hooks/useJokeTicker";
 import { useCalendarData } from "./hooks/useCalendarData";
@@ -619,6 +620,11 @@ const WorkWeekTasks = () => {
         {/* My Metrics — directly below restored-results banner; scoped to active tab */}
         {!combinedOpenWorkActive && jqlRuns.some((r) => isConfiguredJqlRun(r) && r.issues?.length > 0) && activeRun?.issues?.length > 0 ? (
           <MyMetricsSection run={activeRun} jiraRowPriorities={jiraRowPriorities} jqlRuns={jqlRuns} />
+        ) : null}
+
+        {/* My Flow report — separate collapsible card; always covers all of my assigned work */}
+        {!combinedOpenWorkActive ? (
+          <FlowReportSection storageKey="ww-flow-report-open" />
         ) : null}
 
         <JiraResultsTable

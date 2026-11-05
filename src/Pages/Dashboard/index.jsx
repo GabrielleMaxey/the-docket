@@ -23,6 +23,7 @@ import DashboardFiltersPanel from "./components/DashboardFiltersPanel";
 import DashboardTabs from "./components/DashboardTabs";
 import ReportPanel from "./components/ReportPanel";
 import WeeklyDigestPanel from "./components/WeeklyDigestPanel";
+import FlowReportSection from "../../Components/FlowReport/FlowReportSection.jsx";
 import OverallSummaryCard from "./components/OverallSummaryCard";
 import IndividualContributorsPanel from "./components/IndividualContributorsPanel";
 import ProjectMetricsSection from "./components/ProjectMetricsSection";
@@ -526,6 +527,14 @@ const Dashboard = () => {
                   Report is turned off — enable it under Filters → Views to see this tab.
                 </Message>
               )}
+              <FlowReportSection
+                presetIds={selectedPresetIds}
+                presetOptions={presets}
+                onPresetIdsChange={setSelectedPresetIds}
+                allAssignees
+                title="Flow Report"
+                subtitle="Throughput, lead and cycle time, aging and stalled work for the issues in the selected projects"
+              />
             </div>
           ) : null}
         </>

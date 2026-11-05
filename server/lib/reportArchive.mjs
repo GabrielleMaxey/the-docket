@@ -1,5 +1,5 @@
 const WORK_WEEK_TYPES = new Set(["work_week_project_report", "week_plan"]);
-const DASHBOARD_TYPES = new Set(["dashboard_report"]);
+const DASHBOARD_TYPES = new Set(["dashboard_report", "flow_report"]);
 const AD_HOC_TYPES = new Set(["chat_response"]);
 
 export const REPORT_SOURCES = {
@@ -77,7 +77,7 @@ const buildSourceWhereClause = (source) => {
     return { whereSql: "WHERE report_type IN ('work_week_project_report', 'week_plan')", params: [] };
   }
   if (normalizedSource === REPORT_SOURCES.DASHBOARD) {
-    return { whereSql: "WHERE report_type = 'dashboard_report'", params: [] };
+    return { whereSql: "WHERE report_type IN ('dashboard_report', 'flow_report')", params: [] };
   }
   if (normalizedSource === REPORT_SOURCES.ADHOC) {
     return { whereSql: "WHERE source = 'adhoc' OR report_type = 'chat_response'", params: [] };

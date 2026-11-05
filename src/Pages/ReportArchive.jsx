@@ -3,6 +3,7 @@ import React from "react";
 import { Container, Header, Message, Tab, Table, Button } from "semantic-ui-react";
 import CollapsibleSection from "../Components/CollapsibleSection";
 import ReportOutput from "../Components/ReportOutput";
+import FlowReport from "../Components/FlowReport/FlowReport.jsx";
 import ReportDiagrams from "./Dashboard/components/ReportDiagrams";
 import { useReportClipboard } from "../hooks/useReportClipboard";
 import {
@@ -25,6 +26,7 @@ const REPORT_TYPE_LABELS = {
   week_plan: "Week plan",
   cowork_weekly_plan: "CoWork file",
   dashboard_report: "Dashboard report",
+  flow_report: "Flow report",
   chat_response: "Chat response",
 };
 
@@ -515,21 +517,31 @@ const ReportArchivePanel = ({
           defaultOpen={true}
           className="report-archive-detail-collapsible"
         >
-          <ReportOutput
-            report={reportForClipboard}
-            hideTitle
-            copied={copied}
-            onCopy={handleCopy}
-            onDownload={handleDownload}
-            chartSlot={
-              archivedChart ? (
-                <ReportDiagrams
-                  statusCounts={archivedChart.statusCounts}
-                  chartVariant={archivedChart.chartVariant}
-                />
-              ) : null
-            }
-          />
+          {selectedReport.reportType === "flow_report" && selectedReport.meta?.flowReport ? (
+            <>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <Button basic size="mini" onClick={handleCopy}>{copied ? "✓ Copied" : "Copy markdown"}</Button>
+                <Button basic size="mini" onClick={handleDownload}>⤓ Download .md</Button>
+              </div>
+              <FlowReport data={selectedReport.meta.flowReport} />
+            </>
+          ) : (
+            <ReportOutput
+              report={reportForClipboard}
+              hideTitle
+              copied={copied}
+              onCopy={handleCopy}
+              onDownload={handleDownload}
+              chartSlot={
+                archivedChart ? (
+                  <ReportDiagrams
+                    statusCounts={archivedChart.statusCounts}
+                    chartVariant={archivedChart.chartVariant}
+                  />
+                ) : null
+              }
+            />
+          )}
         </CollapsibleSection>
       ) : null}
     </div>
