@@ -12,6 +12,7 @@ import { loadWeeklyDigestFromDb } from "../lib/weeklyDigest.mjs";
 import { fetchLatestCommentTextBulk } from "../lib/jiraCommentText.mjs";
 import {
   insertGeneratedReport,
+  findLatestGeneratedReport,
   getGeneratedReportById,
   listGeneratedReports,
   deleteGeneratedReportById,
@@ -43,6 +44,7 @@ import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildDirectReportsJql, isCurrentUserMember, isJqlCurrentUser, looksLikeAccountId } from "../../shared/directReportsJql.mjs";
 import { fetchJiraMyself } from "../lib/jiraSearchHelpers.mjs";
 import { FLOW_NARRATIVE_SYSTEM_PROMPT, buildFlowJql, fetchFlowIssues, resolveFlowScope, resolveFlowWindow } from "../lib/flowReport.mjs";
+import { GANTT_REPORT_TYPE, buildGanttPlanHealthMarkdown, isGanttPlanHealthData } from "../../shared/ganttPlanHealth.mjs";
 import { FLOW_REPORT_TYPE, buildFlowNarrativeContext, buildFlowReportMarkdown, computeFlowReport, isFlowReportData } from "../../shared/flowMetrics.mjs";
 import { buildWeekPlanContext } from "../lib/weekPlanContext.mjs";
 
@@ -355,6 +357,47 @@ export const registerReportRoutes = (app, { withSiteOperation = (handler) => han
     } catch (error) {
       log.error("flow report archive failed", errorMessage(error));
       return res.status(500).json({ error: "Failed to save report", message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  }));
+
+  // ─── Gantt plan health: snapshots are computed in the browser from the loaded plan; the server stores them ─────
+  app.post("/api/reports/gantt-plan-health/archive", withSiteOperation((req, res) => {
+    const data = req.body?.data;
+    const slug = String(req.body?.slug || "").trim();
+    if (!isGanttPlanHealthData(data)) {
+      return res.status(400).json({ error: "Missing or invalid plan health data" });
+    }
+    if (!slug || slug.length > 200) {
+      return res.status(400).json({ error: "A plan slug is required" });
+    }
+    if (JSON.stringify(data).length > 700_000) {
+      return res.status(413).json({ error: "Plan health report is too large to save" });
+    }
+    try {
+      const archiveId = insertGeneratedReport(getDb(), {
+        source: REPORT_SOURCES.DASHBOARD,
+        reportType: GANTT_REPORT_TYPE,
+        label: String(data.title || "Plan health").slice(0, 120),
+        content: buildGanttPlanHealthMarkdown(data),
+        createdAt: getClientArchiveTimestamp(req),
+        meta: { ganttReport: data, slug, savedFrom: "gantt", ...getClientArchiveMeta(req) },
+      });
+      return res.json({ ok: true, archiveId, label: data.title });
+    } catch (error) {
+      log.error("plan health archive failed", errorMessage(error));
+      return res.status(500).json({ error: "Failed to save report", message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  }));
+
+  app.get("/api/reports/gantt-plan-health/latest", withSiteOperation((req, res) => {
+    const slug = String(req.query?.slug || "").trim();
+    if (!slug) return res.status(400).json({ error: "slug is required" });
+    try {
+      const found = findLatestGeneratedReport(getDb(), { reportType: GANTT_REPORT_TYPE, metaMatch: { slug } });
+      return res.json({ report: found ? { id: found.id, createdAt: found.createdAt, label: found.label, data: found.meta.ganttReport || null } : null });
+    } catch (error) {
+      log.error("plan health lookup failed", errorMessage(error));
+      return res.status(500).json({ error: "Failed to load the previous snapshot" });
     }
   }));
 

@@ -1,5 +1,5 @@
 const WORK_WEEK_TYPES = new Set(["work_week_project_report", "week_plan"]);
-const DASHBOARD_TYPES = new Set(["dashboard_report", "flow_report"]);
+const DASHBOARD_TYPES = new Set(["dashboard_report", "flow_report", "gantt_report"]);
 const AD_HOC_TYPES = new Set(["chat_response"]);
 
 export const REPORT_SOURCES = {
@@ -23,6 +23,12 @@ export const mapGeneratedReportRow = (row, { includeContent = false } = {}) => {
   }
 
   const meta = parseMeta(row.meta_json);
+  // Full structured report data can be large; list rows only say that it exists.
+  if (!includeContent && (meta.flowReport || meta.ganttReport)) {
+    delete meta.flowReport;
+    delete meta.ganttReport;
+    meta.hasReportData = true;
+  }
   const item = {
     id: Number(row.id),
     source: String(row.source || "").trim(),
@@ -77,7 +83,7 @@ const buildSourceWhereClause = (source) => {
     return { whereSql: "WHERE report_type IN ('work_week_project_report', 'week_plan')", params: [] };
   }
   if (normalizedSource === REPORT_SOURCES.DASHBOARD) {
-    return { whereSql: "WHERE report_type IN ('dashboard_report', 'flow_report')", params: [] };
+    return { whereSql: "WHERE report_type IN ('dashboard_report', 'flow_report', 'gantt_report')", params: [] };
   }
   if (normalizedSource === REPORT_SOURCES.ADHOC) {
     return { whereSql: "WHERE source = 'adhoc' OR report_type = 'chat_response'", params: [] };
@@ -98,6 +104,24 @@ export const listGeneratedReports = (db, { source, limit = 100 } = {}) => {
     .all(limit);
 
   return rows.map((row) => mapGeneratedReportRow(row));
+};
+
+/** Newest report of a type whose meta fields all equal `metaMatch` (full meta included). */
+export const findLatestGeneratedReport = (db, { reportType, metaMatch = {}, scanLimit = 50 } = {}) => {
+  const rows = db
+    .prepare(
+      `SELECT id, source, report_type, label, content, meta_json, created_at
+       FROM generated_reports
+       WHERE report_type = ?
+       ORDER BY datetime(created_at) DESC, id DESC
+       LIMIT ?`
+    )
+    .all(String(reportType || ""), scanLimit);
+  for (const candidate of rows) {
+    const item = mapGeneratedReportRow(candidate, { includeContent: true });
+    if (Object.entries(metaMatch).every(([key, value]) => item.meta?.[key] === value)) return item;
+  }
+  return null;
 };
 
 export const getGeneratedReportById = (db, id) => {
