@@ -48,6 +48,8 @@ Pin any issue to the Gantt by opening its planning panel and checking **Pin to G
 - **Preview** — live preview matches the exported HTML (no scripts — safe for SharePoint).
 - **Actions:** **Download HTML**, **Copy HTML**, or optional **Download chart PNG** for slides.
 
+**Plan health** — click **Plan health…** for an on-time / overdue / re-planned report with saved snapshots; the source dropdown also accepts saved presets and custom JQL. See [Flow Report and Plan health](flow-report.md#plan-health-gantt). In the SharePoint report, tick **Include plan health** to add it to the export.
+
 **Legend** — a small color legend at the top of the chart explains the Overdue color and the dashed Planned-bar style; the status filter chips double as the color legend for every status.
 
 ## Asks panel

@@ -83,6 +83,8 @@ The two panels can overlap — a person auto-derived from your projects may also
 
 ## Reports
 
+**Flow Report** — the **Flow Report** card on this page shows created vs. resolved, lead and cycle time, aging and stalled work for the selected projects and all assignees. See [Flow Report and Plan health](flow-report.md).
+
 **Generate Report**  
 Choose an audience and click Generate:
 

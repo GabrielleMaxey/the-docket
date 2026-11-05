@@ -11,6 +11,8 @@ The main [README](../../README.md), [end-user guide](../END_USER_GUIDE.md) and [
 | Recovery notice | [PNG](mockup-recovery-notice.png) | [SVG](mockup-recovery-notice.svg) | Dismiss acknowledges the notice without deleting or reassigning older browser data. |
 | Week plan | [PNG](mockup-week-plan.png) | [SVG](mockup-week-plan.svg) | Help me plan my week: only the signed-in user's issues, ordered by suggested-order score with reasons, suggested working time, and the optional Include team priorities box. Scores and issue keys are illustrative. |
 | Possible existing issues | [PNG](mockup-duplicate-check.png) | [SVG](mockup-duplicate-check.svg) | Create Issue duplicate check: the panel above Close/Create with Create anyway and Dismiss, and a `[label] short ask` title. |
+| Flow Report | [PNG](mockup-flow-report.png) | rendered from `src/Components/FlowReport/FlowReport.jsx` | Metrics Flow Report card: KPIs, throughput, aging, stalled items and takeaways. Synthetic issues from `shared/flowMetrics.mjs` calculations. |
+| Plan health | [PNG](mockup-gantt-plan-health.png) | rendered from `src/Components/FlowReport/GanttPlanHealth.jsx` | Gantt Plan health: on-time delivery, overdue buckets, items needing attention. Synthetic plan data. |
 
 All new names, issue keys, counts and `.example.test` hosts are illustrative. Example hosts are not deployment configuration or additions to the app's Jira hostname allowlist. The mockups omit some controls and spacing to keep the documented behavior readable. The recovery image is a before/after explanation, not a pixel-exact banner layout.
 

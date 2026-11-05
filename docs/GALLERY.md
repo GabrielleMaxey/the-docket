@@ -24,4 +24,12 @@
 ![Possible existing issues documentation mockup](images/mockup-duplicate-check.png)
 *Documentation mockup — synthetic data; simplified layout.*
 
+**Flow Report — throughput, lead and cycle time, aging and stalled work**
+![Flow Report documentation mockup](images/mockup-flow-report.png)
+*Documentation mockup — synthetic data; rendered from the report component.*
+
+**Plan health — on-time delivery, overdue work and items needing attention**
+![Plan health documentation mockup](images/mockup-gantt-plan-health.png)
+*Documentation mockup — synthetic data; rendered from the report component.*
+
 [Mockup sources and provenance](images/README.md).
