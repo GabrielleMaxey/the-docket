@@ -42,6 +42,8 @@ import { computeOverallRollup, normalizePastDueLookbackYears } from "../../share
 import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
 import { buildDirectReportsJql, isCurrentUserMember, isJqlCurrentUser, looksLikeAccountId } from "../../shared/directReportsJql.mjs";
 import { fetchJiraMyself } from "../lib/jiraSearchHelpers.mjs";
+import { FLOW_NARRATIVE_SYSTEM_PROMPT, buildFlowJql, fetchFlowIssues, resolveFlowScope, resolveFlowWindow } from "../lib/flowReport.mjs";
+import { FLOW_REPORT_TYPE, buildFlowNarrativeContext, buildFlowReportMarkdown, computeFlowReport, isFlowReportData } from "../../shared/flowMetrics.mjs";
 import { buildWeekPlanContext } from "../lib/weekPlanContext.mjs";
 
 const log = createLogger("report");
@@ -260,7 +262,100 @@ const createStatements = (db) => ({
   ),
 });
 
-export const registerReportRoutes = (app, { withSiteOperation = (handler) => handler, getDb, dataDir, jiraRequest }) => {
+export const registerReportRoutes = (app, { withSiteOperation = (handler) => handler, getDb, dataDir, jiraRequest, getCredentials, getSiteContext, ensureEnvOrRespond = () => true, completeNarrative = callLLMForReport }) => {
+  // ─── Flow report: how a person's assigned work moves (throughput, lead/cycle time, aging) ─────
+  app.post("/api/reports/flow", withSiteOperation(async (req, res) => {
+    if (!ensureEnvOrRespond(res)) return;
+    const { windowStart, windowEnd, months, windowLabel } = resolveFlowWindow({ windowMonths: req.body?.windowMonths });
+    const stalledDays = Math.min(365, Math.max(7, Number.parseInt(req.body?.stalledDays, 10) || 30));
+
+    try {
+      // Optional: limit to the projects selected on the Metrics page.
+      const presetIds = Array.isArray(req.body?.presetIds) ? req.body.presetIds : [];
+      let scope = { requested: 0, scopeJql: "", scopeLabel: "", names: [] };
+      if (presetIds.length > 0) {
+        const { getEpicPresetStmt } = createStatements(getDb());
+        scope = await resolveFlowScope({
+          presetIds,
+          loadPreset: (id) => mapEpicPresetRow(getEpicPresetStmt.get(id)),
+          jiraRequest,
+        });
+        if (!scope.scopeJql) {
+          return res.status(400).json({ error: "The selected projects have no usable JQL. Check the project selection and try again." });
+        }
+      }
+
+      const allAssignees = req.body?.allAssignees === true && Boolean(scope.scopeJql);
+      const jql = buildFlowJql({ windowStart, scopeJql: scope.scopeJql, allAssignees });
+      const { issues, total, completeness, isComplete } = await fetchFlowIssues({ jql, jiraRequest });
+      const baseUrl = String(getCredentials?.()?.baseUrl || "").replace(/\/+$/, "");
+      const siteLabel = String(getSiteContext?.()?.siteHost || "") || (baseUrl ? new URL(baseUrl).host : "");
+      const data = computeFlowReport(issues, {
+        now: windowEnd,
+        windowStart,
+        windowEnd,
+        stalledDays,
+        windowLabel,
+        siteLabel,
+        scopeLabel: scope.scopeLabel,
+        allAssignees,
+        baseUrl: baseUrl ? `${baseUrl}/browse/` : "",
+      });
+      data.meta = { ...data.meta, windowMonths: months, jiraTotal: total, completeness, isComplete, jql, presetCount: scope.names.length };
+      if (!isComplete) {
+        data.footnote = `Only ${issues.length} of ${total} matching issues were loaded (${completeness}), so figures may be incomplete. ${data.footnote}`;
+      }
+      return res.json({ data, markdown: buildFlowReportMarkdown(data) });
+    } catch (error) {
+      log.error("flow report failed", errorMessage(error));
+      return res.status(500).json({ error: "Unable to build the flow report.", message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  }));
+
+  app.post("/api/reports/flow/narrative", withSiteOperation(async (req, res) => {
+    const data = req.body?.data;
+    if (!isFlowReportData(data)) {
+      return res.status(400).json({ error: "Missing or invalid flow report data" });
+    }
+    try {
+      const text = await completeNarrative({
+        systemPrompt: FLOW_NARRATIVE_SYSTEM_PROMPT,
+        context: buildFlowNarrativeContext(data),
+        label: "flow report summary",
+      });
+      const narrative = String(text || "").trim();
+      if (!narrative) return res.status(502).json({ error: "The AI provider returned an empty summary." });
+      return res.json({ narrative });
+    } catch (error) {
+      log.error("flow report summary failed", errorMessage(error));
+      return res.status(502).json({ error: error instanceof Error ? error.message : "Unable to write the AI summary." });
+    }
+  }));
+
+  app.post("/api/reports/flow/archive", withSiteOperation((req, res) => {
+    const data = req.body?.data;
+    if (!isFlowReportData(data)) {
+      return res.status(400).json({ error: "Missing or invalid flow report data" });
+    }
+    if (JSON.stringify(data).length > 500_000) {
+      return res.status(413).json({ error: "Flow report is too large to save" });
+    }
+    try {
+      const archiveId = insertGeneratedReport(getDb(), {
+        source: REPORT_SOURCES.DASHBOARD,
+        reportType: FLOW_REPORT_TYPE,
+        label: String(data.title || "Flow report").slice(0, 120),
+        content: buildFlowReportMarkdown(data),
+        createdAt: getClientArchiveTimestamp(req),
+        meta: { flowReport: data, savedFrom: "metrics", ...getClientArchiveMeta(req) },
+      });
+      return res.json({ ok: true, archiveId, label: data.title });
+    } catch (error) {
+      log.error("flow report archive failed", errorMessage(error));
+      return res.status(500).json({ error: "Failed to save report", message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  }));
+
   app.post("/api/report/generate", withSiteOperation(async (req, res) => {
     const db = getDb();
     const {

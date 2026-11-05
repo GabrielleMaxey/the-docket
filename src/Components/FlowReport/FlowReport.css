@@ -1,0 +1,122 @@
+/* FlowReport — everything is scoped under .flow-report so it can't collide with
+   Semantic UI or page CSS. Palette lives in variables at the top of this file. */
+
+.flow-report {
+  /* Light theme, Lumen accents. Palette is variables only, so a dark set can be added later without touching rules. */
+  --fr-bg: #f4f6fa;
+  --fr-panel: #ffffff;
+  --fr-panel2: #eceff5;
+  --fr-line: #d8deea;
+  --fr-ink: #1b2333;
+  --fr-muted: #5b6780;
+  --fr-blue: #0c93d9;
+  --fr-green: #17b8b0;
+  --fr-amber: #f2c200;
+  --fr-orange: #fb9429;
+  --fr-red: #e8503c;
+  --fr-violet: #8c6cf0;
+  /* text-safe variants (bars use the base colors; text/links use these so light mode keeps contrast) */
+  --fr-link: #0a6fa8;
+  --fr-link-soft: #0a6fa8;
+  --fr-green-text: #0b8a84;
+  --fr-red-text: #c23a28;
+  --fr-amber-text: #8a6d00;
+  --fr-violet-text: #6a47d6;
+  --fr-ip-bg: rgba(12,147,217,.12);
+  --fr-bl-bg: rgba(140,108,240,.12);
+  --fr-stl-bg: rgba(232,80,60,.12);
+  --fr-ok-bg: rgba(23,184,176,.14);
+  color-scheme: light;
+
+  background: var(--fr-bg);
+  color: var(--fr-ink);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding: 24px 20px 40px;
+  border-radius: 12px;
+  border: 1px solid var(--fr-line);
+}
+.flow-report .fr-card { box-shadow: 0 1px 2px rgba(20,30,60,.06); }
+.flow-report *, .flow-report *::before, .flow-report *::after { box-sizing: border-box; }
+
+/* tone helpers */
+.flow-report .fr-bg-green  { background: var(--fr-green); }
+.flow-report .fr-bg-blue   { background: var(--fr-blue); }
+.flow-report .fr-bg-amber  { background: var(--fr-amber); }
+.flow-report .fr-bg-red    { background: var(--fr-red); }
+.flow-report .fr-bg-violet { background: var(--fr-violet); }
+.flow-report .fr-bg-muted  { background: var(--fr-muted); }
+.flow-report .fr-c-green { color: var(--fr-green-text); }
+.flow-report .fr-c-red   { color: var(--fr-red-text); }
+.flow-report .fr-c-amber { color: var(--fr-amber-text); }
+.flow-report .fr-c-blue  { color: var(--fr-link); }
+
+.flow-report .fr-header h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: -.01em; color: var(--fr-ink); }
+.flow-report .fr-header p { margin: 0; color: var(--fr-muted); }
+.flow-report .fr-chip { display: inline-block; padding: 2px 8px; border: 1px solid var(--fr-line); border-radius: 999px; font-size: 12px; color: var(--fr-muted); margin: 8px 6px 0 0; }
+
+.flow-report .fr-controls { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
+.flow-report .fr-controls label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--fr-muted); text-transform: uppercase; letter-spacing: .06em; }
+.flow-report .fr-controls select { background: var(--fr-panel2); color: var(--fr-ink); border: 1px solid var(--fr-line); border-radius: 8px; padding: 5px 8px; font-size: 13px; text-transform: none; letter-spacing: 0; }
+
+.flow-report .fr-grid { display: grid; gap: 14px; margin-top: 18px; }
+.flow-report .fr-kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.flow-report .fr-two  { grid-template-columns: 2fr 1fr; }
+.flow-report .fr-half { grid-template-columns: 1fr 1fr; }
+@media (max-width: 900px) { .flow-report .fr-two, .flow-report .fr-half { grid-template-columns: 1fr; } }
+
+.flow-report .fr-card { background: var(--fr-panel); border: 1px solid var(--fr-line); border-radius: 12px; padding: 16px; min-width: 0; }
+.flow-report .fr-kpi-v { font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
+.flow-report .fr-kpi-l { color: var(--fr-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.flow-report .fr-kpi-s { color: var(--fr-muted); font-size: 12px; margin-top: 2px; }
+
+.flow-report h2 { font-size: 15px; margin: 0 0 4px; color: var(--fr-ink); }
+.flow-report .fr-h2-gap { margin-top: 18px; }
+.flow-report .fr-sub { color: var(--fr-muted); font-size: 12px; margin: 0 0 14px; }
+.flow-report .fr-note { color: var(--fr-muted); font-size: 12px; }
+.flow-report .fr-footnote { margin-top: 18px; }
+
+/* column chart */
+.flow-report .fr-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; border-bottom: 1px solid var(--fr-line); padding-top: 10px; }
+.flow-report .fr-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; }
+.flow-report .fr-bars { display: flex; align-items: flex-end; gap: 3px; height: 100%; width: 100%; justify-content: center; }
+.flow-report .fr-bar { width: 44%; max-width: 20px; border-radius: 4px 4px 0 0; position: relative; }
+.flow-report .fr-bar span { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--fr-muted); }
+.flow-report .fr-xl { display: flex; gap: 8px; margin-top: 6px; }
+.flow-report .fr-xl div { flex: 1; text-align: center; font-size: 11px; color: var(--fr-muted); min-width: 0; }
+.flow-report .fr-legend { display: flex; gap: 14px; font-size: 12px; color: var(--fr-muted); margin-top: 10px; flex-wrap: wrap; }
+.flow-report .fr-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+/* horizontal bars */
+.flow-report .fr-hrow { display: grid; grid-template-columns: 110px 1fr 40px; gap: 10px; align-items: center; margin: 8px 0; font-size: 13px; }
+.flow-report .fr-hrow-parent { grid-template-columns: 190px 1fr 50px; }
+.flow-report .fr-hval { text-align: right; font-variant-numeric: tabular-nums; }
+.flow-report .fr-track { background: var(--fr-panel2); border-radius: 6px; height: 14px; overflow: hidden; }
+.flow-report .fr-fill { height: 100%; border-radius: 6px; }
+.flow-report .fr-stack { display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin: 6px 0 10px; }
+.flow-report .fr-stack div { height: 100%; }
+
+/* table */
+.flow-report .fr-scroll { overflow-x: auto; }
+.flow-report table { width: 100%; border-collapse: collapse; font-size: 13px; background: transparent; margin: 0; }
+.flow-report th, .flow-report td { text-align: left; padding: 8px; border: 0; border-bottom: 1px solid var(--fr-line); vertical-align: top; background: transparent; color: var(--fr-ink); }
+.flow-report th { color: var(--fr-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; user-select: none; white-space: nowrap; }
+.flow-report th.fr-n, .flow-report td.fr-n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.flow-report a { color: var(--fr-link); text-decoration: none; }
+.flow-report a:hover { text-decoration: underline; }
+.flow-report .fr-pill { font-size: 11px; padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
+.flow-report .fr-ip  { background: var(--fr-ip-bg); color: var(--fr-link-soft); }
+.flow-report .fr-bl  { background: var(--fr-bl-bg); color: var(--fr-violet-text); }
+.flow-report .fr-stl { background: var(--fr-stl-bg); color: var(--fr-red-text); }
+.flow-report .fr-ok  { background: var(--fr-ok-bg); color: var(--fr-green-text); }
+
+.flow-report .fr-filters { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.flow-report .fr-filters button { background: var(--fr-panel2); color: var(--fr-ink); border: 1px solid var(--fr-line); border-radius: 8px; padding: 5px 10px; font-size: 12px; cursor: pointer; }
+.flow-report .fr-filters button.on { border-color: var(--fr-blue); color: var(--fr-link-soft); }
+.flow-report .fr-ins { padding-left: 18px; margin: 0; }
+.flow-report .fr-ins li { margin: 6px 0; }
+
+
+.flow-report .fr-narrative { margin-bottom: 16px; border-left: 4px solid var(--fr-accent, #0b5fff); }
+.flow-report .fr-narrative h3 { margin: 0 0 8px; font-size: 14px; }
+.flow-report .fr-narrative p { margin: 0 0 8px; line-height: 1.5; }
+.flow-report .fr-narrative p:last-child { margin-bottom: 0; }
