@@ -385,7 +385,8 @@ const GanttChart = () => {
   const [ programs, setPrograms ] = React.useState( [] );
   const [ slug, setSlug ] = React.useState( PINNED_SLUG );
   const [ data, setData ] = React.useState( null );
-  const [ loading, setLoading ] = React.useState( false );
+  const [ loading, setLoading ] = React.useState( true );
+  const loadSeqRef = React.useRef( 0 );
   const [ error, setError ] = React.useState( "" );
   const [ zoom, setZoom ] = React.useState( "all" );
   const [ groupMode, setGroupMode ] = React.useState( "status" );
@@ -442,11 +443,15 @@ const GanttChart = () => {
 
   const load = React.useCallback( () => {
     if ( !slug ) return;
+    const seq = ++loadSeqRef.current;
     setLoading( true );
     setError( "" );
+    // Never leave the previous source's issues on screen while another one loads.
+    setData( ( prev ) => ( prev && prev.slug === slug ? prev : null ) );
     fetchGanttData( slug )
-      .then( ( d ) => setData( d ) )
+      .then( ( d ) => { if ( seq === loadSeqRef.current ) setData( d ); } )
       .catch( ( err ) => {
+        if ( seq !== loadSeqRef.current ) return;
         const msg = err?.message || "";
         if ( msg.toLowerCase().includes( "jira environment" ) || msg.toLowerCase().includes( "missing required" ) )
         {
@@ -456,7 +461,7 @@ const GanttChart = () => {
           setError( msg || "Failed to load Gantt data" );
         }
       } )
-      .finally( () => setLoading( false ) );
+      .finally( () => { if ( seq === loadSeqRef.current ) setLoading( false ); } );
   }, [ slug ] );
 
   React.useEffect( () => { void load(); }, [ load ] );
@@ -787,7 +792,7 @@ const GanttChart = () => {
             </>
           ) : null }
           <button type="button" className="pm-gantt-refresh" onClick={ load } disabled={ loading || !slug }>
-            { loading ? "Loading…" : "Refresh" }
+            { loading ? <><span className="pm-gantt-spinner pm-gantt-spinner--sm" aria-hidden="true" /> Loading…</> : "Refresh" }
           </button>
         </div>
       </div>
@@ -880,13 +885,18 @@ const GanttChart = () => {
         </div>
       ) }
 
+      { loading && data && <div className="pm-gantt-progress" role="progressbar" aria-label="Refreshing Gantt data" /> }
+
       { data && <GanttLegend /> }
 
       {/* Chart body */ }
       { error ? (
         <div className="pm-gantt-error">{ error }</div>
       ) : loading && !data ? (
-        <div className="pm-gantt-loading">Loading…</div>
+        <div className="pm-gantt-loading" role="status" aria-live="polite">
+          <span className="pm-gantt-spinner" aria-hidden="true" />
+          Loading Gantt data…
+        </div>
       ) : !loading && flatRows.length === 0 ? (
         <div className="pm-gantt-empty">{ emptyMsg }</div>
       ) : flatRows.length > 0 ? (
