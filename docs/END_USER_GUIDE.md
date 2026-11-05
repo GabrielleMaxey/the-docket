@@ -13,6 +13,7 @@ This guide covers how to use the app day-to-day. No programming knowledge needed
 | [Combined Open Work](user/combined-work.md) | Combined Open Work across several Jira sites. |
 | [Metrics — project-level view](user/metrics.md) | Project-level metrics, contributors, reports and Gantt. |
 | [Project Managers — capacity planning](user/project-managers.md) | Capacity planning, Asks and the planning panel. |
+| [Flow Report and Plan health](user/flow-report.md) | Native flow metrics and Gantt plan health reports, with exports and snapshots. |
 | [Past Reports and Chat](user/reports-and-chat.md) | Saved outputs, and asking Jira questions in Chat. |
 | [Shared projects — notes and priority (PMs and managers)](user/shared-projects.md) | Shared-program notes and priority for PMs and managers. |
 | [Your data and common questions](user/faq-and-data.md) | Where your data lives, and troubleshooting. |

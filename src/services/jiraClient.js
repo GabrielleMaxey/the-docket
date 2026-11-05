@@ -1002,6 +1002,12 @@ export const generateFlowNarrative = async (data) => postJson("/api/reports/flow
 export const archiveFlowReport = async (data) =>
   postJson("/api/reports/flow/archive", { data, ...getLocalTimestampPayload() });
 
+export const archiveGanttPlanHealth = async (data, slug) =>
+  postJson("/api/reports/gantt-plan-health/archive", { data, slug, ...getLocalTimestampPayload() });
+
+export const fetchLatestGanttPlanHealth = async (slug) =>
+  requestJson(`/api/reports/gantt-plan-health/latest?slug=${encodeURIComponent(slug)}`);
+
 export const fetchCoworkWeeklyPlans = async () => {
   const data = await requestJson("/api/reports/cowork-files");
   return data?.items || [];

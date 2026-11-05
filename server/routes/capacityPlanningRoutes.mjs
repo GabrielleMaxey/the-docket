@@ -1,6 +1,7 @@
 import { createLogger, errorMessage } from "../lib/logger.mjs";
 import { fetchCapacityWorkloads } from "../lib/capacityPlanning.mjs";
-import { mapWatchedAssigneeRow } from "../db/schema.mjs";
+import { mapEpicPresetRow, mapWatchedAssigneeRow } from "../db/schema.mjs";
+import { parseGanttSlug, resolveGanttSourceJql } from "../lib/ganttSource.mjs";
 import { buildFieldMappingsMap } from "../lib/epicFilterJql.mjs";
 import { listSharedPrograms, bulkGetTeamDates, isTeamPriorityConfigured, getTeamPrioritySettings } from "../lib/teamPriorityPostgres.mjs";
 import { searchAllIssues } from "../lib/jiraSearchHelpers.mjs";
@@ -129,7 +130,19 @@ export const registerCapacityPlanningRoutes = (app, { withSiteOperation = (handl
       let loaded = [];
       let displayName = "";
 
-      if (slug === "__pinned__") {
+      const source = parseGanttSlug(slug);
+      if (source.kind === "invalid") return res.status(400).json({ error: "Invalid Gantt source" });
+
+      if (source.kind === "preset" || source.kind === "jql") {
+        const resolved = await resolveGanttSourceJql({
+          source,
+          loadPreset: (id) => mapEpicPresetRow(db.prepare("SELECT * FROM epic_presets WHERE id = ?").get(id)),
+          jiraRequest,
+        });
+        if (resolved.error) return res.status(resolved.error === "Preset not found" ? 404 : 400).json({ error: resolved.error });
+        displayName = resolved.displayName;
+        ({ issues: loaded } = await searchAllIssues({ jql: resolved.jql, runJiraSearchRequest, maxTotal: 1000 }));
+      } else if (source.kind === "pinned") {
         displayName = "Pinned Issues";
         const pinnedRows = db
           .prepare("SELECT issue_key FROM issue_metadata WHERE pinned_gantt = 1")

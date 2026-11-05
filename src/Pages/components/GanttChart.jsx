@@ -1,8 +1,10 @@
 import React from "react";
-import { fetchSharedPrograms, fetchGanttData, fetchGanttStatusHistory } from "../../services/jiraClient";
+import { fetchEpicPresets, fetchSharedPrograms, fetchGanttData, fetchGanttStatusHistory } from "../../services/jiraClient";
+import { ganttSnapshotKey, GANTT_MAX_JQL } from "../../../shared/ganttSlug.mjs";
 import { getStatusColor } from "../../utils/statusScale";
 import { filterIssuesBySearch } from "./ganttIssueSearch";
 import GanttSharepointReportPanel from "./GanttSharepointReportPanel";
+import GanttPlanHealthPanel from "./GanttPlanHealthPanel";
 
 const parseDate = ( str ) => {
   if ( !str ) return null;
@@ -360,6 +362,7 @@ const GanttLegend = () => (
 // (custom workflow states) sorts alphabetically after these, terminal states last.
 const KNOWN_STATUS_ORDER = [ "In Progress", "Ready for Verification", "Analyzing", "Ready for Work", "Backlog" ];
 const PINNED_SLUG = "__pinned__";
+const CUSTOM_VALUE = "__custom__";
 const ZOOM_LABELS = { "30d": "30 day", "3mo": "3 mo", "6mo": "6 mo", "1yr": "1 yr", all: "All" };
 
 const orderStatuses = ( statuses, isDoneStatus ) => {
@@ -382,7 +385,8 @@ const GanttChart = () => {
   const [ programs, setPrograms ] = React.useState( [] );
   const [ slug, setSlug ] = React.useState( PINNED_SLUG );
   const [ data, setData ] = React.useState( null );
-  const [ loading, setLoading ] = React.useState( false );
+  const [ loading, setLoading ] = React.useState( true );
+  const loadSeqRef = React.useRef( 0 );
   const [ error, setError ] = React.useState( "" );
   const [ zoom, setZoom ] = React.useState( "all" );
   const [ groupMode, setGroupMode ] = React.useState( "status" );
@@ -395,6 +399,10 @@ const GanttChart = () => {
   const [ searchQuery, setSearchQuery ] = React.useState( "" );
   const [ exporting, setExporting ] = React.useState( false );
   const [ spPanelOpen, setSpPanelOpen ] = React.useState( false );
+  const [ phPanelOpen, setPhPanelOpen ] = React.useState( false );
+  const [ presets, setPresets ] = React.useState( [] );
+  const [ customOpen, setCustomOpen ] = React.useState( false );
+  const [ customJql, setCustomJql ] = React.useState( "" );
   const mountedRef = React.useRef( true );
   const statusHistoryRef = React.useRef( statusHistoryByKey );
   statusHistoryRef.current = statusHistoryByKey;
@@ -409,6 +417,10 @@ const GanttChart = () => {
     fetchSharedPrograms()
       .then( ( items ) => setPrograms( items.filter( ( p ) => p.enabled !== false ) ) )
       .catch( () => { } );
+  }, [] );
+
+  React.useEffect( () => {
+    fetchEpicPresets().then( ( items ) => setPresets( items ) ).catch( () => { } );
   }, [] );
 
   // Reset cached histories and search when switching programs.
@@ -431,11 +443,15 @@ const GanttChart = () => {
 
   const load = React.useCallback( () => {
     if ( !slug ) return;
+    const seq = ++loadSeqRef.current;
     setLoading( true );
     setError( "" );
+    // Never leave the previous source's issues on screen while another one loads.
+    setData( ( prev ) => ( prev && prev.slug === slug ? prev : null ) );
     fetchGanttData( slug )
-      .then( ( d ) => setData( d ) )
+      .then( ( d ) => { if ( seq === loadSeqRef.current ) setData( d ); } )
       .catch( ( err ) => {
+        if ( seq !== loadSeqRef.current ) return;
         const msg = err?.message || "";
         if ( msg.toLowerCase().includes( "jira environment" ) || msg.toLowerCase().includes( "missing required" ) )
         {
@@ -445,7 +461,7 @@ const GanttChart = () => {
           setError( msg || "Failed to load Gantt data" );
         }
       } )
-      .finally( () => setLoading( false ) );
+      .finally( () => { if ( seq === loadSeqRef.current ) setLoading( false ); } );
   }, [ slug ] );
 
   React.useEffect( () => { void load(); }, [ load ] );
@@ -672,7 +688,7 @@ const GanttChart = () => {
   const emptyMsg =
     slug === PINNED_SLUG
       ? "No pinned issues. Open the planning panel for any issue in Task Manager and check 'Pin to Gantt'."
-      : "No issues found for this program.";
+      : "No issues found for this selection.";
 
   return (
     <div className="pm-gantt">
@@ -681,16 +697,54 @@ const GanttChart = () => {
         <div className="pm-gantt-toolbar-left">
           <select
             className="pm-gantt-program-select"
-            value={ slug }
-            onChange={ ( e ) => setSlug( e.target.value ) }
+            value={ customOpen || slug.startsWith( "jql:" ) ? CUSTOM_VALUE : slug }
+            onChange={ ( e ) => {
+              if ( e.target.value === CUSTOM_VALUE ) { setCustomOpen( true ); return; }
+              setCustomOpen( false );
+              setSlug( e.target.value );
+            } }
           >
             <option value={ PINNED_SLUG }>Pinned Issues</option>
-            { programs.map( ( p ) => (
-              <option key={ p.slug } value={ p.slug }>
-                { p.displayName }
-              </option>
-            ) ) }
+            { programs.length > 0 && (
+              <optgroup label="Programs">
+                { programs.map( ( p ) => (
+                  <option key={ p.slug } value={ p.slug }>
+                    { p.displayName }
+                  </option>
+                ) ) }
+              </optgroup>
+            ) }
+            { presets.length > 0 && (
+              <optgroup label="Projects, people and saved filters">
+                { presets.map( ( p ) => (
+                  <option key={ `preset:${ p.id }` } value={ `preset:${ p.id }` }>
+                    { p.label || p.epicName || p.epicKey || `Preset ${ p.id }` }
+                  </option>
+                ) ) }
+              </optgroup>
+            ) }
+            <option value={ CUSTOM_VALUE }>Custom JQL…</option>
           </select>
+          { ( customOpen || slug.startsWith( "jql:" ) ) && (
+            <form
+              className="pm-gantt-jql"
+              onSubmit={ ( e ) => {
+                e.preventDefault();
+                const text = customJql.trim();
+                if ( text ) setSlug( `jql:${ text }` );
+              } }
+            >
+              <input
+                className="pm-gantt-jql-input"
+                placeholder='e.g. project = ODI AND assignee = "Ann Lee"'
+                value={ customJql }
+                maxLength={ GANTT_MAX_JQL }
+                onChange={ ( e ) => setCustomJql( e.target.value ) }
+                aria-label="Custom JQL"
+              />
+              <button type="submit" className="pm-gantt-refresh" disabled={ !customJql.trim() || loading }>Load</button>
+            </form>
+          ) }
         </div>
         <div className="pm-gantt-toolbar-right">
           { !loading && data && (
@@ -706,6 +760,15 @@ const GanttChart = () => {
               onClick={ () => setSpPanelOpen( true ) }
             >
               SharePoint report…
+            </button>
+          ) : null }
+          { !loading && data ? (
+            <button
+              type="button"
+              className="pm-gantt-refresh"
+              onClick={ () => setPhPanelOpen( true ) }
+            >
+              Plan health…
             </button>
           ) : null }
           { !loading && data && searchedIssues.length > 0 ? (
@@ -729,7 +792,7 @@ const GanttChart = () => {
             </>
           ) : null }
           <button type="button" className="pm-gantt-refresh" onClick={ load } disabled={ loading || !slug }>
-            { loading ? "Loading…" : "Refresh" }
+            { loading ? <><span className="pm-gantt-spinner pm-gantt-spinner--sm" aria-hidden="true" /> Loading…</> : "Refresh" }
           </button>
         </div>
       </div>
@@ -822,13 +885,18 @@ const GanttChart = () => {
         </div>
       ) }
 
+      { loading && data && <div className="pm-gantt-progress" role="progressbar" aria-label="Refreshing Gantt data" /> }
+
       { data && <GanttLegend /> }
 
       {/* Chart body */ }
       { error ? (
         <div className="pm-gantt-error">{ error }</div>
       ) : loading && !data ? (
-        <div className="pm-gantt-loading">Loading…</div>
+        <div className="pm-gantt-loading" role="status" aria-live="polite">
+          <span className="pm-gantt-spinner" aria-hidden="true" />
+          Loading Gantt data…
+        </div>
       ) : !loading && flatRows.length === 0 ? (
         <div className="pm-gantt-empty">{ emptyMsg }</div>
       ) : flatRows.length > 0 ? (
@@ -926,7 +994,18 @@ const GanttChart = () => {
         <GanttTooltip issue={ tooltip.issue } x={ tooltip.x } y={ tooltip.y } today={ today } />
       ) }
 
+      <GanttPlanHealthPanel
+        open={ phPanelOpen }
+        onClose={ () => setPhPanelOpen( false ) }
+        slug={ ganttSnapshotKey( slug ) }
+        displayName={ data?.displayName || slug }
+        viewIssues={ searchedIssues }
+        allIssues={ issues }
+        jiraBaseUrl={ window.__JIRA_BASE_URL__ || "" }
+      />
+
       <GanttSharepointReportPanel
+        slug={ ganttSnapshotKey( slug ) }
         open={ spPanelOpen }
         onClose={ () => setSpPanelOpen( false ) }
         displayName={ data?.displayName || slug }

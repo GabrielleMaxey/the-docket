@@ -10,7 +10,7 @@
 |-----|----------|
 | **Task Management** | Project reports and week plans (saved automatically when you click Generate). Also includes a **Completed To Dos** section showing completed to-dos with date range filter chips: **Last 30 days**, **Last 90 days**, **All time** (default is last 90 days). |
 | **Combined Work** | Reports generated from Combined Open Work, separate from the active site archive |
-| **Metrics** | Executive / PM / Developer audience reports (saved automatically on Generate) |
+| **Metrics** | Executive / PM / Developer audience reports (saved automatically on Generate), plus Flow Report and Gantt Plan health snapshots saved with **Save to archive** (reopened in full) |
 | **Ad-hoc** | Chat assistant replies you explicitly saved with **Save to Past Reports** |
 | **Files** | Live list of CoWork `weekly-plan-*.md` files in the data folder (read from disk; optional **Save to archive**) |
 

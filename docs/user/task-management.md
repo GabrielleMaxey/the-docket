@@ -53,6 +53,7 @@ This is the main screen for managing your open work.
 
 Appears after you Run JQL and get results. Shows:
 - Issue count chips (total, open, overdue, in progress) per query
+- A collapsed **Flow report** section for your own issues (throughput, lead and cycle time, aging and stalled work). See [Flow Report and Plan health](flow-report.md)
 - A **📄 Project Report** section inside each query — click to expand, choose a **report scope**, a **report type**, then **Generate Report**:
   - **Report scope** — what data the report is built from: **Current query results** (this slot, as loaded), **All my assigned work** (past 3/6/12 months — includes an issue if it had a status change, a reassignment, a note added in this app, or a comment added directly in Jira within that window; not just any Jira field update, and not limited to activity made through this app), or any other configured query slot on this page. Choosing a scope other than "Current query results" runs its own fresh Jira search rather than reusing what's already loaded.
   - **Status Report** *(default)* — AI-written summary *from your perspective as the assignee*: how the project is tracking, what needs attention, next steps. Reads the scope's label and JQL to frame the report correctly — a closed-work scope gets a completed-work recap instead of being asked about "what needs attention"
