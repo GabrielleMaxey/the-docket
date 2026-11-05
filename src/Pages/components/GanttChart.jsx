@@ -3,6 +3,7 @@ import { fetchSharedPrograms, fetchGanttData, fetchGanttStatusHistory } from "..
 import { getStatusColor } from "../../utils/statusScale";
 import { filterIssuesBySearch } from "./ganttIssueSearch";
 import GanttSharepointReportPanel from "./GanttSharepointReportPanel";
+import GanttPlanHealthPanel from "./GanttPlanHealthPanel";
 
 const parseDate = ( str ) => {
   if ( !str ) return null;
@@ -395,6 +396,7 @@ const GanttChart = () => {
   const [ searchQuery, setSearchQuery ] = React.useState( "" );
   const [ exporting, setExporting ] = React.useState( false );
   const [ spPanelOpen, setSpPanelOpen ] = React.useState( false );
+  const [ phPanelOpen, setPhPanelOpen ] = React.useState( false );
   const mountedRef = React.useRef( true );
   const statusHistoryRef = React.useRef( statusHistoryByKey );
   statusHistoryRef.current = statusHistoryByKey;
@@ -708,6 +710,15 @@ const GanttChart = () => {
               SharePoint report…
             </button>
           ) : null }
+          { !loading && data ? (
+            <button
+              type="button"
+              className="pm-gantt-refresh"
+              onClick={ () => setPhPanelOpen( true ) }
+            >
+              Plan health…
+            </button>
+          ) : null }
           { !loading && data && searchedIssues.length > 0 ? (
             <>
               <button
@@ -925,6 +936,16 @@ const GanttChart = () => {
       { tooltip && (
         <GanttTooltip issue={ tooltip.issue } x={ tooltip.x } y={ tooltip.y } today={ today } />
       ) }
+
+      <GanttPlanHealthPanel
+        open={ phPanelOpen }
+        onClose={ () => setPhPanelOpen( false ) }
+        slug={ slug }
+        displayName={ data?.displayName || slug }
+        viewIssues={ searchedIssues }
+        allIssues={ issues }
+        jiraBaseUrl={ window.__JIRA_BASE_URL__ || "" }
+      />
 
       <GanttSharepointReportPanel
         open={ spPanelOpen }

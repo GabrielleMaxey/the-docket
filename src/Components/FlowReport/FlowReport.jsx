@@ -1,77 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { flowLinkFor } from '../../../shared/flowMetrics.mjs';
+import { BarGroup, Kpi, MonthChart, NarrativeCard, ReportHeader, TakeawaysCard, tone } from './parts.jsx';
 import './FlowReport.css';
 
 /**
- * FlowReport — "My Flow" metrics panel.
- * Pure presentational: everything comes in through the `data` prop (see mockData.js
- * for the shape), so the data layer can be swapped in later without touching layout.
- *
- * Optional controls: pass `controls` = { instances, instance, onInstanceChange,
- * ranges, range, onRangeChange } to show the instance / date-range toolbar.
+ * FlowReport: "My Flow" metrics panel.
+ * Pure presentational: everything comes in through the `data` prop, so the data layer can change
+ * without touching layout. Optional `controls` = { instances, instance, onInstanceChange,
+ * ranges, range, onRangeChange } shows the instance / date-range toolbar.
  */
-
-const TONES = ['green', 'blue', 'amber', 'red', 'violet', 'muted'];
-const tone = (t) => (TONES.includes(t) ? t : 'blue');
-
-function Kpi({ label, value, sub, tone: t }) {
-  return (
-    <div className="fr-card fr-kpi">
-      <div className="fr-kpi-l">{label}</div>
-      <div className={`fr-kpi-v${t ? ` fr-c-${tone(t)}` : ''}`}>{value}</div>
-      {sub && <div className="fr-kpi-s">{sub}</div>}
-    </div>
-  );
-}
-
-function BarRow({ label, value, max, tone: t, suffix = '', wide }) {
-  const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
-  return (
-    <div className={`fr-hrow${wide ? ' fr-hrow-wide' : ''}`}>
-      <span>{label}</span>
-      <div className="fr-track">
-        <div className={`fr-fill fr-bg-${tone(t)}`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="fr-hval">{value}{suffix}</span>
-    </div>
-  );
-}
-
-function BarGroup({ rows, max, suffix }) {
-  const m = max ?? Math.max(1, ...rows.map((r) => r.count ?? r.days ?? 0));
-  return rows.map((r) => (
-    <BarRow key={r.label} label={r.label} value={r.count ?? r.days} max={m} tone={r.tone} suffix={suffix} />
-  ));
-}
-
-function FlowChart({ months, created, resolved }) {
-  const max = Math.max(1, ...created, ...resolved);
-  return (
-    <>
-      <div className="fr-chart">
-        {months.map((m, i) => (
-          <div className="fr-col" key={m}>
-            <div className="fr-bars">
-              <div className="fr-bar fr-bg-violet" style={{ height: `${(created[i] / max) * 88}%` }}>
-                <span>{created[i]}</span>
-              </div>
-              <div className="fr-bar fr-bg-green" style={{ height: `${(resolved[i] / max) * 88}%` }}>
-                <span>{resolved[i]}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="fr-xl">
-        {months.map((m) => <div key={m}>{m}</div>)}
-      </div>
-      <div className="fr-legend">
-        <span><i className="fr-dot fr-bg-violet" />Created</span>
-        <span><i className="fr-dot fr-bg-green" />Resolved</span>
-      </div>
-    </>
-  );
-}
 
 const SORT_DEFAULT_DESC = new Set(['age', 'idle']);
 
@@ -146,28 +83,6 @@ function OpenTable({ rows, link, stalledDays, showAssignee = false }) {
   );
 }
 
-function Controls({ controls }) {
-  if (!controls) return null;
-  const { instances, instance, onInstanceChange, ranges, range, onRangeChange } = controls;
-  return (
-    <div className="fr-controls">
-      {instances && (
-        <label>Jira instance
-          <select value={instance} onChange={(e) => onInstanceChange?.(e.target.value)}>
-            {instances.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
-          </select>
-        </label>
-      )}
-      {ranges && (
-        <label>Range
-          <select value={range} onChange={(e) => onRangeChange?.(e.target.value)}>
-            {ranges.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
-        </label>
-      )}
-    </div>
-  );
-}
 
 export default function FlowReport({ data, controls, className = '' }) {
   const d = data;
@@ -177,19 +92,8 @@ export default function FlowReport({ data, controls, className = '' }) {
 
   return (
     <div className={`flow-report ${className}`}>
-      <header className="fr-header">
-        <h1>{d.title}</h1>
-        <p>{d.subtitle}</p>
-        {d.chips?.map((c) => <span className="fr-chip" key={c}>{c}</span>)}
-        <Controls controls={controls} />
-      </header>
-
-      {d.narrative ? (
-        <section className="fr-card fr-narrative">
-          <h3>AI summary</h3>
-          {String(d.narrative).split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
-        </section>
-      ) : null}
+      <ReportHeader data={d} controls={controls} />
+      <NarrativeCard text={d.narrative} />
 
       <section className="fr-grid fr-kpis">
         {d.kpis.map((k) => <Kpi key={k.label} {...k} />)}
@@ -199,7 +103,7 @@ export default function FlowReport({ data, controls, className = '' }) {
         <div className="fr-card">
           <h2>Throughput: created vs. resolved by month</h2>
           {d.flowNote && <p className="fr-sub">{d.flowNote}</p>}
-          <FlowChart months={d.months} created={d.created} resolved={d.resolved} />
+          <MonthChart months={d.months} series={[{ label: 'Created', values: d.created, tone: 'violet' }, { label: 'Resolved', values: d.resolved, tone: 'green' }]} />
         </div>
         <div className="fr-card">
           <h2>Status breakdown</h2>
@@ -258,21 +162,7 @@ export default function FlowReport({ data, controls, className = '' }) {
             );
           })}
         </div>
-        <div className="fr-card">
-          <h2>Key takeaways</h2>
-          <ul className="fr-ins">
-            {d.takeaways.map((t, i) => (
-              <li key={i}>
-                <b>{t.lead}:</b> {t.text}
-                {t.keys?.length > 0 && (
-                  <> {t.keys.map((k, j) => (
-                    <React.Fragment key={k}>{j > 0 && ', '}<a href={link(k)} target="_blank" rel="noreferrer">{k}</a></React.Fragment>
-                  ))}</>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <TakeawaysCard takeaways={d.takeaways} link={link} />
       </section>
 
       {d.footnote && <p className="fr-note fr-footnote">{d.footnote}</p>}

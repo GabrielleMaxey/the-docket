@@ -1278,6 +1278,10 @@
   overflow: hidden;
 }
 
+.pm-sp-panel--wide {
+  width: min(1120px, 100vw);
+}
+
 .pm-sp-panel-header {
   display: flex;
   align-items: center;
