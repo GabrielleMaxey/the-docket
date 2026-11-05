@@ -1,5 +1,6 @@
 import React from "react";
 import { computeGanttSharepointMetrics, isGanttIssueOverdue } from "./ganttSharepointMetrics";
+import { computeGanttPlanHealth } from "../../../shared/ganttPlanHealth.mjs";
 import { buildGanttSharepointHtml } from "./ganttSharepointHtml";
 import { buildGanttPng } from "./ganttSharepointPng";
 import { fetchChatStatus, generateGanttSharepointSummary } from "../../services/jiraClient";
@@ -18,6 +19,7 @@ const downloadBlob = ( content, filename, type ) => {
 
 const GanttSharepointReportPanel = ( { open, onClose, displayName, viewIssues, allIssues, jiraBaseUrl } ) => {
   const [ includeAll, setIncludeAll ] = React.useState( false );
+  const [ includePlanHealth, setIncludePlanHealth ] = React.useState( false );
   const [ summary, setSummary ] = React.useState( "" );
   const [ copyMsg, setCopyMsg ] = React.useState( "" );
   const [ aiReady, setAiReady ] = React.useState( false );
@@ -35,7 +37,11 @@ const GanttSharepointReportPanel = ( { open, onClose, displayName, viewIssues, a
 
   const scopeIssues = includeAll ? allIssues : viewIssues;
   const metrics = computeGanttSharepointMetrics( scopeIssues );
-  const html = buildGanttSharepointHtml( { displayName, generatedAt, metrics, summary, issues: scopeIssues, jiraBaseUrl } );
+  const planHealth = React.useMemo(
+    () => ( open && includePlanHealth ? computeGanttPlanHealth( scopeIssues, { today: new Date(), displayName, baseUrl: jiraBaseUrl } ) : null ),
+    [ open, includePlanHealth, scopeIssues, displayName, jiraBaseUrl ]
+  );
+  const html = buildGanttSharepointHtml( { displayName, generatedAt, metrics, summary, issues: scopeIssues, jiraBaseUrl, planHealth } );
   const disabled = scopeIssues.length === 0;
 
   const handleDownload = () => {
@@ -114,6 +120,11 @@ const GanttSharepointReportPanel = ( { open, onClose, displayName, viewIssues, a
               Entire plan (ignore filters/search)
             </label>
           </div>
+
+          <label className="pm-sp-scope-option" style={ { marginBottom: 12 } }>
+            <input type="checkbox" checked={ includePlanHealth } onChange={ ( e ) => setIncludePlanHealth( e.target.checked ) } />
+            Include plan health (on-time delivery, overdue work, items needing attention)
+          </label>
 
           { metrics.bullets.length > 0 && (
             <ul className="pm-sp-metrics">

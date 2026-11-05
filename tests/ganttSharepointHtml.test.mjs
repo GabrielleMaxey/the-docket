@@ -86,3 +86,37 @@ describe("buildGanttSharepointHtml", () => {
     assert.ok(html.includes("https://jira.example.com/browse/PROJ-1"));
   });
 });
+
+describe("buildGanttSharepointHtml plan health section", () => {
+  const planHealth = {
+    kpis: [{ label: "Overdue open", value: 2, sub: "of 5 open" }, { label: "Done", value: "40%", sub: "2 of 5 issues" }],
+    slipBuckets: [{ label: "On time", count: 3 }, { label: "1–7 d late", count: 1 }],
+    overdueBuckets: [{ label: "1–7 d", count: 2 }],
+    attention: [{ key: "PROJ-9", summary: "Late <thing>", status: "In Progress", assignee: "Ann", dueDate: "2026-01-05", overdueDays: 12, pushedDays: 4 }],
+    noSchedule: [{ key: "PROJ-7", summary: "Unplanned", status: "To Do", assignee: "" }],
+    takeaways: [{ lead: "Overdue work", text: "2 open issues are past due.", keys: ["PROJ-9"] }],
+    narrative: "",
+  };
+  const build = (extra) => buildGanttSharepointHtml({ displayName: "P", generatedAt: "x", metrics: BASE_METRICS, issues: BASE_ISSUES, jiraBaseUrl: "https://j.example", ...extra });
+
+  it("omits the section by default", () => {
+    assert.ok(!build({}).includes("Plan health"));
+  });
+
+  it("renders KPIs, buckets, attention and takeaways with inline styles only", () => {
+    const html = build({ planHealth });
+    assert.ok(html.includes("Plan health"));
+    assert.ok(html.includes("Overdue open") && html.includes("40%"));
+    assert.ok(html.includes("1–7 d late"));
+    assert.ok(html.includes("https://j.example/browse/PROJ-9"));
+    assert.ok(html.includes("Late &lt;thing&gt;"));
+    assert.ok(html.includes("PROJ-7"));
+    assert.ok(html.includes("2 open issues are past due."));
+  });
+
+  it("places plan health before the timeline table", () => {
+    const html = build({ planHealth });
+    assert.ok(html.indexOf("Plan health") >= 0);
+    assert.ok(html.indexOf("Plan health") < html.indexOf("<div class=\"timeline-wrap\">"));
+  });
+});

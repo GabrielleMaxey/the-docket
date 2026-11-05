@@ -35,6 +35,47 @@ const isOverdue = ( issue ) => {
   return d !== null && d < new Date( new Date().toISOString().slice( 0, 10 ) + "T00:00:00" );
 };
 
+const TH = "border:1px solid #d1d5db;padding:4px 8px;background:#f3f4f6;font-size:12px;text-align:left;";
+const TD = "border:1px solid #e5e7eb;padding:4px 8px;font-size:12px;";
+const TONE_COLORS = { red: "#dc2626", amber: "#d97706", green: "#16a34a" };
+const SLIP_TONES = { "Early": "green", "On time": "green", "1–7 d late": "amber", "8–30 d late": "red", "31+ d late": "red" };
+const OVERDUE_TONES = { "1–7 d": "amber", "8–30 d": "red", "31–90 d": "red", "90+ d": "red" };
+
+const buildPlanHealthSection = ( data, jiraBaseUrl ) => {
+  if ( !data ) return "";
+  const link = ( key ) => ( jiraBaseUrl
+    ? `<a href="${ esc( jiraBaseUrl ) }/browse/${ esc( key ) }" style="color:#2563eb;">${ esc( key ) }</a>`
+    : esc( key ) );
+  const kpis = ( data.kpis || [] ).map( ( k ) => `<td style="${ TD }vertical-align:top;min-width:110px;">
+      <div style="font-size:11px;color:#6b7280;">${ esc( k.label ) }</div>
+      <div style="font-size:20px;font-weight:600;color:${ TONE_COLORS[ k.tone ] || "#111827" };">${ esc( k.value ) }</div>
+      <div style="font-size:11px;color:#6b7280;">${ esc( k.sub ) }</div></td>` ).join( "" );
+  const buckets = ( title, rows, tones ) => {
+    const max = Math.max( 1, ...( rows || [] ).map( ( r ) => r.count ) );
+    const body = ( rows || [] ).map( ( r ) => `<tr><td style="${ TD }">${ esc( r.label ) }</td>
+      <td style="${ TD }width:220px;"><div style="height:12px;width:${ Math.round( ( r.count / max ) * 200 ) }px;background:${ TONE_COLORS[ tones[ r.label ] ] || "#3b82f6" };border-radius:2px;"></div></td>
+      <td style="${ TD }text-align:right;">${ esc( r.count ) }</td></tr>` ).join( "" );
+    return `<table style="margin:8px 24px 8px 0;display:inline-table;vertical-align:top;"><thead><tr><th style="${ TH }" colspan="3">${ esc( title ) }</th></tr></thead><tbody>${ body }</tbody></table>`;
+  };
+  const attention = ( data.attention || [] ).length
+    ? `<table style="margin:8px 0;"><thead><tr>${ [ "Issue", "Summary", "Status", "Assignee", "Due", "Overdue (d)", "Pushed (d)" ].map( ( h ) => `<th style="${ TH }">${ h }</th>` ).join( "" ) }</tr></thead><tbody>
+      ${ data.attention.map( ( r ) => `<tr><td style="${ TD }">${ link( r.key ) }</td><td style="${ TD }">${ esc( r.summary ) }</td><td style="${ TD }">${ esc( r.status ) }</td><td style="${ TD }">${ esc( r.assignee ) }</td><td style="${ TD }">${ esc( r.dueDate ) }</td><td style="${ TD }text-align:right;">${ esc( r.overdueDays ) }</td><td style="${ TD }text-align:right;">${ r.pushedDays == null ? "" : "+" + esc( r.pushedDays ) }</td></tr>` ).join( "" ) }</tbody></table>`
+    : `<p style="font-size:12px;color:#6b7280;">No open issues are past due.</p>`;
+  const gaps = ( data.noSchedule || [] ).length
+    ? `<p style="font-size:12px;margin:8px 0 2px;"><b>No due date or planned finish:</b> ${ data.noSchedule.map( ( r ) => link( r.key ) ).join( ", " ) }</p>`
+    : "";
+  const takeaways = ( data.takeaways || [] ).map( ( t ) => `<li style="margin:2px 0;"><b>${ esc( t.lead ) }:</b> ${ esc( t.text ) }${ t.keys?.length ? " " + t.keys.map( link ).join( ", " ) : "" }</li>` ).join( "" );
+  return `<section style="margin:16px 0 24px;">
+<h2 style="font-size:16px;margin:0 0 8px;">Plan health</h2>
+<table style="border-collapse:collapse;margin-bottom:8px;"><tr>${ kpis }</tr></table>
+${ takeaways ? `<ul style="margin:8px 0;padding-left:20px;font-size:13px;">${ takeaways }</ul>` : "" }
+<div>${ buckets( "Completion vs. planned finish", data.slipBuckets, SLIP_TONES ) }${ buckets( "Open work past due", data.overdueBuckets, OVERDUE_TONES ) }</div>
+<h3 style="font-size:13px;margin:12px 0 0;">Needing attention</h3>
+${ attention }
+${ gaps }
+</section>`;
+};
+
 export const buildGanttSharepointHtml = ( {
   displayName = "",
   generatedAt = "",
@@ -42,6 +83,7 @@ export const buildGanttSharepointHtml = ( {
   summary = "",
   issues = [],
   jiraBaseUrl = "",
+  planHealth = null,
 } ) => {
   // Compute timeline range from issues
   const startMsList = issues.map( ( i ) => parseDate( i.startDate )?.getTime() ).filter( Boolean );
@@ -117,6 +159,7 @@ ${ summarySection }
 ${ bulletItems }
   </ul>
 </section>
+${ buildPlanHealthSection( planHealth, jiraBaseUrl ) }
 <div class="timeline-wrap">
 <table>
   <thead>
