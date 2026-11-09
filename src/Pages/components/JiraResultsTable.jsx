@@ -1208,7 +1208,6 @@ const JiraResultsTable = ({
                                               saveState={save}
                                               value={noteDraft}
                                               onChange={(next) => handleNoteChange(issueKey, next)}
-                                              placeholder="Add notes here"
                                               title={
                                                 isNoteAlreadyPushed
                                                   ? "This note was pushed to Jira. Change the text or images before pushing again."
@@ -1519,7 +1518,6 @@ const JiraResultsTable = ({
                           saveState={saveState[expandedNoteKey] || {}}
                           value={modalNoteDraft}
                           onChange={(next) => handleNoteChange(expandedNoteKey, next)}
-                          placeholder="Add notes here"
                           disabled={modalClosedOrResolved && !combinedRun}
                         />
                       </Modal.Content>
