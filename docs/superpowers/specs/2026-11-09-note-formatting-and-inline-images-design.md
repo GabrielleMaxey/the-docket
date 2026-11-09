@@ -53,7 +53,7 @@ Stored note text format, the ADF builder, the push fingerprint, attachments, rep
 
 ### Representation
 
-A pasted **image** inserts a marker at the cursor: `![filename](img:<localId>)`, where `<localId>` is the draft attachment's local ID. Only images (PNG, JPEG, GIF, WebP) get markers; other files stay as attachments appended at the end, as today. The marker is ordinary markdown text, so notes still read sensibly as plain text.
+A pasted **image** inserts a marker at the cursor: `![filename](img:<id>)`, where `<id>` is the content-hash ID described in item 5 below. Only images (PNG, JPEG, GIF, WebP) get markers; other files stay as attachments appended at the end, as today. The marker is ordinary markdown text, so notes still read sensibly as plain text.
 
 ### Behavior
 
@@ -61,7 +61,7 @@ A pasted **image** inserts a marker at the cursor: `![filename](img:<localId>)`,
 2. **Push:** `buildNoteCommentAdf` splits the text at markers and emits, in order, text nodes and a `mediaSingle` block per marker, using the media ID of the matching uploaded attachment. Attachments not referenced by any marker are appended at the end (today's behavior), so nothing is lost. An image referenced twice is uploaded once and its block repeated.
 3. **Failures:** a marker with no matching attachment is dropped from the ADF and recorded in the push result as a warning; an upload failure aborts the push as it does now, before any comment is posted.
 4. **Keeping strip and text in sync:** removing a thumbnail removes its marker; deleting the marker text leaves the attachment in the strip (it then goes at the end on push).
-5. **Reload:** when **Keep on this machine** is on, the marker's ID must still resolve after a reload. Whether today's `localId` values are stable across reloads is unverified; the plan's first Phase 2 task is to confirm this and, if not, key markers on the stored draft-file ID (`issue_note_images.id`) instead. When it is off, drafts and markers behave as today (cleared after push or tab close).
+5. **Reload:** `localId` is a fresh `crypto.randomUUID()` each time drafts load (`src/Pages/hooks/useTaskManagerJira.js`), so it cannot be the marker ID. The marker ID is instead the first 12 hex characters of the SHA-256 of the file's bytes, computed when the file is added. It is stable across reloads with no schema change, and two copies of the same screenshot share one ID (so "the same image used twice" is one upload).
 6. **Consumers of note text:** the push fingerprint needs no change (marker text is part of the note); exports and reports replace markers with `[image: filename]`; the Jira comment pull never produces markers (pulled images remain attachments).
 
 ### Rollout
