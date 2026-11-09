@@ -137,7 +137,7 @@ Most likely first:
 
 **Interfaces:**
 - Consumes: Task 5 helpers; images in state carry `{ localId, previewUrl, filename, ... }`, to which this task adds `markerId: string`, computed with `noteImageId` when a file is added or rehydrated.
-- Produces: `NoteFormattedField` prop `imagesById: Record<string, { previewUrl: string, filename: string }>` and `onImagePasted(markerText: string)`-style insertion through the existing `onChange`.
+- Produces: `handleNoteImagesAdd(issueKey, files) => Promise<Array<{ markerId: string, filename: string }>>` (now returns the accepted images; existing callers ignore the value); `NoteFormattedField` props `imagesById: Record<string, { previewUrl: string, filename: string }>` and `onAddImages(files: File[]) => Promise<Array<{ markerId: string, filename: string }>>`. When the flag is on and a paste contains image files, the field calls `event.stopPropagation()` (so `NoteImagesStrip` does not add them a second time), awaits `onAddImages`, then inserts one `formatNoteImageMarker(filename, markerId)` per returned image at the cursor through `onChange`. With the flag off, the paste is untouched and goes to the strip as today.
 
 - [ ] **Step 1: Write failing tests** for `noteMarkdownToHtml`: a marker with a matching `imagesById` entry renders an `<img>` with that `previewUrl` and an escaped `alt`; an unmatched marker renders `[image removed]`; text without markers renders exactly as before; a `previewUrl` that is not `blob:` is never emitted.
 - [ ] **Step 2: Run** `node --test tests/noteMarkdown.test.mjs` — expect new tests FAIL.
