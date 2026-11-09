@@ -57,7 +57,7 @@ A pasted **image** inserts a marker at the cursor: `![filename](img:<id>)`, wher
 
 ### Behavior
 
-1. **Preview:** `noteMarkdownToHtml` renders a marker whose `localId` matches a draft attachment as that thumbnail. An unmatched marker renders as the text `[image removed]`.
+1. **Preview:** `noteMarkdownToHtml` renders a marker whose ID matches a draft attachment as that thumbnail. An unmatched marker renders as the text `[image removed]`.
 2. **Push:** `buildNoteCommentAdf` splits the text at markers and emits, in order, text nodes and a `mediaSingle` block per marker, using the media ID of the matching uploaded attachment. Attachments not referenced by any marker are appended at the end (today's behavior), so nothing is lost. An image referenced twice is uploaded once and its block repeated.
 3. **Failures:** a marker with no matching attachment is dropped from the ADF and recorded in the push result as a warning; an upload failure aborts the push as it does now, before any comment is posted.
 4. **Keeping strip and text in sync:** removing a thumbnail removes its marker; deleting the marker text leaves the attachment in the strip (it then goes at the end on push).
