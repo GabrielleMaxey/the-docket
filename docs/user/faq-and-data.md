@@ -84,3 +84,9 @@ Sub-tasks must be **Task** type with `parent` set to the story (not Jira’s sep
 ---
 
 [← User Guide index](../END_USER_GUIDE.md)
+
+### What does "Not connected to the Docket service" mean?
+
+The app checks its local service every 15 seconds. After two failed checks a yellow banner appears under the top bar, and **Generate** on the report forms is disabled until the service answers again. The banner clears by itself on reconnect. If it persists, restart the app (developers: `npm run dev:all`).
+
+Your report form entries (report type, scope, months, goals, Flow Report window) are saved on this computer per Jira site, so they are still there after a disconnect or restart. Clearing the saved goals also clears the cached copy. No credentials are cached.

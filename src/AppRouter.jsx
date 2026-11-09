@@ -9,6 +9,7 @@ import "./AppRouter.css";
 import BackgroundJobIndicator from "./Components/BackgroundJobIndicator.jsx";
 import JiraInstanceSwitcher from "./Components/JiraInstanceSwitcher.jsx";
 import { TodosProvider } from "./context/TodosContext.jsx";
+import { ApiConnectionProvider, useApiConnection } from "./hooks/useApiConnection.jsx";
 import { EpicFiltersProvider } from "./context/EpicFiltersContext.jsx";
 
 const WorkWeekTasks = React.lazy(() => import("./Pages/WorkWeekTasks.jsx"));
@@ -32,6 +33,16 @@ const PageFallback = () => (
     Loading...
   </main>
 );
+
+const ConnectionBanner = () => {
+  const { online } = useApiConnection();
+  if (online) return null;
+  return (
+    <p role="alert" className="app-connection-banner">
+      Not connected to the Docket service. Your entries are kept — they'll work again when it reconnects.
+    </p>
+  );
+};
 
 const AppLayout = () => {
   const context = React.useSyncExternalStore(subscribeSiteContext, getSiteContext);
@@ -64,6 +75,7 @@ const AppLayout = () => {
         ))}
       </ul>
     </nav>
+    <ConnectionBanner />
     {recoveryNotice && <p role="status">{recoveryNotice} <button type="button" onClick={() => dismissSiteRecoveryNotice()}>Dismiss</button></p>}
     <div inert={switching ? "" : undefined} aria-busy={switching}>
       <EpicFiltersProvider key={context.generation}>
@@ -78,7 +90,7 @@ const AppLayout = () => {
 
 const router = createHashRouter([
   {
-    element: <TodosProvider><AppLayout /></TodosProvider>,
+    element: <ApiConnectionProvider><TodosProvider><AppLayout /></TodosProvider></ApiConnectionProvider>,
     errorElement: <Errors />,
     children: [
       { path: "/", element: <WorkWeekTasks /> },

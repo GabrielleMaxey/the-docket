@@ -1,4 +1,6 @@
 import React from "react";
+import { usePersistedState } from "../../Pages/hooks/usePersistedState.js";
+import { useApiConnection, OFFLINE_REASON } from "../../hooks/useApiConnection.jsx";
 import { Button, Checkbox, Dropdown, Message } from "semantic-ui-react";
 import CollapsibleSection from "../CollapsibleSection";
 import FlowReport from "./FlowReport.jsx";
@@ -32,12 +34,13 @@ const FlowReportSection = ({
   storageKey = "dashboard-flow-report-open",
   defaultOpen = true,
 }) => {
-  const [windowMonths, setWindowMonths] = React.useState(12);
+  const { online } = useApiConnection();
+  const [windowMonths, setWindowMonths] = usePersistedState("flow-report-window-months", 12, { siteScoped: true });
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [report, setReport] = React.useState(null);
   const [saveState, setSaveState] = React.useState("idle");
-  const [includeHandedOn, setIncludeHandedOn] = React.useState(false);
+  const [includeHandedOn, setIncludeHandedOn] = usePersistedState("flow-report-include-handed-on", false, { siteScoped: true });
   const [narrativeLoading, setNarrativeLoading] = React.useState(false);
   const reportRef = React.useRef(null);
   const combined = Array.isArray(instanceIds);
@@ -137,7 +140,7 @@ const FlowReportSection = ({
             disabled={loading}
           />
         ) : null}
-        <Button primary size="small" loading={loading} disabled={loading || (combined && instanceIds.length === 0)} onClick={handleGenerate}>
+        <Button primary size="small" loading={loading} disabled={loading || !online || (combined && instanceIds.length === 0)} title={online ? undefined : OFFLINE_REASON} onClick={handleGenerate}>
           {report ? "Regenerate" : "Generate report"}
         </Button>
         {report ? (
