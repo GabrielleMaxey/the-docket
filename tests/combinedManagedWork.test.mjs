@@ -89,7 +89,8 @@ const hooksPlugin = { name: "managed-hooks", setup(build) {
     export const unmount = () => { for (const store of slots.values()) for (const entry of store) entry?.cleanup?.(); };
     export const createElement = (type, props, ...children) => ({type, props: props || {}, children});
     export const createContext = value => ({Provider: 'provider', value});
-    export default {useState,useRef,useMemo,useCallback,useEffect,createElement,createContext};
+    export const useLayoutEffect = useEffect;
+    export default {useState,useRef,useMemo,useCallback,useEffect,useLayoutEffect,createElement,createContext};
   ` }));
   build.onResolve({ filter: /^react-router-dom$/ }, () => ({ path: "router", namespace: "router" }));
   build.onLoad({ filter: /.*/, namespace: "router" }, () => ({ contents: 'export const Link="a";' }));
