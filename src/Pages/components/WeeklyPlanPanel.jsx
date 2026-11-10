@@ -23,6 +23,7 @@ import {
   loadWeekPlanState,
   saveWeekPlanState,
 } from "../../utils/pageReportPersistence";
+import { useApiConnection, OFFLINE_REASON } from "../../hooks/useApiConnection.jsx";
 import { isConfiguredJqlRun } from "../../utils/workWeekStorage.js";
 import { buildWeekPlanProjects, describePlanScope, pickPlanPriorities } from "../../utils/weekPlanProjects.js";
 
@@ -53,6 +54,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities, localRowPriorities, teamE
   const instanceId = React.useRef(getSiteContext()?.instanceId).current;
   const persistedPlan = loadWeekPlanState();
 
+  const { online } = useApiConnection();
   const [planPending, setPlanPending] = React.useState(false);
   const bgPlanRunning = useBackgroundJobRunning(BACKGROUND_JOB_IDS.WORK_WEEK_WEEK_PLAN);
   const loading = planPending || bgPlanRunning;
@@ -78,6 +80,21 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities, localRowPriorities, teamE
   const [selectedCoworkFilename, setSelectedCoworkFilename] = React.useState(
     String(persistedPlan?.selectedCoworkFilename || "")
   );
+
+  // Keep the question inputs as a draft so a failed or never-sent request (e.g. API down) loses nothing.
+  React.useEffect(() => {
+    const current = loadWeekPlanState(instanceId) || {};
+    saveWeekPlanState({
+      ...current,
+      step: current.plan ? current.step : step,
+      focusStyle,
+      capacityHours,
+      fixedCommitments,
+      additionalContext,
+      selectedCoworkFilename,
+      includeTeamPriorities,
+    }, instanceId);
+  }, [instanceId, step, focusStyle, capacityHours, fixedCommitments, additionalContext, selectedCoworkFilename, includeTeamPriorities]);
 
   const hasRuns = jqlRuns.some((r) => isConfiguredJqlRun(r) && r.issues?.length > 0);
 
@@ -322,7 +339,7 @@ const WeeklyPlanPanel = ({ jqlRuns, jiraRowPriorities, localRowPriorities, teamE
               <button type="button" className="ww-plan-edit-btn" onClick={handleReset}>✎ Edit</button>
             </div>
             <div className="ww-weekly-plan-controls">
-              <Button primary size="small" onClick={handleGenerate} loading={loading} disabled={loading}>
+              <Button primary size="small" onClick={handleGenerate} loading={loading} disabled={loading || !online} title={online ? undefined : OFFLINE_REASON}>
                 Generate week plan
               </Button>
               {plan ? <Button basic size="small" onClick={handleReset}>Start over</Button> : null}

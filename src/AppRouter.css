@@ -212,3 +212,12 @@
   .app-nav-logo { font-size: 0.95rem; }
   .app-nav-link { padding: 0 0.5rem; font-size: 0.82rem; }
 }
+
+.app-connection-banner {
+  margin: 0;
+  padding: 8px 16px;
+  background: #fff4ce;
+  color: #5c4400;
+  border-bottom: 1px solid #e0c36a;
+  font-size: 0.9rem;
+}

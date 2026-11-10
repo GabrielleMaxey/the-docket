@@ -2,10 +2,12 @@ import { COMBINED_REPORT_CONTEXT, combinedReportRunKey, buildCombinedReportSumma
 import { buildSummaryFromIssues, monthsAgoDateString } from "../reportSummary.js";
 import { getSiteContext } from "../../utils/siteContextStore.js";
 import React from "react";
+import { usePersistedState } from "../hooks/usePersistedState.js";
 import { Link } from "react-router-dom";
 import { Button, Checkbox, Form } from "semantic-ui-react";
 import CollapsibleSection from "../../Components/CollapsibleSection";
 import ReportOutput from "../../Components/ReportOutput";
+import { useApiConnection, OFFLINE_REASON } from "../../hooks/useApiConnection.jsx";
 import { useReportClipboard } from "../../hooks/useReportClipboard";
 import {
   fetchAppSettings,
@@ -64,11 +66,12 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [], scope, combi
   const combined = scope === "combined-work";
   const siteContext = React.useRef(combined ? COMBINED_REPORT_CONTEXT : getSiteContext()).current;
   const instanceId = combined ? siteContext : siteContext?.instanceId;
-  const [reportType, setReportType] = React.useState("status");
-  const [pwbPeriod, setPwbPeriod] = React.useState("quarterly");
-  const [includeStrengthsGrowth, setIncludeStrengthsGrowth] = React.useState(false);
-  const [reportScope, setReportScope] = React.useState("current");
-  const [allWorkMonths, setAllWorkMonths] = React.useState(3);
+  const { online } = useApiConnection();
+  const [reportType, setReportType] = usePersistedState("project-report-type", "status", { siteScoped: true });
+  const [pwbPeriod, setPwbPeriod] = usePersistedState("project-report-pwb-period", "quarterly", { siteScoped: true });
+  const [includeStrengthsGrowth, setIncludeStrengthsGrowth] = usePersistedState("project-report-strengths-growth", false, { siteScoped: true });
+  const [reportScope, setReportScope] = usePersistedState("project-report-scope", "current", { siteScoped: true });
+  const [allWorkMonths, setAllWorkMonths] = usePersistedState("project-report-all-work-months", 3, { siteScoped: true });
   const runKey = combined ? combinedReportRunKey(combinedSites, { reportScope, allWorkMonths, reportType, pwbPeriod }) : getWorkWeekRunKey(run);
   const jobId = workWeekProjectReportJobId(runKey, siteContext);
   const currentJob = React.useRef(jobId);
@@ -88,9 +91,9 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [], scope, combi
   }, []);
   const { copied, handleCopy, handleDownload } = useReportClipboard(report);
 
-  const [userGoals, setUserGoals] = React.useState("");
-  const [includeCompanyGoals, setIncludeCompanyGoals] = React.useState(false);
-  const [companyGoals, setCompanyGoals] = React.useState("");
+  const [userGoals, setUserGoals] = usePersistedState("project-report-user-goals", "", { siteScoped: true });
+  const [includeCompanyGoals, setIncludeCompanyGoals] = usePersistedState("project-report-include-company-goals", false, { siteScoped: true });
+  const [companyGoals, setCompanyGoals] = usePersistedState("project-report-company-goals", "", { siteScoped: true });
   const [goalsLoaded, setGoalsLoaded] = React.useState(false);
 
   React.useEffect(() => {
@@ -100,10 +103,10 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [], scope, combi
         if (cancelled) return;
         const savedUserGoals = String(settings?.[USER_GOALS_SETTINGS_KEY] || "");
         const savedCompanyGoals = String(settings?.[COMPANY_GOALS_SETTINGS_KEY] || "");
-        if (savedUserGoals) setUserGoals(savedUserGoals);
+        if (savedUserGoals) setUserGoals((prev) => prev || savedUserGoals);
         if (savedCompanyGoals) {
-          setCompanyGoals(savedCompanyGoals);
-          setIncludeCompanyGoals(true);
+          setCompanyGoals((prev) => prev || savedCompanyGoals);
+          setIncludeCompanyGoals((prev) => prev || true);
         }
       })
       .catch(() => {})
@@ -471,7 +474,7 @@ const ProjectReportPanel = ({ run, jiraRowPriorities, jqlRuns = [], scope, combi
       ) : null}
 
       <div className="app-report-controls">
-        <Button size="small" primary onClick={handleGenerate} loading={loading} disabled={loading}>
+        <Button size="small" primary onClick={handleGenerate} loading={loading} disabled={loading || !online} title={online ? undefined : OFFLINE_REASON}>
           Generate Report
         </Button>
         {chatStatus?.displayLabel ? (
