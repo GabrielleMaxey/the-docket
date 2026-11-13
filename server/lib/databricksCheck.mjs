@@ -23,13 +23,9 @@ export const redactToken = (text, token) => {
 // Reduces input to an https origin (no path, query or fragment), or reports why not.
 export const cleanHostInput = (value) => {
   const invalid = { ok: false, message: HOST_INVALID_MESSAGE };
-  const raw = String(value ?? "").trim();
-  if (!raw || /^http:\/\//i.test(raw)) {
-    return invalid;
-  }
   let url;
   try {
-    url = new URL(normalizeDatabricksHost(raw));
+    url = new URL(normalizeDatabricksHost(value));
   } catch {
     return invalid;
   }
@@ -44,7 +40,7 @@ export const cleanHostInput = (value) => {
   ) {
     return invalid;
   }
-  return { ok: true, host: normalizeDatabricksHost(url.origin) };
+  return { ok: true, host: url.origin };
 };
 
 export const cleanEndpointInput = (value) => {
@@ -68,10 +64,11 @@ export const cleanTokenInput = (value) =>
 const sendWithRetry = async ({
   fetchImpl,
   url,
-  init,
+  token,
+  init = {},
   timeoutMs,
-  retryDelaysMs,
-  sleep,
+  retryDelaysMs = [],
+  sleep = delay,
 }) => {
   for (let attempt = 0; ; attempt += 1) {
     const controller = new AbortController();
@@ -85,6 +82,7 @@ const sendWithRetry = async ({
     const exchange = (async () => {
       const response = await fetchImpl(url, {
         ...init,
+        headers: { Authorization: `Bearer ${token}`, ...init.headers },
         redirect: "manual",
         signal: controller.signal,
       });
@@ -126,21 +124,14 @@ export const listServingEndpoints = async ({
   const outcome = await sendWithRetry({
     fetchImpl,
     url: `${base}${SERVING_ENDPOINTS_PATH}`,
-    init: { method: "GET", headers: { Authorization: `Bearer ${secret}` } },
+    token: secret,
     timeoutMs,
-    retryDelaysMs: [],
-    sleep: delay,
   });
-  if (outcome.status !== 200) {
-    return [];
-  }
-  const endpoints = parseJson(outcome.text)?.endpoints;
-  if (!Array.isArray(endpoints)) {
-    return [];
-  }
-  return endpoints
-    .map((entry) => (typeof entry?.name === "string" ? entry.name : ""))
-    .filter(Boolean);
+  const endpoints =
+    outcome.status === 200 ? parseJson(outcome.text)?.endpoints : null;
+  return Array.isArray(endpoints)
+    ? endpoints.map((entry) => entry?.name).filter((name) => typeof name === "string" && name)
+    : [];
 };
 
 const check = (name, status, code, message) => ({ name, status, code, message });
@@ -165,8 +156,6 @@ export const checkDatabricksAccess = async ({
     checks: checks.map((c) => ({ ...c, message: redact(c.message) })),
   });
 
-  const skippedModel = (code, message) =>
-    check("model", "skipped", code, message);
   const identityFailure = (code, message) =>
     finish({
       ok: false,
@@ -174,7 +163,7 @@ export const checkDatabricksAccess = async ({
       message,
       checks: [
         check("identity", "failed", code, message),
-        skippedModel(null, "Skipped because the token check failed."),
+        check("model", "skipped", null, "Skipped because the token check failed."),
       ],
     });
 
@@ -186,17 +175,7 @@ export const checkDatabricksAccess = async ({
   }
 
   const request = (url, init) =>
-    sendWithRetry({
-      fetchImpl,
-      url,
-      init: {
-        ...init,
-        headers: { Authorization: `Bearer ${secret}`, ...init.headers },
-      },
-      timeoutMs,
-      retryDelaysMs,
-      sleep,
-    });
+    sendWithRetry({ fetchImpl, url, token: secret, init, timeoutMs, retryDelaysMs, sleep });
 
   const identity = await request(`${base}${IDENTITY_PATH}`, { method: "GET" });
   if (identity.error === "timeout") {
@@ -227,10 +206,7 @@ export const checkDatabricksAccess = async ({
     );
   }
   const profile = identity.status === 200 ? parseJson(identity.text) : null;
-  const user =
-    profile && typeof profile === "object"
-      ? profile.displayName || profile.userName || null
-      : null;
+  const user = profile?.displayName || profile?.userName || null;
   if (!user) {
     return identityFailure(
       "unexpected_response",
@@ -241,7 +217,9 @@ export const checkDatabricksAccess = async ({
   const identityOk = check("identity", "ok", null, `Connected as ${user}.`);
   const modelName = String(endpoint || "").trim();
   if (!modelName) {
-    const model = skippedModel(
+    const model = check(
+      "model",
+      "skipped",
       "endpoint_missing",
       "No model endpoint was provided, so the model check was skipped.",
     );

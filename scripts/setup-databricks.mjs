@@ -13,9 +13,7 @@ import {
   ACCESS_TOKENS_PATH,
   ENDPOINT_GUIDE,
   HOST_GUIDE,
-  TOKEN_COMMENT,
   TOKEN_GUIDE,
-  TOKEN_LIFETIME_DAYS,
 } from "../shared/databricksSetupGuide.mjs";
 import { writeEnvFile } from "./lib/envFile.mjs";
 import { askLine, isMaskedInputAvailable, readMaskedLine } from "./lib/prompts.mjs";
@@ -34,15 +32,23 @@ export async function runSetup({
 }) {
   const say = (text = "") => stdout.write(`${text}\n`);
   const ask = (prompt) => prompts.askLine({ stdin, stdout, prompt, visibleWarning: false });
-  const aborted = (message) => {
+  const stop = (status, message) => {
     if (message) say(message);
     say("Nothing was changed.");
-    return { status: "aborted", changedKeys: [] };
+    return { status, changedKeys: [] };
   };
-  const failed = (message) => {
-    say(message);
-    say("Nothing was changed.");
-    return { status: "failed", changedKeys: [] };
+  const aborted = (message) => stop("aborted", message);
+  const failed = (message) => stop("failed", message);
+  // Asks up to MAX_ATTEMPTS times; Enter keeps `kept`; returns "" when every answer was invalid.
+  const askValid = async (prompt, kept, clean) => {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      const answer = (await ask(prompt)).trim();
+      if (!answer && kept) return kept;
+      const cleaned = clean(answer);
+      if (cleaned.ok) return cleaned.host ?? cleaned.endpoint;
+      say(cleaned.message);
+    }
+    return "";
   };
 
   const envPath = path.join(projectRoot, ".env");
@@ -56,7 +62,6 @@ export async function runSetup({
   const existing = dotenv.parse(envText);
 
   // Address
-  let host = "";
   const existingHost = existing.DATABRICKS_HOST ? cleanHostInput(existing.DATABRICKS_HOST) : null;
   if (existingHost?.ok) {
     say(`Workspace address from .env: ${existingHost.host}`);
@@ -64,22 +69,16 @@ export async function runSetup({
     if (existingHost) say(existingHost.message);
     say(HOST_GUIDE);
   }
-  for (let attempt = 0; attempt < MAX_ATTEMPTS && !host; attempt += 1) {
-    const answer = (await ask(existingHost?.ok ? "Workspace address (Enter to keep): " : "Workspace address: ")).trim();
-    if (!answer && existingHost?.ok) {
-      host = existingHost.host;
-      break;
-    }
-    const cleaned = cleanHostInput(answer);
-    if (cleaned.ok) host = cleaned.host;
-    else say(cleaned.message);
-  }
+  const host = await askValid(
+    existingHost?.ok ? "Workspace address (Enter to keep): " : "Workspace address: ",
+    existingHost?.ok && existingHost.host,
+    cleanHostInput,
+  );
   if (!host) return aborted();
 
   // Token
   say();
   say(`Create a token at ${host}${ACCESS_TOKENS_PATH}`);
-  say(`Lifetime: ${TOKEN_LIFETIME_DAYS} days. Comment: "${TOKEN_COMMENT}".`);
   say(TOKEN_GUIDE);
   const tokenPrompt = { stdin, stdout, prompt: "Databricks token: " };
   const rawToken = isMaskedInputAvailable(stdin)
@@ -95,7 +94,6 @@ export async function runSetup({
   say(identity.message);
 
   // Endpoint
-  let endpoint = "";
   const existingEndpoint = existing.DATABRICKS_ENDPOINT ? cleanEndpointInput(existing.DATABRICKS_ENDPOINT) : null;
   let names = [];
   if (existingEndpoint?.ok) {
@@ -115,17 +113,9 @@ export async function runSetup({
     : names.length > 0
       ? "Model endpoint (number, or type a different name): "
       : "Model endpoint: ";
-  for (let attempt = 0; attempt < MAX_ATTEMPTS && !endpoint; attempt += 1) {
-    const answer = (await ask(endpointPrompt)).trim();
-    if (!answer && existingEndpoint?.ok) {
-      endpoint = existingEndpoint.endpoint;
-      break;
-    }
-    const picked = /^\d+$/.test(answer) ? names[Number(answer) - 1] : undefined;
-    const cleaned = cleanEndpointInput(picked ?? answer);
-    if (cleaned.ok) endpoint = cleaned.endpoint;
-    else say(cleaned.message);
-  }
+  const endpoint = await askValid(endpointPrompt, existingEndpoint?.ok && existingEndpoint.endpoint, (answer) =>
+    cleanEndpointInput((/^\d+$/.test(answer) && names[Number(answer) - 1]) || answer),
+  );
   if (!endpoint) return aborted();
 
   // Model check
@@ -133,10 +123,10 @@ export async function runSetup({
   const access = await checkDatabricksAccess({ host, token, endpoint, fetchImpl });
   if (!access.ok) return failed(access.message);
   const model = access.checks.find((c) => c.name === "model");
-  if (model?.status === "ok") {
+  if (model.status === "ok") {
     say(model.message);
   } else {
-    say(`Warning: ${model?.message ?? access.message}`);
+    say(`Warning: ${model.message}`);
     if (!isYes(await ask("Save these values anyway? [y/N]: "))) return aborted();
   }
 

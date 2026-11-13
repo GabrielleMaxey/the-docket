@@ -86,12 +86,7 @@ describe("POST /api/databricks/test", () => {
 
   it("returns host_missing from the real check when nothing is set", async () => {
     await new Promise((resolve) => server.close(resolve));
-    const app = express();
-    registerDatabricksRoutes(app);
-    await new Promise((resolve) => {
-      server = app.listen(0, "127.0.0.1", resolve);
-    });
-    baseUrl = `http://127.0.0.1:${server.address().port}`;
+    await startApp();
     const res = await fetch(`${baseUrl}/api/databricks/test`, { method: "POST" });
     assert.equal(res.status, 200);
     const body = await res.json();

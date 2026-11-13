@@ -48,7 +48,6 @@ export const readMaskedLine = ({ stdin, stdout, prompt }) =>
       stdin.setRawMode(true);
       stdin.resume();
     } catch (error) {
-      stdin.removeListener("data", onData);
       reject(error);
       return;
     }

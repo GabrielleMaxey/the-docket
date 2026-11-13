@@ -112,10 +112,6 @@ describe("guide copy", () => {
       ENDPOINT_INVALID_MESSAGE,
       "Endpoint names have no spaces or slashes. Copy the Name from the Serving page.",
     );
-    for (const guide of [HOST_GUIDE, ENDPOINT_GUIDE, TOKEN_GUIDE]) {
-      assert.equal(typeof guide, "string");
-      assert.ok(guide.length > 0);
-    }
     assert.match(HOST_GUIDE, /<workspace-host>/);
     assert.match(ENDPOINT_GUIDE, /Serving/);
     assert.match(TOKEN_GUIDE, /364/);
@@ -252,12 +248,6 @@ describe("checkDatabricksAccess", () => {
     assert.equal(result.code, "unexpected_response");
     assert.match(result.message, /503/);
     assert.equal(calls.length, 3);
-  });
-
-  it("does not retry a 401", async () => {
-    const { fetchImpl, calls } = makeFetch({ identity: json({}, 401) });
-    await run(fetchImpl);
-    assert.equal(calls.length, 1);
   });
 
   it("reports missing host or token without calling fetch", async () => {

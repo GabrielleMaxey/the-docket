@@ -34,6 +34,13 @@ const createOutput = () => {
   return { stdout, read: () => text };
 };
 
+const startMasked = () => {
+  const stdin = createFakeTty();
+  const { stdout, read } = createOutput();
+  const pending = readMaskedLine({ stdin, stdout, prompt: PROMPT });
+  return { stdin, read, pending };
+};
+
 describe("isMaskedInputAvailable", () => {
   it("is true only for a TTY with setRawMode", () => {
     assert.equal(isMaskedInputAvailable(createFakeTty()), true);
@@ -44,9 +51,7 @@ describe("isMaskedInputAvailable", () => {
 
 describe("readMaskedLine", () => {
   it("handles typing, backspace and enter without echoing the secret", async () => {
-    const stdin = createFakeTty();
-    const { stdout, read } = createOutput();
-    const pending = readMaskedLine({ stdin, stdout, prompt: PROMPT });
+    const { stdin, read, pending } = startMasked();
     for (const key of ["a", "b", "\x7f", "c", "\r"]) stdin.emit("data", Buffer.from(key));
     assert.equal(await pending, "ac");
     const echoed = read().slice(PROMPT.length);
@@ -58,26 +63,20 @@ describe("readMaskedLine", () => {
   });
 
   it("treats \\b as backspace", async () => {
-    const stdin = createFakeTty();
-    const { stdout } = createOutput();
-    const pending = readMaskedLine({ stdin, stdout, prompt: PROMPT });
+    const { stdin, pending } = startMasked();
     for (const key of ["x", "\b", "y", "\n"]) stdin.emit("data", key);
     assert.equal(await pending, "y");
   });
 
   it("handles a pasted chunk with a trailing carriage return", async () => {
-    const stdin = createFakeTty();
-    const { stdout, read } = createOutput();
-    const pending = readMaskedLine({ stdin, stdout, prompt: PROMPT });
+    const { stdin, read, pending } = startMasked();
     stdin.emit("data", Buffer.from("dapi-test\r"));
     assert.equal(await pending, "dapi-test");
     assert.equal(read().slice(PROMPT.length).replace(/\r?\n$/, ""), "*".repeat(9));
   });
 
   it("rejects with Cancelled on Ctrl-C and restores raw mode", async () => {
-    const stdin = createFakeTty();
-    const { stdout } = createOutput();
-    const pending = readMaskedLine({ stdin, stdout, prompt: PROMPT });
+    const { stdin, pending } = startMasked();
     stdin.emit("data", Buffer.from("ab\x03"));
     await assert.rejects(pending, (error) => {
       assert.ok(error instanceof Error);
@@ -89,9 +88,7 @@ describe("readMaskedLine", () => {
   });
 
   it("restores raw mode when stdin errors", async () => {
-    const stdin = createFakeTty();
-    const { stdout } = createOutput();
-    const pending = readMaskedLine({ stdin, stdout, prompt: PROMPT });
+    const { stdin, pending } = startMasked();
     stdin.emit("error", new Error("boom"));
     await assert.rejects(pending, /boom/);
     assert.deepEqual(stdin.rawModeCalls, [true, false]);

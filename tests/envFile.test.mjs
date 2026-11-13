@@ -92,6 +92,12 @@ describe("writeEnvFile", () => {
     dirs.push(d);
     return d;
   };
+  const tmpEnv = (content) => {
+    const dir = tmp();
+    const envPath = path.join(dir, ".env");
+    fs.writeFileSync(envPath, content);
+    return { dir, envPath };
+  };
   afterEach(() => {
     while (dirs.length) fs.rmSync(dirs.pop(), { recursive: true, force: true });
   });
@@ -107,9 +113,7 @@ describe("writeEnvFile", () => {
   });
 
   it("writes through a same-folder temp file, then renames", () => {
-    const dir = tmp();
-    const envPath = path.join(dir, ".env");
-    fs.writeFileSync(envPath, "A=1\n");
+    const { dir, envPath } = tmpEnv("A=1\n");
     const calls = [];
     const fsImpl = {
       ...fs,
@@ -151,10 +155,8 @@ describe("writeEnvFile", () => {
   });
 
   it("on rename EPERM leaves the original, removes the temp file and names path and code", () => {
-    const dir = tmp();
-    const envPath = path.join(dir, ".env");
     const original = Buffer.from("﻿A=1\r\n# keep\r\n");
-    fs.writeFileSync(envPath, original);
+    const { dir, envPath } = tmpEnv(original);
     const fsImpl = {
       ...fs,
       renameSync: () => {
@@ -175,9 +177,7 @@ describe("writeEnvFile", () => {
   });
 
   it("does not write when nothing changed", () => {
-    const dir = tmp();
-    const envPath = path.join(dir, ".env");
-    fs.writeFileSync(envPath, "A=1\n");
+    const { dir, envPath } = tmpEnv("A=1\n");
     const fsImpl = {
       ...fs,
       writeFileSync: () => {

@@ -23,21 +23,18 @@ export const registerDatabricksRoutes = (
     "/api/databricks/test",
     withSiteOperation(async (_req, res) => {
       const rawHost = readEnv("DATABRICKS_HOST");
-      let host = "";
-      if (rawHost) {
-        const cleaned = cleanHostInput(rawHost);
-        if (!cleaned.ok) {
-          res.json({ ok: false, user: null, code: "host_invalid", message: HOST_INVALID_MESSAGE, checks: [] });
-          return;
-        }
-        host = cleaned.host;
+      const cleaned = rawHost ? cleanHostInput(rawHost) : { ok: true, host: "" };
+      if (!cleaned.ok) {
+        res.json({ ok: false, user: null, code: "host_invalid", message: HOST_INVALID_MESSAGE, checks: [] });
+        return;
       }
-      const result = await check({
-        host,
-        token: readEnv("DATABRICKS_TOKEN"),
-        endpoint: readEnv("DATABRICKS_ENDPOINT"),
-      });
-      res.json(result);
+      res.json(
+        await check({
+          host: cleaned.host,
+          token: readEnv("DATABRICKS_TOKEN"),
+          endpoint: readEnv("DATABRICKS_ENDPOINT"),
+        }),
+      );
     }),
   );
 };
