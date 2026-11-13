@@ -4,8 +4,10 @@ import {
   completeLlmText,
   completeLlmWithJiraTools,
   extractAssistantText,
+  buildDatabricksCredentials,
   getConfiguredLlmProvider,
   isChatProviderReady,
+  normalizeDatabricksHost,
   resolveFirstReadyLlmProvider,
   resolveFirstReadyReportProvider,
 } from "../server/lib/llmClient.mjs";
@@ -16,6 +18,7 @@ const ENV_NAMES = [
   "DATABRICKS_HOST",
   "DATABRICKS_TOKEN",
   "DATABRICKS_ENDPOINT",
+  "DATABRICKS_API_PATH",
   "REPORT_DATABRICKS_ENDPOINT",
   "ANTHROPIC_API_KEY",
   "OPENAI_API_KEY",
@@ -179,5 +182,34 @@ describe("extractAssistantText", () => {
       ],
     };
     assert.equal(extractAssistantText(data), "Final answer.");
+  });
+});
+
+describe("databricks credential builders", () => {
+  it("normalizeDatabricksHost strips scheme noise, trailing slashes and gateway paths", () => {
+    for (const input of [
+      "example.cloud.databricks.com",
+      "https://example.cloud.databricks.com/",
+      "https://example.cloud.databricks.com/serving-endpoints",
+      "https://example.cloud.databricks.com/ai-gateway/mlflow/v1/",
+    ]) {
+      assert.equal(normalizeDatabricksHost(input), "https://example.cloud.databricks.com");
+    }
+    assert.equal(normalizeDatabricksHost(""), "");
+  });
+
+  it("buildDatabricksCredentials composes credentials from explicit values", () => {
+    assert.deepEqual(
+      buildDatabricksCredentials({
+        host: "example.cloud.databricks.com/",
+        token: "dapi-test",
+        endpoint: "chat-endpoint",
+      }),
+      {
+        apiKey: "dapi-test",
+        baseUrl: "https://example.cloud.databricks.com/ai-gateway/mlflow/v1",
+        model: "chat-endpoint",
+      },
+    );
   });
 });

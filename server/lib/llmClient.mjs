@@ -264,7 +264,7 @@ const getAnthropicCredentials = ({ forReports = false } = {}) => {
   return { apiKey, baseUrl, model };
 };
 
-const normalizeDatabricksHost = (value) => {
+export const normalizeDatabricksHost = (value) => {
   let host = String(value || "")
     .trim()
     .replace(/\/+$/, "");
@@ -290,26 +290,32 @@ const isDatabricksConfigured = ({ forReports = false } = {}) =>
 
 // Databricks Model Serving exposes an OpenAI-compatible chat route at
 // {workspace}/serving-endpoints/chat/completions; "model" is the serving endpoint name.
+export const buildDatabricksCredentials = ({ host, token, endpoint }) => ({
+  apiKey: String(token || "").trim(),
+  baseUrl: `${normalizeDatabricksHost(host)}${getDatabricksApiPath()}`,
+  model: String(endpoint || "").trim(),
+});
+
 const getDatabricksCredentials = ({ forReports = false } = {}) => {
   const host = normalizeDatabricksHost(process.env.DATABRICKS_HOST);
   if (!host) {
     throw new Error("DATABRICKS_HOST is not configured on the proxy host");
   }
-  const apiKey = String(process.env.DATABRICKS_TOKEN || "").trim();
-  if (!apiKey) {
+  const token = String(process.env.DATABRICKS_TOKEN || "").trim();
+  if (!token) {
     throw new Error("DATABRICKS_TOKEN is not configured on the proxy host");
   }
   const chatModel = String(process.env.DATABRICKS_ENDPOINT || "").trim();
   const reportModel = String(
     process.env.REPORT_DATABRICKS_ENDPOINT || "",
   ).trim();
-  const model = forReports && reportModel ? reportModel : chatModel;
-  if (!model) {
+  const endpoint = forReports && reportModel ? reportModel : chatModel;
+  if (!endpoint) {
     throw new Error(
       "DATABRICKS_ENDPOINT (the gateway model or serving endpoint name) is not configured on the proxy host",
     );
   }
-  return { apiKey, baseUrl: `${host}${getDatabricksApiPath()}`, model };
+  return buildDatabricksCredentials({ host, token, endpoint });
 };
 
 const getOllamaConfig = ({ forReports = false } = {}) => {
