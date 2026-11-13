@@ -17,6 +17,8 @@
     "seed:presets": "node scripts/seed-epic-presets.mjs",
     "preseed:presets": "npm run check:node && npm rebuild better-sqlite3",
     "prebuild": "npm run check:node && npm run check:jira-client-exports",
+    "presetup:databricks": "npm run check:node",
+    "setup:databricks": "node scripts/setup-databricks.mjs",
     "predev": "npm run check:node",
     "predev:ui": "npm run check:node",
     "predev:api": "npm run check:node && npm rebuild better-sqlite3",

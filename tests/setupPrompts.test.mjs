@@ -108,4 +108,14 @@ describe("askLine", () => {
     assert.equal(await pending, "tok");
     assert.match(read(), /visible/);
   });
+
+  it("omits the visibility warning when visibleWarning is false", async () => {
+    const stdin = new PassThrough();
+    const { stdout, read } = createOutput();
+    const pending = askLine({ stdin, stdout, prompt: PROMPT, visibleWarning: false });
+    stdin.write("value\n");
+    assert.equal(await pending, "value");
+    assert.doesNotMatch(read(), /visible/);
+    assert.ok(read().includes(PROMPT));
+  });
 });

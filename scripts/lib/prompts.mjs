@@ -56,8 +56,10 @@ export const readMaskedLine = ({ stdin, stdout, prompt }) =>
     stdin.on("error", onError);
   });
 
-export const askLine = async ({ stdin, stdout, prompt }) => {
-  stdout.write("Warning: input will be visible as you type (masked input is not available in this terminal).\n");
+export const askLine = async ({ stdin, stdout, prompt, visibleWarning = true }) => {
+  if (visibleWarning) {
+    stdout.write("Warning: input will be visible as you type (masked input is not available in this terminal).\n");
+  }
   const rl = readline.createInterface({ input: stdin, output: stdout });
   try {
     return await rl.question(prompt);
