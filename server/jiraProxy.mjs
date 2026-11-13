@@ -12,6 +12,7 @@ import { registerAppConfigRoutes } from "./routes/appConfigRoutes.mjs";
 import { registerDashboardRoutes } from "./routes/dashboardRoutes.mjs";
 import { registerReportRoutes } from "./routes/reportRoutes.mjs";
 import { registerChatRoutes } from "./routes/chatRoutes.mjs";
+import { registerDatabricksRoutes } from "./routes/databricksRoutes.mjs";
 import { registerJiraCoreRoutes } from "./routes/jiraCoreRoutes.mjs";
 import { registerJiraInstanceRoutes } from "./routes/jiraInstanceRoutes.mjs";
 import { registerJiraIssueRoutes } from "./routes/jiraIssueRoutes.mjs";
@@ -298,6 +299,7 @@ registerAppConfigRoutes(app, routeCtx);
 registerDashboardRoutes(app, routeCtx);
 registerReportRoutes(app, routeCtx);
 registerChatRoutes(app, routeCtx);
+registerDatabricksRoutes(app, routeCtx);
 
 // ─── Static (production packaged build) ──────────────────────────────────────
 

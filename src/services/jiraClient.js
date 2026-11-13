@@ -734,6 +734,12 @@ export const fetchChatStatus = async () => {
   return requestJson( path );
 };
 
+export const fetchDatabricksStatus = async () =>
+  requestJson( "/api/databricks/status" );
+
+export const testDatabricksConnection = async () =>
+  requestJson( "/api/databricks/test", { method: "POST" } );
+
 export const generateGanttSharepointSummary = async ( payload ) => {
   return postJson( "/api/report/gantt-summary", payload );
 };
