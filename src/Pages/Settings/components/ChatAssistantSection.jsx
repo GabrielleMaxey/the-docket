@@ -1,6 +1,7 @@
 import React from "react";
 import { Button, Form, Header, Message } from "semantic-ui-react";
 import SettingsSection from "./SettingsSection";
+import DatabricksConnectionPanel from "./DatabricksConnectionPanel";
 import { fetchChatStatus, saveAppSettings } from "../../../services/jiraClient.js";
 import { setStoredProxyUrl } from "../../../services/apiBase.js";
 import { getPreferredAiPath, setPreferredAiPath } from "../../../services/aiPathPreference.js";
@@ -124,6 +125,8 @@ const ChatAssistantSection = ({ settings, setSettings, chatStatus, onError }) =>
       ) : (
         <Message warning size="small">Could not load chat status.</Message>
       )}
+
+      <DatabricksConnectionPanel />
     </SettingsSection>
   );
 };
