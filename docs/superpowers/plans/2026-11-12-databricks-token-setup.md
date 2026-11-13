@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give each end user a guided, cross-platform way to connect The Docket to Databricks with their own personal access token, verified before it is saved.
+**Goal:** Give each end user guidance and a guided, cross-platform setup for all three Databricks values (workspace address, model endpoint name, personal access token), verified before anything is saved.
 
 **Architecture:** A shared check module (`server/lib/databricksCheck.mjs`) verifies identity and model access. Two Express endpoints and a read-only Settings panel expose status and a Test button. A cross-platform Node script (`npm run setup:databricks`) prompts for values, verifies with the same check module, and writes `.env` atomically. No token ever crosses an HTTP route.
 
@@ -25,7 +25,7 @@
 
 1. Pasted token with whitespace, newline, surrounding quotes or a `Bearer ` prefix is cleaned, not rejected or saved dirty (Task 6).
 2. `.env` copied from `.env.example` has only commented placeholders; re-running replaces instead of duplicating; BOM + CRLF files keep working (Task 4).
-3. Host typed as bare hostname, with trailing slash, or with a `/serving-endpoints` suffix works (Tasks 1, 6).
+3. Host pasted from the browser address bar works: bare hostname, trailing slash, `/serving-endpoints` suffix, path, or a `?o=<id>` query; a non-hostname or `http://` is re-prompted with guidance, not saved (Tasks 2, 6). A malformed endpoint name (spaces, slashes) is re-prompted (Tasks 2, 6).
 4. A proxy/SSO page answering 200 HTML, a 302, or a hung connection is reported as a failure, never as success (Task 2).
 5. A locked or read-only `.env` (Windows `EPERM`) leaves the original untouched and names the path (Tasks 4, 6).
 
@@ -38,6 +38,7 @@
 - [ ] **Step 1:** Confirm with your Databricks admin: developer assignment is what grants token creation and API access; personal access tokens are enabled; the maximum token lifetime is at least 364 days.
 - [ ] **Step 2:** In Databricks, open your user settings → Developer → Access tokens and copy the page's URL path. If it differs from `/settings/user/developer/access-tokens`, use it for `ACCESS_TOKENS_PATH` in Task 2.
 - [ ] **Step 3:** Decide how teammates receive their real host and endpoint values (outside the repo) and write one sentence for the docs.
+- [ ] **Step 3a:** Confirm the guidance copy against the real workspace: the sidebar label and field for the endpoint name (Serving → Name), what the address bar shows for the workspace address, and whether `GET /api/2.0/serving-endpoints` lists the endpoints chat uses. If it does not, drop `listServingEndpoints` in Tasks 2 and 6 and keep typed entry.
 - [ ] **Step 4:** `git switch pilot && git switch -c gmaxey_databricks_token_setup`, then commit the spec and this plan.
 
 ### Task 1: Export Databricks credential builders
@@ -67,6 +68,9 @@
 - Consumes: `normalizeDatabricksHost`, `buildDatabricksCredentials` (Task 1).
 - Produces:
   - Constants: `TOKEN_LIFETIME_DAYS = 364`, `TOKEN_COMMENT = "The Docket"`, `SETUP_COMMAND = "npm run setup:databricks"`, `ACCESS_TOKENS_PATH = "/settings/user/developer/access-tokens"` (use the Task 0 result), `DEVELOPER_ROLE_MESSAGE = "Your Databricks account may not have API access. Ask your Databricks admin to assign you as a developer."`
+  - Guidance copy (spec 5.10, placeholders only): `HOST_GUIDE`, `ENDPOINT_GUIDE`, `TOKEN_GUIDE` (strings); `HOST_INVALID_MESSAGE = "That doesn't look like a Databricks workspace address. Copy it from your browser's address bar, for example https://<workspace-host>."`; `ENDPOINT_INVALID_MESSAGE = "Endpoint names have no spaces or slashes. Copy the Name from the Serving page."`
+  - `cleanHostInput(raw: string): { ok: true, host: string } | { ok: false, message: string }` (adds `https://`, strips path/query/fragment/trailing slash and a `/serving-endpoints` or API-path suffix, rejects `http://` and non-hostnames; builds on `normalizeDatabricksHost`); `cleanEndpointInput(raw: string): { ok: true, endpoint: string } | { ok: false, message: string }`; `cleanTokenInput(raw: string): string` (trim, strip surrounding quotes and a leading `Bearer `).
+  - `listServingEndpoints({ host, token, fetchImpl = fetch, timeoutMs = 15000 }): Promise<string[]>` → `GET {host}/api/2.0/serving-endpoints` with `redirect: "manual"`; returns endpoint names, or `[]` on any failure (never throws, never includes the token).
   - `redactToken(text: string, token: string): string` replaces every occurrence of a non-empty token with `<redacted>`.
   - `checkDatabricksAccess({ host, token, endpoint, fetchImpl = fetch, timeoutMs = 15000, retryDelaysMs = [1000, 2000], sleep = delay }): Promise<CheckResult>` where `CheckResult = { ok: boolean, user: string | null, code: string | null, message: string, checks: Array<{ name: "identity" | "model", status: "ok" | "failed" | "warning" | "skipped", code: string | null, message: string }> }`. `ok` is true when the identity check passes (a model warning keeps `ok` true). Codes: `host_missing`, `token_missing`, `endpoint_missing`, `token_rejected`, `no_api_access`, `unreachable`, `timeout`, `redirected`, `unexpected_response`, `model_unavailable`, `model_failed`.
 
@@ -80,6 +84,8 @@
   - 503 then 200 retries per `retryDelaysMs` and succeeds; 503 three times → `unexpected_response` naming the HTTP status.
   - Missing host/token → `host_missing`/`token_missing` with no fetch call; missing endpoint → identity runs, model `skipped` with `endpoint_missing`.
   - Redaction: a response body or thrown error containing the token never appears in any returned `message` (`redactToken`).
+  - **Review Focus 3:** `cleanHostInput` maps `example.cloud.databricks.com`, `https://example.cloud.databricks.com/`, `https://example.cloud.databricks.com/serving-endpoints`, `https://example.cloud.databricks.com/?o=123` and `https://example.cloud.databricks.com/ml/endpoints` to `https://example.cloud.databricks.com`; rejects `http://example.cloud.databricks.com`, `not a host`, `` (empty) with `HOST_INVALID_MESSAGE`. `cleanEndpointInput` accepts `chat-endpoint`, trims whitespace, rejects `chat endpoint`, `a/b`, `` with `ENDPOINT_INVALID_MESSAGE`. `cleanTokenInput("  \"Bearer dapi-test\"\n")` returns `dapi-test`.
+  - `listServingEndpoints`: 200 `{ "endpoints": [{ "name": "chat-endpoint" }, { "name": "other-endpoint" }] }` → `["chat-endpoint", "other-endpoint"]`; 403, 404, 302, HTML body, rejected fetch and timeout each → `[]`; the Authorization header is `Bearer <token>` and no returned value contains the token.
 - [ ] **Step 2:** Run `node --test tests/databricksCheck.test.mjs`. Expected: FAIL (module missing).
 - [ ] **Step 3:** Implement both files. Use `AbortController` for `timeoutMs`; retry only HTTP 429/5xx; build the model URL from `buildDatabricksCredentials`.
 - [ ] **Step 4:** Re-run. Expected: all PASS.
@@ -151,20 +157,23 @@
 - Test: `tests/setupDatabricks.test.mjs`
 
 **Interfaces:**
-- Consumes: `checkDatabricksAccess` and guide constants (Task 2), `writeEnvFile` (Task 4), prompts (Task 5), `normalizeDatabricksHost` (Task 1).
+- Consumes: `checkDatabricksAccess`, `listServingEndpoints`, guide copy and the `clean*Input` helpers (Task 2), `writeEnvFile` (Task 4), prompts (Task 5).
 - Produces: `runSetup({ projectRoot, stdin, stdout, platform = process.platform, fetchImpl = fetch, prompts = { askLine, readMaskedLine } }): Promise<{ status: "saved" | "aborted" | "failed", changedKeys: string[] }>`. Run directly, the script exits `0` on `saved`, `1` otherwise (direct-run detection compares `fileURLToPath(import.meta.url)` with `path.resolve(process.argv[1])` so it works on Windows).
 
 - [ ] **Step 1: Failing tests** (temp project folder, scripted `prompts`, fake `fetchImpl`, captured stdout; hosts like `example.cloud.databricks.com`, tokens like `dapi-test-token`):
-  - no `.env`: created from `.env.example`, then `DATABRICKS_HOST` (normalized `https://…`), `DATABRICKS_ENDPOINT` and `DATABRICKS_TOKEN` are written; result `saved`; stdout lists key names only and **never contains the token**.
+  - no `.env`: created from `.env.example`; stdout shows `HOST_GUIDE` before the address prompt, `TOKEN_GUIDE` before the token prompt and `ENDPOINT_GUIDE` before the endpoint prompt (when listing returns nothing); `DATABRICKS_HOST` (normalized `https://…`), `DATABRICKS_ENDPOINT` and `DATABRICKS_TOKEN` are written; result `saved`; stdout lists key names only and **never contains the token**.
+  - prompt order is address → token → identity check → endpoint → model check; no endpoint prompt happens before the token is verified.
+  - malformed address (`http://example.cloud.databricks.com`, then `https://example.cloud.databricks.com/?o=1`) shows `HOST_INVALID_MESSAGE` once, re-asks, then saves the cleaned address; a malformed endpoint (`chat endpoint`, then `chat-endpoint`) behaves the same with `ENDPOINT_INVALID_MESSAGE`.
+  - endpoint discovery: when `listServingEndpoints` returns two names, stdout shows a numbered list and answering `2` saves the second; typing a name not in the list is accepted; when the list is empty the script falls back to `ENDPOINT_GUIDE` and typed entry; an existing `DATABRICKS_ENDPOINT` or `DATABRICKS_HOST` is shown and Enter keeps it (no listing call is made for a kept endpoint).
   - identity `401`: result `failed`, `.env` bytes unchanged, stdout shows the mapped message.
   - model warning: asks to save anyway; answering yes saves, no gives `aborted` with nothing written.
   - **Review Focus 1:** a pasted value `  "Bearer dapi-test-token"\n` is saved as `dapi-test-token`; an empty entry gives `aborted` with `No token entered.`
-  - **Review Focus 3:** host answers `example.cloud.databricks.com`, `https://example.cloud.databricks.com/` and `https://example.cloud.databricks.com/serving-endpoints` all save `https://example.cloud.databricks.com`.
+  - **Review Focus 3:** host answers `example.cloud.databricks.com`, `https://example.cloud.databricks.com/`, `https://example.cloud.databricks.com/serving-endpoints` and `https://example.cloud.databricks.com/?o=123` all save `https://example.cloud.databricks.com`.
   - existing `CHAT_PROVIDER=anthropic` is not replaced unless the user answers yes (default no); unset or `databricks` defaults to yes.
   - existing `.env` lines, CRLF and BOM survive; on `platform: "win32"` stdout includes the note that `.env` inherits the folder's permissions.
   - **Review Focus 5:** a `.env` write failure (`EPERM`) returns `failed` and prints the path.
 - [ ] **Step 2:** Run `node --test tests/setupDatabricks.test.mjs`. Expected: FAIL.
-- [ ] **Step 3:** Implement the flow in spec 5.2 order: locate/create `.env`, prompt only for missing host/endpoint, print the guide (access-tokens link from the host plus `ACCESS_TOKENS_PATH`, `TOKEN_LIFETIME_DAYS`, `TOKEN_COMMENT`, `DEVELOPER_ROLE_MESSAGE` context), masked token prompt, verify before writing, write, print changed key names and both restart commands (`npm run dev:all`, `npm run desktop:dev`).
+- [ ] **Step 3:** Implement the flow in spec 5.2 order: locate/create `.env`; address (show existing or print `HOST_GUIDE`, clean and re-ask on failure); token guide (access-tokens link from the address plus `ACCESS_TOKENS_PATH`, `TOKEN_LIFETIME_DAYS`, `TOKEN_COMMENT`, `DEVELOPER_ROLE_MESSAGE`) and masked prompt via `cleanTokenInput`; identity check before writing; endpoint (show existing, else `listServingEndpoints` pick list, else `ENDPOINT_GUIDE` and typed entry); model check; provider question; write; print changed key names and both restart commands (`npm run dev:all`, `npm run desktop:dev`).
 - [ ] **Step 4:** Re-run the file. Then run `npm run setup:databricks` in a scratch copy of the project with a fake token and confirm it aborts at verification without touching `.env`.
 - [ ] **Step 5:** Commit `feat: add cross-platform Databricks setup script`.
 
@@ -178,7 +187,7 @@
 - Consumes: `fetchDatabricksStatus`, `testDatabricksConnection` (Task 3); `SETUP_COMMAND`, `TOKEN_LIFETIME_DAYS`, `TOKEN_COMMENT`, `ACCESS_TOKENS_PATH`, `DEVELOPER_ROLE_MESSAGE` (Task 2).
 - Produces: default-exported `DatabricksConnectionPanel()` (no props).
 
-- [ ] **Step 1:** Implement the panel: Token / Host / Endpoint rows (✓ or ✗ naming `DATABRICKS_TOKEN`, `DATABRICKS_HOST`, `DATABRICKS_ENDPOINT`); a **Test connection** button showing each check's status and message; the numbered setup guide with `SETUP_COMMAND`; for `token_missing` or `token_rejected` the hint "Restart The Docket after running setup." There is **no token input**.
+- [ ] **Step 1:** Implement the panel: Host / Endpoint / Token rows (✓ or ✗ naming `DATABRICKS_HOST`, `DATABRICKS_ENDPOINT`, `DATABRICKS_TOKEN`), where each ✗ row shows its guidance (`HOST_GUIDE`, `ENDPOINT_GUIDE`, `TOKEN_GUIDE`); a **Test connection** button showing each check's status and message; the numbered setup guide with `SETUP_COMMAND`; for `token_missing` or `token_rejected` the hint "Restart The Docket after running setup." There is **no token input**.
 - [ ] **Step 2:** Run `npm run build`. Expected: Vite build succeeds. Run `grep -n "password" src/Pages/Settings/components/DatabricksConnectionPanel.jsx`. Expected: no matches.
 - [ ] **Step 3:** Manual check in browser mode (`npm run dev:all`) and Electron (`npm run desktop:dev`): with nothing configured the panel names the missing variables; after running the setup script and restarting, **Test connection** shows identity ✓.
 - [ ] **Step 4:** Commit `feat: add Databricks connection panel to Settings`.
@@ -189,7 +198,7 @@
 - Modify: `.env.example` (comment above the Databricks block pointing to `npm run setup:databricks`; placeholders unchanged), `docs/setup/chat-and-ai.md` (Databricks Model Serving section), `docs/user/reports-and-chat.md`, `README.md` (quick start line)
 - Create: `docs/PR_WriteUps/gmaxey_databricks_token_setup.md` (template: `docs/dev/contributing.md` § PR write-ups)
 
-- [ ] **Step 1:** Replace the manual token instructions with the guided flow: create a **364-day** token with comment **"The Docket"**, the developer-role requirement, `npm run setup:databricks` (same command on macOS, Windows PowerShell/cmd/Git Bash), restart, then **Test connection**. Include the Task 0 sentence on how to get real host/endpoint values. Placeholders only.
+- [ ] **Step 1:** Replace the manual instructions with the guided flow: a "Where to find each value" table (workspace address, endpoint name, token, per spec 5.10 with placeholders), then create a **364-day** token with comment **"The Docket"**, the developer-role requirement, `npm run setup:databricks` (same command on macOS, Windows PowerShell/cmd/Git Bash), restart, then **Test connection**. Include the Task 0 sentence on how to get real host/endpoint values. Placeholders only.
 - [ ] **Step 2:** Write the PR write-up with the Task 0 answers and the Task 9 results. No secrets, hostnames or tokens.
 - [ ] **Step 3:** Run `npm test`. Expected: all PASS.
 - [ ] **Step 4:** Commit `docs: document guided Databricks token setup`.
