@@ -109,13 +109,13 @@ Session context stays in the browser and SQLite (dashboard snapshot + archived r
 
 ## Databricks Model Serving
 
-Until The Docket completes its organization's AI governance and security review, each person connects with their **own personal access token**. This is an interim approach; OAuth (PKCE) sign-in is a planned future feature. Chat needs three values:
+Until a sign-in flow is available, each person connects with their **own personal access token**. This is an interim approach; OAuth (PKCE) sign-in is a planned future feature. Chat needs three values:
 
 | Value | `.env` key | Where to find it | Placeholder |
 |-------|-----------|------------------|-------------|
 | Workspace address | `DATABRICKS_HOST` | Open the Databricks workspace in a browser and copy the address up to the end of the domain. Leave off the path and anything after `?`. | `https://<workspace-host>` |
 | Model endpoint name | `DATABRICKS_ENDPOINT` | In the workspace sidebar open **Serving**, find the endpoint your team named, and copy its **Name** (not a display title). | `<serving-endpoint-name>` |
-| Token | `DATABRICKS_TOKEN` | User settings > Developer > Access tokens > Generate new token. | `<databricks-personal-access-token>` |
+| Token | `DATABRICKS_TOKEN` | User settings > Developer > Access tokens > Generate new token (menu names can differ slightly between workspaces). | `<databricks-personal-access-token>` |
 
 Get the real workspace address and endpoint name from your team (they are not published in this repository).
 

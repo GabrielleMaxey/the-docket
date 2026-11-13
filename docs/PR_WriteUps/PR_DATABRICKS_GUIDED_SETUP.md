@@ -1,7 +1,7 @@
 # PR: Guided Databricks setup (workspace address, model endpoint, token)
 
 ## Summary
-Adds `npm run setup:databricks`, a cross-platform guided setup that collects the Databricks workspace address, model endpoint name and personal access token, verifies them before saving, and updates `.env` safely. Settings > Chat assistant gains a read-only status panel with **Test connection**. This is an interim approach until the app clears AI governance and security review; OAuth (PKCE) sign-in is a planned future feature.
+Adds `npm run setup:databricks`, a cross-platform guided setup that collects the Databricks workspace address, model endpoint name and personal access token, verifies them before saving, and updates `.env` safely. Settings > Chat assistant gains a read-only status panel with **Test connection**. This is an interim approach until the app is cleared for broader use; OAuth (PKCE) sign-in is a planned future feature.
 
 ## Problem
 | Symptom | Root cause |
@@ -27,13 +27,13 @@ Adds `npm run setup:databricks`, a cross-platform guided setup that collects the
 - `docs/setup/chat-and-ai.md`, `docs/user/reports-and-chat.md`, `README.md` and `.env.example` describe the guided flow with placeholders only. Real host and endpoint values come from the team, not this repository.
 
 ## Test plan
-- [x] Automated: `node --test` over the Databricks tests (check module, routes, provider, `.env` writer, prompts, setup script) passes in the agent sandbox.
+- [x] Automated: `node --test` over the Databricks tests (check module, routes, provider, `.env` writer, prompts, setup script) passed in the agent sandbox during development; re-confirm with `npm test` on your machine (below).
 - [x] Token never appears in results, errors or logs (asserted in tests).
 - [x] Every relative link added in the docs resolves to an existing file.
 - [x] Changed files scanned for real-looking hostnames and tokens; only placeholders found.
 
 ### Verification still to do
-**Phase 0 (Databricks side, needs the admin)**
+**Phase 0 (Databricks side, needs the admin)** — none of these are answered yet; the docs and code assume the answers below.
 - [ ] Developer assignment grants token creation and API access.
 - [ ] Personal access tokens are enabled for the workspace.
 - [ ] Maximum token lifetime is at least 364 days.
