@@ -3,7 +3,11 @@ import {
   buildDatabricksCredentials,
   normalizeDatabricksHost,
 } from "./llmClient.mjs";
-import { DEVELOPER_ROLE_MESSAGE } from "../../shared/databricksSetupGuide.mjs";
+import {
+  DEVELOPER_ROLE_MESSAGE,
+  ENDPOINT_INVALID_MESSAGE,
+  HOST_INVALID_MESSAGE,
+} from "../../shared/databricksSetupGuide.mjs";
 
 const IDENTITY_PATH = "/api/2.0/preview/scim/v2/Me";
 const SERVING_ENDPOINTS_PATH = "/api/2.0/serving-endpoints";
@@ -16,18 +20,18 @@ export const redactToken = (text, token) => {
   return secret ? value.split(secret).join("<redacted>") : value;
 };
 
-// Returns an https origin (no path, query or fragment) or null when the input is not a
-// workspace hostname.
+// Reduces input to an https origin (no path, query or fragment), or reports why not.
 export const cleanHostInput = (value) => {
+  const invalid = { ok: false, message: HOST_INVALID_MESSAGE };
   const raw = String(value ?? "").trim();
   if (!raw || /^http:\/\//i.test(raw)) {
-    return null;
+    return invalid;
   }
   let url;
   try {
     url = new URL(normalizeDatabricksHost(raw));
   } catch {
-    return null;
+    return invalid;
   }
   const hasDomainShape =
     /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(url.hostname) &&
@@ -38,15 +42,16 @@ export const cleanHostInput = (value) => {
     url.password ||
     !hasDomainShape
   ) {
-    return null;
+    return invalid;
   }
-  return normalizeDatabricksHost(url.origin);
+  return { ok: true, host: normalizeDatabricksHost(url.origin) };
 };
 
-// Returns the trimmed endpoint name or null when it is empty or has spaces or slashes.
 export const cleanEndpointInput = (value) => {
-  const name = String(value ?? "").trim();
-  return name && !/[\s/]/.test(name) ? name : null;
+  const endpoint = String(value ?? "").trim();
+  return endpoint && !/[\s/]/.test(endpoint)
+    ? { ok: true, endpoint }
+    : { ok: false, message: ENDPOINT_INVALID_MESSAGE };
 };
 
 export const cleanTokenInput = (value) =>

@@ -8,7 +8,14 @@ import {
   listServingEndpoints,
   redactToken,
 } from "../server/lib/databricksCheck.mjs";
-import { DEVELOPER_ROLE_MESSAGE } from "../shared/databricksSetupGuide.mjs";
+import {
+  DEVELOPER_ROLE_MESSAGE,
+  ENDPOINT_GUIDE,
+  ENDPOINT_INVALID_MESSAGE,
+  HOST_GUIDE,
+  HOST_INVALID_MESSAGE,
+  TOKEN_GUIDE,
+} from "../shared/databricksSetupGuide.mjs";
 
 const HOST = "example.cloud.databricks.com";
 const TOKEN = "dapi-test";
@@ -60,32 +67,59 @@ describe("redactToken", () => {
 });
 
 describe("input cleaners", () => {
-  it("cleanHostInput strips path, query, fragment and API suffixes", () => {
-    assert.equal(cleanHostInput(HOST), `https://${HOST}`);
-    assert.equal(cleanHostInput(`https://${HOST}/?o=123#x`), `https://${HOST}`);
-    assert.equal(cleanHostInput(`https://${HOST}/serving-endpoints/`), `https://${HOST}`);
-    assert.equal(cleanHostInput(`${HOST}/ai-gateway/mlflow/v1`), `https://${HOST}`);
-    assert.equal(cleanHostInput(`  https://${HOST}/browse?o=1  `), `https://${HOST}`);
-  });
-
-  it("cleanHostInput rejects http, non-hostnames and credentials", () => {
-    for (const bad of ["", "http://example.cloud.databricks.com", "not a host", "localhost", "ftp://example.cloud.databricks.com", "https://u:p@example.cloud.databricks.com", "10.0.0.1", "/just/a/path"]) {
-      assert.equal(cleanHostInput(bad), null, bad);
+  it("cleanHostInput normalizes accepted forms", () => {
+    for (const input of [
+      HOST,
+      `https://${HOST}/`,
+      `https://${HOST}/serving-endpoints`,
+      `https://${HOST}/?o=123`,
+      `https://${HOST}/ml/endpoints`,
+      `${HOST}/ai-gateway/mlflow/v1#frag`,
+      `  https://${HOST}/browse?o=1  `,
+    ]) {
+      assert.deepEqual(cleanHostInput(input), { ok: true, host: `https://${HOST}` }, input);
     }
   });
 
-  it("cleanEndpointInput accepts plain names only", () => {
-    assert.equal(cleanEndpointInput("  chat-endpoint "), ENDPOINT);
-    for (const bad of ["", "   ", "has space", "a/b"]) {
-      assert.equal(cleanEndpointInput(bad), null, bad);
+  it("cleanHostInput rejects bad input with the guide message", () => {
+    for (const bad of ["", "http://example.cloud.databricks.com", "not a host", "localhost", "ftp://example.cloud.databricks.com", "https://u:p@example.cloud.databricks.com", "10.0.0.1", "/just/a/path"]) {
+      assert.deepEqual(cleanHostInput(bad), { ok: false, message: HOST_INVALID_MESSAGE }, bad);
+    }
+  });
+
+  it("cleanEndpointInput accepts plain names and rejects the rest", () => {
+    assert.deepEqual(cleanEndpointInput("  chat-endpoint \n"), { ok: true, endpoint: ENDPOINT });
+    for (const bad of ["", "   ", "chat endpoint", "a/b"]) {
+      assert.deepEqual(cleanEndpointInput(bad), { ok: false, message: ENDPOINT_INVALID_MESSAGE }, bad);
     }
   });
 
   it("cleanTokenInput trims quotes and a Bearer prefix", () => {
-    assert.equal(cleanTokenInput(`  "Bearer ${TOKEN}" `), TOKEN);
+    assert.equal(cleanTokenInput('  "Bearer dapi-test"\n'), TOKEN);
     assert.equal(cleanTokenInput(`'${TOKEN}'`), TOKEN);
     assert.equal(cleanTokenInput(TOKEN), TOKEN);
     assert.equal(cleanTokenInput(undefined), "");
+  });
+});
+
+describe("guide copy", () => {
+  it("exports exact messages and placeholder-only guides", () => {
+    assert.equal(
+      HOST_INVALID_MESSAGE,
+      "That doesn't look like a Databricks workspace address. Copy it from your browser's address bar, for example https://<workspace-host>.",
+    );
+    assert.equal(
+      ENDPOINT_INVALID_MESSAGE,
+      "Endpoint names have no spaces or slashes. Copy the Name from the Serving page.",
+    );
+    for (const guide of [HOST_GUIDE, ENDPOINT_GUIDE, TOKEN_GUIDE]) {
+      assert.equal(typeof guide, "string");
+      assert.ok(guide.length > 0);
+    }
+    assert.match(HOST_GUIDE, /<workspace-host>/);
+    assert.match(ENDPOINT_GUIDE, /Serving/);
+    assert.match(TOKEN_GUIDE, /364/);
+    assert.match(TOKEN_GUIDE, /The Docket/);
   });
 });
 
@@ -265,24 +299,46 @@ describe("checkDatabricksAccess", () => {
 });
 
 describe("listServingEndpoints", () => {
-  const list = (fetchImpl) => listServingEndpoints({ host: HOST, token: TOKEN, fetchImpl, timeoutMs: 50 });
+  const list = (fetchImpl) => listServingEndpoints({ host: HOST, token: TOKEN, fetchImpl, timeoutMs: 20 });
 
-  it("returns endpoint names", async () => {
+  it("returns endpoint names with a bearer header and manual redirects", async () => {
     const calls = [];
     const names = await list(async (url, init) => {
       calls.push({ url: String(url), init });
-      return json({ endpoints: [{ name: "a" }, { name: "b" }, {}] });
+      return json({ endpoints: [{ name: "chat-endpoint" }, { name: "other-endpoint" }, {}] });
     });
-    assert.deepEqual(names, ["a", "b"]);
+    assert.deepEqual(names, ["chat-endpoint", "other-endpoint"]);
     assert.equal(calls[0].url, `https://${HOST}/api/2.0/serving-endpoints`);
+    assert.equal(calls[0].init.headers.Authorization, `Bearer ${TOKEN}`);
     assert.equal(calls[0].init.redirect, "manual");
+    assert.ok(!JSON.stringify(names).includes(TOKEN));
   });
 
   it("returns an empty list on any failure", async () => {
-    assert.deepEqual(await list(async () => json({}, 403)), []);
-    assert.deepEqual(await list(async () => json({ nope: 1 })), []);
-    assert.deepEqual(await list(async () => new Response("<html>", { status: 200 })), []);
-    assert.deepEqual(await list(async () => { throw new TypeError("x"); }), []);
-    assert.deepEqual(await list(() => new Promise(() => {})), []);
+    const failures = {
+      403: async () => json({}, 403),
+      404: async () => json({}, 404),
+      302: async () => new Response(null, { status: 302, headers: { location: "https://elsewhere.example.com/" } }),
+      html: async () => new Response("<html>", { status: 200 }),
+      badShape: async () => json({ nope: 1 }),
+      rejected: async () => {
+        throw new TypeError(`boom ${TOKEN}`);
+      },
+      timeout: () => new Promise(() => {}),
+    };
+    for (const [name, fetchImpl] of Object.entries(failures)) {
+      assert.deepEqual(await list(fetchImpl), [], name);
+    }
+  });
+
+  it("returns an empty list without calling fetch when host or token is missing", async () => {
+    let called = 0;
+    const fetchImpl = async () => {
+      called += 1;
+      return json({ endpoints: [{ name: "x" }] });
+    };
+    assert.deepEqual(await listServingEndpoints({ host: "", token: TOKEN, fetchImpl }), []);
+    assert.deepEqual(await listServingEndpoints({ host: HOST, token: "", fetchImpl }), []);
+    assert.equal(called, 0);
   });
 });
