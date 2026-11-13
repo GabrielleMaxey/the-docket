@@ -105,6 +105,8 @@ npm run dev:all
 npm run desktop:dev
 ```
 
+To use Databricks for chat, run `npm run setup:databricks` and follow the prompts; see [Databricks Model Serving](docs/setup/chat-and-ai.md#databricks-model-serving).
+
 Some corporate secure laptops may block Electron windows, local desktop apps, or the embedded proxy. If `npm run desktop:dev` is unavailable, run `npm run dev:all` and install the browser UI as its own desktop-style app window; see [END_USER_GUIDE.md](docs/user/getting-started.md#install-as-its-own-application-window).
 
 Packaged installers, including unsigned Mac `.dmg` and Windows NSIS installers, are unsupported. Both supported launch workflows require the project checkout, Node, installed dependencies, and the local `.env` setup above. `npm run build` builds the browser assets; `npm run desktop:build` remains an alias for that build.

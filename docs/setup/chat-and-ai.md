@@ -109,14 +109,24 @@ Session context stays in the browser and SQLite (dashboard snapshot + archived r
 
 ## Databricks Model Serving
 
-```env
-CHAT_PROVIDER=databricks
-DATABRICKS_HOST=https://<workspace-host>
-DATABRICKS_TOKEN=<personal-access-token>
-DATABRICKS_ENDPOINT=<serving-endpoint-name>
-```
+Until The Docket completes its organization's AI governance and security review, each person connects with their **own personal access token**. This is an interim approach; OAuth (PKCE) sign-in is a planned future feature. Chat needs three values:
 
-The app calls `<DATABRICKS_HOST>/serving-endpoints/chat/completions` with the endpoint name as `model`. Pick a chat endpoint that supports tool calling, since chat uses it for Jira search. Set `REPORT_DATABRICKS_ENDPOINT` to send reports to a different endpoint. Restart the API after editing `.env`.
+| Value | `.env` key | Where to find it | Placeholder |
+|-------|-----------|------------------|-------------|
+| Workspace address | `DATABRICKS_HOST` | Open the Databricks workspace in a browser and copy the address up to the end of the domain. Leave off the path and anything after `?`. | `https://<workspace-host>` |
+| Model endpoint name | `DATABRICKS_ENDPOINT` | In the workspace sidebar open **Serving**, find the endpoint your team named, and copy its **Name** (not a display title). | `<serving-endpoint-name>` |
+| Token | `DATABRICKS_TOKEN` | User settings > Developer > Access tokens > Generate new token. | `<databricks-personal-access-token>` |
+
+Get the real workspace address and endpoint name from your team (they are not published in this repository).
+
+1. In Databricks, generate a token with a **364-day** lifetime and the comment **"The Docket"**. You must be assigned as a developer in Databricks; if token creation or the setup check fails with a permission error, ask your Databricks admin for that assignment.
+2. In the project folder, run `npm run setup:databricks`. The command is the same in macOS Terminal, PowerShell, cmd and Git Bash. It asks for the workspace address, the token (hidden as you type) and the endpoint, checks them against Databricks, and only then updates `.env`, leaving your other lines alone. Git Bash may show the token as you paste it; the script prints a warning when that happens.
+3. Restart the app (`npm run dev:all` or `npm run desktop:dev`).
+4. Open **Settings > Chat assistant** and click **Test connection**.
+
+Run the script again to change a value. To remove the token, delete the `DATABRICKS_TOKEN` line from `.env`.
+
+`REPORT_DATABRICKS_ENDPOINT` is optional (a separate endpoint for reports); the script does not ask for it, so set it in `.env` by hand. Chat calls `<DATABRICKS_HOST>/serving-endpoints/chat/completions` with the endpoint name as `model`, so pick an endpoint that supports tool calling (chat uses it for Jira search).
 
 ## OpenAI-compatible providers
 

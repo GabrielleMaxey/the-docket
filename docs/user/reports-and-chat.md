@@ -62,11 +62,13 @@ The assistant uses session context first when you ask about reports or queries y
 |-------|----------------|
 | **Anthropic** | `CHAT_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` in `.env` on the proxy host |
 | **OpenAI** | `CHAT_PROVIDER=openai` + `OPENAI_API_KEY` (+ optional `OPENAI_BASE_URL`) |
-| **Databricks Model Serving** | `CHAT_PROVIDER=databricks` + `DATABRICKS_HOST` + `DATABRICKS_TOKEN` + `DATABRICKS_ENDPOINT` (serving endpoint name) |
+| **Databricks Model Serving** | `CHAT_PROVIDER=databricks` + `DATABRICKS_HOST` + `DATABRICKS_TOKEN` + `DATABRICKS_ENDPOINT` (serving endpoint name); run `npm run setup:databricks` to set these up, see [Databricks Model Serving](../setup/chat-and-ai.md#databricks-model-serving) |
 | **Ollama (local)** | `CHAT_PROVIDER=ollama` + `OLLAMA_BASE_URL` |
 | **Any OpenAI-compatible API** | `CHAT_PROVIDER=openai` + `OPENAI_API_KEY` + `OPENAI_BASE_URL` |
 | **Rovo (opt-in)** | `CHAT_PROVIDER=rovo` + OAuth vars — see [Chat, reports and AI providers](../setup/chat-and-ai.md) |
 | **Disabled / not configured** | `CHAT_PROVIDER=disabled` or leave unset |
+
+**Databricks quick steps:** get the workspace address and endpoint name from your team (they are not published in this repository); create a 364-day personal access token with the comment "The Docket" (you must be assigned as a developer in Databricks); run `npm run setup:databricks` (same command in Terminal, PowerShell, cmd and Git Bash); restart the app; then open **Settings > Chat assistant** and click **Test connection**. Personal tokens are an interim approach until the app clears AI governance and security review; OAuth (PKCE) sign-in is planned. `REPORT_DATABRICKS_ENDPOINT` is optional and set in `.env` by hand. Details: [Databricks Model Serving](../setup/chat-and-ai.md#databricks-model-serving).
 
 Check readiness: `GET /api/chat/status` returns `provider`, `ready`, and for Rovo also `oauthConfigured` and `oauthConnected`.
 
