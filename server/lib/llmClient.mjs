@@ -288,8 +288,8 @@ const isDatabricksConfigured = ({ forReports = false } = {}) =>
     ).trim(),
   );
 
-// Databricks Model Serving exposes an OpenAI-compatible chat route at
-// {workspace}/serving-endpoints/chat/completions; "model" is the serving endpoint name.
+// Chat goes to {workspace}{DATABRICKS_API_PATH}/chat/completions (default /ai-gateway/mlflow/v1);
+// "model" is the endpoint or gateway route name.
 export const buildDatabricksCredentials = ({ host, token, endpoint }) => ({
   apiKey: String(token || "").trim(),
   baseUrl: `${normalizeDatabricksHost(host)}${getDatabricksApiPath()}`,

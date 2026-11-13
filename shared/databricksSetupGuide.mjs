@@ -23,6 +23,6 @@ export const HOST_GUIDE =
   "Open the Databricks workspace in a browser and copy the address up to the end of the domain, for example https://<workspace-host>. Leave off the path and anything after `?`.";
 
 export const ENDPOINT_GUIDE =
-  "In the workspace sidebar open Serving, find the endpoint your team named, and copy its Name (not a display title), for example <serving-endpoint-name>. If unsure which one, ask your team.";
+  "In the workspace sidebar open Serving, find the endpoint your team named, and copy its Name (not a display title), for example <serving-endpoint-name>. If unsure which one (or if that name is rejected, since gateway routes can differ), ask your team.";
 
 export const TOKEN_GUIDE = `In Databricks open User settings > Developer > Access tokens > Generate new token. Set the lifetime to ${TOKEN_LIFETIME_DAYS} days and the comment to "${TOKEN_COMMENT}". Creating tokens requires developer assignment. Paste the token when the script asks; it is never echoed.`;

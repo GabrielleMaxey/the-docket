@@ -126,7 +126,7 @@ Get the real workspace address and endpoint name from your team (they are not pu
 
 Run the script again to change a value. To remove the token, delete the `DATABRICKS_TOKEN` line from `.env`.
 
-`REPORT_DATABRICKS_ENDPOINT` is optional (a separate endpoint for reports); the script does not ask for it, so set it in `.env` by hand. Chat calls `<DATABRICKS_HOST>/serving-endpoints/chat/completions` with the endpoint name as `model`, so pick an endpoint that supports tool calling (chat uses it for Jira search).
+`REPORT_DATABRICKS_ENDPOINT` is optional (a separate endpoint for reports); the script does not ask for it, so set it in `.env` by hand. Chat calls `<DATABRICKS_HOST>/ai-gateway/mlflow/v1/chat/completions` (set `DATABRICKS_API_PATH` to override the path) with the endpoint value as `model`. With the default gateway path, that value may be a gateway route name rather than the Name shown on the Serving page; the Test connection model check tells you which works. Pick an endpoint that supports tool calling (chat uses it for Jira search).
 
 ## OpenAI-compatible providers
 

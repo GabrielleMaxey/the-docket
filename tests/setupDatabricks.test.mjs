@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
-import { runSetup } from "../scripts/setup-databricks.mjs";
+import { isDirectRun, runSetup } from "../scripts/setup-databricks.mjs";
 import {
   ACCESS_TOKENS_PATH,
   DEVELOPER_ROLE_MESSAGE,
@@ -338,5 +338,28 @@ describe("runSetup provider question and file handling", () => {
     assert.ok(output.includes(path.join(root, ".env")));
     assert.ok(output.includes("EPERM"));
     assert.ok(!output.includes(TOKEN));
+  });
+});
+
+describe("BOM and direct-run handling", () => {
+  it("recognises DATABRICKS_HOST as the first key after a BOM and keeps the BOM", async () => {
+    const { result, output, root } = await run({
+      env: `\uFEFFDATABRICKS_HOST=${HOST}\n`,
+      answers: ["", TOKEN, "chat-endpoint", ""],
+    });
+    assert.equal(result.status, "saved");
+    assert.ok(output.includes(`Workspace address from .env: ${HOST}`));
+    assert.ok(readEnv(root).startsWith("\uFEFF"));
+  });
+
+  it("isDirectRun follows symlinks and falls back to string comparison", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "docket-link-"));
+    const real = path.join(dir, "real.mjs");
+    fs.writeFileSync(real, "");
+    const link = path.join(dir, "link.mjs");
+    fs.symlinkSync(real, link);
+    assert.equal(isDirectRun(link, real), true);
+    assert.equal(isDirectRun(undefined, real), false);
+    assert.equal(isDirectRun(path.join(dir, "missing.mjs"), real), false);
   });
 });

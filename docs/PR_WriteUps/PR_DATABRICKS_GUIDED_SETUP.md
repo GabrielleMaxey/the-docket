@@ -69,8 +69,13 @@ Adds `npm run setup:databricks`, a cross-platform guided setup that collects the
 | Area | Path |
 |------|------|
 | Check module | `server/lib/databricksCheck.mjs` |
+| Routes | `server/routes/databricksRoutes.mjs` |
+| Chat client / proxy | `server/lib/llmClient.mjs`, `server/jiraProxy.mjs`, `src/services/jiraClient.js` |
+| Script helpers | `scripts/lib/envFile.mjs`, `scripts/lib/prompts.mjs` |
 | Shared guidance | `shared/databricksSetupGuide.mjs` |
 | Setup script | `scripts/setup-databricks.mjs` |
-| UI | `src/Pages/Settings/components/ChatAssistantSection.jsx` |
+| UI | `src/Pages/Settings/components/ChatAssistantSection.jsx`, `src/Pages/Settings/components/DatabricksConnectionPanel.jsx` |
+| Package | `package.json` |
+| Tests | `tests/setupDatabricks.test.mjs`, `tests/databricksCheck.test.mjs`, `tests/databricksRoutes.test.mjs`, `tests/databricksProvider.test.mjs`, `tests/envFile.test.mjs`, `tests/setupPrompts.test.mjs`, `tests/publicRepoPlaceholders.test.mjs` |
 | Docs | `docs/setup/chat-and-ai.md`, `docs/user/reports-and-chat.md`, `README.md`, `.env.example` |
-| Spec | `docs/superpowers/specs/2026-11-12-databricks-token-setup-design.md` |
+| Spec / plan | `docs/superpowers/specs/2026-11-12-databricks-token-setup-design.md`, `docs/superpowers/plans/2026-11-12-databricks-token-setup.md` |

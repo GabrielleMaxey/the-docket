@@ -105,11 +105,12 @@ const DatabricksConnectionPanel = () => {
       <Header as="h5" style={{ margin: "1rem 0 0.5rem" }}>Setup guide</Header>
       <ol className="ww-copy">
         <li>Open a terminal in the project folder and run <code>{SETUP_COMMAND}</code>.</li>
+        <li>Enter the workspace address when asked.</li>
         <li>
           When asked for the token, create one in Databricks under <code>{ACCESS_TOKENS_PATH}</code> with a
           lifetime of {TOKEN_LIFETIME_DAYS} days and the comment &quot;{TOKEN_COMMENT}&quot;, then paste it into the terminal.
         </li>
-        <li>Enter the workspace address and model endpoint name when asked.</li>
+        <li>Enter the model endpoint name when asked.</li>
         <li>Restart The Docket, then choose Test connection.</li>
       </ol>
     </>

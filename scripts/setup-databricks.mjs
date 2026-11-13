@@ -59,7 +59,7 @@ export async function runSetup({
   } catch (error) {
     if (error?.code !== "ENOENT") return failed(`Could not read ${envPath}: ${error?.code ?? "error"}`);
   }
-  const existing = dotenv.parse(envText);
+  const existing = dotenv.parse(envText.replace(/^\uFEFF/, ""));
 
   // Address
   const existingHost = existing.DATABRICKS_HOST ? cleanHostInput(existing.DATABRICKS_HOST) : null;
@@ -163,7 +163,16 @@ export async function runSetup({
 }
 
 const scriptPath = fileURLToPath(import.meta.url);
-if (process.argv[1] && scriptPath === path.resolve(process.argv[1])) {
+export const isDirectRun = (argv1, selfPath, platform = process.platform) => {
+  if (!argv1) return false;
+  const norm = (p) => (platform === "win32" ? p.toLowerCase() : p);
+  try {
+    return norm(fs.realpathSync(argv1)) === norm(fs.realpathSync(selfPath));
+  } catch {
+    return scriptPath === path.resolve(argv1);
+  }
+};
+if (isDirectRun(process.argv[1], scriptPath)) {
   const projectRoot = path.resolve(path.dirname(scriptPath), "..");
   dotenv.config({ path: path.join(projectRoot, ".env"), override: false });
   runSetup({ projectRoot, stdin: process.stdin, stdout: process.stdout })
